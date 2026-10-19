@@ -27,10 +27,10 @@ function asegurarEdificios3D(mapa: MapaML) {
     'source-layer': 'building',
     minzoom: 14,
     paint: {
-      'fill-extrusion-color': '#dddddd',
+      'fill-extrusion-color': '#e6e6e6',
       'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
       'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-      'fill-extrusion-opacity': 0.85,
+      'fill-extrusion-opacity': 0.7,
     },
   })
 }
@@ -67,10 +67,10 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
       asegurarEdificios3D(m)
       // Ruta azul que se aclara hacia el final, con un borde blanco para que destaque sobre las calles.
       m.addSource('ruta', { type: 'geojson', data: lineaGeo(lineaPendiente.current), lineMetrics: true })
-      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 10 } })
+      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 9 } })
       m.addLayer({
         id: 'ruta', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-width': 5.5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#0a2fc4', 1, '#6aa3ff'] },
+        paint: { 'line-width': 5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#1f48d8', 1, '#7fb0ff'] },
       })
       listo.current = true
     })

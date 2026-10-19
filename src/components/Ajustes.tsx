@@ -4,6 +4,7 @@ import { Download, Plus, Trash2, Upload } from 'lucide-react'
 import { borrar, db, guardar, uid, type Producto } from '../lib/db'
 import { dinero, hoy } from '../lib/fechas'
 import { borrarTodo } from '../lib/demo'
+import { Insignia } from './Fruta'
 import { Boton, Campo, Hoja, aviso, claseInput } from './ui'
 
 const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce', '#ef4444', '#22c55e', '#38bdf8', '#a3e635']
@@ -50,14 +51,14 @@ export function Ajustes() {
 
   return (
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-3 text-[32px] leading-9 font-extrabold tracking-tight">Sabores y datos</h1>
+      <h1 className="mt-3 text-3xl font-bold tracking-tight">Sabores y datos</h1>
 
       <div className="mt-4 space-y-2">
         {productos.map((p) => (
           <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
-            <span className="h-11 w-11 shrink-0 rounded-full border border-black/10" style={{ background: p.color_hex }} />
+            <Insignia sabor={p.sabor} color={p.color_hex} size={48} />
             <div className="flex-1">
-              <div className="font-bold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
+              <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
               <div className="text-xs text-apagado">Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L</div>
             </div>
             <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
@@ -66,7 +67,7 @@ export function Ajustes() {
         <Boton variante="secundario" className="w-full" onClick={() => setEditando('nuevo')}><Plus size={18} /> Nuevo sabor</Boton>
       </div>
 
-      <h2 className="mt-8 text-2xl font-bold tracking-tight">Tus datos</h2>
+      <h2 className="mt-8 text-2xl font-semibold tracking-tight">Tus datos</h2>
       <p className="mt-1 text-sm text-apagado">
         Todo se guarda en este teléfono y funciona sin internet. Mientras no haya servidor, descarga un respaldo seguido.
         {cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}
@@ -113,13 +114,17 @@ function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; t
   return (
     <Hoja abierta onCerrar={onCerrar} titulo={producto ? 'Editar sabor' : 'Nuevo sabor'}>
       <div className="space-y-4 pb-4">
+        <div className="flex items-center gap-3">
+          <Insignia sabor={sabor} color={color} size={56} />
+          <p className="text-sm text-apagado">El ícono se elige solo según el nombre: fresa, mango, durazno, nuez, zarzamora, plátano…</p>
+        </div>
         <Campo etiqueta="Sabor"><input className={claseInput} value={sabor} onChange={(e) => setSabor(e.target.value)} placeholder="Ej. Fresa" /></Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Precio por litro"><input className={claseInput} inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Campo>
           <Campo etiqueta="Costo por litro"><input className={claseInput} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} /></Campo>
         </div>
         <div>
-          <div className="mb-1.5 text-sm font-semibold text-apagado">Color</div>
+          <div className="mb-1.5 text-sm font-semibold text-apagado">Color de acento</div>
           <div className="flex flex-wrap gap-2">
             {COLORES.map((c) => (
               <button key={c} onClick={() => setColor(c)} className={`h-10 w-10 rounded-full ${color === c ? 'ring-2 ring-tinta ring-offset-2' : ''}`} style={{ background: c }} aria-label={c} />

@@ -18,13 +18,12 @@
   --color-niebla: #f3f3f3;
   --color-linea: #e2e2e2;
   --color-apagado: #6b6b6b;
-  --color-marino: #0e1124;
   --color-azul: #276ef1;
   --color-verde: #05a357;
   --color-rojo: #e11900;
   --color-ambar: #ffc043;
-  --shadow-tarjeta: 0 4px 16px rgba(0, 0, 0, 0.16);
-  --shadow-hoja: 0 -6px 24px rgba(0, 0, 0, 0.16);
+  --shadow-tarjeta: 0 2px 12px rgba(0, 0, 0, 0.1);
+  --shadow-hoja: 0 -4px 20px rgba(0, 0, 0, 0.1);
 }
 
 :root { color-scheme: light; }
@@ -40,7 +39,7 @@ body {
 .pt-safe { padding-top: max(env(safe-area-inset-top), 0.5rem); }
 
 /* Pines del mapa: cuadrados negros numerados (destino) y punto azul (yo), como en Uber. */
-.pin { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font: 700 13px var(--font-sans);
+.pin { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; font: 600 12px var(--font-sans);
   color: #fff; border: 2.5px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); cursor: pointer; background: #000; }
 .pin-ENTREGADO { background: #05a357; border-radius: 9999px; }
 .pin-OMITIDO { background: #9a9a9a; }

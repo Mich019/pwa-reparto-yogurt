@@ -9,6 +9,7 @@ import { dinero, hoy, iso, textoFecha } from '../lib/fechas'
 import { calcularRuta, distancia, enlaceNavegar, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../lib/ruteo'
 import { cargarDemo } from '../lib/demo'
 import { Mapa, type Pin } from './Mapa'
+import { IconoSabor } from './Fruta'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { Accion, Boton, Hoja, Segmentado, aviso, telLimpio } from './ui'
@@ -201,22 +202,22 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
               )}
             </BotonRedondo>
           </div>
-          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-tinta px-5 py-2.5 text-white shadow-tarjeta">
-            <span className="text-lg leading-none font-bold tabular-nums">{dinero(totalDia)}</span>
+          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-papel px-5 py-2.5 shadow-tarjeta">
+            <span className="text-lg leading-none font-semibold tabular-nums">{dinero(totalDia)}</span>
             {enLinea ? (
-              <span className="text-xs font-medium text-white/60">cobrado hoy</span>
+              <span className="text-xs font-medium text-apagado">cobrado hoy</span>
             ) : (
-              <span className="flex items-center gap-1 text-xs font-semibold text-ambar"><WifiOff size={14} /> sin red</span>
+              <span className="flex items-center gap-1 text-xs font-semibold text-amber-600"><WifiOff size={14} /> sin red</span>
             )}
           </div>
         </div>
 
         {activo && clienteActivo && (
           <div className="pointer-events-auto mt-3 flex items-center gap-3 rounded-2xl bg-papel p-3 shadow-tarjeta">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-tinta"><span className="h-3.5 w-3.5 bg-white" /></span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-niebla"><span className="h-3.5 w-3.5 bg-tinta" /></span>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-apagado">Parada {orden.indexOf(activo.id) + 1} de {orden.length}</div>
-              <div className="truncate text-[17px] leading-tight font-bold">{clienteActivo.direccion || clienteActivo.nombre}</div>
+              <div className="truncate text-base leading-tight font-semibold">{clienteActivo.direccion || clienteActivo.nombre}</div>
             </div>
           </div>
         )}
@@ -237,7 +238,7 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
         </div>
       </div>
 
-      {/* Hoja inferior: parada activa y, abajo, el avance del día en azul marino */}
+      {/* Hoja inferior: parada activa y, abajo, el avance del día */}
       <div className="absolute inset-x-0 bottom-0 z-20">
         <div className="mx-auto max-w-xl overflow-hidden rounded-t-[28px] bg-papel shadow-hoja">
           <button onClick={() => setExpandida(!expandida)} className="mx-auto mt-2.5 block h-1 w-10 rounded-full bg-linea" aria-label="Expandir" />
@@ -248,7 +249,7 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
               <div className={`px-5 pt-3 ${expandida ? 'max-h-[44dvh] overflow-y-auto' : ''}`}>
                 <button className="flex w-full items-start gap-3 text-left" onClick={() => setExpandida(!expandida)}>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[28px] leading-8 font-extrabold tracking-tight">{clienteActivo.nombre}</div>
+                    <div className="truncate text-2xl leading-8 font-bold tracking-tight">{clienteActivo.nombre}</div>
                     <div className="mt-1 flex items-center gap-1.5 truncate text-sm text-apagado">
                       {clienteActivo.ventana === 'MAÑANA' ? <Sun size={14} /> : <Moon size={14} />}
                       {clienteActivo.ventana === 'MAÑANA' ? 'Mañana' : 'Tarde'}
@@ -256,7 +257,7 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[28px] leading-8 font-extrabold tracking-tight tabular-nums">{dinero(activo.total)}</div>
+                    <div className="text-2xl leading-8 font-semibold tracking-tight tabular-nums">{dinero(activo.total)}</div>
                     <div className="mt-1 text-sm text-apagado">{litrosActivo} L</div>
                   </div>
                 </button>
@@ -265,8 +266,8 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
                   {activo.items.map((i) => {
                     const p = prodPorId.get(i.productoId)
                     return (
-                      <span key={i.productoId} className="flex items-center gap-1.5 rounded-full bg-niebla py-1.5 pr-3 pl-2 text-sm font-semibold">
-                        <span className="h-4 w-4 rounded-full border border-black/15" style={{ background: p?.color_hex ?? '#888' }} />
+                      <span key={i.productoId} className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
+                        <IconoSabor sabor={p?.sabor ?? ''} size={22} />
                         {i.litros} L {p?.sabor ?? '¿?'}
                       </span>
                     )
@@ -307,8 +308,8 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
                             const c = porId.get(p.clienteId)!
                             return (
                               <button key={id} onClick={() => seleccionar(id)} className="relative flex w-full items-center gap-4 py-2 text-left">
-                                <span className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-tinta text-xs font-bold text-white ring-4 ring-papel">{orden.indexOf(id) + 1}</span>
-                                <span className="min-w-0 flex-1 truncate font-semibold">{c.nombre}</span>
+                                <span className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-niebla text-xs font-semibold ring-4 ring-papel">{orden.indexOf(id) + 1}</span>
+                                <span className="min-w-0 flex-1 truncate font-medium">{c.nombre}</span>
                                 <span className="text-apagado tabular-nums">{dinero(p.total)}</span>
                               </button>
                             )
@@ -339,14 +340,14 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
           ) : totalPedidos > 0 ? (
             <div className="px-5 pt-4 pb-5">
               <Sparkles size={28} />
-              <div className="mt-2 text-[28px] leading-8 font-extrabold tracking-tight">¡Ruta terminada!</div>
+              <div className="mt-2 text-2xl leading-8 font-bold tracking-tight">¡Ruta terminada!</div>
               <div className="mt-1 text-apagado">
                 {entregados.length} entregas · {litrosEntregados} L · {dinero(totalDia)}
               </div>
             </div>
           ) : (
             <div className="px-5 pt-3 pb-5">
-              <div className="text-[28px] leading-8 font-extrabold tracking-tight">Hoy no hay entregas</div>
+              <div className="text-2xl leading-8 font-bold tracking-tight">Hoy no hay entregas</div>
               <div className="mt-1 text-sm text-apagado">Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.</div>
               <button onClick={irAClientes} className="mt-4 flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-4 text-left text-lg font-semibold text-apagado active:bg-linea">
                 <ArrowRight size={20} className="text-tinta" /> ¿A quién le llevamos?
@@ -366,9 +367,9 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
           )}
 
           {totalPedidos > 0 && (
-            <div className="bg-marino px-5 pt-3.5 pb-4 text-white">
-              <div className="h-1 overflow-hidden rounded-full bg-white/20">
-                <div className="h-full rounded-full bg-azul transition-all duration-500" style={{ width: `${avance}%` }} />
+            <div className="border-t border-linea px-5 pt-3.5 pb-3.5">
+              <div className="h-1 overflow-hidden rounded-full bg-linea">
+                <div className="h-full rounded-full bg-tinta transition-all duration-500" style={{ width: `${avance}%` }} />
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3">
                 <Dato valor={`${entregados.length} de ${totalPedidos}`} etiqueta="entregas" />
@@ -451,7 +452,7 @@ function Recordatorios({ abierta, onCerrar, porId, onPedido }: {
           const msg = encodeURIComponent(`Hola ${c.nombre}, ¿qué sabores de yogurt te llevo en la próxima visita? 🍓`)
           return (
             <div key={r.id} className="rounded-2xl bg-niebla p-4">
-              <div className="text-lg font-bold">{c.nombre}</div>
+              <div className="text-lg font-semibold">{c.nombre}</div>
               <div className="text-sm text-apagado">Desde {textoFecha(iso(new Date(r.creado))).toLowerCase()}</div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <a href={`https://wa.me/${telLimpio(c.telefono)}?text=${msg}`} target="_blank" className="rounded-xl bg-verde py-3 text-center text-sm font-semibold text-white">WhatsApp</a>
@@ -477,19 +478,19 @@ function BotonRedondo({ children, onClick, etiqueta }: { children: ReactNode; on
 function Dato({ valor, etiqueta }: { valor: string; etiqueta: string }) {
   return (
     <div>
-      <div className="text-xl leading-6 font-bold tabular-nums">{valor}</div>
-      <div className="text-xs text-white/60">{etiqueta}</div>
+      <div className="text-lg leading-6 font-semibold tabular-nums">{valor}</div>
+      <div className="text-xs text-apagado">{etiqueta}</div>
     </div>
   )
 }
 
 function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: ReactNode; titulo: string; sub: string; destacada?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`flex w-full items-center gap-4 rounded-2xl p-4 text-left transition-colors ${destacada ? 'bg-tinta text-white active:bg-neutral-700' : 'bg-niebla active:bg-linea'}`}>
-      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${destacada ? 'bg-white/15' : 'bg-papel'}`}>{icono}</div>
+    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-2xl bg-niebla p-4 text-left transition-colors active:bg-linea">
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${destacada ? 'bg-tinta text-white' : 'bg-papel'}`}>{icono}</div>
       <div className="min-w-0 flex-1">
-        <div className="text-lg font-bold">{titulo}</div>
-        <div className={`truncate text-sm ${destacada ? 'text-white/65' : 'text-apagado'}`}>{sub}</div>
+        <div className="text-lg font-semibold">{titulo}</div>
+        <div className="truncate text-sm text-apagado">{sub}</div>
       </div>
       <ChevronRight size={20} className="shrink-0 opacity-40" />
     </button>

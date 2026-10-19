@@ -7,6 +7,7 @@ import { DIAS_CORTOS, dinero, textoFecha, textoFrecuencia } from '../lib/fechas'
 import { ubicacionActual, type Punto } from '../lib/ruteo'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
+import { IconoSabor } from './Fruta'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from './ui'
 
 export function Clientes() {
@@ -53,7 +54,7 @@ export function Clientes() {
     <div className="flex h-full flex-col">
       <div className="px-4 pt-safe">
         <div className="mt-3 flex items-center justify-between">
-          <h1 className="text-[32px] leading-9 font-extrabold tracking-tight">Clientes</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
           <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-full bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
             {verInactivos ? 'Ver activos' : 'Ver archivados'}
           </button>
@@ -74,14 +75,14 @@ export function Clientes() {
           const fav = favorito(c.id)
           return (
             <button key={c.id} onClick={() => setPerfilId(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left active:bg-niebla">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-[3px] border-linea bg-niebla text-lg font-bold" style={fav ? { borderColor: fav.color_hex } : undefined}>
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-niebla text-lg font-semibold">
                 {c.nombre.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[17px] leading-5 font-bold">{c.nombre}</div>
+                <div className="truncate text-base leading-5 font-semibold">{c.nombre}</div>
                 <div className="mt-0.5 truncate text-sm text-apagado">
                   {textoFrecuencia(c.frecuencia)} · {c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}
-                  {fav && <> · ★ {fav.sabor}</>}
+                  {fav && <span className="inline-flex items-center gap-1 align-middle"> · <IconoSabor sabor={fav.sabor} size={15} /> {fav.sabor}</span>}
                 </div>
               </div>
               {s?.proximo && <div className="rounded-full bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
@@ -132,7 +133,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
         <div className="text-sm text-apagado">{cliente.direccion} · {textoFrecuencia(cliente.frecuencia)} · {cliente.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <Dato valor={`${litros} L`} etiqueta="Consumidos" />
-          <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={<Star size={12} className="inline" />} />
+          <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={favorito ? <IconoSabor sabor={favorito} size={13} className="inline" /> : <Star size={12} className="inline" />} />
           <Dato valor={ultima ? textoFecha(ultima.fecha) : '—'} etiqueta="Última visita" />
         </div>
         <div className="grid grid-cols-4 gap-2">
@@ -170,7 +171,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
 function Dato({ valor, etiqueta, icono }: { valor: string; etiqueta: string; icono?: ReactNode }) {
   return (
     <div className="rounded-xl bg-niebla px-2 py-3">
-      <div className="truncate text-base font-bold">{valor}</div>
+      <div className="truncate text-base font-semibold">{valor}</div>
       <div className="text-[11px] text-apagado">{icono} {etiqueta}</div>
     </div>
   )
@@ -179,7 +180,7 @@ function Dato({ valor, etiqueta, icono }: { valor: string; etiqueta: string; ico
 function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-lg font-bold tracking-tight">{titulo}</div>
+      <div className="mb-2 text-lg font-semibold tracking-tight">{titulo}</div>
       <div className="space-y-1.5">{children}</div>
     </div>
   )
@@ -190,17 +191,17 @@ const ETIQUETA_ESTADO = { PENDIENTE: 'Agendado', ENTREGADO: 'Entregado', OMITIDO
 function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => { sabor: string; color_hex: string } | undefined; onClick?: () => void }) {
   return (
     <button onClick={onClick} disabled={!onClick} className="flex w-full items-center gap-3 rounded-xl bg-niebla px-3 py-3 text-left">
-      <div className="w-20 shrink-0 text-sm font-semibold">{textoFecha(p.fecha)}</div>
+      <div className="w-20 shrink-0 text-sm font-medium">{textoFecha(p.fecha)}</div>
       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
         {p.items.map((i) => (
           <span key={i.productoId} className="flex items-center gap-1 text-xs">
-            <span className="h-3 w-3 rounded-full" style={{ background: sabor(i.productoId)?.color_hex }} />
+            <IconoSabor sabor={sabor(i.productoId)?.sabor ?? ''} size={15} />
             {i.litros}L {sabor(i.productoId)?.sabor}
           </span>
         ))}
       </div>
       <div className="text-right">
-        <div className="text-sm font-bold tabular-nums">{dinero(p.total)}</div>
+        <div className="text-sm font-semibold tabular-nums">{dinero(p.total)}</div>
         <div className="text-[10px] text-apagado">{ETIQUETA_ESTADO[p.estado]}</div>
       </div>
     </button>
@@ -284,7 +285,7 @@ function FormCliente({ cliente, onCerrar }: { cliente?: Cliente; onCerrar: () =>
                 <button
                   key={d}
                   onClick={() => setFrecuencia({ tipo: 'semana', dias: dias.includes(d) ? dias.filter((x) => x !== d) : [...dias, d] })}
-                  className={`grid aspect-square place-items-center rounded-full text-xs font-bold ${dias.includes(d) ? 'bg-tinta text-white' : 'bg-niebla text-tinta active:bg-linea'}`}
+                  className={`grid aspect-square place-items-center rounded-full text-xs font-semibold ${dias.includes(d) ? 'bg-tinta text-white' : 'bg-niebla text-tinta active:bg-linea'}`}
                 >
                   {DIAS_CORTOS[d].slice(0, 2)}
                 </button>

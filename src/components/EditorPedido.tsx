@@ -44,7 +44,16 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuard
   }
 
   return (
-    <Hoja abierta={abierto} onCerrar={onCerrar} alto titulo={<div>{pedido ? 'Editar pedido' : 'Nuevo pedido'}<div className="text-base font-medium text-apagado">{cliente.nombre}</div></div>}>
+    <Hoja
+      abierta={abierto}
+      onCerrar={onCerrar}
+      alto
+      pie={
+        <Boton onClick={guardarPedido} className="w-full text-lg">
+          {pedido ? 'Guardar cambios' : `Agendar para ${textoFecha(fecha).toLowerCase()}`}
+        </Boton>
+      }
+      titulo={<div>{pedido ? 'Editar pedido' : 'Nuevo pedido'}<div className="text-base font-medium text-apagado">{cliente.nombre}</div></div>}>
       <div className="mb-4">
         <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-apagado">
           <CalendarDays size={16} /> Fecha de entrega
@@ -64,11 +73,6 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuard
         </div>
       </div>
       <SelectorSabores productos={productos} valor={cant} onChange={setCant} />
-      <div className="sticky bottom-0 bg-papel py-3">
-        <Boton onClick={guardarPedido} className="w-full text-lg">
-          {pedido ? 'Guardar cambios' : `Agendar para ${textoFecha(fecha).toLowerCase()}`}
-        </Boton>
-      </div>
     </Hoja>
   )
 }

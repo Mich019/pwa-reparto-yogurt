@@ -2,12 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 // Hoja modal que sube desde abajo, cómoda para usar con una mano.
-export function Hoja({ abierta, onCerrar, titulo, children, alto = false }: {
+export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie }: {
   abierta: boolean
   onCerrar: () => void
   titulo?: ReactNode
   children: ReactNode
   alto?: boolean
+  pie?: ReactNode // botón fijo abajo, fuera del área que se desplaza
 }) {
   const [montada, setMontada] = useState(abierta)
   const [visible, setVisible] = useState(false)
@@ -33,12 +34,13 @@ export function Hoja({ abierta, onCerrar, titulo, children, alto = false }: {
       >
         <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-linea" />
         <div className="flex items-center gap-3 px-5 pt-7 pb-3">
-          <div className="min-w-0 flex-1 text-2xl leading-tight font-bold tracking-tight">{titulo}</div>
+          <div className="min-w-0 flex-1 text-2xl leading-tight font-semibold tracking-tight">{titulo}</div>
           <button onClick={onCerrar} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-niebla text-tinta active:bg-linea" aria-label="Cerrar">
             <X size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 pb-safe">{children}</div>
+        <div className={`flex-1 overflow-y-auto px-5 ${pie ? 'pb-3' : 'pb-safe'}`}>{children}</div>
+        {pie && <div className="px-5 pt-3 pb-safe">{pie}</div>}
       </div>
     </div>
   )
@@ -68,7 +70,7 @@ export function Boton({ children, onClick, variante = 'primario', className = ''
   )
 }
 
-// Opciones en píldora, como "CAR / BIKE / SCOOT": la activa va en azul marino.
+// Opciones en píldora, como "CAR / BIKE / SCOOT" de Uber: la activa va en negro.
 export function Segmentado<T extends string>({ opciones, valor, onChange, className = '' }: {
   opciones: { valor: T; texto: ReactNode }[]
   valor: T
@@ -81,7 +83,7 @@ export function Segmentado<T extends string>({ opciones, valor, onChange, classN
         <button
           key={o.valor}
           onClick={() => onChange(o.valor)}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-bold tracking-wide whitespace-nowrap uppercase transition-colors ${valor === o.valor ? 'bg-marino text-white' : 'text-tinta active:bg-niebla'}`}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${valor === o.valor ? 'bg-tinta text-white' : 'bg-niebla text-tinta active:bg-linea'}`}
         >
           {o.texto}
         </button>

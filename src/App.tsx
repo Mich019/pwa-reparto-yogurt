@@ -33,10 +33,10 @@ export default function App() {
             <button
               key={id}
               onClick={() => setPestana(id)}
-              className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] font-semibold ${activa ? 'text-tinta' : 'text-apagado'}`}
+              className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] ${activa ? 'font-semibold text-tinta' : 'font-medium text-apagado'}`}
             >
-              <span className={`grid h-8 w-14 place-items-center rounded-full transition-colors ${activa ? 'bg-tinta text-white' : ''}`}>
-                <Icono size={21} strokeWidth={activa ? 2.4 : 2} />
+              <span className={`grid h-8 w-14 place-items-center rounded-full transition-colors ${activa ? 'bg-niebla' : ''}`}>
+                <Icono size={21} strokeWidth={activa ? 2.3 : 1.8} />
               </span>
               {texto}
             </button>
