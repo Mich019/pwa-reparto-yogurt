@@ -44,9 +44,9 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuard
   }
 
   return (
-    <Hoja abierta={abierto} onCerrar={onCerrar} alto titulo={<span>{pedido ? 'Editar pedido' : 'Nuevo pedido'} · <span className="text-pink-400">{cliente.nombre}</span></span>}>
+    <Hoja abierta={abierto} onCerrar={onCerrar} alto titulo={<div>{pedido ? 'Editar pedido' : 'Nuevo pedido'}<div className="text-base font-medium text-apagado">{cliente.nombre}</div></div>}>
       <div className="mb-4">
-        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-400">
+        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-apagado">
           <CalendarDays size={16} /> Fecha de entrega
         </div>
         <div className="flex flex-wrap gap-2">
@@ -54,7 +54,7 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuard
             <button
               key={d}
               onClick={() => setFecha(d)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${fecha === d ? 'bg-pink-500 text-white' : 'bg-slate-800 text-slate-300'}`}
+              className={`rounded-full px-4 py-2.5 text-sm font-semibold ${fecha === d ? 'bg-tinta text-white' : 'bg-niebla text-tinta'}`}
             >
               {textoFecha(d)}
               {d === sugerida && <span className="ml-1 opacity-70">★</span>}
@@ -64,8 +64,8 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuard
         </div>
       </div>
       <SelectorSabores productos={productos} valor={cant} onChange={setCant} />
-      <div className="sticky bottom-0 bg-slate-900 py-3">
-        <Boton onClick={guardarPedido} variante="rosa" className="w-full text-lg">
+      <div className="sticky bottom-0 bg-papel py-3">
+        <Boton onClick={guardarPedido} className="w-full text-lg">
           {pedido ? 'Guardar cambios' : `Agendar para ${textoFecha(fecha).toLowerCase()}`}
         </Boton>
       </div>

@@ -21,7 +21,8 @@ function textoSobre(hex: string) {
   return l > 0.6 ? '#0f172a' : '#ffffff'
 }
 
-// Tarjetas grandes por sabor con [-] litros [+], pensadas para una sola mano.
+// Tarjetas por sabor: el color arriba con [-] litros [+] y una franja oscura con nombre y precio,
+// como las tarjetas de vehículo de Uber. Botones grandes para usar con una sola mano.
 export function SelectorSabores({ productos, valor, onChange }: {
   productos: Producto[]
   valor: Cantidades
@@ -40,43 +41,41 @@ export function SelectorSabores({ productos, valor, onChange }: {
           const l = valor[p.id] ?? 0
           const color = textoSobre(p.color_hex)
           return (
-            <div
-              key={p.id}
-              className={`overflow-hidden rounded-2xl border-2 transition-all ${l ? 'border-white/80' : 'border-transparent opacity-80'}`}
-              style={{ background: p.color_hex, color }}
-            >
-              <div className="px-3 pt-3">
-                <div className="text-lg leading-tight font-extrabold">{p.sabor}</div>
-                <div className="text-xs font-medium opacity-75">{dinero(p.precio_litro)} / L</div>
-              </div>
-              <div className="flex items-center justify-between gap-1 p-2">
+            <div key={p.id} className={`overflow-hidden rounded-2xl transition-shadow ${l ? 'shadow-tarjeta ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
+              <div className="flex items-center justify-between gap-1 px-2 py-4" style={{ background: p.color_hex, color }}>
                 <button
                   onClick={() => cambiar(p.id, -1)}
-                  className="grid h-12 w-12 place-items-center rounded-xl bg-black/15 active:bg-black/30"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-white/80 text-tinta active:bg-white"
                   aria-label={`Quitar litro de ${p.sabor}`}
                 >
-                  <Minus size={22} strokeWidth={3} />
+                  <Minus size={20} strokeWidth={3} />
                 </button>
                 <div className="text-center">
-                  <div className="text-3xl leading-none font-black tabular-nums">{l}</div>
-                  <div className="text-[11px] font-semibold opacity-75">litros</div>
+                  <div className="text-4xl leading-none font-extrabold tabular-nums">{l}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold opacity-70">litros</div>
                 </div>
                 <button
                   onClick={() => cambiar(p.id, 1)}
-                  className="grid h-12 w-12 place-items-center rounded-xl bg-black/15 active:bg-black/30"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-white/80 text-tinta active:bg-white"
                   aria-label={`Agregar litro de ${p.sabor}`}
                 >
-                  <Plus size={22} strokeWidth={3} />
+                  <Plus size={20} strokeWidth={3} />
                 </button>
               </div>
-              <div className="bg-black/10 px-3 py-1 text-right text-sm font-bold tabular-nums">{l ? dinero(l * p.precio_litro) : '—'}</div>
+              <div className="bg-marino px-3 py-2.5 text-white">
+                <div className="truncate text-base leading-5 font-bold">{p.sabor}</div>
+                <div className="mt-0.5 flex justify-between text-xs text-white/60">
+                  <span>{dinero(p.precio_litro)} / L</span>
+                  <span className={`font-bold tabular-nums ${l ? 'text-white' : ''}`}>{l ? dinero(l * p.precio_litro) : '—'}</span>
+                </div>
+              </div>
             </div>
           )
         })}
       </div>
-      <div className="mt-3 flex items-center justify-between rounded-2xl bg-slate-800 px-4 py-3">
-        <span className="text-slate-300">{litros} L en total</span>
-        <span className="text-xl font-extrabold tabular-nums">{dinero(total)}</span>
+      <div className="mt-3 flex items-center justify-between rounded-2xl bg-marino px-4 py-3.5 text-white">
+        <span className="text-white/70">{litros} L en total</span>
+        <span className="text-2xl font-extrabold tracking-tight tabular-nums">{dinero(total)}</span>
       </div>
     </div>
   )

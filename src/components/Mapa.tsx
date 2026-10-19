@@ -3,8 +3,8 @@ import { LngLatBounds, Map as MapaML, Marker, type StyleSpecification } from 'ma
 import type { EstadoPedido } from '../lib/db'
 import type { Punto } from '../lib/ruteo'
 
-// Estilo libre de OpenFreeMap (sin llave), con edificios 3D.
-export const ESTILO_MAPA = 'https://tiles.openfreemap.org/styles/liberty'
+// Estilo libre de OpenFreeMap (sin llave): gris claro y limpio, como el mapa de Uber. Los edificios 3D se agregan abajo.
+export const ESTILO_MAPA = 'https://tiles.openfreemap.org/styles/positron'
 
 export interface Pin {
   id: string
@@ -27,10 +27,10 @@ function asegurarEdificios3D(mapa: MapaML) {
     'source-layer': 'building',
     minzoom: 14,
     paint: {
-      'fill-extrusion-color': '#cbd5e1',
+      'fill-extrusion-color': '#dddddd',
       'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
       'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-      'fill-extrusion-opacity': 0.75,
+      'fill-extrusion-opacity': 0.85,
     },
   })
 }
@@ -65,9 +65,13 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
     mapa.current = m
     m.on('load', () => {
       asegurarEdificios3D(m)
-      m.addSource('ruta', { type: 'geojson', data: lineaGeo(lineaPendiente.current) })
-      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#831843', 'line-width': 10 } })
-      m.addLayer({ id: 'ruta', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ec4899', 'line-width': 6 } })
+      // Ruta azul que se aclara hacia el final, con un borde blanco para que destaque sobre las calles.
+      m.addSource('ruta', { type: 'geojson', data: lineaGeo(lineaPendiente.current), lineMetrics: true })
+      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 10 } })
+      m.addLayer({
+        id: 'ruta', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-width': 5.5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#0a2fc4', 1, '#6aa3ff'] },
+      })
       listo.current = true
     })
     return () => {
@@ -128,23 +132,23 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
     if (enfoque && yo) {
       // Zoom para que quepan "yo" y la parada; con inclinación se aleja un poco para no cortarlos.
       const b = new LngLatBounds(yo, yo).extend(enfoque)
-      const cam = m.cameraForBounds(b, { padding: { top: 110, bottom: 300, left: 60, right: 60 }, absolutePadding: true, maxZoom: 17 })
+      const cam = m.cameraForBounds(b, { padding: { top: 170, bottom: 340, left: 60, right: 60 }, absolutePadding: true, maxZoom: 17 })
       const medio: Punto = [(yo[0] + enfoque[0]) / 2, (yo[1] + enfoque[1]) / 2]
       m.easeTo({
         center: medio,
         zoom: (cam?.zoom ?? 15) - (modo3D ? 0.7 : 0),
         pitch,
         bearing: modo3D ? -20 : 0,
-        padding: { top: 90, bottom: 260, left: 0, right: 0 },
+        padding: { top: 150, bottom: 300, left: 0, right: 0 },
         duration: 1200,
       })
     } else if (enfoque) {
-      m.easeTo({ center: enfoque, zoom: 16, pitch, bearing: modo3D ? -20 : 0, padding: { top: 90, bottom: 260, left: 0, right: 0 }, duration: 1200 })
+      m.easeTo({ center: enfoque, zoom: 16, pitch, bearing: modo3D ? -20 : 0, padding: { top: 150, bottom: 300, left: 0, right: 0 }, duration: 1200 })
     } else if (pines.length) {
       const b = new LngLatBounds(pines[0].punto, pines[0].punto)
       pines.forEach((p) => b.extend(p.punto))
       if (yo) b.extend(yo)
-      m.fitBounds(b, { padding: { top: 110, bottom: 300, left: 50, right: 50 }, duration: 1000, maxZoom: 16 })
+      m.fitBounds(b, { padding: { top: 170, bottom: 340, left: 50, right: 50 }, duration: 1000, maxZoom: 16 })
     } else if (yo) {
       m.easeTo({ center: yo, zoom: 15, pitch })
     }

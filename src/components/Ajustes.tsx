@@ -50,30 +50,30 @@ export function Ajustes() {
 
   return (
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-2 text-2xl font-extrabold">Sabores y datos</h1>
+      <h1 className="mt-3 text-[32px] leading-9 font-extrabold tracking-tight">Sabores y datos</h1>
 
       <div className="mt-4 space-y-2">
         {productos.map((p) => (
-          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-slate-900 p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
-            <span className="h-10 w-10 shrink-0 rounded-xl border border-white/20" style={{ background: p.color_hex }} />
+          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
+            <span className="h-11 w-11 shrink-0 rounded-full border border-black/10" style={{ background: p.color_hex }} />
             <div className="flex-1">
-              <div className="font-bold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-slate-400">(sin stock)</span>}</div>
-              <div className="text-xs text-slate-400">Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L</div>
+              <div className="font-bold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
+              <div className="text-xs text-apagado">Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L</div>
             </div>
-            <div className="text-sm font-semibold text-emerald-400">+{dinero(p.precio_litro - p.costo_litro)}</div>
+            <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
           </button>
         ))}
         <Boton variante="secundario" className="w-full" onClick={() => setEditando('nuevo')}><Plus size={18} /> Nuevo sabor</Boton>
       </div>
 
-      <h2 className="mt-8 text-lg font-bold">Tus datos</h2>
-      <p className="mt-1 text-sm text-slate-400">
+      <h2 className="mt-8 text-2xl font-bold tracking-tight">Tus datos</h2>
+      <p className="mt-1 text-sm text-apagado">
         Todo se guarda en este teléfono y funciona sin internet. Mientras no haya servidor, descarga un respaldo seguido.
         {cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Boton variante="secundario" onClick={exportar}><Download size={18} /> Respaldo</Boton>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-800 px-4 py-3.5 font-semibold active:bg-slate-700">
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-niebla px-4 py-4 font-semibold active:bg-linea">
           <Upload size={18} /> Restaurar
           <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])} />
         </label>
@@ -89,7 +89,7 @@ export function Ajustes() {
       )}
       <Hoja abierta={confirmarBorrado} onCerrar={() => setConfirmarBorrado(false)} titulo="¿Borrar todo?">
         <div className="space-y-3 pb-3">
-          <p className="text-slate-400">Se borran clientes, pedidos y recordatorios de este teléfono. Los sabores se quedan. No se puede deshacer.</p>
+          <p className="text-apagado">Se borran clientes, pedidos y recordatorios de este teléfono. Los sabores se quedan. No se puede deshacer.</p>
           <Boton variante="peligro" className="w-full" onClick={async () => { await borrarTodo(); localStorage.clear(); setConfirmarBorrado(false); aviso('Datos borrados') }}>Sí, borrar</Boton>
         </div>
       </Hoja>
@@ -119,19 +119,19 @@ function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; t
           <Campo etiqueta="Costo por litro"><input className={claseInput} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} /></Campo>
         </div>
         <div>
-          <div className="mb-1.5 text-sm font-medium text-slate-400">Color</div>
+          <div className="mb-1.5 text-sm font-semibold text-apagado">Color</div>
           <div className="flex flex-wrap gap-2">
             {COLORES.map((c) => (
-              <button key={c} onClick={() => setColor(c)} className={`h-10 w-10 rounded-xl ${color === c ? 'ring-3 ring-white' : ''}`} style={{ background: c }} aria-label={c} />
+              <button key={c} onClick={() => setColor(c)} className={`h-10 w-10 rounded-full ${color === c ? 'ring-2 ring-tinta ring-offset-2' : ''}`} style={{ background: c }} aria-label={c} />
             ))}
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded-xl bg-transparent" />
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded-full bg-transparent" />
           </div>
         </div>
-        <label className="flex items-center justify-between rounded-xl bg-slate-800 px-4 py-3">
+        <label className="flex items-center justify-between rounded-xl bg-niebla px-4 py-3">
           <span className="font-semibold">Disponible</span>
-          <input type="checkbox" checked={disponible} onChange={(e) => setDisponible(e.target.checked)} className="h-6 w-6 accent-pink-500" />
+          <input type="checkbox" checked={disponible} onChange={(e) => setDisponible(e.target.checked)} className="h-6 w-6 accent-black" />
         </label>
-        <Boton variante="rosa" className="w-full" onClick={guardarSabor}>Guardar</Boton>
+        <Boton className="w-full" onClick={guardarSabor}>Guardar</Boton>
         {producto && !tieneVentas && (
           <Boton variante="peligro" className="w-full" onClick={async () => { await borrar('productos', producto.id); onCerrar() }}>Eliminar sabor</Boton>
         )}

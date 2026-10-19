@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
-  Bell, Box, CheckCircle2, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Navigation,
-  Pencil, Phone, PlusCircle, RefreshCw, Sparkles, WifiOff, X,
+  Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
+  Navigation, Pencil, Phone, PlusCircle, RefreshCw, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../lib/fechas'
@@ -11,7 +11,7 @@ import { cargarDemo } from '../lib/demo'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
-import { Boton, Hoja, aviso, telLimpio } from './ui'
+import { Accion, Boton, Hoja, Segmentado, aviso, telLimpio } from './ui'
 
 const CLAVE_RUTA = 'ruta-del-dia'
 interface RutaGuardada extends RutaCalc { fecha: string; claves: string }
@@ -181,150 +181,199 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
   const clientePost = postEntrega ? porId.get(postEntrega.clienteId) : undefined
   const baseAnterior = useMemo(() => (postEntrega ? aCantidades(postEntrega.items) : undefined), [postEntrega])
 
+  const litrosActivo = activo ? activo.items.reduce((s, i) => s + i.litros, 0) : 0
+  const litrosEntregados = entregados.reduce((s, p) => s + p.items.reduce((a, i) => a + i.litros, 0), 0)
+  const avance = totalPedidos ? Math.round((entregados.length / totalPedidos) * 100) : 0
+  const minutosRuta = ruta && orden.length ? Math.max(1, Math.round(ruta.duracion_s / 60)) : null
+
   return (
     <div className="relative h-full overflow-hidden">
       <Mapa pines={pines} linea={orden.length ? (ruta?.linea ?? []) : []} yo={yo} enfoque={puntoActivo} modo3D={modo3D} onSeleccionar={seleccionar} />
 
-      {/* Barra superior */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-2 px-3 pt-safe">
-        <div className="pointer-events-auto mt-1 flex-1 rounded-2xl bg-slate-900/95 px-4 py-2.5 shadow-lg backdrop-blur">
-          <div className="text-xs font-medium text-slate-400">Hoy · {dinero(totalDia)} cobrado</div>
-          <div className="text-base font-bold">
-            {entregados.length} de {totalPedidos} entregados
-            {!enLinea && <WifiOff size={14} className="ml-2 inline text-amber-400" />}
+      {/* Arriba: campana, lo cobrado hoy y la parada actual */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-3 pt-safe">
+        <div className="relative mt-2 flex h-11 items-center">
+          <div className="pointer-events-auto">
+            <BotonRedondo onClick={() => setVerRecordatorios(true)} etiqueta="Recordatorios">
+              <Bell size={20} />
+              {recordatorios.length > 0 && (
+                <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-tinta px-1 text-[11px] font-bold text-white ring-2 ring-papel">{recordatorios.length}</span>
+              )}
+            </BotonRedondo>
+          </div>
+          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-tinta px-5 py-2.5 text-white shadow-tarjeta">
+            <span className="text-lg leading-none font-bold tabular-nums">{dinero(totalDia)}</span>
+            {enLinea ? (
+              <span className="text-xs font-medium text-white/60">cobrado hoy</span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs font-semibold text-ambar"><WifiOff size={14} /> sin red</span>
+            )}
           </div>
         </div>
-        <div className="pointer-events-auto mt-1 flex gap-2">
-          <BotonMapa onClick={() => setVerRecordatorios(true)} etiqueta="Recordatorios">
-            <Bell size={20} />
-            {recordatorios.length > 0 && (
-              <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-pink-500 px-1 text-[11px] font-bold">{recordatorios.length}</span>
-            )}
-          </BotonMapa>
-          <BotonMapa onClick={() => setModo3D(!modo3D)} etiqueta="Vista 2D/3D">
+
+        {activo && clienteActivo && (
+          <div className="pointer-events-auto mt-3 flex items-center gap-3 rounded-2xl bg-papel p-3 shadow-tarjeta">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-tinta"><span className="h-3.5 w-3.5 bg-white" /></span>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-apagado">Parada {orden.indexOf(activo.id) + 1} de {orden.length}</div>
+              <div className="truncate text-[17px] leading-tight font-bold">{clienteActivo.direccion || clienteActivo.nombre}</div>
+            </div>
+          </div>
+        )}
+
+        {ruta && !ruta.porCalles && orden.length > 0 && (
+          <div className="pointer-events-auto mt-2 rounded-xl bg-ambar px-3 py-2 text-xs font-semibold text-tinta">
+            Sin conexión al ruteador: orden aproximado en línea recta. Toca ↻ al tener señal.
+          </div>
+        )}
+
+        <div className={`mt-3 flex flex-col items-end gap-2 transition-opacity duration-200 ${expandida ? 'pointer-events-none opacity-0' : 'pointer-events-auto'}`}>
+          <BotonRedondo onClick={() => setModo3D(!modo3D)} etiqueta="Vista 2D/3D">
             {modo3D ? <MapIcon size={20} /> : <Box size={20} />}
-          </BotonMapa>
-          <BotonMapa onClick={() => recalcular(true)} etiqueta="Recalcular ruta">
+          </BotonRedondo>
+          <BotonRedondo onClick={() => recalcular(true)} etiqueta="Recalcular ruta">
             <RefreshCw size={20} className={calculando ? 'animate-spin' : ''} />
-          </BotonMapa>
+          </BotonRedondo>
         </div>
       </div>
 
-      {ruta && !ruta.porCalles && orden.length > 0 && (
-        <div className="absolute inset-x-3 top-24 z-10 rounded-xl bg-amber-500/95 px-3 py-2 text-xs font-medium text-slate-950">
-          Sin conexión al ruteador: orden aproximado en línea recta. Toca ↻ al tener señal.
-        </div>
-      )}
-
-      {/* Hoja inferior con la parada activa */}
+      {/* Hoja inferior: parada activa y, abajo, el avance del día en azul marino */}
       <div className="absolute inset-x-0 bottom-0 z-20">
-        <div className="mx-auto max-w-xl rounded-t-3xl bg-slate-900 px-4 pt-2 pb-3 shadow-[0_-8px_30px_rgba(0,0,0,.45)]">
-          <button onClick={() => setExpandida(!expandida)} className="mx-auto mb-2 block h-1.5 w-10 rounded-full bg-slate-700" aria-label="Expandir" />
+        <div className="mx-auto max-w-xl overflow-hidden rounded-t-[28px] bg-papel shadow-hoja">
+          <button onClick={() => setExpandida(!expandida)} className="mx-auto mt-2.5 block h-1 w-10 rounded-full bg-linea" aria-label="Expandir" />
           {cargando ? (
-            <div className="py-6 text-center text-slate-400">Cargando…</div>
+            <div className="py-8 text-center text-apagado">Cargando…</div>
           ) : activo && clienteActivo ? (
             <>
-              <button className="flex w-full items-start gap-3 text-left" onClick={() => setExpandida(!expandida)}>
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-pink-500 text-lg font-black">{orden.indexOf(activo.id) + 1}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xl font-bold">{clienteActivo.nombre}</div>
-                  <div className="truncate text-sm text-slate-400">
-                    {clienteActivo.direccion}
-                    {yo && <> · {(distancia(yo, puntoActivo!) / 1000).toFixed(1)} km</>}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-extrabold tabular-nums">{dinero(activo.total)}</div>
-                  <div className="text-xs text-slate-400">{clienteActivo.ventana === 'MAÑANA' ? '☀️ Mañana' : '🌙 Tarde'}</div>
-                </div>
-              </button>
-
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {activo.items.map((i) => {
-                  const p = prodPorId.get(i.productoId)
-                  return (
-                    <span key={i.productoId} className="flex items-center gap-1.5 rounded-full bg-slate-800 py-1 pr-3 pl-1 text-sm font-semibold">
-                      <span className="h-5 w-5 rounded-full border border-white/30" style={{ background: p?.color_hex ?? '#888' }} />
-                      {i.litros} L {p?.sabor ?? '¿?'}
-                    </span>
-                  )
-                })}
-              </div>
-
-              <div className={`grid transition-all duration-300 ${expandida ? 'mt-3 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                <div className="overflow-hidden">
-                  <div className="grid grid-cols-4 gap-2">
-                    <Accion href={enlaceNavegar(puntoActivo!)} icono={<Navigation size={20} />} texto="Navegar" />
-                    <Accion href={`tel:${clienteActivo.telefono}`} icono={<Phone size={20} />} texto="Llamar" />
-                    <Accion href={`https://wa.me/${telLimpio(clienteActivo.telefono)}`} icono={<MessageCircle size={20} />} texto="WhatsApp" />
-                    <Accion onClick={() => setEditor({ cliente: clienteActivo, pedido: activo })} icono={<Pencil size={20} />} texto="Editar" />
-                  </div>
-                  <div className="mt-3 text-sm font-medium text-slate-400">Pago</div>
-                  <div className="mt-1.5 grid grid-cols-2 gap-2">
-                    {(['EFECTIVO', 'TRANSFERENCIA'] as const).map((m) => (
-                      <button key={m} onClick={() => setPago(m)} className={`rounded-xl py-2.5 text-sm font-semibold ${pago === m ? 'bg-slate-100 text-slate-900' : 'bg-slate-800 text-slate-300'}`}>
-                        {m === 'EFECTIVO' ? '💵 Efectivo' : '📲 Transferencia'}
-                      </button>
-                    ))}
-                  </div>
-                  {clienteActivo.notas && <div className="mt-3 rounded-xl bg-slate-800/60 p-3 text-sm text-slate-300">📝 {clienteActivo.notas}</div>}
-                  <button onClick={() => setOmitir(activo)} className="mt-3 flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-slate-400">
-                    <CircleSlash size={16} /> No estaba / no quiso (omitir)
-                  </button>
-                  {orden.length > 1 && (
-                    <div className="mt-1 border-t border-slate-800 pt-2">
-                      <div className="mb-1 text-xs font-medium text-slate-500">Siguientes paradas</div>
-                      {orden.slice(0, 6).filter((id) => id !== activo.id).map((id) => {
-                        const p = pendientes.find((x) => x.id === id)!
-                        const c = porId.get(p.clienteId)!
-                        return (
-                          <button key={id} onClick={() => seleccionar(id)} className="flex w-full items-center gap-3 py-1.5 text-left text-sm">
-                            <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-700 text-xs font-bold">{orden.indexOf(id) + 1}</span>
-                            <span className="flex-1 truncate">{c.nombre}</span>
-                            <span className="text-slate-400 tabular-nums">{dinero(p.total)}</span>
-                          </button>
-                        )
-                      })}
+              <div className={`px-5 pt-3 ${expandida ? 'max-h-[44dvh] overflow-y-auto' : ''}`}>
+                <button className="flex w-full items-start gap-3 text-left" onClick={() => setExpandida(!expandida)}>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[28px] leading-8 font-extrabold tracking-tight">{clienteActivo.nombre}</div>
+                    <div className="mt-1 flex items-center gap-1.5 truncate text-sm text-apagado">
+                      {clienteActivo.ventana === 'MAÑANA' ? <Sun size={14} /> : <Moon size={14} />}
+                      {clienteActivo.ventana === 'MAÑANA' ? 'Mañana' : 'Tarde'}
+                      {yo && <> · {(distancia(yo, puntoActivo!) / 1000).toFixed(1)} km</>}
                     </div>
-                  )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[28px] leading-8 font-extrabold tracking-tight tabular-nums">{dinero(activo.total)}</div>
+                    <div className="mt-1 text-sm text-apagado">{litrosActivo} L</div>
+                  </div>
+                </button>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {activo.items.map((i) => {
+                    const p = prodPorId.get(i.productoId)
+                    return (
+                      <span key={i.productoId} className="flex items-center gap-1.5 rounded-full bg-niebla py-1.5 pr-3 pl-2 text-sm font-semibold">
+                        <span className="h-4 w-4 rounded-full border border-black/15" style={{ background: p?.color_hex ?? '#888' }} />
+                        {i.litros} L {p?.sabor ?? '¿?'}
+                      </span>
+                    )
+                  })}
+                </div>
+
+                <div className={`grid transition-all duration-300 ${expandida ? 'mt-4 grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-4 gap-2">
+                      <Accion href={enlaceNavegar(puntoActivo!)} icono={<Navigation size={22} />} texto="Navegar" />
+                      <Accion href={`tel:${clienteActivo.telefono}`} icono={<Phone size={22} />} texto="Llamar" />
+                      <Accion href={`https://wa.me/${telLimpio(clienteActivo.telefono)}`} icono={<MessageCircle size={22} />} texto="WhatsApp" />
+                      <Accion onClick={() => setEditor({ cliente: clienteActivo, pedido: activo })} icono={<Pencil size={22} />} texto="Editar" />
+                    </div>
+                    <div className="mt-5 text-sm font-semibold text-apagado">Forma de pago</div>
+                    <Segmentado
+                      className="mt-2"
+                      valor={pago}
+                      onChange={setPago}
+                      opciones={[
+                        { valor: 'EFECTIVO', texto: <><Banknote size={16} /> Efectivo</> },
+                        { valor: 'TRANSFERENCIA', texto: <><Smartphone size={16} /> Transfer</> },
+                      ]}
+                    />
+                    {clienteActivo.notas && (
+                      <div className="mt-4 flex gap-2.5 rounded-xl bg-niebla p-3 text-sm">
+                        <StickyNote size={18} className="mt-0.5 shrink-0 text-apagado" />
+                        {clienteActivo.notas}
+                      </div>
+                    )}
+                    {orden.length > 1 && (
+                      <div className="mt-5">
+                        <div className="mb-1 text-sm font-semibold text-apagado">Siguientes paradas</div>
+                        <div className="relative">
+                          <div className="absolute top-5 bottom-5 left-3 w-0.5 bg-linea" />
+                          {orden.slice(0, 6).filter((id) => id !== activo.id).map((id) => {
+                            const p = pendientes.find((x) => x.id === id)!
+                            const c = porId.get(p.clienteId)!
+                            return (
+                              <button key={id} onClick={() => seleccionar(id)} className="relative flex w-full items-center gap-4 py-2 text-left">
+                                <span className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-tinta text-xs font-bold text-white ring-4 ring-papel">{orden.indexOf(id) + 1}</span>
+                                <span className="min-w-0 flex-1 truncate font-semibold">{c.nombre}</span>
+                                <span className="text-apagado tabular-nums">{dinero(p.total)}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={() => setOmitir(activo)} className="mt-3 mb-1 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold text-rojo">
+                      <CircleSlash size={16} /> No estaba / no quiso (omitir)
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-3 flex gap-2">
-                <Boton onClick={() => setExpandida(!expandida)} variante="secundario" className="!px-3.5" >
-                  <ChevronUp size={22} className={`transition-transform ${expandida ? 'rotate-180' : ''}`} />
-                </Boton>
-                <Boton onClick={pedidoRealizado} className="flex-1 py-4 text-lg">
+              <div className="flex gap-2 px-5 pt-4 pb-4">
+                <button
+                  onClick={() => setExpandida(!expandida)}
+                  aria-label={expandida ? 'Ver menos' : 'Ver más'}
+                  className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-niebla active:bg-linea"
+                >
+                  <ChevronUp size={24} className={`transition-transform ${expandida ? 'rotate-180' : ''}`} />
+                </button>
+                <Boton onClick={pedidoRealizado} className="h-14 flex-1 !py-0 text-lg">
                   <CheckCircle2 size={22} /> Pedido Realizado
                 </Boton>
               </div>
             </>
           ) : totalPedidos > 0 ? (
-            <div className="py-3 text-center">
-              <Sparkles className="mx-auto text-pink-400" size={32} />
-              <div className="mt-2 text-xl font-bold">¡Ruta terminada!</div>
-              <div className="mt-1 text-slate-400">
-                {entregados.length} entregas · {entregados.reduce((s, p) => s + p.items.reduce((a, i) => a + i.litros, 0), 0)} L · {dinero(totalDia)}
+            <div className="px-5 pt-4 pb-5">
+              <Sparkles size={28} />
+              <div className="mt-2 text-[28px] leading-8 font-extrabold tracking-tight">¡Ruta terminada!</div>
+              <div className="mt-1 text-apagado">
+                {entregados.length} entregas · {litrosEntregados} L · {dinero(totalDia)}
               </div>
             </div>
           ) : (
-            <div className="py-3 text-center">
-              <div className="text-lg font-bold">No hay entregas para hoy</div>
-              <div className="mt-1 text-sm text-slate-400">Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.</div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Boton variante="secundario" onClick={irAClientes}>
-                  <PlusCircle size={18} /> Clientes
-                </Boton>
-                <Boton
-                  variante="rosa"
-                  onClick={async () => {
-                    const centro = yo ?? (await ubicacionActual()) ?? [-99.1332, 19.4326]
-                    await cargarDemo(centro)
-                    aviso('Datos de ejemplo cargados')
-                  }}
-                >
-                  <Sparkles size={18} /> Ejemplo
-                </Boton>
+            <div className="px-5 pt-3 pb-5">
+              <div className="text-[28px] leading-8 font-extrabold tracking-tight">Hoy no hay entregas</div>
+              <div className="mt-1 text-sm text-apagado">Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.</div>
+              <button onClick={irAClientes} className="mt-4 flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-4 text-left text-lg font-semibold text-apagado active:bg-linea">
+                <ArrowRight size={20} className="text-tinta" /> ¿A quién le llevamos?
+              </button>
+              <Boton
+                variante="secundario"
+                className="mt-2 w-full"
+                onClick={async () => {
+                  const centro = yo ?? (await ubicacionActual()) ?? [-99.1332, 19.4326]
+                  await cargarDemo(centro)
+                  aviso('Datos de ejemplo cargados')
+                }}
+              >
+                <Sparkles size={18} /> Cargar datos de ejemplo
+              </Boton>
+            </div>
+          )}
+
+          {totalPedidos > 0 && (
+            <div className="bg-marino px-5 pt-3.5 pb-4 text-white">
+              <div className="h-1 overflow-hidden rounded-full bg-white/20">
+                <div className="h-full rounded-full bg-azul transition-all duration-500" style={{ width: `${avance}%` }} />
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <Dato valor={`${entregados.length} de ${totalPedidos}`} etiqueta="entregas" />
+                <Dato valor={`${litrosEntregados} L`} etiqueta="repartidos" />
+                <Dato valor={minutosRuta ? `${minutosRuta} min` : '—'} etiqueta="de ruta" />
               </div>
             </div>
           )}
@@ -335,27 +384,34 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
       <Hoja
         abierta={!!postEntrega}
         onCerrar={() => siguiente()}
-        titulo={paso === 'opciones' ? <span className="text-emerald-400">✓ Entregado · {dinero(postEntrega?.total ?? 0)}</span> : 'Nuevo pedido'}
+        titulo={
+          paso === 'opciones' ? (
+            <span className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-verde text-white"><Check size={20} strokeWidth={3} /></span>
+              Entregado · {dinero(postEntrega?.total ?? 0)}
+            </span>
+          ) : 'Nuevo pedido'
+        }
       >
         {clientePost && paso === 'opciones' && (
-          <div className="space-y-3 pb-3">
-            <div className="text-slate-400">¿Qué sigue con <b className="text-slate-100">{clientePost.nombre}</b>?</div>
-            <OpcionGrande color="bg-pink-500" icono={<PlusCircle size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
-            <OpcionGrande color="bg-amber-500" icono={<Clock size={26} />} titulo="Recordar más tarde" sub="Te aviso para escribirle o llamarle" onClick={recordarMasTarde} />
-            <OpcionGrande color="bg-slate-700" icono={<X size={26} />} titulo="Cerrar" sub="Ir a la siguiente parada" onClick={() => siguiente()} />
+          <div className="space-y-2.5 pb-3">
+            <div className="pb-1 text-apagado">¿Qué sigue con <b className="text-tinta">{clientePost.nombre}</b>?</div>
+            <OpcionGrande destacada icono={<PlusCircle size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
+            <OpcionGrande icono={<Clock size={26} />} titulo="Recordar más tarde" sub="Te aviso para escribirle o llamarle" onClick={recordarMasTarde} />
+            <OpcionGrande icono={<X size={26} />} titulo="Cerrar" sub="Ir a la siguiente parada" onClick={() => siguiente()} />
           </div>
         )}
         {clientePost && paso === 'nuevo' && (
-          <div className="space-y-3 pb-3">
+          <div className="space-y-2.5 pb-3">
             <OpcionGrande
-              color="bg-pink-500"
+              destacada
               icono={<Copy size={26} />}
               titulo="Igual que el anterior"
               sub={postEntrega!.items.map((i) => `${i.litros} L ${prodPorId.get(i.productoId)?.sabor ?? ''}`).join(' · ')}
               onClick={() => { setEditor({ cliente: clientePost, base: baseAnterior }); setPostEntrega(null) }}
             />
-            <OpcionGrande color="bg-slate-700" icono={<PlusCircle size={26} />} titulo="Desde cero" sub="Todos los sabores en 0" onClick={() => { setEditor({ cliente: clientePost, base: {} }); setPostEntrega(null) }} />
-            <button onClick={() => setPaso('opciones')} className="w-full py-2 text-sm font-semibold text-slate-400">← Volver</button>
+            <OpcionGrande icono={<PlusCircle size={26} />} titulo="Desde cero" sub="Todos los sabores en 0" onClick={() => { setEditor({ cliente: clientePost, base: {} }); setPostEntrega(null) }} />
+            <button onClick={() => setPaso('opciones')} className="w-full py-3 text-sm font-semibold text-apagado">← Volver</button>
           </div>
         )}
       </Hoja>
@@ -367,8 +423,8 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
       {/* Omitir visita (RF-026) */}
       <Hoja abierta={!!omitir} onCerrar={() => setOmitir(null)} titulo="Omitir visita">
         <div className="space-y-3 pb-3">
-          <div className="text-slate-400">Se marcará como no entregado. ¿Quieres reprogramarlo?</div>
-          <Boton variante="rosa" className="w-full" onClick={() => confirmarOmitir(true)}>Omitir y reprogramar</Boton>
+          <div className="text-apagado">Se marcará como no entregado. ¿Quieres reprogramarlo?</div>
+          <Boton className="w-full" onClick={() => confirmarOmitir(true)}>Omitir y reprogramar</Boton>
           <Boton variante="secundario" className="w-full" onClick={() => confirmarOmitir(false)}>Sólo omitir</Boton>
         </div>
       </Hoja>
@@ -387,20 +443,20 @@ function Recordatorios({ abierta, onCerrar, porId, onPedido }: {
   const lista = useLiveQuery(() => db.recordatorios.filter((r) => !r.hecho).toArray(), []) ?? []
   return (
     <Hoja abierta={abierta} onCerrar={onCerrar} titulo="Por confirmar">
-      {lista.length === 0 && <div className="py-8 text-center text-slate-400">Nada pendiente 👌</div>}
-      <div className="space-y-2 pb-3">
+      {lista.length === 0 && <div className="py-10 text-center text-apagado">Nada pendiente</div>}
+      <div className="space-y-2.5 pb-3">
         {lista.map((r) => {
           const c = porId.get(r.clienteId)
           if (!c) return null
           const msg = encodeURIComponent(`Hola ${c.nombre}, ¿qué sabores de yogurt te llevo en la próxima visita? 🍓`)
           return (
-            <div key={r.id} className="rounded-2xl bg-slate-800 p-3">
-              <div className="font-bold">{c.nombre}</div>
-              <div className="text-xs text-slate-400">Desde {textoFecha(iso(new Date(r.creado))).toLowerCase()}</div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <a href={`https://wa.me/${telLimpio(c.telefono)}?text=${msg}`} target="_blank" className="rounded-xl bg-emerald-600 py-2 text-center text-sm font-semibold">WhatsApp</a>
-                <button onClick={() => onPedido(c)} className="rounded-xl bg-pink-500 py-2 text-sm font-semibold">Pedido</button>
-                <button onClick={() => guardar('recordatorios', { ...r, hecho: true })} className="rounded-xl bg-slate-700 py-2 text-sm font-semibold">Listo</button>
+            <div key={r.id} className="rounded-2xl bg-niebla p-4">
+              <div className="text-lg font-bold">{c.nombre}</div>
+              <div className="text-sm text-apagado">Desde {textoFecha(iso(new Date(r.creado))).toLowerCase()}</div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <a href={`https://wa.me/${telLimpio(c.telefono)}?text=${msg}`} target="_blank" className="rounded-xl bg-verde py-3 text-center text-sm font-semibold text-white">WhatsApp</a>
+                <button onClick={() => onPedido(c)} className="rounded-xl bg-tinta py-3 text-sm font-semibold text-white">Pedido</button>
+                <button onClick={() => guardar('recordatorios', { ...r, hecho: true })} className="rounded-xl bg-linea py-3 text-sm font-semibold">Listo</button>
               </div>
             </div>
           )
@@ -410,31 +466,32 @@ function Recordatorios({ abierta, onCerrar, porId, onPedido }: {
   )
 }
 
-function BotonMapa({ children, onClick, etiqueta }: { children: ReactNode; onClick: () => void; etiqueta: string }) {
+function BotonRedondo({ children, onClick, etiqueta }: { children: ReactNode; onClick: () => void; etiqueta: string }) {
   return (
-    <button onClick={onClick} aria-label={etiqueta} className="relative grid h-12 w-12 place-items-center rounded-2xl bg-slate-900/95 shadow-lg backdrop-blur active:bg-slate-800">
+    <button onClick={onClick} aria-label={etiqueta} className="relative grid h-11 w-11 place-items-center rounded-full bg-papel shadow-tarjeta active:bg-niebla">
       {children}
     </button>
   )
 }
 
-function Accion({ icono, texto, href, onClick }: { icono: ReactNode; texto: string; href?: string; onClick?: () => void }) {
-  const clase = 'flex flex-col items-center gap-1 rounded-xl bg-slate-800 py-2.5 text-xs font-semibold active:bg-slate-700'
-  return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className={clase}>{icono}{texto}</a>
-  ) : (
-    <button onClick={onClick} className={clase}>{icono}{texto}</button>
+function Dato({ valor, etiqueta }: { valor: string; etiqueta: string }) {
+  return (
+    <div>
+      <div className="text-xl leading-6 font-bold tabular-nums">{valor}</div>
+      <div className="text-xs text-white/60">{etiqueta}</div>
+    </div>
   )
 }
 
-function OpcionGrande({ icono, titulo, sub, color, onClick }: { icono: ReactNode; titulo: string; sub: string; color: string; onClick: () => void }) {
+function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: ReactNode; titulo: string; sub: string; destacada?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-2xl bg-slate-800 p-4 text-left active:bg-slate-700">
-      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${color}`}>{icono}</div>
-      <div className="min-w-0">
+    <button onClick={onClick} className={`flex w-full items-center gap-4 rounded-2xl p-4 text-left transition-colors ${destacada ? 'bg-tinta text-white active:bg-neutral-700' : 'bg-niebla active:bg-linea'}`}>
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${destacada ? 'bg-white/15' : 'bg-papel'}`}>{icono}</div>
+      <div className="min-w-0 flex-1">
         <div className="text-lg font-bold">{titulo}</div>
-        <div className="truncate text-sm text-slate-400">{sub}</div>
+        <div className={`truncate text-sm ${destacada ? 'text-white/65' : 'text-apagado'}`}>{sub}</div>
       </div>
+      <ChevronRight size={20} className="shrink-0 opacity-40" />
     </button>
   )
 }

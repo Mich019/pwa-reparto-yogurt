@@ -18,7 +18,7 @@ type Pestana = (typeof PESTANAS)[number]['id']
 export default function App() {
   const [pestana, setPestana] = useState<Pestana>('ruta')
   return (
-    <div className="flex h-dvh flex-col bg-slate-950 text-slate-100">
+    <div className="flex h-dvh flex-col bg-papel text-tinta">
       <Avisos />
       <main className="relative min-h-0 flex-1">
         {pestana === 'ruta' && <Ruta irAClientes={() => setPestana('clientes')} />}
@@ -26,17 +26,22 @@ export default function App() {
         {pestana === 'produccion' && <Pronostico />}
         {pestana === 'sabores' && <Ajustes />}
       </main>
-      <nav className="z-30 grid grid-cols-4 border-t border-slate-800 bg-slate-950 pb-safe">
-        {PESTANAS.map(({ id, texto, icono: Icono }) => (
-          <button
-            key={id}
-            onClick={() => setPestana(id)}
-            className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] font-semibold ${pestana === id ? 'text-pink-400' : 'text-slate-500'}`}
-          >
-            <Icono size={22} />
-            {texto}
-          </button>
-        ))}
+      <nav className="z-30 grid grid-cols-4 border-t border-linea bg-papel pb-safe">
+        {PESTANAS.map(({ id, texto, icono: Icono }) => {
+          const activa = pestana === id
+          return (
+            <button
+              key={id}
+              onClick={() => setPestana(id)}
+              className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] font-semibold ${activa ? 'text-tinta' : 'text-apagado'}`}
+            >
+              <span className={`grid h-8 w-14 place-items-center rounded-full transition-colors ${activa ? 'bg-tinta text-white' : ''}`}>
+                <Icono size={21} strokeWidth={activa ? 2.4 : 2} />
+              </span>
+              {texto}
+            </button>
+          )
+        })}
       </nav>
     </div>
   )
