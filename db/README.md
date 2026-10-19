@@ -1,5 +1,7 @@
 # Base de datos · PostgreSQL
 
+La versión MySQL 8, con los pasos para pasarla a la nube, está en [`mysql/`](mysql/README.md).
+
 ## Cómo crearla
 
 Requiere PostgreSQL 13 o superior. Desde esta carpeta:

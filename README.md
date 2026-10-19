@@ -33,7 +33,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 - Ruteo en `src/lib/ruteo.ts`: servicio `/trip` de OSRM (resuelve el orden óptimo). Usa el servidor público de demostración; para uso diario conviene un OSRM propio (cambiar `OSRM_URL`). Sin señal usa el orden ya calculado o, si no hay, el vecino más cercano en línea recta.
 - Service worker propio (`public/sw.js`): guarda la app completa al instalar y los mosaicos del mapa que ya viste.
 - Pronóstico en `src/lib/pronostico.ts`.
-- Base de datos PostgreSQL del backend en `db/` (ver `db/README.md`).
+- Base de datos del backend en `db/`: versión PostgreSQL (ver `db/README.md`) y versión MySQL 8 lista para migrar a la nube (ver `db/mysql/README.md`).
 
 ## Pendiente (siguientes pasos)
 
