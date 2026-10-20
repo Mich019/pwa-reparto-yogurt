@@ -39,7 +39,8 @@ export default function App() {
   // =========================================================================
   // VISTA PANEL ADMINISTRADOR (/admin)
   // =========================================================================
-  if (esAdmin) {
+  // Sin servidor no hay cuentas que validar: /admin abre la misma app, que ya trae producción y sabores.
+  if (esAdmin && MODO_SERVIDOR) {
     if (!sesion) {
       return (
         <>

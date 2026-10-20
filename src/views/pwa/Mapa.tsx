@@ -101,7 +101,7 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
       .map((p) => {
         const el = document.createElement('div')
         el.className = `pin pin-${p.estado} ${p.activo ? 'pin-activo' : ''}`
-        el.textContent = p.estado === 'ENTREGADO' ? '✓' : String(p.numero)
+        el.textContent = p.estado === 'ENTREGADO' ? '✓' : p.estado === 'PENDIENTE' ? String(p.numero) : '–' // omitido: ya no tiene lugar en la ruta
         el.addEventListener('click', (e) => {
           e.stopPropagation()
           onSeleccionar?.(p.id)

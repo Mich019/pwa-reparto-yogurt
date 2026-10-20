@@ -285,3 +285,33 @@ describe('conflictos entre dispositivos (RF-053)', () => {
     assert.equal(fila.datos.nombre, 'Pierde')
   })
 })
+
+describe('catálogo de sabores (RF-032)', () => {
+  it('guarda descripción y presentación; la presentación queda fija y los precios siguen por litro', async () => {
+    const admin = await sesion('administrador')
+    const id = randomUUID()
+    const nuevo = { id, sabor: `Guayaba ${id.slice(0, 6)}`, descripcion: 'Con trozos de fruta', presentacion: 0.5, precio_litro: 80, costo_litro: 30, color_hex: '#ef4444', disponible: true }
+    const fila = async () => (await db.query(`SELECT descripcion, presentacion_litros::float8 AS pres, precio_unitario::float8 AS precio FROM productos WHERE id_producto = $1`, [id])).rows[0]
+    try {
+      const r = await push(admin, [op('productos', id, nuevo)])
+      assert.equal(r.body.resultados[0].estado, 'aplicada')
+      assert.deepEqual(await fila(), { descripcion: 'Con trozos de fruta', pres: 0.5, precio: 40 }) // $80 el litro = $40 el envase de medio litro
+      const guardado = r.body.resultados[0].registro
+      assert.equal(guardado.presentacion, 0.5)
+      assert.equal(guardado.precio_litro, 80)
+
+      // Una copia sin descripción (app vieja) la conserva, y otra presentación no cambia la guardada.
+      const e1 = await push(admin, [op('productos', id, { ...nuevo, descripcion: undefined, presentacion: 2, precio_litro: 90 }, guardado.version)])
+      assert.equal(e1.body.resultados[0].estado, 'aplicada')
+      assert.deepEqual(await fila(), { descripcion: 'Con trozos de fruta', pres: 0.5, precio: 45 })
+
+      // Vacía, la borra.
+      const e2 = await push(admin, [op('productos', id, { ...nuevo, descripcion: '', precio_litro: 90 }, e1.body.resultados[0].registro.version)])
+      assert.equal(e2.body.resultados[0].estado, 'aplicada')
+      assert.equal((await fila()).descripcion, null)
+      assert.equal(e2.body.resultados[0].registro.descripcion, undefined)
+    } finally {
+      await db.query(`DELETE FROM productos WHERE id_producto = $1`, [id])
+    }
+  })
+})

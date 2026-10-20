@@ -5,7 +5,7 @@ import { ChevronRight, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plu
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
-import { DIAS_CORTOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
+import { DIAS_CORTOS, DIAS_LARGOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
 import { ESTILO_MAPA } from './Mapa'
@@ -16,6 +16,14 @@ import { IconoSabor } from '../../components/Fruta'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
+
+const sinAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+// Lo que encuentra el buscador (RF-011): nombre, teléfono, dirección (con su colonia), días o cada cuánto se le surte, y horario.
+function textoBusqueda(c: Cliente) {
+  const dias = c.frecuencia.tipo === 'semana' ? c.frecuencia.dias.map((d) => DIAS_LARGOS[d]).join(' ') : ''
+  return sinAcentos(`${c.nombre} ${c.telefono} ${c.telefono.replace(/\D/g, '')} ${c.direccion} ${textoFrecuencia(c.frecuencia)} ${dias} ${c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}`)
+}
 
 export function Clientes() {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), []) ?? []
@@ -53,10 +61,8 @@ export function Clientes() {
     return prod.get([...s.sabores.entries()].sort((a, b) => b[1] - a[1])[0][0])
   }
 
-  const t = q.trim().toLowerCase()
-  const lista = clientes.filter(
-    (c) => c.activo !== verInactivos && (!t || `${c.nombre} ${c.telefono} ${c.direccion}`.toLowerCase().includes(t)),
-  )
+  const t = sinAcentos(q.trim())
+  const lista = clientes.filter((c) => c.activo !== verInactivos && (!t || textoBusqueda(c).includes(t)))
   const perfil = clientes.find((c) => c.id === perfilId)
 
   return (
@@ -78,7 +84,7 @@ export function Clientes() {
         </div>
         <div className="relative mt-4">
           <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono o calle" className={`${claseInput} pl-11`} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono, colonia o día" className={`${claseInput} pl-11`} />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28">
@@ -112,7 +118,6 @@ export function Clientes() {
         <Plus size={30} />
       </button>
 
-      {form && <FormCliente cliente={form === 'nuevo' ? undefined : form} onCerrar={() => setForm(null)} />}
       {imprimir && <ImpresionMasiva clientes={clientes} onCerrar={() => setImprimir(false)} />}
       {escaner && (
         <Suspense fallback={null}>
@@ -130,6 +135,8 @@ export function Clientes() {
           onEditar={() => setForm(perfil)}
         />
       )}
+      {/* Después del perfil: al editar desde él, el formulario queda encima y no detrás. */}
+      {form && <FormCliente cliente={form === 'nuevo' ? undefined : form} onCerrar={() => setForm(null)} />}
     </div>
   )
 }

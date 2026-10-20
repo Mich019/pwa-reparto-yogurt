@@ -57,9 +57,12 @@ export function Ajustes() {
         {productos.map((p) => (
           <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
             <Insignia sabor={p.sabor} color={p.color_hex} size={48} />
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
-              <div className="text-xs text-apagado">Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L</div>
+              {p.descripcion && <div className="truncate text-xs text-apagado">{p.descripcion}</div>}
+              <div className="text-xs text-apagado">
+                Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L{(p.presentacion ?? 1) !== 1 && ` · envase de ${p.presentacion} L`}
+              </div>
             </div>
             <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
           </button>
@@ -102,14 +105,22 @@ export function Ajustes() {
 
 function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; tieneVentas: boolean; onCerrar: () => void }) {
   const [sabor, setSabor] = useState(producto?.sabor ?? '')
+  const [descripcion, setDescripcion] = useState(producto?.descripcion ?? '')
+  const [presentacion, setPresentacion] = useState(String(producto?.presentacion ?? 1))
   const [precio, setPrecio] = useState(String(producto?.precio_litro ?? ''))
   const [costo, setCosto] = useState(String(producto?.costo_litro ?? ''))
   const [color, setColor] = useState(producto?.color_hex ?? COLORES[0])
   const [disponible, setDisponible] = useState(producto?.disponible ?? true)
+  // RF-032: litros por envase. Se elige al crear el sabor y ya no cambia: lo vendido se guarda en envases de ese tamaño.
+  const envase = producto ? (producto.presentacion ?? 1) : Math.round(Number(presentacion.replace(',', '.')) * 100) / 100
 
   async function guardarSabor() {
     if (!sabor.trim() || !Number(precio)) return aviso('Falta nombre o precio')
-    await guardar('productos', { id: producto?.id ?? uid(), sabor: sabor.trim(), precio_litro: Number(precio), costo_litro: Number(costo) || 0, color_hex: color, disponible })
+    if (!(envase > 0 && envase <= 999)) return aviso('La presentación son los litros de cada envase, por ejemplo 1 o 0.5')
+    await guardar('productos', {
+      id: producto?.id ?? uid(), sabor: sabor.trim(), descripcion: descripcion.trim(), presentacion: envase,
+      precio_litro: Number(precio), costo_litro: Number(costo) || 0, color_hex: color, disponible,
+    })
     onCerrar()
   }
 
@@ -121,10 +132,25 @@ function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; t
           <p className="text-sm text-apagado">El ícono se elige solo según el nombre: fresa, mango, durazno, nuez, zarzamora, plátano…</p>
         </div>
         <Campo etiqueta="Sabor"><input className={claseInput} value={sabor} onChange={(e) => setSabor(e.target.value)} placeholder="Ej. Fresa" /></Campo>
+        <Campo etiqueta="Descripción (opcional)">
+          <textarea className={claseInput} rows={2} maxLength={500} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Con trozos de fresa, endulzado con miel" />
+        </Campo>
+        {producto ? (
+          <div className="rounded-xl bg-niebla px-4 py-3 text-sm">
+            Presentación: <b>envase de {envase} L</b>. <span className="text-apagado">Se elige al crear el sabor.</span>
+          </div>
+        ) : (
+          <Campo etiqueta="Presentación (litros por envase)">
+            <input className={claseInput} inputMode="decimal" value={presentacion} onChange={(e) => setPresentacion(e.target.value)} placeholder="Ej. 1 o 0.5" />
+          </Campo>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Precio por litro"><input className={claseInput} inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Campo>
           <Campo etiqueta="Costo por litro"><input className={claseInput} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} /></Campo>
         </div>
+        {envase > 0 && envase !== 1 && Number(precio) > 0 && (
+          <p className="-mt-2 text-xs text-apagado">El envase de {envase} L se vende en {dinero(Number(precio) * envase)} y cuesta {dinero((Number(costo) || 0) * envase)}.</p>
+        )}
         <div>
           <div className="mb-1.5 text-sm font-semibold text-apagado">Color de acento</div>
           <div className="flex flex-wrap gap-2">

@@ -13,19 +13,19 @@ npm run preview    # sirve dist/ para probar el modo sin internet
 
 La carpeta `dist/` ya compilada se puede subir tal cual a cualquier hosting estático con HTTPS (Netlify, Vercel, GitHub Pages, Cloudflare Pages). El GPS y la instalación como app requieren HTTPS.
 
-En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clientes de prueba alrededor de tu ubicación con 4 semanas de historial. Se borran en **Sabores → Borrar clientes y pedidos**.
+En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo** carga 10 clientes de prueba alrededor de tu ubicación con 4 semanas de historial. Se borran en **Sabores → Borrar clientes y pedidos**.
 
 ## Qué hace
 
 | Pantalla | Contenido |
 |---|---|
-| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total y **Pedido Realizado**, y una franja con el avance del día. Cada sabor lleva el ícono de su fruta. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
-| Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. |
-| Selector | Tarjetas por sabor con su color, botones grandes − / + por litro, subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
-| Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
+| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total, forma de pago (vuelve a efectivo en cada parada) y **Pedido Realizado**, y una franja con el avance del día. Cada sabor lleva el ícono de su fruta. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
+| Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. Si la ubicación guardada del cliente queda lejos de donde se entregó, ofrece guardarla ahí con un toque. |
+| Selector | Tarjetas por sabor con su color, botones grandes − / + por envase (1 L si el sabor no dice otra cosa), subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
+| Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda por nombre, teléfono, colonia, día de visita u horario, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
 | Producción | Litros por sabor para los próximos 7 días = pedidos agendados + estimado por historial de clientes a los que les toca visita. Ventas de hoy / 7 / 30 días, ganancia neta, más y menos vendido. Con servidor, el administrador también ve aquí **Stock del día** (ver abajo). |
 | Stock | Sólo vendedor y sólo con servidor. Su carga del día, lo que ha entregado y lo que le queda de cada sabor, aunque no tenga señal. |
-| Sabores | Alta/edición de sabores, precio y costo por litro, color, disponible sí/no. Respaldo y restauración en JSON. |
+| Sabores | Alta/edición de sabores con descripción, presentación (litros por envase, se elige al crearlo), precio y costo por litro, color, disponible sí/no. Respaldo y restauración en JSON. Con servidor está en el panel `/admin`; sin servidor, en la propia app junto con Producción. |
 | Reportes | Sólo administrador y sólo con servidor. Corte del día, comparativos por semana y mes, utilidad por sabor, ranking, rendimiento por vendedor y exportación a Excel o CSV (ver abajo). |
 | Equipo | Sólo administrador y sólo con servidor. Altas, ediciones y bajas de cuentas, contraseña temporal, y pasar clientes de un vendedor a otro (ver abajo). |
 
@@ -42,7 +42,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 
 ## Servidor
 
-La API (`server/`, ver [su README](server/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL`; sin esa variable la app sigue siendo sólo local. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
+La API (`api/`, ver [su README](api/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL` (en Vercel, `/api`); con `VITE_OFFLINE_SOLO=true` la app es sólo local y sin cuentas. El administrador trabaja en el panel `/admin`. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
 
 ## Equipo y cartera
 
@@ -93,4 +93,5 @@ Los avisos de stock y de ventas se generan **en el teléfono**, así que funcion
 
 ## Pendiente (siguientes pasos)
 
-- Recuperación de contraseña por correo (RF-002), cierre de sesión que no dependa de la señal.
+- Cierre de sesión que no dependa de la señal.
+- Sincronizar con la app cerrada (RF-052): hoy el service worker despierta a la app al volver la señal y es la app la que envía la cola; con la app cerrada, se envía al abrirla.

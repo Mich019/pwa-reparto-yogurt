@@ -22,7 +22,8 @@ export function SelectorSabores({ productos, valor, onChange }: {
   onChange: (c: Cantidades) => void
 }) {
   const visibles = productos.filter((p) => p.disponible || valor[p.id])
-  const cambiar = (id: string, d: number) => onChange({ ...valor, [id]: Math.max(0, (valor[id] ?? 0) + d) })
+  // Cada toque suma o quita un envase (RF-032: 1 L si el sabor no dice otra cosa).
+  const cambiar = (id: string, d: number) => onChange({ ...valor, [id]: Math.max(0, Math.round(((valor[id] ?? 0) + d) * 100) / 100) })
   const items = aItems(valor, productos)
   const litros = items.reduce((s, i) => s + i.litros, 0)
   const total = items.reduce((s, i) => s + i.litros * i.precio_litro, 0)
@@ -32,6 +33,7 @@ export function SelectorSabores({ productos, valor, onChange }: {
       <div className="grid grid-cols-2 gap-3">
         {visibles.map((p) => {
           const l = valor[p.id] ?? 0
+          const envase = p.presentacion ?? 1
           return (
             <div key={p.id} className={`rounded-2xl bg-papel p-3.5 transition-colors ${l ? 'ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
               <div className="flex items-start justify-between">
@@ -39,12 +41,12 @@ export function SelectorSabores({ productos, valor, onChange }: {
                 <div className={`pt-1 text-sm font-semibold tabular-nums ${l ? 'text-tinta' : 'text-transparent'}`}>{dinero(l * p.precio_litro)}</div>
               </div>
               <div className="mt-2.5 truncate text-base leading-5 font-semibold">{p.sabor}</div>
-              <div className="text-xs text-apagado">{dinero(p.precio_litro)} / L</div>
+              <div className="text-xs text-apagado">{dinero(p.precio_litro)} / L{envase !== 1 && ` · envase de ${envase} L`}</div>
               <div className="mt-3 flex items-center justify-between">
                 <button
-                  onClick={() => cambiar(p.id, -1)}
+                  onClick={() => cambiar(p.id, -envase)}
                   className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea disabled:opacity-35"
-                  aria-label={`Quitar litro de ${p.sabor}`}
+                  aria-label={`Quitar ${envase} L de ${p.sabor}`}
                   disabled={!l}
                 >
                   <Minus size={20} strokeWidth={2.5} />
@@ -54,9 +56,9 @@ export function SelectorSabores({ productos, valor, onChange }: {
                   <div className="text-[11px] text-apagado">litros</div>
                 </div>
                 <button
-                  onClick={() => cambiar(p.id, 1)}
+                  onClick={() => cambiar(p.id, envase)}
                   className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea"
-                  aria-label={`Agregar litro de ${p.sabor}`}
+                  aria-label={`Agregar ${envase} L de ${p.sabor}`}
                 >
                   <Plus size={20} strokeWidth={2.5} />
                 </button>
