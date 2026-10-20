@@ -7,6 +7,7 @@ import type { Db } from './db.js'
 import { rutasAuth } from './auth.js'
 import { rutasCartera } from './cartera.js'
 import { rutasUsuarios } from './usuarios.js'
+import { rutasAdmin } from './admin.js'
 import { rutasSync } from './sync/rutas.js'
 import { rutasRecuperacion } from './recuperacion.js'
 
@@ -85,6 +86,7 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin })
   await rutasUsuarios(app, ctx, { requiereAdmin })
   await rutasCartera(app, ctx, { requiereAdmin })
+  await rutasAdmin(app, ctx, { requiereAdmin })
 
   return app
 }

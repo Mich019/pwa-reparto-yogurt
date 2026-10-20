@@ -1,29 +1,40 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CloudOff, LogOut, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { CloudOff, Eye, EyeOff, LogOut, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { db } from '../../lib/db'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { hace } from '../../lib/fechas'
-import { cambiarPassword, cerrarSesion, useSesion } from '../../lib/sesion'
+import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, useSesion } from '../../lib/sesion'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
 
 export function FormPassword({ onListo }: { onListo?: () => void }) {
-  const [actual, setActual] = useState('')
+  const [actual, setActual] = useState(() => obtenerUltimoPassword() ?? '')
   const [nueva, setNueva] = useState('')
   const [repetir, setRepetir] = useState('')
+  const [verActual, setVerActual] = useState(false)
+  const [verNueva, setVerNueva] = useState(false)
+  const [verRepetir, setVerRepetir] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
 
   async function guardar() {
-    if (nueva.length < 8 || !/[A-Za-z]/.test(nueva) || !/\d/.test(nueva)) return setError('La nueva contraseña debe tener al menos 8 caracteres, con letras y números')
-    if (nueva !== repetir) return setError('Las contraseñas nuevas no coinciden')
+    const act = actual.trim()
+    const nue = nueva.trim()
+    const rep = repetir.trim()
+    if (!act) return setError('Ingresa tu contraseña actual o temporal')
+    if (nue.length < 8 || !/[A-Za-z]/.test(nue) || !/\d/.test(nue)) {
+      return setError('La nueva contraseña debe tener al menos 8 caracteres, con letras y números')
+    }
+    if (nue !== rep) return setError('Las contraseñas nuevas no coinciden')
+    if (act === nue) return setError('La nueva contraseña debe ser diferente a la actual')
+
     setCargando(true)
     setError('')
     try {
-      await cambiarPassword(actual, nueva)
+      await cambiarPassword(act, nue)
       aviso('Contraseña actualizada')
       onListo?.()
     } catch (e) {
@@ -35,17 +46,76 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void guardar() }}>
-      <Campo etiqueta="Contraseña actual">
-        <input className={claseInput} type="password" autoComplete="current-password" value={actual} onChange={(e) => setActual(e.target.value)} />
+      <Campo etiqueta="Contraseña actual o temporal">
+        <div className="relative">
+          <input
+            className={`${claseInput} pr-10`}
+            type={verActual ? 'text' : 'password'}
+            autoComplete="current-password"
+            value={actual}
+            onChange={(e) => setActual(e.target.value)}
+            placeholder="Contraseña actual"
+          />
+          <button
+            type="button"
+            onClick={() => setVerActual(!verActual)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-apagado hover:text-tinta"
+            aria-label="Ver contraseña"
+          >
+            {verActual ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
       </Campo>
-      <Campo etiqueta="Contraseña nueva">
-        <input className={claseInput} type="password" autoComplete="new-password" value={nueva} onChange={(e) => setNueva(e.target.value)} />
+
+      <Campo etiqueta="Contraseña nueva (mínimo 8 caract., letras y números)">
+        <div className="relative">
+          <input
+            className={`${claseInput} pr-10`}
+            type={verNueva ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={nueva}
+            onChange={(e) => setNueva(e.target.value)}
+            placeholder="Nueva contraseña"
+          />
+          <button
+            type="button"
+            onClick={() => setVerNueva(!verNueva)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-apagado hover:text-tinta"
+            aria-label="Ver contraseña"
+          >
+            {verNueva ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
       </Campo>
+
       <Campo etiqueta="Repite la contraseña nueva">
-        <input className={claseInput} type="password" autoComplete="new-password" value={repetir} onChange={(e) => setRepetir(e.target.value)} />
+        <div className="relative">
+          <input
+            className={`${claseInput} pr-10`}
+            type={verRepetir ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={repetir}
+            onChange={(e) => setRepetir(e.target.value)}
+            placeholder="Confirmar contraseña"
+          />
+          <button
+            type="button"
+            onClick={() => setVerRepetir(!verRepetir)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-apagado hover:text-tinta"
+            aria-label="Ver contraseña"
+          >
+            {verRepetir ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
       </Campo>
+
       {error && <p role="alert" className="rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
-      <button type="submit" disabled={cargando} className="flex w-full items-center justify-center rounded-xl bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-700 disabled:opacity-40">
+
+      <button
+        type="submit"
+        disabled={cargando}
+        className="flex w-full items-center justify-center rounded-xl bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
+      >
         {cargando ? 'Guardando…' : 'Guardar contraseña'}
       </button>
     </form>
