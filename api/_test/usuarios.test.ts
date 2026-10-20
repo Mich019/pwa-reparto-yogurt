@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { after, describe, it } from 'node:test'
 import type { FastifyInstance } from 'fastify'
-import pg from 'pg'
-import { construirApp } from '../_lib/app.js'
-import { hashPassword } from '../_lib/auth.js'
-import { PASSWORD, app, cliente, config, crearUsuario, db, login, op, pedido, pull, push, sabores, sesion } from './ayuda.js'
+import { PASSWORD, app, cliente, crearUsuario, db, enBaseAislada, login, op, pedido, pull, push, sabores, sesion } from './ayuda.js'
 
 after(async () => { await app.close(); await db.end() })
 
@@ -17,33 +13,6 @@ async function llamar(s: { token: string }, method: 'GET' | 'POST' | 'PATCH', ur
 }
 const nuevaCuenta = (admin: S, extra: Record<string, unknown> = {}) =>
   llamar(admin, 'POST', '/usuarios', { nombre: 'Rosa Vendedora', correo: `rosa-${randomUUID().slice(0, 8)}@prueba.local`, ...extra })
-
-// Una base propia (esquema aparte) para lo que depende de cuántos administradores o clientes sin vendedor hay en total.
-async function enBaseAislada(prueba: (x: { srv: FastifyInstance; pool: pg.Pool; usuario: (nombre: string, rol: 'administrador' | 'vendedor') => Promise<S & { id: string }> }) => Promise<void>) {
-  const esquema = `aislado_${randomUUID().slice(0, 8)}`
-  const cx = new pg.Client(config.conexion)
-  await cx.connect()
-  await cx.query(`CREATE SCHEMA ${esquema}`)
-  await cx.query(`SET search_path TO ${esquema}`)
-  await cx.query(readFileSync(new URL('../../db/01_esquema.sql', import.meta.url), 'utf8'))
-  const pool = new pg.Pool({ ...config.conexion, options: `-c search_path=${esquema}`, max: 4 })
-  const srv = await construirApp({ db: pool, config })
-  const hash = await hashPassword(PASSWORD)
-  const usuario = async (nombre: string, rol: 'administrador' | 'vendedor') => {
-    const correo = `${nombre}@prueba.local`
-    const { rows } = await pool.query(`INSERT INTO usuarios (nombre, correo, password_hash, rol) VALUES ($1, $2, $3, $4) RETURNING id_usuario`, [nombre, correo, hash, rol])
-    const r = await srv.inject({ method: 'POST', url: '/auth/login', payload: { correo, password: PASSWORD, dispositivo: nombre } })
-    return { id: rows[0].id_usuario as string, token: r.json().accessToken as string, dispositivo: nombre }
-  }
-  try {
-    await prueba({ srv, pool, usuario })
-  } finally {
-    await srv.close()
-    await pool.end()
-    await cx.query(`DROP SCHEMA ${esquema} CASCADE`)
-    await cx.end()
-  }
-}
 
 describe('altas, cambios y bajas de cuentas (RF-038 a RF-040)', () => {
   it('el administrador da de alta a un vendedor con contraseña temporal, y la persona debe cambiarla al entrar', async () => {

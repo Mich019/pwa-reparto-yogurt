@@ -1,6 +1,6 @@
 # API de Reparto Yogurt
 
-Servidor de la PWA: **inicio de sesión por rol** (M01), **sincronización** de lo que el teléfono hizo sin conexión (RF-051, RF-052) y **resolución de conflictos** (RF-053). Node 22 + Fastify sobre la base PostgreSQL de [`../db`](../db/README.md).
+Servidor de la PWA: **inicio de sesión por rol** (M01), **sincronización** de lo que el teléfono hizo sin conexión (RF-051, RF-052) y **resolución de conflictos** (RF-053) y **reportes** de ventas (M08). Node 22 + Fastify sobre la base PostgreSQL de [`../db`](../db/README.md).
 
 ## Puesta en marcha
 
@@ -44,6 +44,8 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 | `POST /usuarios/:id/password` | administrador | Restablece la contraseña (RF-039): temporal nueva, cierra sus sesiones, quita el bloqueo. |
 | `POST /usuarios/:id/baja` y `/reactivar` | administrador | Suspensión y baja (RF-040): corta el acceso al instante y cierra sus sesiones. Reactivar quita bloqueo e intentos. |
 | `POST /clientes/reasignar` | administrador | Pasa clientes a otro vendedor (RF-041): `{ hacia, clienteIds }` o `{ hacia, desde }` para toda una cartera. `null` = sin vendedor. |
+| `GET /reportes/ventas` | administrador | Reporte de un periodo (RF-043 a RF-047): resumen, comparación, serie por día/semana/mes, sabores con utilidad y ranking, y rendimiento por vendedor. |
+| `GET /reportes/exportar` | administrador | El mismo reporte como archivo (RF-048): `.xlsx` con cinco hojas, o `.csv` de una tabla. |
 
 Contraseñas con Argon2id (RF-004). El token de acceso lleva la sesión: si se cierra la sesión, se desactiva al usuario o cambia su rol, el servidor lo nota en la siguiente petición (RF-005, RF-006).
 
@@ -64,6 +66,17 @@ Contraseñas con Argon2id (RF-004). El token de acceso lleva la sesión: si se c
 - **Reasignar**: pasa los clientes y, con ellos, sus pedidos `pendiente`/`en_camino` y recordatorios pendientes. Los pedidos cerrados siguen siendo venta del vendedor que los hizo (sus ventas y su historial no cambian), pero se «tocan» para que el vendedor nuevo los descargue como historial. El vendedor anterior se entera por la tabla `retiros_vendedor`: su siguiente `pull` los trae en `eliminados` (no se usa `eliminaciones`, que es global y borraría el cliente también al vendedor nuevo y al administrador). Si el cliente vuelve a un vendedor que lo tuvo, se borra su retiro. No se puede pasar a un usuario dado de baja.
 - **Copias viejas**: el vendedor de un cliente o pedido que ya existe sólo cambia con `/clientes/reasignar`; un administrador con una copia desactualizada que sincroniza no lo deshace. Si el vendedor anterior manda una edición sin conexión de algo que ya no es suyo, la operación se rechaza con `retirado: true` y su teléfono lo quita, sin recibir datos del cliente.
 - La baja **no** reasigna sola la cartera por la API; la app lo ofrece en el mismo paso. Todo queda en `auditoria` con quién lo hizo.
+
+## Reportes (M08)
+
+`GET /reportes/ventas?desde=2026-10-01&hasta=2026-10-15&agrupar=semana` (fechas `YYYY-MM-DD`; `agrupar` = `dia` | `semana` | `mes`, por defecto `dia`). Hasta tres años por consulta, y por día hasta un año. Opcional `compararDesde` y `compararHasta` para elegir con qué periodo comparar (debe terminar antes de `desde`); sin ellos se usa el de la misma duración justo antes. Responde `resumen`, `anterior` (`null` si ese periodo no tuvo ventas), `periodos`, `sabores`, `ranking` y `vendedores`.
+
+- **Qué cuenta**: pedidos `entregado`, por su `fecha`, con `precio_unitario` y `costo_unitario` del renglón (congelados al vender). Los costos y márgenes sólo salen por estas rutas, que son de administrador (RF-005).
+- **Cálculos en el servidor**: el mismo criterio que `v_ventas_diarias` y `v_ventas_por_sabor`, pero sobre todo el rango, para que «clientes atendidos» cuente una vez a quien compró en dos días distintos.
+- **Periodos**: las semanas van de lunes a domingo; el primero y el último se recortan al rango pedido (`inicio`/`fin`) y los días sin ventas aparecen en cero. `anterior.resumen` se compara con `resumen`.
+- **Sabores**: ordenados de más a menos litros (desempata por ingreso); `ranking.estrella` es el primero si vendió algo y `ranking.menorRotacion` el último. Entran los sabores disponibles aunque no se hayan vendido, y los no disponibles sólo si vendieron. `sinCosto` avisa de ventas con costo 0.
+- **Vendedores**: todos los activos (aunque estén en cero), los dados de baja o administradores que vendieron en el periodo y, si lo hay, «Sin vendedor». `omitidos` son visitas sin venta (RF-026).
+- **Exportar** (`/reportes/exportar?desde=&hasta=&agrupar=&formato=xlsx|csv&tabla=ventas|periodos|sabores|vendedores`): `xlsx` trae todas las hojas y `tabla` sólo aplica al CSV. El `.xlsx` se escribe a mano (`_lib/exportar.ts`, un zip con XML, sin dependencias): fechas y números son valores de Excel, con encabezado fijo y filtros. El CSV lleva BOM para Excel y neutraliza celdas que empiezan con `=`, `+`, `-` o `@` (un cliente llamado `=HIPERVINCULO(…)` no se ejecuta). Más de 100,000 renglones de ventas responde `413`.
 
 ## Sincronización y conflictos
 

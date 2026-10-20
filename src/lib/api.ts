@@ -37,3 +37,18 @@ export async function api<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' |
   if (!r.ok) throw new ErrorApi(r.status, datos?.error ?? `Error ${r.status}`, datos?.codigo, datos)
   return datos as T
 }
+
+// Un archivo que genera el servidor (Excel, CSV). Los errores llegan como JSON, igual que en `api`.
+export async function apiArchivo(ruta: string, token: string): Promise<Blob> {
+  let r: Response
+  try {
+    r = await fetch(API_URL + ruta, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(120_000) })
+  } catch {
+    throw new ErrorRed('Sin conexión con el servidor')
+  }
+  if (!r.ok) {
+    const datos = await r.json().catch(() => null)
+    throw new ErrorApi(r.status, datos?.error ?? `Error ${r.status}`, datos?.codigo, datos)
+  }
+  return r.blob()
+}

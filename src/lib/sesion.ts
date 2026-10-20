@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { api, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
+import { api, apiArchivo, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
@@ -124,12 +124,12 @@ export const sesionRevocada = () => fijar(null)
 
 // Llamada al servidor con la sesión de este teléfono: renueva el token si hace falta y, si el servidor lo
 // rechaza, pide uno nuevo y reintenta una vez. Si la sesión se revocó, vuelve la pantalla de entrada.
-export async function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PATCH'; cuerpo?: unknown } = {}): Promise<T> {
+async function conSesion<T>(llamada: (token: string) => Promise<T>): Promise<T> {
   for (let intento = 0; ; intento++) {
     const token = await tokenValido()
     if (!token) throw new ErrorRed(actual ? 'Sin conexión' : 'Sin sesión')
     try {
-      return await api<T>(ruta, { ...opciones, token })
+      return await llamada(token)
     } catch (e) {
       if (e instanceof ErrorApi && e.status === 401 && intento === 0) {
         expirarToken()
@@ -140,6 +140,13 @@ export async function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'G
     }
   }
 }
+
+export function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PATCH'; cuerpo?: unknown } = {}): Promise<T> {
+  return conSesion((token) => api<T>(ruta, { ...opciones, token }))
+}
+
+// Igual, para bajar un archivo (reportes en Excel o CSV).
+export const descargarAutenticado = (ruta: string): Promise<Blob> => conSesion((token) => apiArchivo(ruta, token))
 
 export function marcarPasswordPendiente(pendiente: boolean) {
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, debeCambiarPassword: pendiente } })

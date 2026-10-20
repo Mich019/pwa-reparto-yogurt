@@ -53,7 +53,7 @@ El diseño base era correcto en lo esencial: cuatro entidades (Clientes, Product
 | `retiros_vendedor` | Clientes, pedidos y recordatorios que salieron de la cartera de un vendedor al reasignar (no son borrados: sólo ese teléfono los quita) | RF-041 |
 | `suscripciones_push`, `notificaciones` | Avisos al vendedor | RF-054, RF-055 |
 
-Vistas: `v_ruta_del_dia` (RF-027), `v_ventas_diarias` (RF-043, RF-044, RF-047), `v_ventas_por_sabor` (RF-045, RF-046), `v_resumen_cliente` (RF-012, RF-013).
+Vistas: `v_ruta_del_dia` (RF-027), `v_ventas_diarias` (RF-043, RF-044, RF-047), `v_ventas_por_sabor` (RF-045, RF-046), `v_resumen_cliente` (RF-012, RF-013). La API de reportes (`api/_lib/reportes.ts`) usa el mismo criterio sobre todo el rango pedido en lugar de sumar día por día.
 Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor a producir (agendados + estimado por historial).
 
 ## Bases ya creadas
