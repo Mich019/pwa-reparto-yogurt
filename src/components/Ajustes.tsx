@@ -4,7 +4,6 @@ import { Download, Plus, Trash2, Upload } from 'lucide-react'
 import { borrar, db, guardar, uid, type Producto } from '../lib/db'
 import { dinero, hoy } from '../lib/fechas'
 import { borrarTodo } from '../lib/demo'
-import { Insignia } from './Fruta'
 import { Boton, Campo, Hoja, aviso, claseInput } from './ui'
 
 const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce', '#ef4444', '#22c55e', '#38bdf8', '#a3e635']
@@ -56,7 +55,7 @@ export function Ajustes() {
       <div className="mt-4 space-y-2">
         {productos.map((p) => (
           <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
-            <Insignia sabor={p.sabor} color={p.color_hex} size={48} />
+            <span className="h-11 w-11 shrink-0 rounded-full border border-black/10" style={{ background: p.color_hex }} />
             <div className="flex-1">
               <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
               <div className="text-xs text-apagado">Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L</div>
@@ -114,17 +113,13 @@ function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; t
   return (
     <Hoja abierta onCerrar={onCerrar} titulo={producto ? 'Editar sabor' : 'Nuevo sabor'}>
       <div className="space-y-4 pb-4">
-        <div className="flex items-center gap-3">
-          <Insignia sabor={sabor} color={color} size={56} />
-          <p className="text-sm text-apagado">El ícono se elige solo según el nombre: fresa, mango, durazno, nuez, zarzamora, plátano…</p>
-        </div>
         <Campo etiqueta="Sabor"><input className={claseInput} value={sabor} onChange={(e) => setSabor(e.target.value)} placeholder="Ej. Fresa" /></Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Precio por litro"><input className={claseInput} inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Campo>
           <Campo etiqueta="Costo por litro"><input className={claseInput} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} /></Campo>
         </div>
         <div>
-          <div className="mb-1.5 text-sm font-semibold text-apagado">Color de acento</div>
+          <div className="mb-1.5 text-sm font-semibold text-apagado">Color</div>
           <div className="flex flex-wrap gap-2">
             {COLORES.map((c) => (
               <button key={c} onClick={() => setColor(c)} className={`h-10 w-10 rounded-full ${color === c ? 'ring-2 ring-tinta ring-offset-2' : ''}`} style={{ background: c }} aria-label={c} />

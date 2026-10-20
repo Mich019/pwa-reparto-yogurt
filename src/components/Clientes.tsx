@@ -7,7 +7,6 @@ import { DIAS_CORTOS, dinero, textoFecha, textoFrecuencia } from '../lib/fechas'
 import { ubicacionActual, type Punto } from '../lib/ruteo'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
-import { IconoSabor } from './Fruta'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from './ui'
 
 export function Clientes() {
@@ -82,7 +81,7 @@ export function Clientes() {
                 <div className="truncate text-base leading-5 font-semibold">{c.nombre}</div>
                 <div className="mt-0.5 truncate text-sm text-apagado">
                   {textoFrecuencia(c.frecuencia)} · {c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}
-                  {fav && <span className="inline-flex items-center gap-1 align-middle"> · <IconoSabor sabor={fav.sabor} size={15} /> {fav.sabor}</span>}
+                  {fav && <> · ★ {fav.sabor}</>}
                 </div>
               </div>
               {s?.proximo && <div className="rounded-full bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
@@ -133,7 +132,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
         <div className="text-sm text-apagado">{cliente.direccion} · {textoFrecuencia(cliente.frecuencia)} · {cliente.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <Dato valor={`${litros} L`} etiqueta="Consumidos" />
-          <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={favorito ? <IconoSabor sabor={favorito} size={13} className="inline" /> : <Star size={12} className="inline" />} />
+          <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={<Star size={12} className="inline" />} />
           <Dato valor={ultima ? textoFecha(ultima.fecha) : '—'} etiqueta="Última visita" />
         </div>
         <div className="grid grid-cols-4 gap-2">
@@ -195,7 +194,7 @@ function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => {
       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
         {p.items.map((i) => (
           <span key={i.productoId} className="flex items-center gap-1 text-xs">
-            <IconoSabor sabor={sabor(i.productoId)?.sabor ?? ''} size={15} />
+            <span className="h-3 w-3 rounded-full" style={{ background: sabor(i.productoId)?.color_hex }} />
             {i.litros}L {sabor(i.productoId)?.sabor}
           </span>
         ))}

@@ -19,7 +19,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 
 | Pantalla | Contenido |
 |---|---|
-| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total y **Pedido Realizado**, y una franja con el avance del día. Cada sabor lleva el ícono de su fruta. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
+| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total y **Pedido Realizado**, y una franja con el avance del día. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
 | Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. |
 | Selector | Tarjetas por sabor con su color, botones grandes − / + por litro, subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
 | Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
@@ -28,7 +28,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 
 ## Técnico
 
-- Diseño estilo Uber, limpio: fondo blanco, botones negros, tarjetas grises suaves y azul sólo para la ruta. Colores definidos en `src/index.css` (`@theme`). Los íconos de fruta de cada sabor están en `src/components/Fruta.tsx` y se eligen solos por el nombre del sabor (fresa, durazno, mango, nuez, zarzamora, plátano…); un sabor sin fruta conocida usa un vasito de yogurt. Tipografía Inter (licencia OFL en `src/fonts/`), incluida en la app para que se vea igual sin internet.
+- Diseño estilo Uber, limpio: fondo blanco, botones negros, tarjetas grises suaves y azul sólo para la ruta. Colores definidos en `src/index.css` (`@theme`). Tipografía Inter (licencia OFL en `src/fonts/`), incluida en la app para que se vea igual sin internet.
 
 - Vite + React 19 + TypeScript + Tailwind 4. Mapa: `maplibre-gl` con estilo libre de OpenFreeMap (sin llave).
 - Datos en IndexedDB con Dexie (`src/lib/db.ts`). Cada cambio queda también en la tabla `cola` para sincronizar con un servidor cuando exista.

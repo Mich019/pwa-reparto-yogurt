@@ -9,7 +9,6 @@ import { dinero, hoy, iso, textoFecha } from '../lib/fechas'
 import { calcularRuta, distancia, enlaceNavegar, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../lib/ruteo'
 import { cargarDemo } from '../lib/demo'
 import { Mapa, type Pin } from './Mapa'
-import { IconoSabor } from './Fruta'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { Accion, Boton, Hoja, Segmentado, aviso, telLimpio } from './ui'
@@ -266,8 +265,8 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
                   {activo.items.map((i) => {
                     const p = prodPorId.get(i.productoId)
                     return (
-                      <span key={i.productoId} className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
-                        <IconoSabor sabor={p?.sabor ?? ''} size={22} />
+                      <span key={i.productoId} className="flex items-center gap-1.5 rounded-full bg-niebla py-1.5 pr-3 pl-2 text-sm font-semibold">
+                        <span className="h-4 w-4 rounded-full border border-black/15" style={{ background: p?.color_hex ?? '#888' }} />
                         {i.litros} L {p?.sabor ?? '¿?'}
                       </span>
                     )
