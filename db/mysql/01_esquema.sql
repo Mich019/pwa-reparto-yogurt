@@ -26,8 +26,7 @@ CREATE TABLE usuarios (
   rol                   ENUM('administrador', 'vendedor') NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                BOOLEAN      NOT NULL DEFAULT TRUE,     -- RF-040
   debe_cambiar_password BOOLEAN      NOT NULL DEFAULT FALSE,    -- RF-039
-  intentos_fallidos     SMALLINT     NOT NULL DEFAULT 0,        -- RF-003
-  bloqueado_hasta       DATETIME(3),                            -- RF-003
+  password_cambiado_en  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3), -- RF-003: los fallidos de antes ya no cuentan
   ultimo_acceso         DATETIME(3),
   creado_en             DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   actualizado_en        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -35,8 +34,7 @@ CREATE TABLE usuarios (
   PRIMARY KEY (id_usuario),
   UNIQUE KEY usuarios_correo_unico (correo),
   CONSTRAINT usuarios_correo_formato CHECK (correo REGEXP '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$'),
-  CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%'),
-  CONSTRAINT usuarios_intentos_no_negativos CHECK (intentos_fallidos >= 0)
+  CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%')
 ) ENGINE = InnoDB;
 
 -- RF-006: sesiones con refresh token; cerrar sesión = revocar.
@@ -64,8 +62,10 @@ CREATE TABLE recuperaciones_password (
   creado_en       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   expira_en       DATETIME(3)  NOT NULL,
   usado_en        DATETIME(3),
+  ip              VARCHAR(45),                                -- topes de códigos por conexión
   PRIMARY KEY (id_recuperacion),
   KEY recuperaciones_usuario (id_usuario, usado_en),
+  KEY recuperaciones_ip (ip, creado_en),
   CONSTRAINT recuperaciones_usuario_fk FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
@@ -79,6 +79,7 @@ CREATE TABLE intentos_login (
   creado_en  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id_intento),
   KEY intentos_login_correo (correo, creado_en),
+  KEY intentos_login_ip (ip, creado_en),
   CONSTRAINT intentos_login_usuario_fk FOREIGN KEY (id_usuario) REFERENCES usuarios (id_usuario) ON DELETE SET NULL
 ) ENGINE = InnoDB;
 

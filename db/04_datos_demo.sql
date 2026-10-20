@@ -3,7 +3,8 @@
 -- 1 administrador, 1 vendedor, 10 clientes en CDMX, 4 semanas de historial,
 -- la ruta de hoy y algunos pedidos de la próxima semana.
 --
--- Usuarios (contraseña de ambos: Yogurt2026!, se pide cambiarla al entrar):
+-- Usuarios (sin contraseña utilizable: `npm run db:migrar -- --demo` les pone una temporal al azar y la muestra;
+-- se pide cambiarla al entrar):
 --   admin@yogurt.local     · administrador
 --   vendedor@yogurt.local  · vendedor
 -- Uso:  psql -U postgres -d reparto_yogurt -f 04_datos_demo.sql
@@ -16,7 +17,7 @@ SET LOCAL app.permitir_correccion = 'on';   -- permite cargar pedidos ya entrega
 
 DO $$
 DECLARE
-  hash      constant text := '$argon2id$v=19$m=65536,t=3,p=4$/3EZaDHF9wCysjRqDJQRWw$BgW3m7v++fxocFm83ZZH6ilwYSk5c+MsCQuEwnGYUKg';
+  hash      constant text := '$argon2id$sin-contrasena';  -- ninguna contraseña coincide con esto
   v_admin   uuid;
   v_vend    uuid;
   c         record;

@@ -44,7 +44,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
     e.preventDefault()
     const n = nueva.trim()
     if (codigo.trim().length !== 6) return setError('Escribe el código de 6 dígitos')
-    if (n.length < 8 || !/[A-Za-z]/.test(n) || !/\d/.test(n)) return setError('La nueva contraseña debe tener al menos 8 caracteres, con letras y números')
+    if (n.length < 10 || !/[A-Za-z]/.test(n) || !/\d/.test(n)) return setError('La nueva contraseña debe tener al menos 10 caracteres, con letras y números')
     if (n !== confirmar.trim()) return setError('Las contraseñas no coinciden')
     setCargando(true)
     setError('')
@@ -107,7 +107,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
               autoComplete="new-password"
               value={nueva}
               onChange={(e) => setNueva(e.target.value)}
-              placeholder="Mínimo 8 caracteres (letras y números)"
+              placeholder="Mínimo 10 caracteres (letras y números)"
               className={`${claseInput} pr-11`}
             />
             <button

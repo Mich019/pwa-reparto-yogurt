@@ -14,6 +14,7 @@ import { rutasUsuarios } from './usuarios.js'
 import { rutasAdmin } from './admin.js'
 import { rutasSync } from './sync/rutas.js'
 import { rutasRecuperacion } from './recuperacion.js'
+import { ipCliente } from './seguridad.js'
 
 export type Rol = 'administrador' | 'vendedor'
 export interface Usuario {
@@ -36,10 +37,12 @@ export interface Contexto {
 }
 
 export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
+  const saltos = ctx.config.trustProxy
   const app = Fastify({
     logger: process.env.NODE_ENV !== 'test',
-    trustProxy: ctx.config.trustProxy,
-    bodyLimit: 5 * 1024 * 1024,
+    // Se le cree a X-Forwarded-For sólo lo que agregaron nuestros proxies (los primeros saltos); lo de antes lo pudo inventar quien llama.
+    trustProxy: saltos ? (_ip: string, salto: number) => salto < saltos : false,
+    bodyLimit: 1024 * 1024, // 1 MB; la sincronización (muchos cambios juntos) tiene su propio tope
     // En Vercel todo llega como /api/...; en local y en las pruebas, sin prefijo. Ambas formas valen.
     rewriteUrl: (req) => (req.url ?? '/').replace(/^\/api(?=\/|\?|$)/, '') || '/',
   })
@@ -51,9 +54,23 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
     return rep.code(500).send({ error: 'Error interno del servidor' })
   })
 
+  // Cabeceras de seguridad en todas las respuestas: nada queda en cachés ni en el Referer, el navegador no adivina
+  // el tipo de contenido y ninguna respuesta se puede mostrar dentro de otra página.
+  app.addHook('onRequest', async (_req, rep) => {
+    rep.header('cache-control', 'no-store')
+    rep.header('x-content-type-options', 'nosniff')
+    rep.header('referrer-policy', 'no-referrer')
+    rep.header('x-frame-options', 'DENY')
+    rep.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'")
+  })
+
   await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'] })
-  await app.register(rateLimit, { global: false, allowList: () => ctx.config.sinLimiteDePeticiones })
-  await app.register(jwt, { secret: ctx.config.jwtSecret, sign: { expiresIn: `${ctx.config.accesoMinutos}m` } })
+  await app.register(rateLimit, { global: false, allowList: () => ctx.config.sinLimiteDePeticiones, keyGenerator: (req) => ipCliente(req, ctx.config) })
+  await app.register(jwt, {
+    secret: ctx.config.jwtSecret,
+    sign: { algorithm: 'HS256', expiresIn: `${ctx.config.accesoMinutos}m` },
+    verify: { algorithms: ['HS256'] },
+  })
 
   // RF-005 / RF-006: el token trae la sesión; si se revocó (cerrar sesión) o el usuario se
   // desactivó o cambió de rol, la base lo dice en cada petición.

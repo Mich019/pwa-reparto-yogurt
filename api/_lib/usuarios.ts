@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
-import { hashPassword, passwordValida } from './auth.js'
+import type { Config } from './config.js'
+import { hashPassword, revisarPassword } from './contrasenas.js'
 import { tx, type Cx } from './db.js'
 import { passwordTemporal } from './seguridad.js'
 
@@ -20,17 +21,31 @@ const bodyCrear = z.object({
   correo,
   telefono: telefono.optional(),
   rol: rol.default('vendedor'),
-  password: z.string().min(8).max(200).optional(), // si falta, el servidor genera una temporal
+  password: z.string().max(1000).optional(), // si falta, el servidor genera una temporal
 })
 const bodyEditar = z
   .object({ nombre: z.string().trim().min(2).max(100), correo, telefono, rol })
   .partial()
   .refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
-const bodyPassword = z.object({ password: z.string().min(8).max(200).optional() })
+const bodyPassword = z.object({ password: z.string().max(1000).optional() })
 
 const revisa = (e: z.ZodError) => 'Revisa estos datos: ' + [...new Set(e.issues.map((i) => String(i.path[0] ?? 'datos')))].join(', ')
 
-const COLUMNAS = `u.id_usuario, u.nombre, u.correo, u.telefono, u.rol, u.activo, u.debe_cambiar_password, u.bloqueado_hasta, u.ultimo_acceso, u.creado_en,
+// RF-003: hasta cuándo está bloqueada la cuenta desde alguna conexión (la misma cuenta que hace auth.ts al entrar):
+// los fallidos de cada IP después de su último acceso bueno y del último cambio de contraseña, dentro de la ventana.
+const bloqueo = (config: Config) => {
+  const max = Math.trunc(config.maxIntentos)
+  const ventana = `make_interval(mins => ${Math.trunc(config.bloqueoMinutos)})`
+  return `(SELECT max(b.hasta) FROM (
+      SELECT (array_agg(i.creado_en ORDER BY i.creado_en DESC))[${max}] + ${ventana} AS hasta
+        FROM intentos_login i
+       WHERE lower(i.correo) = lower(u.correo) AND NOT i.exitoso AND i.creado_en > greatest(now() - ${ventana}, u.password_cambiado_en)
+         AND NOT EXISTS (SELECT 1 FROM intentos_login e WHERE e.exitoso AND lower(e.correo) = lower(u.correo)
+                           AND e.ip IS NOT DISTINCT FROM i.ip AND e.creado_en > i.creado_en)
+       GROUP BY i.ip HAVING count(*) >= ${max}) b) AS bloqueado_hasta`
+}
+const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefono, u.rol, u.activo, u.debe_cambiar_password, u.ultimo_acceso, u.creado_en,
+  ${bloqueo(config)},
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario) AS clientes,
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario AND c.activo) AS clientes_activos`
 
@@ -45,7 +60,6 @@ function wire(r: any) {
     clientes: r.clientes as number, clientesActivos: r.clientes_activos as number,
   }
 }
-const leer = async (c: Cx, id: string) => (await c.query(`SELECT ${COLUMNAS} FROM usuarios u WHERE u.id_usuario = $1`, [id])).rows[0]
 const otroAdminActivo = async (c: Cx, excepto: string) =>
   (await c.query(`SELECT 1 FROM usuarios WHERE rol = 'administrador' AND activo AND id_usuario <> $1 LIMIT 1`, [excepto])).rows.length > 0
 // Sin sesiones tampoco quedan teléfonos suscritos a sus avisos (RF-054): un teléfono que ya no es suyo no debe seguir recibiéndolos.
@@ -59,8 +73,10 @@ const falla = (status: number, error: string, codigo?: string): Falla => ({ stat
 const esFalla = (r: unknown): r is Falla => !!r && typeof r === 'object' && 'status' in r
 
 // RF-038 a RF-040: altas, cambios y bajas de cuentas. Sólo el administrador.
-export async function rutasUsuarios(app: FastifyInstance, { db }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
+export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
   const pre = { preHandler: requiereAdmin }
+  const COLUMNAS = columnas(config)
+  const leer = async (c: Cx, id: string) => (await c.query(`SELECT ${COLUMNAS} FROM usuarios u WHERE u.id_usuario = $1`, [id])).rows[0]
 
   app.get('/usuarios', pre, async () => {
     const { rows } = await db.query(`SELECT ${COLUMNAS} FROM usuarios u ORDER BY u.activo DESC, (u.rol = 'administrador') DESC, lower(u.nombre)`)
@@ -72,9 +88,10 @@ export async function rutasUsuarios(app: FastifyInstance, { db }: Contexto, { re
   app.post('/usuarios', pre, async (req, rep) => {
     const b = bodyCrear.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: revisa(b.error) })
-    if (b.data.password && !passwordValida(b.data.password)) return rep.code(400).send({ error: 'La contraseña debe tener letras y números' })
+    const regla = b.data.password === undefined ? null : revisarPassword(b.data.password, b.data.correo)
+    if (regla) return rep.code(400).send({ error: regla })
     const temporal = b.data.password ?? passwordTemporal()
-    const hash = await hashPassword(temporal)
+    const hash = await hashPassword(config, temporal)
     try {
       const u = await tx(db, req.usuario.id, async (c) => {
         const { rows } = await c.query(
@@ -128,12 +145,18 @@ export async function rutasUsuarios(app: FastifyInstance, { db }: Contexto, { re
     if (!p.success) return rep.code(404).send({ error: 'Esa cuenta no existe' })
     if (!b.success) return rep.code(400).send({ error: revisa(b.error) })
     if (p.data.id === req.usuario.id) return rep.code(400).send({ error: 'Tu propia contraseña se cambia en Cuenta' })
-    if (b.data.password && !passwordValida(b.data.password)) return rep.code(400).send({ error: 'La contraseña debe tener letras y números' })
+    if (b.data.password !== undefined) {
+      const { rows: [u] } = await db.query(`SELECT correo FROM usuarios WHERE id_usuario = $1`, [p.data.id])
+      if (!u) return rep.code(404).send({ error: 'Esa cuenta no existe' })
+      const regla = revisarPassword(b.data.password, u.correo)
+      if (regla) return rep.code(400).send({ error: regla })
+    }
     const temporal = b.data.password ?? passwordTemporal()
-    const hash = await hashPassword(temporal)
+    const hash = await hashPassword(config, temporal)
     const r = await tx(db, req.usuario.id, async (c) => {
+      // password_cambiado_en también la desbloquea: los intentos fallidos de antes dejan de contar (RF-003).
       const { rowCount } = await c.query(
-        `UPDATE usuarios SET password_hash = $2, debe_cambiar_password = true, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id_usuario = $1`,
+        `UPDATE usuarios SET password_hash = $2, debe_cambiar_password = true, password_cambiado_en = now() WHERE id_usuario = $1`,
         [p.data.id, hash],
       )
       if (!rowCount) return falla(404, 'Esa cuenta no existe')
@@ -154,7 +177,7 @@ export async function rutasUsuarios(app: FastifyInstance, { db }: Contexto, { re
       const { rows: [u] } = await c.query(`SELECT id_usuario, rol, activo FROM usuarios WHERE id_usuario = $1 FOR UPDATE`, [p.data.id])
       if (!u) return falla(404, 'Esa cuenta no existe')
       if (!activo && u.activo && u.rol === 'administrador' && !(await otroAdminActivo(c, u.id_usuario))) return falla(409, 'Debe quedar al menos un administrador activo', 'ULTIMO_ADMIN')
-      await c.query(`UPDATE usuarios SET activo = $2, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id_usuario = $1`, [p.data.id, activo])
+      await c.query(`UPDATE usuarios SET activo = $2 WHERE id_usuario = $1`, [p.data.id, activo])
       if (!activo) await cerrarSesiones(c, p.data.id)
       return { usuario: wire(await leer(c, p.data.id)) }
     })

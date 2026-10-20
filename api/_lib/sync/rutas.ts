@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Contexto } from '../app.js'
 import { tx } from '../db.js'
 import { hoyEn } from '../fechas.js'
+import { ipCliente } from '../seguridad.js'
 import type { Despachador } from '../notificaciones.js'
 import { ADAPTADORES } from './adaptadores.js'
 import { conCostos, procesarOperacion, type Efectos, type Resultado } from './aplicar.js'
@@ -22,7 +23,7 @@ export async function rutasSync(
   despachador: Despachador,
 ) {
   // RF-052: el teléfono envía su cola de cambios. Cada operación es independiente.
-  app.post('/sync/push', { preHandler: requiereSesion, config: { rateLimit: { max: 120, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.headers.authorization ?? req.ip } } }, async (req, rep) => {
+  app.post('/sync/push', { preHandler: requiereSesion, bodyLimit: 5 * 1024 * 1024, config: { rateLimit: { max: 120, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.headers.authorization ?? ipCliente(req, config) } } }, async (req, rep) => {
     const body = bodyPush.safeParse(req.body)
     if (!body.success) return rep.code(400).send({ error: 'Datos de sincronización inválidos', detalles: body.error.issues.slice(0, 5) })
     const ahoraMs = Date.now()

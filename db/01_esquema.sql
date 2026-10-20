@@ -46,15 +46,13 @@ CREATE TABLE usuarios (
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040
   debe_cambiar_password boolean NOT NULL DEFAULT false,     -- RF-039 restablecimiento manual
-  intentos_fallidos     smallint NOT NULL DEFAULT 0,        -- RF-003
-  bloqueado_hasta       timestamptz,                        -- RF-003
+  password_cambiado_en  timestamptz NOT NULL DEFAULT now(), -- RF-003: los intentos fallidos de antes ya no cuentan
   ultimo_acceso         timestamptz,
   creado_en             timestamptz NOT NULL DEFAULT now(),
   actualizado_en        timestamptz NOT NULL DEFAULT now(),
   version               integer NOT NULL DEFAULT 1,
   CONSTRAINT usuarios_correo_formato CHECK (correo ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
-  CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%'),
-  CONSTRAINT usuarios_intentos_no_negativos CHECK (intentos_fallidos >= 0)
+  CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%')
 );
 CREATE UNIQUE INDEX usuarios_correo_unico ON usuarios (lower(correo));
 
@@ -80,11 +78,14 @@ CREATE TABLE recuperaciones_password (
   creado_en       timestamptz NOT NULL DEFAULT now(),
   expira_en       timestamptz NOT NULL,
   usado_en        timestamptz,
-  intentos        smallint NOT NULL DEFAULT 0                  -- códigos incorrectos; a los 5 se invalida
+  intentos        smallint NOT NULL DEFAULT 0,                 -- códigos incorrectos; a los 5 se invalida
+  ip              inet                                         -- topes de códigos por conexión
 );
 CREATE INDEX recuperaciones_usuario ON recuperaciones_password (id_usuario) WHERE usado_en IS NULL;
+CREATE INDEX recuperaciones_ip ON recuperaciones_password (ip, creado_en DESC);
 
--- RF-003: registro de intentos de inicio de sesión.
+-- RF-003: registro de intentos de inicio de sesión. Los límites cuentan por cuenta + IP y por IP (api/_lib/auth.ts):
+-- así nadie bloquea la cuenta de otro desde fuera ni prueba contraseñas en muchas cuentas.
 CREATE TABLE intentos_login (
   id_intento  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   correo      varchar(150) NOT NULL,
@@ -94,6 +95,7 @@ CREATE TABLE intentos_login (
   creado_en   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX intentos_login_correo ON intentos_login (lower(correo), creado_en DESC);
+CREATE INDEX intentos_login_ip ON intentos_login (ip, creado_en DESC);
 
 -- =============================================================================
 -- M02 / M03 · Clientes, frecuencia, QR y NFC
@@ -418,9 +420,9 @@ BEGIN
   -- Nunca guardar contraseñas en la bitácora.
   antes   := antes   - 'password_hash';
   despues := despues - 'password_hash';
-  -- Ignora cambios de rutina (marcas de tiempo, contador de intentos de login).
-  IF TG_OP = 'UPDATE' AND antes - ARRAY['actualizado_en', 'version', 'ultimo_acceso', 'intentos_fallidos', 'bloqueado_hasta']
-                        = despues - ARRAY['actualizado_en', 'version', 'ultimo_acceso', 'intentos_fallidos', 'bloqueado_hasta'] THEN
+  -- Ignora cambios de rutina (marcas de tiempo del último acceso).
+  IF TG_OP = 'UPDATE' AND antes - ARRAY['actualizado_en', 'version', 'ultimo_acceso']
+                        = despues - ARRAY['actualizado_en', 'version', 'ultimo_acceso'] THEN
     RETURN NULL;
   END IF;
   INSERT INTO auditoria (id_usuario, accion, tabla, id_registro, datos_antes, datos_despues)

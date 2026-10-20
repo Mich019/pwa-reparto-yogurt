@@ -81,6 +81,8 @@ async function adoptarUsuario(u: UsuarioSesion) {
   await db.meta.put({ clave: 'usuarioId', valor: u.id })
 }
 
+// Sólo con una contraseña temporal recién usada: el cambio obligatorio la trae escrita. Nunca en una sesión normal,
+// donde pedir la actual protege a la cuenta si alguien toma el teléfono abierto (y el ojito la mostraría).
 let ultimoPasswordSesion: string | null = null
 export const obtenerUltimoPassword = () => ultimoPasswordSesion
 export const limpiarUltimoPassword = () => { ultimoPasswordSesion = null }
@@ -95,7 +97,7 @@ export async function iniciarSesion(correo: string, password: string) {
     await api('/auth/logout', { cuerpo: { refreshToken: r.refreshToken } }).catch(() => {})
     throw e
   }
-  ultimoPasswordSesion = p
+  ultimoPasswordSesion = r.usuario.debeCambiarPassword ? p : null
   fijar({ accessToken: r.accessToken, expiraEn: r.expiraEn, refreshToken: r.refreshToken, usuario: r.usuario })
 }
 

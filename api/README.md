@@ -7,13 +7,13 @@ Servidor de la PWA: **inicio de sesión por rol** (M01), **sincronización** de 
 ```bash
 # en la raíz del repo
 npm install
-cp .env.example .env        # ajusta DATABASE_URL y pon un JWT_SECRET largo (openssl rand -hex 32)
+cp .env.example .env        # ajusta DATABASE_URL; JWT_SECRET y AUTH_PEPPER_SECRET: dos claves distintas (openssl rand -hex 32)
 npm run dev                 # app en http://localhost:5173 y API en http://localhost:3000 (npm run dev:api, sólo la API)
 ```
 
-La base se crea con `db/crear_bd.sql` (ver `db/README.md`). Si ya la tenías creada antes de esta API, aplica además `db/migraciones/001_indice_sync.sql` y `002_retiros_vendedor.sql`.
+La base se crea con `npm run db:migrar` o con `db/crear_bd.sql` (ver `db/README.md`). Si ya la tenías creada, `npm run db:migrar` aplica las migraciones de `db/migraciones/` que falten.
 
-Cuentas de prueba (sólo con los datos demo): `admin@yogurt.local` y `vendedor@yogurt.local`, contraseña `Yogurt2026!`. La primera vez piden elegir una contraseña propia.
+Cuentas de prueba: `npm run db:migrar -- --demo`, sobre una base vacía, crea `admin@yogurt.local` y `vendedor@yogurt.local` y muestra sus contraseñas temporales. Son al azar en cada base (ninguna contraseña va escrita en el repositorio) y al entrar piden elegir una propia. Si la base se creó con `crear_bd.sql`, esas cuentas no tienen contraseña: usa «¿Olvidaste tu contraseña?» (en local, sin `RESEND_API_KEY`, el código sale en la consola de la API).
 
 ### Conectar la app
 
@@ -29,11 +29,11 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 
 | Ruta | Quién | Para qué |
 |---|---|---|
-| `POST /auth/login` | todos | Correo y contraseña → token de acceso (15 min) + token de renovación (30 días). Bloqueo de 15 min tras 5 fallos (RF-003). |
+| `POST /auth/login` | todos | Correo y contraseña → token de acceso (15 min) + token de renovación (30 días). Límite de intentos fallidos (RF-003, ver [Seguridad](#seguridad)). |
 | `POST /auth/refresh` | todos | Token de acceso nuevo con el de renovación. |
 | `POST /auth/logout` | todos | Revoca la sesión de ese teléfono (RF-006). |
-| `POST /auth/cambiar-password` | sesión | Contraseña nueva; cierra las demás sesiones. Obligatorio si `debe_cambiar_password`. |
-| `POST /auth/recuperar` | todos | Manda por correo un código de 6 dígitos que vale 15 min (RF-002). Responde lo mismo exista o no la cuenta. Necesita `RESEND_API_KEY`; sin ella, fuera de producción el código sale en la consola. |
+| `POST /auth/cambiar-password` | sesión | Contraseña nueva; cierra las demás sesiones. Obligatorio si `debe_cambiar_password`. Una contraseña actual equivocada cuenta como intento fallido. |
+| `POST /auth/recuperar` | todos | Manda por correo un código de 6 dígitos que vale 15 min (RF-002). Responde lo mismo y tarda lo mismo exista o no la cuenta; hasta 3 códigos por cuenta y 10 por conexión cada hora. Necesita `RESEND_API_KEY`; sin ella, fuera de producción el código sale en la consola. |
 | `POST /auth/restablecer` | todos | Correo, código y contraseña nueva: la cambia, quita el bloqueo y cierra todas las sesiones. El código se anula tras 5 intentos. |
 | `GET /me` | sesión | Datos del usuario. |
 | `POST /sync/push` | sesión | El teléfono manda su cola de cambios (hasta 200 por envío). |
@@ -44,7 +44,7 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 | `POST /usuarios` | administrador | Alta (RF-038): nombre, correo, teléfono, rol. Devuelve una contraseña temporal; la persona debe cambiarla al entrar. |
 | `PATCH /usuarios/:id` | administrador | Edición (RF-039): nombre, correo, teléfono, rol. |
 | `POST /usuarios/:id/password` | administrador | Restablece la contraseña (RF-039): temporal nueva, cierra sus sesiones, quita el bloqueo. |
-| `POST /usuarios/:id/baja` y `/reactivar` | administrador | Suspensión y baja (RF-040): corta el acceso al instante y cierra sus sesiones. Reactivar quita bloqueo e intentos. |
+| `POST /usuarios/:id/baja` y `/reactivar` | administrador | Suspensión y baja (RF-040): corta el acceso al instante y cierra sus sesiones. Reactivar le devuelve el acceso con su misma contraseña. |
 | `POST /clientes/reasignar` | administrador | Pasa clientes a otro vendedor (RF-041): `{ hacia, clienteIds }` o `{ hacia, desde }` para toda una cartera. `null` = sin vendedor. |
 | `GET /reportes/ventas` | administrador | Reporte de un periodo (RF-043 a RF-047): resumen, comparación, serie por día/semana/mes, sabores con utilidad y ranking, y rendimiento por vendedor. |
 | `GET /reportes/exportar` | administrador | El mismo reporte como archivo (RF-048): `.xlsx` con cinco hojas, o `.csv` de una tabla. |
@@ -57,7 +57,7 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 | `POST /notificaciones/leidas` | sesión | Marca avisos como leídos. |
 | `POST /notificaciones/prueba` | sesión | Manda un aviso de prueba a los teléfonos de esa cuenta. |
 
-Contraseñas con Argon2id (RF-004). El token de acceso lleva la sesión: si se cierra la sesión, se desactiva al usuario o cambia su rol, el servidor lo nota en la siguiente petición (RF-005, RF-006).
+Contraseñas con Argon2id y pepper (RF-004, ver [Seguridad](#seguridad)). El token de acceso lleva la sesión: si se cierra la sesión, se desactiva al usuario o cambia su rol, el servidor lo nota en la siguiente petición (RF-005, RF-006).
 
 ## Roles
 
@@ -112,6 +112,18 @@ Lo que pierde no se descarta en silencio: queda en `operaciones_sync` (estado `c
 
 Un teléfono que ya trabajaba sin servidor une sus datos con los del servidor al iniciar sesión por primera vez: sus sabores se emparejan por nombre (sin duplicarlos) y todo lo demás se sube.
 
+## Seguridad
+
+- **Contraseñas** (RF-004): Argon2id (64 MiB, 3 pasadas) sobre la contraseña mezclada con un pepper (HMAC-SHA256 con `AUTH_PEPPER_SECRET`). El pepper vive sólo en el entorno del servidor, nunca en la base: con una copia robada de la base no se pueden probar contraseñas. La API no arranca sin él, si tiene menos de 32 caracteres o si es igual a `JWT_SECRET`. Para cambiarlo se pone el anterior en `AUTH_PEPPER_ANTERIOR` y cada quien queda con el nuevo al entrar (lo mismo si cambian los parámetros de Argon2id).
+- **Regla de contraseñas**: de 10 a 200 caracteres, con letras y números, sin el correo y sin «yogurt» ni «reparto». Vale al cambiarla, al restablecerla y cuando el administrador escribe una. Las temporales (`kP7x-Ym3Q-aR9d`) la cumplen.
+- **Intentos de entrada** (RF-003): 5 fallos seguidos de una cuenta desde una misma conexión (IP) la bloquean 15 minutos en esa conexión, aun con la contraseña correcta, y 15 fallos desde una conexión, con las cuentas que sean, bloquean esa conexión. La respuesta es `429 BLOQUEADA` con `Retry-After`, exista o no la cuenta. La cuenta no se bloquea en todas partes a propósito: si no, cualquiera dejaría fuera a un vendedor desde otro lado con 5 intentos. Entrar bien desde esa conexión la reinicia ahí; cambiar o restablecer la contraseña, en todas. Los intentos se cuentan en la base (`intentos_login`) con un candado por conexión, así que valen aunque haya varias instancias del servidor y no se cuelan intentos en paralelo. El administrador ve en **Equipo** si una cuenta está bloqueada y la libera restableciendo su contraseña.
+- **IP real**: en Vercel se toma de `x-vercel-forwarded-for`, que pone Vercel; en otro hosting, `TRUST_PROXY` dice cuántos proxies propios hay delante. Un `X-Forwarded-For` inventado no cambia la IP.
+- **Recuperación** (RF-002): la misma respuesta y al menos 2 segundos, exista o no la cuenta y aunque falle el correo. Pasados los topes (3 códigos por cuenta y 10 por conexión cada hora) no se manda nada, pero se responde igual. El código de 6 dígitos se guarda como HMAC, vale 15 minutos y se anula a los 5 intentos.
+- **Sesiones**: token de acceso JWT de 15 minutos (sólo HS256) ligado a una sesión que se revisa en cada petición; token de renovación al azar, guardado sólo como SHA-256. Cambiar la contraseña cierra las demás sesiones; restablecerla o dar de baja la cuenta, todas.
+- **Respuestas de la API**: `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY` y CSP `default-src 'none'; frame-ancestors 'none'`. Cuerpos de hasta 1 MB (5 MB en `/sync/push`), CORS sólo para `CORS_ORIGINS` y errores sin detalles internos.
+- **La app**: al compilar se agrega una política de contenido (CSP) en un `<meta>`, que vale en cualquier hosting: sólo scripts propios (ninguno en línea ni de terceros) y conexiones sólo a la API, al mapa (OpenFreeMap) y a las rutas (OSRM). La sesión se guarda en el teléfono para abrir sin señal, y esa política es la que impide que un script ajeno la lea. En Vercel, `vercel.json` agrega HSTS, `frame-ancestors 'none'`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y COOP. El service worker guarda sólo los archivos de la app, nunca respuestas de la API. El cambio de contraseña sólo trae escrita la actual justo después de entrar con una temporal.
+- **Sin cookies**: el token viaja en `Authorization`, así que no aplica CSRF. Las cookies HttpOnly no sirven con la app en GitHub Pages y la API en otro dominio, porque Safari las bloquea.
+
 ## Pruebas
 
 ```bash
@@ -121,7 +133,7 @@ for f in 01_esquema 02_vistas 03_datos_iniciales; do psql -U postgres -d reparto
 DATABASE_URL=postgres://postgres:CLAVE@localhost:5432/reparto_yogurt_test npm run test:api
 ```
 
-123 pruebas contra PostgreSQL real: login, bloqueo, cierre de sesión, roles, sincronización, idempotencia, cada regla de conflicto, altas, ediciones, bajas, contraseñas temporales, reasignación de cartera, reportes, captura de stock, avisos y push (con un enviador falso, sin salir a internet) y la lógica de avisos locales. La del «último administrador» corre en un esquema de Postgres propio para poder dejar un solo administrador sin afectar a las demás. También corren en GitHub Actions (`.github/workflows/server.yml`).
+138 pruebas contra PostgreSQL real: login, límites de intentos por cuenta y conexión (también con IP falsa en `X-Forwarded-For`), pepper y su rotación, regla de contraseñas, recuperación (misma respuesta y tiempo, topes, código anulado), cabeceras y límites de tamaño, cierre de sesión, roles, sincronización, idempotencia, cada regla de conflicto, altas, ediciones, bajas, contraseñas temporales, reasignación de cartera, reportes, captura de stock, avisos y push (con un enviador falso, sin salir a internet) y la lógica de avisos locales. La del «último administrador» corre en un esquema de Postgres propio para poder dejar un solo administrador sin afectar a las demás. También corren en GitHub Actions (`.github/workflows/server.yml`).
 
 ## Lo que todavía no hace
 

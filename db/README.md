@@ -18,7 +18,7 @@ El script crea la base `reparto_yogurt` y se detiene si ya existe. Para volver a
 | `01_esquema.sql` | Tipos, 16 tablas, índices, restricciones y triggers |
 | `02_vistas.sql` | Vistas de reportes y la función de pronóstico |
 | `03_datos_iniciales.sql` | Los 6 sabores con sus colores |
-| `04_datos_demo.sql` | Sólo desarrollo: admin y vendedor (contraseña `Yogurt2026!`), 10 clientes, 4 semanas de historial y la ruta de hoy |
+| `04_datos_demo.sql` | Sólo desarrollo: admin y vendedor (sin contraseña: `npm run db:migrar -- --demo` les pone una temporal al azar y la muestra), 10 clientes, 4 semanas de historial y la ruta de hoy |
 
 ## Análisis del esquema original (drawSQL)
 

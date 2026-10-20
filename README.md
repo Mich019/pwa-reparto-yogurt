@@ -44,6 +44,8 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo*
 
 La API (`api/`, ver [su README](api/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. La app usa el servidor por omisión: llama a `/api`, o a `VITE_API_URL` si la API vive en otro dominio (variables en [`.env.example`](.env.example)). Con `VITE_OFFLINE_SOLO=true` es sólo local y sin cuentas. El administrador trabaja en el panel `/admin`. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
 
+Las medidas de seguridad (contraseñas con pepper, límites de intentos por conexión, recuperación que no revela cuentas, cabeceras y política de contenido de la app) están en [`api/README.md`](api/README.md#seguridad).
+
 ## Equipo y cartera
 
 La pestaña **Equipo** (sólo para el administrador y con servidor) cubre las altas, bajas y reasignaciones. Necesita conexión: son cambios que el servidor aplica al instante.

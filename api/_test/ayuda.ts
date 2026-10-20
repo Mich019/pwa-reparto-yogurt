@@ -1,21 +1,26 @@
-import { randomUUID } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import type { FastifyInstance } from 'fastify'
 import pg from 'pg'
 import { construirApp } from '../_lib/app.js'
-import { hashPassword } from '../_lib/auth.js'
 import { leerConfig } from '../_lib/config.js'
+import { hashPassword } from '../_lib/contrasenas.js'
 import { crearPool } from '../_lib/db.js'
 
 process.env.NODE_ENV = 'test'
 process.env.JWT_SECRET ??= 'x'.repeat(40)
+process.env.AUTH_PEPPER_SECRET ??= 'p'.repeat(40)
 process.env.DATABASE_URL ??= 'postgres://postgres:test@localhost:5432/reparto_yogurt_test'
 
 export const PASSWORD = 'Yogurt2026!'
 export const config = leerConfig()
 export const db = crearPool(config.conexion)
 export const app: FastifyInstance = await construirApp({ db, config })
-const HASH = await hashPassword(PASSWORD)
+const HASH = await hashPassword(config, PASSWORD)
+
+// Cada inicio de sesión de prueba sale de una IP distinta: los límites de intentos (RF-003) cuentan por IP y en la
+// base de pruebas quedan los de corridas anteriores. Las pruebas de esos límites pasan una IP fija.
+export const ipAleatoria = () => `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`
 
 export async function crearUsuario(rol: 'administrador' | 'vendedor', extra: { debeCambiar?: boolean; activo?: boolean } = {}) {
   const correo = `${rol}-${randomUUID().slice(0, 8)}@prueba.local`
@@ -26,8 +31,8 @@ export async function crearUsuario(rol: 'administrador' | 'vendedor', extra: { d
   return { id: rows[0].id_usuario as string, correo }
 }
 
-export async function login(correo: string, password = PASSWORD, dispositivo = 'prueba') {
-  const r = await app.inject({ method: 'POST', url: '/auth/login', payload: { correo, password, dispositivo } })
+export async function login(correo: string, password = PASSWORD, dispositivo = 'prueba', ip = ipAleatoria()) {
+  const r = await app.inject({ method: 'POST', url: '/auth/login', payload: { correo, password, dispositivo }, remoteAddress: ip })
   return { status: r.statusCode, body: r.json() }
 }
 
@@ -91,7 +96,7 @@ export async function enBaseAislada(prueba: (x: { srv: FastifyInstance; pool: pg
   await cx.query(readFileSync(new URL('../../db/01_esquema.sql', import.meta.url), 'utf8'))
   const pool = new pg.Pool({ ...config.conexion, options: `-c search_path=${esquema}`, max: 4 })
   const srv = await construirApp({ db: pool, config })
-  const hash = await hashPassword(PASSWORD)
+  const hash = await hashPassword(config, PASSWORD)
   const usuario = async (nombre: string, rol: 'administrador' | 'vendedor') => {
     const correo = `${nombre}@prueba.local`
     const { rows } = await pool.query(`INSERT INTO usuarios (nombre, correo, password_hash, rol) VALUES ($1, $2, $3, $4) RETURNING id_usuario`, [nombre, correo, hash, rol])

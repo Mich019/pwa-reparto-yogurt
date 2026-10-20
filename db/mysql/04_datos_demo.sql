@@ -3,7 +3,7 @@
 -- 1 administrador, 1 vendedor, 10 clientes en CDMX, 4 semanas de historial,
 -- la ruta de hoy y algunos pedidos de la próxima semana.
 --
--- Usuarios (contraseña de ambos: Yogurt2026!, se pide cambiarla al entrar):
+-- Usuarios (sin contraseña utilizable: las contraseñas se generan con el secreto del servidor, ver db/migrar.ts):
 --   admin@yogurt.local     · administrador
 --   vendedor@yogurt.local  · vendedor
 -- Uso (desde esta carpeta):  mysql -u root -p reparto_yogurt -e "source 04_datos_demo.sql"
@@ -14,7 +14,7 @@ SET NAMES utf8mb4;
 DELIMITER //
 CREATE PROCEDURE sp_cargar_demo()
 BEGIN
-  DECLARE v_hash   VARCHAR(255) DEFAULT '$argon2id$v=19$m=65536,t=3,p=4$/3EZaDHF9wCysjRqDJQRWw$BgW3m7v++fxocFm83ZZH6ilwYSk5c+MsCQuEwnGYUKg';
+  DECLARE v_hash   VARCHAR(255) DEFAULT '$argon2id$sin-contrasena';  -- ninguna contraseña coincide con esto
   DECLARE v_admin  CHAR(36) DEFAULT UUID();
   DECLARE v_vend   CHAR(36) DEFAULT UUID();
   DECLARE v_cli    CHAR(36);
