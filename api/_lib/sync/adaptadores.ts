@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import type { Cx } from '../db.js'
 import type { Usuario } from '../app.js'
+import type { AvisoPendiente } from '../notificaciones.js'
 import {
   clienteWire, pedidoWire, productoWire, recordatorioWire,
   type ClienteWire, type PedidoWire, type ProductoWire, type RecordatorioWire, type Tabla,
@@ -35,6 +36,10 @@ export interface Adaptador<W> {
   escribir(c: Cx, u: Usuario, w: W, ex: Existente<W> | null): Promise<void>
   autorizarBorrado(u: Usuario, ex: Existente<W>): string | null
   borrar(c: Cx, id: string): Promise<void>
+  // Avisos para el vendedor (RF-054). Se llaman ya aplicado el cambio, dentro de su transacción; `hoy` es el día en la
+  // zona horaria del negocio. Lo que devuelven sólo sale si la transacción se confirma.
+  avisarEscritura?(c: Cx, u: Usuario, w: W, ex: Existente<W> | null, hoy: string): Promise<AvisoPendiente[]>
+  avisarBorrado?(c: Cx, u: Usuario, ex: Existente<W>, hoy: string): Promise<AvisoPendiente[]>
   verCostos?: boolean
 }
 
@@ -223,7 +228,7 @@ const pedidos: Adaptador<PedidoWire> = {
         estado: r.estado === 'entregado' ? ('ENTREGADO' as const) : r.estado === 'pendiente' || r.estado === 'en_camino' ? ('PENDIENTE' as const) : ('OMITIDO' as const),
         items: porPedido.get(r.id_pedido) ?? [], total: num(r.total),
         metodo_pago: r.metodo_pago ? (r.metodo_pago === 'efectivo' ? ('EFECTIVO' as const) : ('TRANSFERENCIA' as const)) : undefined,
-        orden_ruta: r.orden_ruta ?? undefined, fecha_entregado_real: r.entregado_ms ?? undefined,
+        orden_ruta: r.orden_ruta ?? undefined, urgente: r.urgente, fecha_entregado_real: r.entregado_ms ?? undefined,
         creado: r.creado_ms, actualizado: r.act_ms, vendedorId: r.id_vendedor ?? undefined, version: r.version,
       },
       version: r.version, actualizadoMs: r.act_ms, actualizadoUs: r.act_us, final: ESTADOS_FINALES.has(r.estado),
@@ -248,6 +253,8 @@ const pedidos: Adaptador<PedidoWire> = {
     const dueno = ex ? ex.dueno : esAdmin(u) ? (w.vendedorId ?? cl[0].id_vendedor ?? null) : u.id // igual que en clientes: lo cambia /clientes/reasignar
     const estado = ESTADO_A_DB[w.estado]
     const entregado = estado === 'entregado'
+    // Sólo el administrador marca un pedido como urgente; una copia vieja del teléfono no lo quita. Cerrado, ya no lo es.
+    const urgente = estado === 'pendiente' && (esAdmin(u) ? (w.urgente ?? ex?.wire.urgente ?? false) : (ex?.wire.urgente ?? false))
     if (ex?.final) await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`) // corrección de administrador
 
     if (!ex) {
@@ -262,12 +269,42 @@ const pedidos: Adaptador<PedidoWire> = {
       `UPDATE pedidos
           SET id_cliente = $2, id_vendedor = $3, fecha = $4, estado = $5::estado_pedido,
               metodo_pago = CASE WHEN $6::text IS NOT NULL THEN $6::metodo_pago WHEN $7 THEN 'efectivo'::metodo_pago END,
-              orden_ruta = $8,
+              orden_ruta = $8, urgente = $10,
               fecha_entregado_real = CASE WHEN $9::float8 IS NOT NULL THEN to_timestamp($9::float8 / 1000.0) WHEN $7 THEN now() END,
               motivo_omision = CASE WHEN $5 = 'omitido' THEN coalesce(motivo_omision, 'Omitido desde la app') END
         WHERE id_pedido = $1`,
-      [w.id, w.clienteId, dueno, w.fecha, estado, w.metodo_pago ? w.metodo_pago.toLowerCase() : null, entregado, w.orden_ruta ?? null, w.fecha_entregado_real ?? null],
+      [w.id, w.clienteId, dueno, w.fecha, estado, w.metodo_pago ? w.metodo_pago.toLowerCase() : null, entregado, w.orden_ruta ?? null, w.fecha_entregado_real ?? null, urgente],
     )
+  },
+  // RF-054: cuando el administrador agrega, cambia o urgente un pedido del día, el vendedor se entera.
+  async avisarEscritura(c, u, w, ex, hoy) {
+    if (!esAdmin(u) || ex?.final) return []
+    const { rows: [p] } = await c.query(
+      `SELECT p.id_vendedor, p.urgente, cl.nombre FROM pedidos p JOIN clientes cl USING (id_cliente) WHERE p.id_pedido = $1`,
+      [w.id],
+    )
+    if (!p?.id_vendedor || p.id_vendedor === u.id) return []
+    const litros = Math.round(w.items.reduce((s, i) => s + i.litros, 0) * 100) / 100
+    const datos = { pestana: 'ruta' as const, pedidoId: w.id }
+    const aviso = (tipo: AvisoPendiente['tipo'], titulo: string, cuerpo: string): AvisoPendiente[] => [{ para: p.id_vendedor, tipo, titulo, cuerpo, datos }]
+
+    if (p.urgente && !ex?.wire.urgente) return aviso('pedido_urgente', 'Pedido urgente', `${p.nombre}: ${litros} L, entrégalo cuanto antes`)
+
+    const antes = ex?.wire
+    const eraDeHoy = antes?.fecha === hoy
+    const esDeHoy = w.fecha === hoy
+    if (!eraDeHoy && !esDeHoy) return []
+    const ruta = (cuerpo: string) => aviso('ruta_modificada', 'Tu ruta cambió', cuerpo)
+    if (!antes) return w.estado === 'PENDIENTE' ? ruta(`Nueva parada: ${p.nombre}, ${litros} L`) : []
+    if (antes.fecha !== w.fecha) return esDeHoy ? ruta(`Se agregó a tu ruta de hoy: ${p.nombre}`) : ruta(`${p.nombre} ya no se visita hoy`)
+    if (antes.estado !== w.estado) return w.estado === 'PENDIENTE' ? ruta(`${p.nombre} volvió a tu ruta de hoy`) : ruta(`${p.nombre} se quitó de tu ruta de hoy`)
+    if (firmaItems(antes.items) !== firmaItems(w.items)) return ruta(`Cambió el pedido de ${p.nombre}: ahora ${litros} L`)
+    return []
+  },
+  async avisarBorrado(c, u, ex, hoy) {
+    if (!esAdmin(u) || ex.final || ex.wire.fecha !== hoy || !ex.dueno || ex.dueno === u.id) return []
+    const { rows: [cl] } = await c.query(`SELECT nombre FROM clientes WHERE id_cliente = $1`, [ex.wire.clienteId])
+    return [{ para: ex.dueno, tipo: 'ruta_modificada', titulo: 'Tu ruta cambió', cuerpo: `Se quitó el pedido de ${cl?.nombre ?? 'un cliente'} de tu ruta de hoy`, datos: { pestana: 'ruta' } }]
   },
   autorizarBorrado(u, ex) {
     if (esAdmin(u)) return null

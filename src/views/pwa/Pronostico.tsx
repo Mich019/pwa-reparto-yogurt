@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Factory, TrendingDown, TrendingUp } from 'lucide-react'
 import { db } from '../../lib/db'
@@ -9,7 +9,7 @@ import { pronosticoSemanal, resumenVentas } from '../../lib/pronostico'
 
 const PERIODOS = { hoy: 'Hoy', semana: '7 días', mes: '30 días' } as const
 
-export function Pronostico() {
+export function Pronostico({ selector }: { selector?: ReactNode }) {
   const clientes = useLiveQuery(() => db.clientes.toArray(), []) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
@@ -25,6 +25,7 @@ export function Pronostico() {
   return (
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Producción y ventas</h1>
+      {selector && <div className="mt-3">{selector}</div>}
 
       <section className="mt-4">
         <div className="flex items-center gap-2 text-sm font-medium text-apagado">

@@ -23,8 +23,10 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 | Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. |
 | Selector | Tarjetas por sabor con su color, botones grandes − / + por litro, subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
 | Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
-| Producción | Litros por sabor para los próximos 7 días = pedidos agendados + estimado por historial de clientes a los que les toca visita. Ventas de hoy / 7 / 30 días, ganancia neta, más y menos vendido. |
+| Producción | Litros por sabor para los próximos 7 días = pedidos agendados + estimado por historial de clientes a los que les toca visita. Ventas de hoy / 7 / 30 días, ganancia neta, más y menos vendido. Con servidor, el administrador también ve aquí **Stock del día** (ver abajo). |
+| Stock | Sólo vendedor y sólo con servidor. Su carga del día, lo que ha entregado y lo que le queda de cada sabor, aunque no tenga señal. |
 | Sabores | Alta/edición de sabores, precio y costo por litro, color, disponible sí/no. Respaldo y restauración en JSON. |
+| Reportes | Sólo administrador y sólo con servidor. Corte del día, comparativos por semana y mes, utilidad por sabor, ranking, rendimiento por vendedor y exportación a Excel o CSV (ver abajo). |
 | Equipo | Sólo administrador y sólo con servidor. Altas, ediciones y bajas de cuentas, contraseña temporal, y pasar clientes de un vendedor a otro (ver abajo). |
 
 ## Técnico
@@ -52,6 +54,19 @@ La pestaña **Equipo** (sólo para el administrador y con servidor) cubre las al
 - **Dar de baja / Reactivar**: la baja corta el acceso al instante en todos sus teléfonos (el token se valida contra la base en cada petición) y al intentar entrar se le dice que su cuenta está dada de baja. No se borra nada: clientes e historial se conservan. Al dar de baja se puede decidir qué pasa con sus clientes (pasarlos a otro vendedor, dejarlos sin vendedor o decidir después).
 - **Pasar cartera**: de un vendedor a otro (o a «sin vendedor», que sólo ve el administrador), toda de una vez o eligiendo clientes. También se puede cambiar un cliente suelto desde su perfil (renglón **Vendedor**). Con el cliente viajan sus pedidos agendados y recordatorios pendientes; lo ya entregado sigue siendo venta de quien lo hizo, pero el nuevo vendedor lo ve en el historial. El teléfono del vendedor anterior quita esos clientes al sincronizar, aunque los haya editado sin conexión.
 
+## Reportes
+
+La pestaña **Reportes** (también en el panel web, `/admin`) es sólo para el administrador y necesita conexión: el servidor los arma con todo el historial de todos los vendedores. Un vendedor no los ve ni el servidor se los entrega, porque llevan costos y márgenes.
+
+- **Periodo**: **Día** (el corte de un día, con ‹ › para ir a otros), **Semana** (lunes a domingo), **Mes** o **Rango** con dos fechas. Abre en el corte de hoy.
+- **Resumen**: recaudado, utilidad neta y margen, litros entregados, clientes atendidos y pedidos, más lo cobrado en efectivo y por transferencia. En un periodo ya terminado muestra cuánto subió o bajó frente al anterior (un mes se compara con el mes anterior completo; lo demás, con el periodo de la misma duración justo antes).
+- **Comparativo**: gráficas de ingresos y de litros agrupadas por día, semana o mes (según lo largo del periodo). Tocar una barra muestra su valor; **Ver como tabla** da los mismos números.
+- **Sabores**: del que más litros vendió al que menos, con ingresos, costo y utilidad por sabor. El primero es el sabor estrella y el último el de menor rotación; un sabor disponible que no se vendió cuenta como 0 L. Si algo se vendió sin costo capturado lo avisa, porque su utilidad sale inflada.
+- **Vendedores**: pedidos, clientes, litros, ingresos, utilidad, ticket promedio y visitas sin venta de cada uno, incluidos los dados de baja que vendieron en el periodo.
+- **Exportar**: un libro de **Excel** (.xlsx) con las hojas Resumen, Por periodo, Por sabor, Por vendedor y el historial de Ventas (una fila por sabor entregado a cada cliente), o un **CSV** de la tabla que elijas.
+
+Cuentan los pedidos **entregados**, por su fecha de entrega, con el precio y el costo que tenían al venderse (el costo se congela en cada renglón, así que cambiar el costo de un sabor no reescribe los reportes pasados). En **Producción** se conserva el resumen rápido de ventas que funciona sin conexión, calculado en el teléfono.
+
 ## QR, NFC y cámara
 
 Cada cliente tiene un QR único (`YGT1:<uuid del cliente>`) que se genera al darlo de alta y no necesita internet.
@@ -62,7 +77,20 @@ Cada cliente tiene un QR único (`YGT1:<uuid del cliente>`) que se genera al dar
 - **Escanear** (botón del visor en Ruta y en Clientes): la cámara lee el QR y, en Android con Chrome, la misma pantalla escucha tarjetas NFC. En Ruta, un cliente con entrega hoy abre su parada; uno sin entrega abre un pedido para hoy con lo del pedido anterior. En Clientes abre su perfil. Códigos que no son de la app, de clientes archivados o que no existen se avisan sin cerrar el visor.
 - La cámara usa el lector nativo del navegador (`BarcodeDetector`: QR y códigos de barras comunes) y, donde no existe (Safari, Firefox), `jsqr` sólo para QR. Web NFC existe únicamente en Chrome para Android y pide HTTPS. El PDF se escribe a mano en `src/lib/pdf.ts`.
 
+## Stock diario y avisos
+
+**Stock del día** (RF-037) está en **Producción** del administrador, con servidor. Se captura en dos pasos: **Registrar producción** (litros hechos de cada sabor) y, tocando un vendedor, **su carga** (litros que se lleva de cada sabor, y al cerrar lo que devuelve). Cada sabor muestra cuánto queda sin asignar y avisa en rojo si se asignó más de lo producido; **Repetir el día anterior** copia la carga de ayer. Es una captura del administrador (el servidor la valida y la audita), así que necesita conexión.
+
+El vendedor la ve en su pestaña **Stock**: «Te quedan 7 L de 16 L», y por sabor lo que llevaba, lo entregado y lo que le piden hoy. Lo entregado se cuenta con los pedidos entregados en su propio teléfono, así que el saldo se actualiza al instante y sin señal.
+
+**Avisos** (M10, RF-054 y RF-055), todos en **Cuenta → Avisos**:
+
+- **Pedido urgente y ruta modificada** (RF-054). El administrador marca **Urgente** al crear o editar un pedido (queda para hoy y va primero en la ruta del vendedor, con una etiqueta roja). También avisan una parada nueva, quitada o movida de hoy, una cartera que cambió y una carga de stock nueva. El aviso llega como notificación del sistema aunque la app esté cerrada (**Cuenta → Notificaciones → Activar avisos**) y, si no hay push, al abrir la app o sincronizar.
+- **Stock por agotarse** (RF-055): queda poco (2 L o menos, o la quinta parte o menos de lo que llevaba), no alcanza para los pedidos de hoy, o se agotó. Salen como mensaje con la app abierta o como notificación con la app en segundo plano, una sola vez por sabor y por nivel; varios a la vez se juntan en un solo mensaje. La ruta muestra una franja mientras siga pasando.
+- **Ventas sin enviar** (RF-055): a partir de las 18:00 (se cambia en Cuenta), si quedan cambios sin sincronizar.
+
+Los avisos de stock y de ventas se generan **en el teléfono**, así que funcionan sin internet pero sólo mientras la app esté abierta o se vuelva a abrir; el sistema operativo no deja a una PWA vigilar en segundo plano. Las notificaciones push necesitan que el servidor tenga claves VAPID y HTTPS (ver [`api/README.md`](api/README.md)). En iPhone sólo funcionan con la app instalada («Compartir → Agregar a inicio»). El service worker sólo se registra en la app compilada, así que para probar push hay que usar `npm run build` y `npm run preview`.
+
 ## Pendiente (siguientes pasos)
 
 - Recuperación de contraseña por correo (RF-002), cierre de sesión que no dependa de la señal.
-- Stock diario, exportar a Excel, notificaciones push.

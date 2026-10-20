@@ -2,9 +2,9 @@ name: Probar el servidor
 
 on:
   push:
-    paths: ['server/**', 'db/**', '.github/workflows/server.yml']
+    paths: ['api/**', 'db/**', 'package.json', 'package-lock.json', '.github/workflows/server.yml']
   pull_request:
-    paths: ['server/**', 'db/**', '.github/workflows/server.yml']
+    paths: ['api/**', 'db/**', 'package.json', 'package-lock.json', '.github/workflows/server.yml']
 
 jobs:
   pruebas:
@@ -26,7 +26,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: server/package-lock.json
       - name: Crear la base de pruebas
         run: |
           psql -h localhost -U postgres -c "CREATE DATABASE reparto_yogurt_test ENCODING 'UTF8' TEMPLATE template0"
@@ -34,8 +33,5 @@ jobs:
             psql -h localhost -U postgres -d reparto_yogurt_test -v ON_ERROR_STOP=1 -f db/$f.sql
           done
       - run: npm ci
-        working-directory: server
-      - run: npm run typecheck
-        working-directory: server
-      - run: npm test
-        working-directory: server
+      - run: npm run typecheck:api
+      - run: npm run test:api

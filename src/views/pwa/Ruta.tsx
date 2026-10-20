@@ -2,13 +2,14 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Navigation, Pencil, Phone, PlusCircle, RefreshCw, ScanLine, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
+  Flame, Navigation, Pencil, Phone, PlusCircle, RefreshCw, ScanLine, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
 import { calcularRuta, distancia, enlaceNavegar, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../../lib/ruteo'
 import { cargarDemo } from '../../lib/demo'
 import { baseDelUltimoPedido } from '../../lib/codigos'
+import { AlertasRuta } from './AlertasRuta'
 import { Mapa, type Pin } from './Mapa'
 import { IconoSabor } from '../../components/Fruta'
 import { EditorPedido } from './EditorPedido'
@@ -54,7 +55,11 @@ function useUbicacion() {
   return yo
 }
 
-export function Ruta({ irAClientes }: { irAClientes: () => void }) {
+const Urgente = ({ className = '' }: { className?: string }) => (
+  <span className={`inline-flex items-center gap-1 rounded-full bg-rojo px-2 py-0.5 text-[11px] font-bold tracking-wide text-white ${className}`}><Flame size={11} />URGENTE</span>
+)
+
+export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irAStock?: () => void }) {
   const fecha = hoy()
   const pedidosHoy = useLiveQuery(() => db.pedidos.where('fecha').equals(fecha).toArray(), [fecha])
   const clientes = useLiveQuery(() => db.clientes.toArray(), [])
@@ -84,7 +89,7 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
     () => (pedidosHoy ?? []).filter((p) => p.estado === 'PENDIENTE' && porId.get(p.clienteId)?.activo),
     [pedidosHoy, porId],
   )
-  const claves = useMemo(() => pendientes.map((p) => p.id).sort().join(','), [pendientes])
+  const claves = useMemo(() => pendientes.map((p) => p.id + (p.urgente ? '!' : '')).sort().join(','), [pendientes]) // una parada que se vuelve urgente cambia la ruta
 
   // Calcula (o recalcula) la ruta cuando cambia el conjunto de pedidos pendientes (RF-030, RF-031).
   const recalcular = useCallback(async (forzar = false) => {
@@ -107,7 +112,7 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
     setCalculando(true)
     const paradas = pendientes.map((p) => {
       const c = porId.get(p.clienteId)!
-      return { id: p.id, punto: [c.longitud, c.latitud] as Punto, ventana: c.ventana }
+      return { id: p.id, punto: [c.longitud, c.latitud] as Punto, ventana: c.ventana, urgente: p.urgente }
     })
     const inicio = yoRef.current ?? (await ubicacionActual()) ?? paradas[0].punto
     const r: RutaGuardada = { ...(await calcularRuta(inicio, paradas)), fecha, claves }
@@ -238,11 +243,13 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
           <div className="pointer-events-auto mt-3 flex items-center gap-3 rounded-2xl bg-papel p-3 shadow-tarjeta">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-niebla"><span className="h-3.5 w-3.5 bg-tinta" /></span>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-apagado">Parada {orden.indexOf(activo.id) + 1} de {orden.length}</div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-apagado">Parada {orden.indexOf(activo.id) + 1} de {orden.length}{activo.urgente && <Urgente />}</div>
               <div className="truncate text-base leading-tight font-semibold">{clienteActivo.direccion || clienteActivo.nombre}</div>
             </div>
           </div>
         )}
+
+        <AlertasRuta irAStock={irAStock} />
 
         {ruta && !ruta.porCalles && orden.length > 0 && (
           <div className="pointer-events-auto mt-2 rounded-xl bg-ambar px-3 py-2 text-xs font-semibold text-tinta">

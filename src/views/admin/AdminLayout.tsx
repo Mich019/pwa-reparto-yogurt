@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   BarChart3,
+  ChartLine,
   IceCreamBowl,
   LayoutDashboard,
   LogOut,
@@ -15,10 +16,11 @@ import { Logo } from '../../components/Logo'
 import { AdminDashboard } from './AdminDashboard'
 import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
-import { Pronostico } from '../pwa/Pronostico'
+import { Produccion } from '../pwa/Produccion'
 import { Ajustes } from '../pwa/Ajustes'
+import { Reportes } from '../pwa/Reportes'
 
-type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores'
+type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes'
 
 export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const sesion = useSesion()
@@ -71,6 +73,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
     { id: 'clientes', texto: 'Clientes', icono: MapPin },
     { id: 'produccion', texto: 'Producción', icono: BarChart3 },
     { id: 'sabores', texto: 'Sabores y Precios', icono: IceCreamBowl },
+    { id: 'reportes', texto: 'Reportes', icono: ChartLine },
   ] as const
 
   return (
@@ -148,13 +151,14 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
           {seccion === 'equipo' && <div className="p-4 sm:p-6"><Equipo /></div>}
           {seccion === 'clientes' && <div className="p-4 sm:p-6"><Clientes /></div>}
-          {seccion === 'produccion' && <div className="p-4 sm:p-6"><Pronostico /></div>}
+          {seccion === 'produccion' && <div className="p-4 sm:p-6"><Produccion /></div>}
           {seccion === 'sabores' && <div className="p-4 sm:p-6"><Ajustes /></div>}
+          {seccion === 'reportes' && <div className="p-4 sm:p-6"><Reportes /></div>}
         </main>
       </div>
 
       {/* Barra inferior en pantallas móviles */}
-      <nav className="lg:hidden z-30 grid grid-cols-5 border-t border-linea bg-papel pb-safe">
+      <nav className="lg:hidden z-30 grid grid-cols-6 border-t border-linea bg-papel pb-safe">
         {pestanas.map(({ id, texto, icono: Icono }) => {
           const activa = seccion === id
           return (

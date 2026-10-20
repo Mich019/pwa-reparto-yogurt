@@ -53,11 +53,38 @@ export interface Pedido {
   total: number
   metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA'
   orden_ruta?: number
+  urgente?: boolean // el administrador lo marcó para entregarse ya (RF-054); sólo él lo cambia
   fecha_entregado_real?: number
   creado: number
   actualizado: number
   version?: number
   vendedorId?: string
+}
+
+// Litros de un sabor que el administrador le asignó a este vendedor en un día (RF-037). Sólo se lee: lo escribe el servidor.
+export interface StockDia {
+  id: string
+  fecha: string // YYYY-MM-DD
+  productoId: string
+  asignada: number
+  devuelta: number
+  version?: number
+}
+
+export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'prueba' | 'stock_bajo' | 'sync_pendiente'
+export type PestanaAviso = 'ruta' | 'clientes' | 'stock' | 'cuenta'
+
+// Avisos para el vendedor (RF-054, RF-055). Los de pedido urgente, ruta y carga los manda el servidor; los de stock
+// bajo y ventas sin enviar los genera esta app en el teléfono (`local`).
+export interface Aviso {
+  id: string
+  tipo: TipoAviso
+  titulo: string
+  cuerpo: string
+  pestana?: PestanaAviso // a dónde lleva al tocarlo
+  creado: number
+  leida: boolean
+  local?: boolean
 }
 
 export interface Recordatorio {
@@ -104,6 +131,8 @@ export const db = new Dexie('reparto-yogurt') as Dexie & {
   cola: EntityTable<Cambio, 'id'>
   meta: EntityTable<Meta, 'clave'>
   problemas: EntityTable<Problema, 'id'>
+  stock: EntityTable<StockDia, 'id'>
+  avisos: EntityTable<Aviso, 'id'>
 }
 
 db.version(1).stores({
@@ -117,6 +146,8 @@ db.version(1).stores({
 db.version(2)
   .stores({ cola: '++id, ts, registroId, opId', meta: 'clave', problemas: 'id, ts, visto' })
   .upgrade((t) => t.table('cola').toCollection().modify((c) => { c.opId = crypto.randomUUID() }))
+
+db.version(3).stores({ stock: 'id, fecha, productoId', avisos: 'id, creado' })
 
 export const uid = () => crypto.randomUUID()
 

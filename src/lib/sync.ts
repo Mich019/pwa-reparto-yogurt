@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
-import { db, uid, type Cambio, type Tabla } from './db'
+import { aviso } from '../components/ui'
+import { db, uid, type Aviso, type Cambio, type PestanaAviso, type StockDia, type Tabla, type TipoAviso } from './db'
+import { hoy, sumarDias } from './fechas'
 import { dispositivoId, llamarAutenticado, sesionActual } from './sesion'
 
 // Sincronización con el servidor (RF-051 a RF-053).
@@ -37,8 +39,19 @@ interface Resultado {
   retirado?: boolean // ya no es de tu cartera (el administrador lo pasó a otro vendedor)
   error?: string
 }
+interface AvisoServidor {
+  id: string
+  tipo: TipoAviso
+  titulo: string
+  cuerpo: string
+  datos?: { pestana?: PestanaAviso }
+  creado: number
+}
 interface Bajada {
+  ahora: number
   cursor: number
+  stock?: StockDia[] // sólo vendedores (RF-037)
+  avisos?: AvisoServidor[] // RF-054
   eliminados: { tabla: Tabla; id: string }[]
   productos: Registro[]
   clientes: Registro[]
@@ -152,7 +165,8 @@ async function enviar() {
 async function descargar(desde?: number) {
   const cursor = desde ?? (((await db.meta.get('cursor'))?.valor as number | undefined) ?? 0)
   const r = await llamar<Bajada>(`/sync/pull?desde=${Math.floor(cursor)}`)
-  await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta], async () => {
+  const nuevos: Aviso[] = []
+  await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta, db.stock, db.avisos], async () => {
     // Lo que tiene cambios locales sin enviar no se pisa: se resuelve al enviarlo.
     const sucios = new Set((await db.cola.toArray()).map((c) => `${c.tabla}:${c.registroId}`))
     for (const tabla of TABLAS) {
@@ -161,8 +175,25 @@ async function descargar(desde?: number) {
       await db.table(tabla).bulkPut(recibidos.filter((x, i) => !sucios.has(`${tabla}:${x.id}`) && (locales[i]?.version ?? -1) < x.version))
     }
     for (const e of r.eliminados) if (!sucios.has(`${e.tabla}:${e.id}`)) await db.table(e.tabla).delete(e.id)
+
+    // El stock lo escribe el administrador: aquí sólo se adopta tal cual, y se olvida el de hace más de una semana.
+    if (r.stock?.length) await db.stock.bulkPut(r.stock)
+    await db.stock.where('fecha').below(sumarDias(hoy(), -7)).delete()
+
+    // Los avisos que el servidor repite (la descarga siempre trae unos segundos de más) no se duplican ni se desmarcan.
+    if (r.avisos?.length) {
+      const previos = await db.avisos.bulkGet(r.avisos.map((a) => a.id))
+      const altas = r.avisos.flatMap((a, i): Aviso[] =>
+        previos[i] ? [] : [{ id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo, pestana: a.datos?.pestana, creado: a.creado, leida: false }])
+      await db.avisos.bulkAdd(altas)
+      nuevos.push(...altas)
+    }
     await db.meta.put({ clave: 'cursor', valor: r.cursor })
   })
+  // Con la app abierta el push no suena: el aviso sale aquí. Los de hace rato (otro teléfono, otro día) no.
+  const recientes = nuevos.filter((a) => a.creado >= r.ahora - 5 * 60_000)
+  if (recientes.length === 1) aviso(`${recientes[0].titulo}: ${recientes[0].cuerpo}`)
+  else if (recientes.length > 1) aviso(`${recientes.length} avisos nuevos. Revisa Cuenta.`)
 }
 
 // ------------------------------------------------------------------ ciclo

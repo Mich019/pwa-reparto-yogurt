@@ -1,5 +1,6 @@
 import { tx, type Cx, type Db } from '../db.js'
 import type { Usuario } from '../app.js'
+import type { AvisoPendiente } from '../notificaciones.js'
 import { ADAPTADORES, ErrorNegocio, type Existente } from './adaptadores.js'
 import type { OperacionEntrante } from './esquemas.js'
 
@@ -12,6 +13,13 @@ export interface Resultado {
   eliminado?: boolean // el registro ya no existe en el servidor
   retirado?: boolean // sigue existiendo, pero ya no es de la cartera de quien lo mandó (RF-041): debe quitar su copia
   error?: string
+}
+
+// Lo que las operaciones aplicadas le piden a quien las llamó: avisar a los vendedores (RF-054). Sólo se llena con
+// operaciones confirmadas; `hoy` es el día en la zona horaria del negocio.
+export interface Efectos {
+  hoy: string
+  avisos: AvisoPendiente[]
 }
 
 interface Reloj {
@@ -77,11 +85,11 @@ function mensajeBD(e: any): string | null {
   }
 }
 
-export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrante, reloj: Reloj): Promise<Resultado> {
-  const ad = ADAPTADORES[op.tabla]
+export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrante, reloj: Reloj, efectos: Efectos = { hoy: '', avisos: [] }): Promise<Resultado> {
   const tsMs = Math.min(op.ts + reloj.skewMs, reloj.ahoraMs) // el desfase del reloj del teléfono no cuenta; nunca en el futuro
 
-  return tx(db, u.id, async (c) => {
+  const avisos: AvisoPendiente[] = []
+  const resultado = await tx(db, u.id, async (c) => {
     // Serializa operaciones sobre el mismo registro (también cuando todavía no existe).
     await c.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [`${op.tabla}:${op.registroId}`])
 
@@ -96,7 +104,7 @@ export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrant
     let estado: EstadoOperacion
     let nota: string | undefined
     try {
-      ;({ estado, nota } = await aplicar(c, u, op, tsMs, reloj))
+      ;({ estado, nota } = await aplicar(c, u, op, tsMs, reloj, efectos.hoy, avisos))
       await c.query('RELEASE SAVEPOINT operacion')
     } catch (e: any) {
       await c.query('ROLLBACK TO SAVEPOINT operacion')
@@ -120,9 +128,11 @@ export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrant
     }
     return { id: op.id, estado, error: nota, ...actual, ...(retirado ? { retirado } : {}) }
   })
+  if (resultado.estado === 'aplicada') efectos.avisos.push(...avisos)
+  return resultado
 }
 
-async function aplicar(c: Cx, u: Usuario, op: OperacionEntrante, tsMs: number, reloj: Reloj): Promise<{ estado: EstadoOperacion; nota?: string }> {
+async function aplicar(c: Cx, u: Usuario, op: OperacionEntrante, tsMs: number, reloj: Reloj, hoy: string, avisos: AvisoPendiente[]): Promise<{ estado: EstadoOperacion; nota?: string }> {
   const ad = ADAPTADORES[op.tabla]
   const [ex] = (await ad.listar(c, { id: op.registroId, bloquear: true })) as Existente<any>[]
   const base = op.version ?? 0
@@ -138,6 +148,7 @@ async function aplicar(c: Cx, u: Usuario, op: OperacionEntrante, tsMs: number, r
       }
     }
     await ad.borrar(c, op.registroId)
+    avisos.push(...((await ad.avisarBorrado?.(c, u, ex, hoy)) ?? []))
     return { estado: 'aplicada' }
   }
 
@@ -152,6 +163,7 @@ async function aplicar(c: Cx, u: Usuario, op: OperacionEntrante, tsMs: number, r
   if (!ex) {
     if (base > 0) return { estado: 'conflicto', nota: 'Ya se había borrado en otro dispositivo.' }
     await ad.escribir(c, u, w, null)
+    avisos.push(...((await ad.avisarEscritura?.(c, u, w, null, hoy)) ?? []))
     return { estado: 'aplicada' }
   }
 
@@ -168,5 +180,6 @@ async function aplicar(c: Cx, u: Usuario, op: OperacionEntrante, tsMs: number, r
     }
   }
   await ad.escribir(c, u, w, ex)
+  avisos.push(...((await ad.avisarEscritura?.(c, u, w, ex, hoy)) ?? []))
   return { estado: 'aplicada', nota }
 }

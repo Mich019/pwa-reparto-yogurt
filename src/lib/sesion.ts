@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { api, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
+import { api, apiArchivo, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
@@ -74,8 +74,8 @@ async function adoptarUsuario(u: UsuarioSesion) {
     if (u.rol !== 'administrador' && (await db.cola.count()) > 0) {
       throw new Error('Este teléfono tiene cambios sin enviar de otra cuenta. Entra con esa cuenta para sincronizarlos primero.')
     }
-    await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta, db.problemas], async () => {
-      await Promise.all([db.clientes.clear(), db.productos.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear(), db.meta.clear(), db.problemas.clear()])
+    await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta, db.problemas, db.stock, db.avisos], async () => {
+      await Promise.all([db.clientes.clear(), db.productos.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear(), db.meta.clear(), db.problemas.clear(), db.stock.clear(), db.avisos.clear()])
     })
   }
   await db.meta.put({ clave: 'usuarioId', valor: u.id })
@@ -132,12 +132,12 @@ export const sesionRevocada = () => fijar(null)
 
 // Llamada al servidor con la sesión de este teléfono: renueva el token si hace falta y, si el servidor lo
 // rechaza, pide uno nuevo y reintenta una vez. Si la sesión se revocó, vuelve la pantalla de entrada.
-export async function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PATCH'; cuerpo?: unknown } = {}): Promise<T> {
+async function conSesion<T>(llamada: (token: string) => Promise<T>): Promise<T> {
   for (let intento = 0; ; intento++) {
     const token = await tokenValido()
     if (!token) throw new ErrorRed(actual ? 'Sin conexión' : 'Sin sesión')
     try {
-      return await api<T>(ruta, { ...opciones, token })
+      return await llamada(token)
     } catch (e) {
       if (e instanceof ErrorApi && e.status === 401 && intento === 0) {
         expirarToken()
@@ -148,6 +148,13 @@ export async function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'G
     }
   }
 }
+
+export function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PUT' | 'PATCH'; cuerpo?: unknown } = {}): Promise<T> {
+  return conSesion((token) => api<T>(ruta, { ...opciones, token }))
+}
+
+// Igual, para bajar un archivo (reportes en Excel o CSV).
+export const descargarAutenticado = (ruta: string): Promise<Blob> => conSesion((token) => apiArchivo(ruta, token))
 
 export function marcarPasswordPendiente(pendiente: boolean) {
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, debeCambiarPassword: pendiente } })
@@ -161,11 +168,22 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
   marcarPasswordPendiente(false)
 }
 
+// Lo que hay que hacer mientras la sesión sigue abierta, antes de cerrarla (p. ej. dejar de recibir los avisos de la cuenta).
+const antesDeCerrar = new Set<() => Promise<unknown>>()
+export function alCerrarSesion(tarea: () => Promise<unknown>) {
+  antesDeCerrar.add(tarea)
+  return () => { antesDeCerrar.delete(tarea) }
+}
+
 // Los datos del teléfono se conservan: si quedaron cambios sin enviar, se mandan al volver a entrar.
 export async function cerrarSesion() {
   limpiarUltimoPassword()
   const s = actual
-  if (s) await api('/auth/logout', { cuerpo: { refreshToken: s.refreshToken } }).catch(() => {})
+  if (s) {
+    // Mejor esfuerzo y con tope de tiempo: sin señal, cerrar sesión no debe quedarse esperando.
+    await Promise.race([Promise.allSettled([...antesDeCerrar].map((t) => t())), new Promise((r) => setTimeout(r, 4000))])
+    await api('/auth/logout', { cuerpo: { refreshToken: s.refreshToken } }).catch(() => {})
+  }
   fijar(null)
 }
 

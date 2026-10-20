@@ -23,6 +23,27 @@ function leerConexion(): PoolConfig {
   }
 }
 
+function leerPush() {
+  const vapidPublica = process.env.VAPID_PUBLIC_KEY ?? ''
+  const vapidPrivada = process.env.VAPID_PRIVATE_KEY ?? ''
+  if (!!vapidPublica !== !!vapidPrivada) throw new Error('Define VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY juntas (npm run push:claves las genera)')
+  const vapidContacto = process.env.VAPID_SUBJECT ?? ''
+  if (vapidPublica && !/^(mailto:[^@\s]+@[^@\s]+|https:\/\/\S+)$/.test(vapidContacto)) {
+    throw new Error('Falta VAPID_SUBJECT: un correo (mailto:tu@correo.com) o una dirección https con la que los servicios de push puedan contactarte')
+  }
+  return { vapidPublica, vapidPrivada, vapidContacto }
+}
+
+function leerZona(): string {
+  const zona = process.env.ZONA_HORARIA ?? 'America/Mexico_City'
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: zona })
+  } catch {
+    throw new Error(`ZONA_HORARIA no es una zona válida: ${zona} (ejemplo: America/Mexico_City)`)
+  }
+  return zona
+}
+
 export function leerConfig() {
   const jwtSecret = requerido('JWT_SECRET')
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET debe tener al menos 32 caracteres')
@@ -44,6 +65,10 @@ export function leerConfig() {
     correoRemitente: process.env.MAIL_FROM ?? 'Reparto Yogurt <onboarding@resend.dev>',
     recuperacionMinutos: 15,
     recuperacionMaxIntentos: 5,
+    // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.
+    ...leerPush(),
+    // Para saber cuál es «hoy» al avisar de cambios en la ruta del día.
+    zonaHoraria: leerZona(),
   }
 }
 

@@ -172,6 +172,17 @@ CREATE TABLE stock_diario (
   CONSTRAINT stock_cantidades_validas CHECK (cantidad_asignada >= 0 AND cantidad_devuelta BETWEEN 0 AND cantidad_asignada),
   CONSTRAINT stock_unico_por_dia UNIQUE (fecha, id_producto, id_vendedor)
 );
+CREATE INDEX stock_sync ON stock_diario (actualizado_en);
+
+-- RF-037: litros producidos de cada sabor en el día; lo que no se asigna a un vendedor queda en el almacén.
+CREATE TABLE produccion_diaria (
+  fecha          date NOT NULL,
+  id_producto    uuid NOT NULL REFERENCES productos (id_producto) ON DELETE CASCADE,
+  litros         numeric(8, 2) NOT NULL,
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (fecha, id_producto),
+  CONSTRAINT produccion_litros_validos CHECK (litros >= 0)
+);
 
 -- =============================================================================
 -- M04 / M05 · Pedidos, detalle y ruta
@@ -189,6 +200,7 @@ CREATE TABLE pedidos (
   fecha_entregado_real timestamptz,                            -- RF-023
   motivo_omision       varchar(200),                           -- RF-026 visita sin venta
   notas                text,
+  urgente              boolean NOT NULL DEFAULT false,         -- RF-054: el administrador lo marcó para ya
   creado_por           uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
   creado_en            timestamptz NOT NULL DEFAULT now(),
   actualizado_en       timestamptz NOT NULL DEFAULT now(),
@@ -312,7 +324,7 @@ CREATE TABLE suscripciones_push (
 CREATE TABLE notificaciones (
   id_notificacion uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   id_usuario      uuid NOT NULL REFERENCES usuarios (id_usuario) ON DELETE CASCADE,
-  tipo            varchar(30) NOT NULL,   -- pedido_urgente, ruta_modificada, stock_bajo, sync_pendiente
+  tipo            varchar(30) NOT NULL,   -- pedido_urgente, ruta_modificada, stock_asignado (stock bajo y ventas sin enviar, RF-055, los genera la app)
   titulo          varchar(120) NOT NULL,
   cuerpo          text,
   datos           jsonb,
@@ -320,6 +332,7 @@ CREATE TABLE notificaciones (
   leida_en        timestamptz
 );
 CREATE INDEX notificaciones_no_leidas ON notificaciones (id_usuario, creado_en DESC) WHERE leida_en IS NULL;
+CREATE INDEX notificaciones_usuario ON notificaciones (id_usuario, creado_en DESC);
 
 -- =============================================================================
 -- Triggers
