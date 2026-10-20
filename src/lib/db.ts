@@ -191,16 +191,6 @@ export async function borrar(tabla: Tabla, id: string) {
   })
 }
 
-export async function borrarVarios(tabla: Tabla, ids: string[]) {
-  await db.transaction('rw', db.table(tabla), db.cola, async () => {
-    for (const id of ids) {
-      const previo = await db.table(tabla).get(id)
-      await db.table(tabla).delete(id)
-      await encolar(tabla, id, 'delete', previo?.version)
-    }
-  })
-}
-
 export const totalDe = (items: DetallePedido[]) =>
   Math.round(items.reduce((s, i) => s + i.litros * i.precio_litro, 0) * 100) / 100
 

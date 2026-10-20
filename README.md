@@ -13,7 +13,7 @@ npm run preview    # sirve dist/ para probar el modo sin internet
 
 La carpeta `dist/` ya compilada se puede subir tal cual a cualquier hosting estático con HTTPS (Netlify, Vercel, GitHub Pages, Cloudflare Pages). El GPS y la instalación como app requieren HTTPS.
 
-En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo** carga 10 clientes de prueba alrededor de tu ubicación con 4 semanas de historial. Se borran en **Sabores → Borrar clientes y pedidos**.
+En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo** carga 10 clientes de prueba alrededor de tu ubicación con 4 semanas de historial. Se borran en **Sabores → Borrar clientes y pedidos**. Los dos botones sólo aparecen sin servidor: con servidor, los clientes de ejemplo se subirían como reales y el borrado quitaría del servidor los de toda la empresa. Para probar con servidor están los datos de `npm run db:migrar -- --demo`.
 
 ## Qué hace
 

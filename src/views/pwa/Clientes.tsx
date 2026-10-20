@@ -105,7 +105,8 @@ export function Clientes() {
                 <div className="truncate text-base leading-5 font-semibold">{c.nombre}</div>
                 <div className="mt-0.5 truncate text-sm text-apagado">
                   {textoFrecuencia(c.frecuencia)} · {c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}
-                  {fav && <span className="inline-flex items-center gap-1 align-middle"> · <IconoSabor sabor={fav.sabor} size={15} /> {fav.sabor}</span>}
+                  {/* En línea con el texto: si no cabe, se recorta el nombre del sabor y no desaparece entero. */}
+                  {fav && <> · <IconoSabor sabor={fav.sabor} size={15} className="inline" /> {fav.sabor}</>}
                 </div>
               </div>
               {s?.proximo && <div className="rounded-full bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}

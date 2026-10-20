@@ -8,6 +8,7 @@ import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
 import { calcularRuta, distancia, enlaceNavegar, posicionActual, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../../lib/ruteo'
 import { cargarDemo } from '../../lib/demo'
+import { MODO_SERVIDOR } from '../../lib/api'
 import { baseDelUltimoPedido } from '../../lib/codigos'
 import { AlertasRuta } from './AlertasRuta'
 import { Mapa, type Pin } from './Mapa'
@@ -411,21 +412,26 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
           ) : (
             <div className="px-5 pt-3 pb-5">
               <div className="text-2xl leading-8 font-bold tracking-tight">Hoy no hay entregas</div>
-              <div className="mt-1 text-sm text-apagado">Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.</div>
+              <div className="mt-1 text-sm text-apagado">
+                {MODO_SERVIDOR ? 'Agenda pedidos desde Clientes.' : 'Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.'}
+              </div>
               <button onClick={irAClientes} className="mt-4 flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-4 text-left text-lg font-semibold text-apagado active:bg-linea">
                 <ArrowRight size={20} className="text-tinta" /> ¿A quién le llevamos?
               </button>
-              <Boton
-                variante="secundario"
-                className="mt-2 w-full"
-                onClick={async () => {
-                  const centro = yo ?? (await ubicacionActual()) ?? [-99.1332, 19.4326]
-                  await cargarDemo(centro)
-                  aviso('Datos de ejemplo cargados')
-                }}
-              >
-                <Sparkles size={18} /> Cargar datos de ejemplo
-              </Boton>
+              {/* Sólo sin servidor: con servidor los clientes de ejemplo se subirían como clientes reales. */}
+              {!MODO_SERVIDOR && (
+                <Boton
+                  variante="secundario"
+                  className="mt-2 w-full"
+                  onClick={async () => {
+                    const centro = yo ?? (await ubicacionActual()) ?? [-99.1332, 19.4326]
+                    await cargarDemo(centro)
+                    aviso('Datos de ejemplo cargados')
+                  }}
+                >
+                  <Sparkles size={18} /> Cargar datos de ejemplo
+                </Boton>
+              )}
             </div>
           )}
 

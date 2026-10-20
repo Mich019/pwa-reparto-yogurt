@@ -1,4 +1,4 @@
-import { asegurarCatalogo, borrarVarios, db, guardarVarios, totalDe, uid, type Cliente, type Pedido } from './db'
+import { asegurarCatalogo, db, guardarVarios, totalDe, uid, type Cliente, type Pedido } from './db'
 import { MODO_SERVIDOR } from './api'
 import { hoy, sumarDias, tocaVisita } from './fechas'
 import type { Punto } from './ruteo'
@@ -60,13 +60,8 @@ export async function cargarDemo(centro: Punto) {
   await guardarVarios('pedidos', pedidos)
 }
 
+// Sólo sin servidor. Con servidor el borrado se sincronizaría y quitaría del servidor los clientes y pedidos de toda la empresa.
 export async function borrarTodo() {
-  if (!MODO_SERVIDOR) {
-    await Promise.all([db.clientes.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear()])
-    return
-  }
-  // Con servidor el borrado se sincroniza: hay que borrar registro por registro, no vaciar las tablas.
-  await borrarVarios('recordatorios', await db.recordatorios.toCollection().primaryKeys())
-  await borrarVarios('pedidos', await db.pedidos.toCollection().primaryKeys())
-  await borrarVarios('clientes', await db.clientes.toCollection().primaryKeys())
+  if (MODO_SERVIDOR) return
+  await Promise.all([db.clientes.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear()])
 }

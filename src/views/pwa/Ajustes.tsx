@@ -84,7 +84,10 @@ export function Ajustes() {
           <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])} />
         </label>
       </div>
-      <Boton variante="peligro" className="mt-2 w-full" onClick={() => setConfirmarBorrado(true)}><Trash2 size={18} /> Borrar clientes y pedidos</Boton>
+      {/* Con servidor los clientes y pedidos son de toda la empresa: borrarlos aquí los quitaría también del servidor. */}
+      {!MODO_SERVIDOR && (
+        <Boton variante="peligro" className="mt-2 w-full" onClick={() => setConfirmarBorrado(true)}><Trash2 size={18} /> Borrar clientes y pedidos</Boton>
+      )}
 
       {editando && (
         <FormSabor
