@@ -12,8 +12,7 @@ import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
-import { IconoSabor } from '../../components/Fruta'
-import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
+import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -106,7 +105,7 @@ export function Clientes() {
                 <div className="mt-0.5 truncate text-sm text-apagado">
                   {textoFrecuencia(c.frecuencia)} · {c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}
                   {/* En línea con el texto: si no cabe, se recorta el nombre del sabor y no desaparece entero. */}
-                  {fav && <> · <IconoSabor sabor={fav.sabor} size={15} className="inline" /> {fav.sabor}</>}
+                  {fav && <> · <PuntoSabor color={fav.color_hex} className="h-2.5 w-2.5 align-middle" /> {fav.sabor}</>}
                 </div>
               </div>
               {s?.proximo && <div className="rounded-full bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
@@ -130,7 +129,7 @@ export function Clientes() {
           cliente={perfil}
           pedidos={pedidos.filter((p) => p.clienteId === perfil.id)}
           litros={stats.get(perfil.id)?.litros ?? 0}
-          favorito={favorito(perfil.id)?.sabor}
+          favorito={favorito(perfil.id)}
           sabor={(id) => prod.get(id)}
           onCerrar={() => setPerfilId(null)}
           onEditar={() => setForm(perfil)}
@@ -146,7 +145,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
   cliente: Cliente
   pedidos: Pedido[]
   litros: number
-  favorito?: string
+  favorito?: { sabor: string; color_hex: string }
   sabor: (id: string) => { sabor: string; color_hex: string } | undefined
   onCerrar: () => void
   onEditar: () => void
@@ -174,7 +173,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
         <div className="text-sm text-apagado">{cliente.direccion} · {textoFrecuencia(cliente.frecuencia)} · {cliente.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <Dato valor={`${litros} L`} etiqueta="Consumidos" />
-          <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={favorito ? <IconoSabor sabor={favorito} size={13} className="inline" /> : <Star size={12} className="inline" />} />
+          <Dato valor={favorito?.sabor ?? '—'} etiqueta="Favorito" icono={favorito ? <PuntoSabor color={favorito.color_hex} className="h-2.5 w-2.5 align-[-1px]" /> : <Star size={12} className="inline" />} />
           <Dato valor={ultima ? textoFecha(ultima.fecha) : '—'} etiqueta="Última visita" />
         </div>
         <div className="grid grid-cols-5 gap-1">
@@ -249,7 +248,7 @@ function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => {
       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
         {p.items.map((i) => (
           <span key={i.productoId} className="flex items-center gap-1 text-xs">
-            <IconoSabor sabor={sabor(i.productoId)?.sabor ?? ''} size={15} />
+            <PuntoSabor color={sabor(i.productoId)?.color_hex} className="h-3 w-3" />
             {i.litros}L {sabor(i.productoId)?.sabor}
           </span>
         ))}

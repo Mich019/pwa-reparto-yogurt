@@ -1,7 +1,6 @@
 import { Minus, Plus } from 'lucide-react'
 import type { DetallePedido, Producto } from '../../lib/db'
 import { dinero } from '../../lib/fechas'
-import { Insignia } from '../../components/Fruta'
 
 export type Cantidades = Record<string, number> // productoId -> litros
 
@@ -15,7 +14,15 @@ export function aItems(c: Cantidades, productos: Producto[]): DetallePedido[] {
     .map(([id, litros]) => ({ productoId: id, litros, precio_litro: prod.get(id)!.precio_litro }))
 }
 
-// Una tarjeta limpia por sabor: su fruta, el precio y [-] litros [+] con botones grandes para una sola mano.
+// Texto claro sobre el fondo de color del sabor.
+function textoSobre(hex: string) {
+  const n = parseInt(hex.slice(1), 16)
+  const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255
+  return l > 0.6 ? '#0f172a' : '#ffffff'
+}
+
+// Tarjetas por sabor: el color arriba con [-] litros [+] y una franja oscura con nombre y precio,
+// como las tarjetas de vehículo de Uber. Botones grandes para usar con una sola mano.
 export function SelectorSabores({ productos, valor, onChange }: {
   productos: Producto[]
   valor: Cantidades
@@ -34,42 +41,45 @@ export function SelectorSabores({ productos, valor, onChange }: {
         {visibles.map((p) => {
           const l = valor[p.id] ?? 0
           const envase = p.presentacion ?? 1
+          const color = textoSobre(p.color_hex)
           return (
-            <div key={p.id} className={`rounded-2xl bg-papel p-3.5 transition-colors ${l ? 'ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
-              <div className="flex items-start justify-between">
-                <Insignia sabor={p.sabor} color={p.color_hex} size={52} />
-                <div className={`pt-1 text-sm font-semibold tabular-nums ${l ? 'text-tinta' : 'text-transparent'}`}>{dinero(l * p.precio_litro)}</div>
-              </div>
-              <div className="mt-2.5 truncate text-base leading-5 font-semibold">{p.sabor}</div>
-              <div className="text-xs text-apagado">{dinero(p.precio_litro)} / L{envase !== 1 && ` · envase de ${envase} L`}</div>
-              <div className="mt-3 flex items-center justify-between">
+            <div key={p.id} className={`flex flex-col overflow-hidden rounded-2xl transition-shadow ${l ? 'shadow-tarjeta ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
+              <div className="flex items-center justify-between gap-1 px-2 py-4" style={{ background: p.color_hex, color }}>
                 <button
                   onClick={() => cambiar(p.id, -envase)}
-                  className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea disabled:opacity-35"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-white/80 text-tinta active:bg-white disabled:opacity-40"
                   aria-label={`Quitar ${envase} L de ${p.sabor}`}
                   disabled={!l}
                 >
-                  <Minus size={20} strokeWidth={2.5} />
+                  <Minus size={20} strokeWidth={3} />
                 </button>
                 <div className="text-center">
-                  <div className="text-2xl leading-6 font-semibold tabular-nums">{l}</div>
-                  <div className="text-[11px] text-apagado">litros</div>
+                  <div className="text-4xl leading-none font-extrabold tabular-nums">{l}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold opacity-70">litros</div>
                 </div>
                 <button
                   onClick={() => cambiar(p.id, envase)}
-                  className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-white/80 text-tinta active:bg-white"
                   aria-label={`Agregar ${envase} L de ${p.sabor}`}
                 >
-                  <Plus size={20} strokeWidth={2.5} />
+                  <Plus size={20} strokeWidth={3} />
                 </button>
+              </div>
+              <div className="flex-1 bg-marino px-3 py-2.5 text-white">
+                <div className="truncate text-base leading-5 font-bold">{p.sabor}</div>
+                <div className="mt-0.5 flex justify-between gap-2 text-xs text-white/60">
+                  <span>{dinero(p.precio_litro)} / L</span>
+                  <span className={`font-bold tabular-nums ${l ? 'text-white' : ''}`}>{l ? dinero(l * p.precio_litro) : '—'}</span>
+                </div>
+                {envase !== 1 && <div className="mt-0.5 truncate text-[11px] text-white/60">envase de {envase} L</div>}
               </div>
             </div>
           )
         })}
       </div>
-      <div className="mt-3 flex items-center justify-between rounded-2xl bg-niebla px-4 py-3.5">
-        <span className="text-apagado">{litros} L en total</span>
-        <span className="text-2xl font-semibold tracking-tight tabular-nums">{dinero(total)}</span>
+      <div className="mt-3 flex items-center justify-between rounded-2xl bg-marino px-4 py-3.5 text-white">
+        <span className="text-white/70">{litros} L en total</span>
+        <span className="text-2xl font-extrabold tracking-tight tabular-nums">{dinero(total)}</span>
       </div>
     </div>
   )

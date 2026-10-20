@@ -5,8 +5,7 @@ import { borrar, db, guardar, guardarVarios, uid, type Producto } from '../../li
 import { dinero, hoy } from '../../lib/fechas'
 import { borrarTodo } from '../../lib/demo'
 import { MODO_SERVIDOR } from '../../lib/api'
-import { Insignia } from '../../components/Fruta'
-import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
+import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
 
 const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce', '#ef4444', '#22c55e', '#38bdf8', '#a3e635']
 
@@ -56,7 +55,7 @@ export function Ajustes() {
       <div className="mt-4 space-y-2">
         {productos.map((p) => (
           <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
-            <Insignia sabor={p.sabor} color={p.color_hex} size={48} />
+            <PuntoSabor color={p.color_hex} className="h-11 w-11" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
               {p.descripcion && <div className="truncate text-xs text-apagado">{p.descripcion}</div>}
@@ -130,10 +129,6 @@ function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; t
   return (
     <Hoja abierta onCerrar={onCerrar} titulo={producto ? 'Editar sabor' : 'Nuevo sabor'}>
       <div className="space-y-4 pb-4">
-        <div className="flex items-center gap-3">
-          <Insignia sabor={sabor} color={color} size={56} />
-          <p className="text-sm text-apagado">El ícono se elige solo según el nombre: fresa, mango, durazno, nuez, zarzamora, plátano…</p>
-        </div>
         <Campo etiqueta="Sabor"><input className={claseInput} value={sabor} onChange={(e) => setSabor(e.target.value)} placeholder="Ej. Fresa" /></Campo>
         <Campo etiqueta="Descripción (opcional)">
           <textarea className={claseInput} rows={2} maxLength={500} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Con trozos de fresa, endulzado con miel" />
@@ -155,7 +150,7 @@ function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; t
           <p className="-mt-2 text-xs text-apagado">El envase de {envase} L se vende en {dinero(Number(precio) * envase)} y cuesta {dinero((Number(costo) || 0) * envase)}.</p>
         )}
         <div>
-          <div className="mb-1.5 text-sm font-semibold text-apagado">Color de acento</div>
+          <div className="mb-1.5 text-sm font-semibold text-apagado">Color</div>
           <div className="flex flex-wrap gap-2">
             {COLORES.map((c) => (
               <button key={c} onClick={() => setColor(c)} className={`h-10 w-10 rounded-full ${color === c ? 'ring-2 ring-tinta ring-offset-2' : ''}`} style={{ background: c }} aria-label={c} />

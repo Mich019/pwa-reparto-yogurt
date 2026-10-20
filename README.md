@@ -19,9 +19,9 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo*
 
 | Pantalla | Contenido |
 |---|---|
-| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total, forma de pago (vuelve a efectivo en cada parada) y **Pedido Realizado**, y una franja con el avance del día. Cada sabor lleva el ícono de su fruta. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
+| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total, forma de pago (vuelve a efectivo en cada parada) y **Pedido Realizado**, y una franja con el avance del día. Cada sabor se reconoce por su color. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
 | Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. Si la ubicación guardada del cliente queda lejos de donde se entregó, ofrece guardarla ahí con un toque. |
-| Selector | Tarjetas por sabor con su color, botones grandes − / + por envase (1 L si el sabor no dice otra cosa), subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
+| Selector | Tarjetas por sabor con su color arriba y una franja azul marino con nombre, precio y subtotal; botones grandes − / + por envase (1 L si el sabor no dice otra cosa), subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
 | Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda por nombre, teléfono, colonia, día de visita u horario, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
 | Producción | Litros por sabor para los próximos 7 días = pedidos agendados + estimado por historial de clientes a los que les toca visita. Ventas de hoy / 7 / 30 días, ganancia neta, más y menos vendido. Con servidor, el administrador también ve aquí **Stock del día** (ver abajo). |
 | Stock | Sólo vendedor y sólo con servidor. Su carga del día, lo que ha entregado y lo que le queda de cada sabor, aunque no tenga señal. |
@@ -31,7 +31,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo*
 
 ## Técnico
 
-- Diseño estilo Uber, limpio: fondo blanco, botones negros, tarjetas grises suaves y azul sólo para la ruta. Colores definidos en `src/index.css` (`@theme`). Los íconos de fruta de cada sabor están en `src/components/Fruta.tsx` y se eligen solos por el nombre del sabor (fresa, durazno, mango, nuez, zarzamora, plátano…); un sabor sin fruta conocida usa un vasito de yogurt. Tipografía Inter (licencia OFL en `src/fonts/`), incluida en la app para que se vea igual sin internet.
+- Diseño estilo Uber, limpio: fondo blanco, botones negros, tarjetas grises suaves y azul sólo para la ruta. Colores definidos en `src/index.css` (`@theme`). Cada sabor se identifica por el color que se le elige en Sabores: el selector usa tarjetas de ese color con una franja azul marino (`--color-marino`), y en la ruta, clientes, stock, producción y reportes un punto del mismo color (`PuntoSabor` en `src/components/ui.tsx`). Tipografía Inter (licencia OFL en `src/fonts/`), incluida en la app para que se vea igual sin internet.
 
 - Vite + React 19 + TypeScript + Tailwind 4. Mapa: `maplibre-gl` con estilo libre de OpenFreeMap (sin llave).
 - Datos en IndexedDB con Dexie (`src/lib/db.ts`). Cada cambio queda también en la tabla `cola` para sincronizar con un servidor cuando exista.

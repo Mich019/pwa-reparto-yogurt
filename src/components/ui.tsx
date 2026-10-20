@@ -103,6 +103,11 @@ export function Accion({ icono, texto, href, onClick }: { icono: ReactNode; text
   )
 }
 
+// Cada sabor se reconoce por su color en toda la app (el mismo de su tarjeta en el selector).
+export function PuntoSabor({ color, className = 'h-4 w-4' }: { color?: string; className?: string }) {
+  return <span aria-hidden="true" className={`inline-block shrink-0 rounded-full border border-black/15 ${className}`} style={{ background: color ?? '#d4d4d4' }} />
+}
+
 export function Campo({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
     <label className="block">

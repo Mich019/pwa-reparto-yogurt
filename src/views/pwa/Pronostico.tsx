@@ -3,8 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Factory, TrendingDown, TrendingUp } from 'lucide-react'
 import { db } from '../../lib/db'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
-import { Segmentado } from '../../components/ui'
-import { IconoSabor, Insignia } from '../../components/Fruta'
+import { PuntoSabor, Segmentado } from '../../components/ui'
 import { pronosticoSemanal, resumenVentas } from '../../lib/pronostico'
 
 const PERIODOS = { hoy: 'Hoy', semana: '7 días', mes: '30 días' } as const
@@ -37,7 +36,7 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
         <div className="mt-5 divide-y divide-linea">
           {pron.filas.map((f) => (
             <div key={f.producto.id} className="flex items-center gap-3 py-3">
-              <Insignia sabor={f.producto.sabor} color={f.producto.color_hex} size={44} />
+              <PuntoSabor color={f.producto.color_hex} className="h-5 w-5" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between">
                   <span className="font-semibold">{f.producto.sabor}</span>
@@ -81,17 +80,17 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-2xl bg-niebla p-3">
               <div className="flex items-center gap-1 text-xs text-verde"><TrendingUp size={14} /> Más vendido</div>
-              <div className="mt-1 flex items-center gap-1.5 font-semibold"><IconoSabor sabor={ventas.porSabor[0].producto.sabor} size={20} />{ventas.porSabor[0].producto.sabor}</div>
+              <div className="mt-1 flex items-center gap-1.5 font-semibold"><PuntoSabor color={ventas.porSabor[0].producto.color_hex} className="h-3.5 w-3.5" />{ventas.porSabor[0].producto.sabor}</div>
             </div>
             <div className="rounded-2xl bg-niebla p-3">
               <div className="flex items-center gap-1 text-xs text-amber-600"><TrendingDown size={14} /> Menos vendido</div>
-              <div className="mt-1 flex items-center gap-1.5 font-semibold"><IconoSabor sabor={ventas.porSabor[ventas.porSabor.length - 1].producto.sabor} size={20} />{ventas.porSabor[ventas.porSabor.length - 1].producto.sabor}</div>
+              <div className="mt-1 flex items-center gap-1.5 font-semibold"><PuntoSabor color={ventas.porSabor[ventas.porSabor.length - 1].producto.color_hex} className="h-3.5 w-3.5" />{ventas.porSabor[ventas.porSabor.length - 1].producto.sabor}</div>
             </div>
           </div>
           <div className="mt-3 divide-y divide-linea">
             {ventas.porSabor.map((s) => (
               <div key={s.producto.id} className="flex items-center gap-3 py-3">
-                <Insignia sabor={s.producto.sabor} color={s.producto.color_hex} size={40} />
+                <PuntoSabor color={s.producto.color_hex} />
                 <div className="min-w-0 flex-1">
                   <div className="flex justify-between gap-2 text-sm">
                     <span className="font-semibold">{s.producto.sabor}</span>

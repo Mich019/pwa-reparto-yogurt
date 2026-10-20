@@ -12,10 +12,9 @@ import { MODO_SERVIDOR } from '../../lib/api'
 import { baseDelUltimoPedido } from '../../lib/codigos'
 import { AlertasRuta } from './AlertasRuta'
 import { Mapa, type Pin } from './Mapa'
-import { IconoSabor } from '../../components/Fruta'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
-import { Accion, Boton, Hoja, Segmentado, aviso, telLimpio } from '../../components/ui'
+import { Accion, Boton, Hoja, PuntoSabor, Segmentado, aviso, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -331,7 +330,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                     const p = prodPorId.get(i.productoId)
                     return (
                       <span key={i.productoId} className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
-                        <IconoSabor sabor={p?.sabor ?? ''} size={22} />
+                        <PuntoSabor color={p?.color_hex} />
                         {i.litros} L {p?.sabor ?? '¿?'}
                       </span>
                     )
