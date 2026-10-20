@@ -1,0 +1,249 @@
+-- ==========================================================
+-- TIPOS ENUM NATIVOS DE POSTGRESQL
+-- ==========================================================
+CREATE TYPE rol_usuario AS ENUM ('administrador', 'vendedor');
+CREATE TYPE frecuencia_tipo_enum AS ENUM ('dias_semana', 'intervalo');
+CREATE TYPE ventana_horario_enum AS ENUM ('manana', 'tarde');
+CREATE TYPE estado_pedido_enum AS ENUM ('pendiente', 'en_camino', 'entregado', 'omitido', 'cancelado');
+CREATE TYPE metodo_pago_enum AS ENUM ('efectivo', 'transferencia');
+CREATE TYPE estado_recordatorio_enum AS ENUM ('pendiente', 'atendido', 'descartado');
+CREATE TYPE tabla_sync_enum AS ENUM ('clientes', 'pedidos', 'detalle_pedido', 'recordatorios', 'productos', 'stock_diario');
+CREATE TYPE operacion_sync_enum AS ENUM ('insert', 'update', 'delete');
+CREATE TYPE estado_sync_enum AS ENUM ('aplicada', 'conflicto', 'rechazada');
+
+-- ==========================================================
+-- 1. USUARIOS Y AUTENTICACIÓN
+-- ==========================================================
+CREATE TABLE usuarios (
+    id_usuario UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre VARCHAR(100) NOT NULL,
+    correo VARCHAR(150) NOT NULL UNIQUE,
+    telefono VARCHAR(20) NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rol rol_usuario NOT NULL DEFAULT 'vendedor',
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE,
+    intentos_fallidos SMALLINT NOT NULL DEFAULT 0,
+    bloqueado_hasta TIMESTAMPTZ NULL,
+    ultimo_acceso TIMESTAMPTZ NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE sesiones (
+    id_sesion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario UUID NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    refresh_token_hash VARCHAR(255) NOT NULL UNIQUE,
+    dispositivo VARCHAR(200) NULL,
+    ip VARCHAR(45) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    expira_en TIMESTAMPTZ NOT NULL,
+    revocado_en TIMESTAMPTZ NULL
+);
+CREATE INDEX sesiones_usuario_idx ON sesiones (id_usuario, revocado_en);
+
+CREATE TABLE recuperaciones_password (
+    id_recuperacion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario UUID NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    codigo_hash VARCHAR(255) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    expira_en TIMESTAMPTZ NOT NULL,
+    usado_en TIMESTAMPTZ NULL
+);
+CREATE INDEX recuperaciones_usuario_idx ON recuperaciones_password (id_usuario, usado_en);
+
+CREATE TABLE intentos_login (
+    id_intento BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    correo VARCHAR(150) NOT NULL,
+    id_usuario UUID NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    exitoso BOOLEAN NOT NULL,
+    ip VARCHAR(45) NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX intentos_login_correo_idx ON intentos_login (correo, creado_en);
+
+-- ==========================================================
+-- 2. CLIENTES Y RUTA
+-- ==========================================================
+CREATE TABLE clientes (
+    id_cliente UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_vendedor UUID NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    nombre VARCHAR(100) NOT NULL,
+    direccion TEXT NOT NULL,
+    colonia VARCHAR(100) NULL,
+    referencias TEXT NULL,
+    latitud NUMERIC(10, 8) NULL,
+    longitud NUMERIC(11, 8) NULL,
+    telefono VARCHAR(20) NULL,
+    frecuencia_tipo frecuencia_tipo_enum NOT NULL DEFAULT 'dias_semana',
+    dias_semana TEXT[] NOT NULL DEFAULT '{}', -- Arreglo en Postgres ['dom', 'lun', ...]
+    cada_dias SMALLINT NULL,
+    ventana_horario ventana_horario_enum NOT NULL DEFAULT 'manana',
+    qr_uuid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    nfc_uid VARCHAR(64) NULL UNIQUE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1
+);
+CREATE INDEX clientes_vendedor_idx ON clientes (id_vendedor, activo);
+CREATE INDEX clientes_nombre_idx ON clientes (nombre);
+CREATE INDEX clientes_telefono_idx ON clientes (telefono);
+CREATE INDEX clientes_colonia_idx ON clientes (colonia);
+CREATE INDEX clientes_sync_idx ON clientes (actualizado_en);
+
+-- ==========================================================
+-- 3. PRODUCTOS Y STOCK
+-- ==========================================================
+CREATE TABLE productos (
+    id_producto UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre VARCHAR(100) NOT NULL DEFAULT 'Yogurt',
+    sabor VARCHAR(100) NOT NULL,
+    descripcion TEXT NULL,
+    presentacion_litros NUMERIC(5, 2) NOT NULL DEFAULT 1.00,
+    precio_unitario NUMERIC(10, 2) NOT NULL,
+    costo_produccion NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    color_hex CHAR(7) NOT NULL DEFAULT '#f472b6',
+    disponible BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1,
+    CONSTRAINT productos_nombre_sabor_unico UNIQUE (nombre, sabor, presentacion_litros)
+);
+
+CREATE TABLE stock_diario (
+    id_stock UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fecha DATE NOT NULL,
+    id_producto UUID NOT NULL REFERENCES productos(id_producto) ON DELETE RESTRICT,
+    id_vendedor UUID NOT NULL REFERENCES usuarios(id_usuario) ON DELETE RESTRICT,
+    cantidad_asignada NUMERIC(8, 2) NOT NULL,
+    cantidad_devuelta NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1,
+    CONSTRAINT stock_unico_por_dia UNIQUE (fecha, id_producto, id_vendedor)
+);
+
+-- ==========================================================
+-- 4. PEDIDOS Y DETALLE
+-- ==========================================================
+CREATE TABLE pedidos (
+    id_pedido UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_cliente UUID NOT NULL REFERENCES clientes(id_cliente) ON DELETE RESTRICT,
+    id_vendedor UUID NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    id_pedido_origen UUID NULL REFERENCES pedidos(id_pedido) ON DELETE SET NULL,
+    fecha DATE NOT NULL,
+    estado estado_pedido_enum NOT NULL DEFAULT 'pendiente',
+    total NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    metodo_pago metodo_pago_enum NULL,
+    orden_ruta SMALLINT NULL,
+    fecha_entregado_real TIMESTAMPTZ NULL,
+    motivo_omision VARCHAR(200) NULL,
+    notas TEXT NULL,
+    creado_por UUID NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1
+);
+CREATE INDEX pedidos_ruta_del_dia_idx ON pedidos (id_vendedor, fecha, estado);
+CREATE INDEX pedidos_fecha_estado_idx ON pedidos (fecha, estado);
+CREATE INDEX pedidos_cliente_idx ON pedidos (id_cliente, fecha);
+CREATE INDEX pedidos_sync_idx ON pedidos (actualizado_en);
+
+CREATE TABLE detalle_pedido (
+    id_detalle_pedido UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_pedido UUID NOT NULL REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    id_producto UUID NOT NULL REFERENCES productos(id_producto) ON DELETE RESTRICT,
+    cantidad NUMERIC(8, 2) NOT NULL,
+    precio_unitario NUMERIC(10, 2) NOT NULL,
+    costo_unitario NUMERIC(10, 2) NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1,
+    CONSTRAINT detalle_producto_unico UNIQUE (id_pedido, id_producto)
+);
+CREATE INDEX detalle_producto_idx ON detalle_pedido (id_producto);
+
+-- ==========================================================
+-- 5. RECORDATORIOS Y AUDITORÍA
+-- ==========================================================
+CREATE TABLE recordatorios (
+    id_recordatorio UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_cliente UUID NOT NULL REFERENCES clientes(id_cliente) ON DELETE CASCADE,
+    id_vendedor UUID NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    id_pedido_origen UUID NULL REFERENCES pedidos(id_pedido) ON DELETE SET NULL,
+    estado estado_recordatorio_enum NOT NULL DEFAULT 'pendiente',
+    nota TEXT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    atendido_en TIMESTAMPTZ NULL,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    version INT NOT NULL DEFAULT 1
+);
+CREATE INDEX recordatorios_pendientes_idx ON recordatorios (id_vendedor, estado);
+
+CREATE TABLE auditoria (
+    id_auditoria BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_usuario UUID NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    accion VARCHAR(10) NOT NULL,
+    tabla VARCHAR(50) NOT NULL,
+    id_registro UUID NULL,
+    datos_antes JSONB NULL,
+    datos_despues JSONB NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX auditoria_tabla_registro_idx ON auditoria (tabla, id_registro);
+CREATE INDEX auditoria_fecha_idx ON auditoria (creado_en);
+
+-- ==========================================================
+-- 6. SINCRONIZACIÓN OFFLINE Y ELIMINACIONES
+-- ==========================================================
+CREATE TABLE operaciones_sync (
+    id_operacion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario UUID NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    dispositivo VARCHAR(200) NULL,
+    tabla tabla_sync_enum NOT NULL,
+    id_registro UUID NOT NULL,
+    operacion operacion_sync_enum NOT NULL,
+    version_cliente INT NULL,
+    datos JSONB NOT NULL,
+    creado_en_cliente TIMESTAMPTZ NOT NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    estado estado_sync_enum NOT NULL,
+    detalle_error TEXT NULL
+);
+CREATE INDEX sync_usuario_fecha_idx ON operaciones_sync (id_usuario, recibido_en);
+CREATE INDEX sync_estado_idx ON operaciones_sync (estado, recibido_en);
+
+CREATE TABLE eliminaciones (
+    tabla VARCHAR(50) NOT NULL,
+    id_registro UUID NOT NULL,
+    eliminado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (tabla, id_registro)
+);
+CREATE INDEX eliminaciones_fecha_idx ON eliminaciones (eliminado_en);
+
+-- ==========================================================
+-- 7. NOTIFICACIONES PUSH (WEB VAPID)
+-- ==========================================================
+CREATE TABLE suscripciones_push (
+    id_suscripcion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario UUID NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    endpoint VARCHAR(500) NOT NULL UNIQUE,
+    clave_p256dh VARCHAR(255) NOT NULL,
+    clave_auth VARCHAR(255) NOT NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE TABLE notificaciones (
+    id_notificacion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario UUID NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    tipo VARCHAR(30) NOT NULL,
+    titulo VARCHAR(120) NOT NULL,
+    cuerpo TEXT NULL,
+    datos JSONB NULL,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    leida_en TIMESTAMPTZ NULL
+);
+CREATE INDEX notificaciones_usuario_idx ON notificaciones (id_usuario, leida_en, creado_en);

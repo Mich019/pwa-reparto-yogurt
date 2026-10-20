@@ -79,7 +79,8 @@ CREATE TABLE recuperaciones_password (
   codigo_hash     text NOT NULL,
   creado_en       timestamptz NOT NULL DEFAULT now(),
   expira_en       timestamptz NOT NULL,
-  usado_en        timestamptz
+  usado_en        timestamptz,
+  intentos        smallint NOT NULL DEFAULT 0                  -- códigos incorrectos; a los 5 se invalida
 );
 CREATE INDEX recuperaciones_usuario ON recuperaciones_password (id_usuario) WHERE usado_en IS NULL;
 

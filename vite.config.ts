@@ -25,4 +25,12 @@ function precache(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), precache()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

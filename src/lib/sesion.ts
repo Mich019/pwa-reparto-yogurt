@@ -158,3 +158,18 @@ export async function cerrarSesion() {
   if (s) await api('/auth/logout', { cuerpo: { refreshToken: s.refreshToken } }).catch(() => {})
   fijar(null)
 }
+
+// RF-002: Solicita un código de 6 dígitos al correo registrado
+export async function solicitarRecuperacion(correo: string): Promise<{ ok: boolean; minutos: number }> {
+  return await api<{ ok: boolean; minutos: number }>('/auth/recuperar', {
+    cuerpo: { correo: correo.trim() },
+  })
+}
+
+// RF-002: Valida el código de 6 dígitos y define la nueva contraseña
+export async function restablecerPassword(correo: string, codigo: string, nueva: string): Promise<void> {
+  await api('/auth/restablecer', {
+    cuerpo: { correo: correo.trim(), codigo: codigo.trim(), nueva },
+  })
+}
+

@@ -1,7 +1,6 @@
-// Conexión con el servidor (server/). Sin VITE_API_URL la app funciona sólo en este teléfono,
-// sin inicio de sesión ni sincronización, como antes.
-export const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/+$/, '')
-export const MODO_SERVIDOR = API_URL !== ''
+// Conexión con el servidor. En Vercel o con proxy local apunta a /api por defecto.
+export const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? '/api').replace(/\/+$/, '')
+export const MODO_SERVIDOR = import.meta.env.VITE_OFFLINE_SOLO === 'true' ? false : true
 
 export class ErrorApi extends Error {
   status: number
