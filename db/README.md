@@ -55,6 +55,10 @@ El diseño base era correcto en lo esencial: cuatro entidades (Clientes, Product
 Vistas: `v_ruta_del_dia` (RF-027), `v_ventas_diarias` (RF-043, RF-044, RF-047), `v_ventas_por_sabor` (RF-045, RF-046), `v_resumen_cliente` (RF-012, RF-013).
 Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor a producir (agendados + estimado por historial).
 
+## Bases ya creadas
+
+`migraciones/` trae los cambios al esquema posteriores a la primera versión. Aplícalos en orden con `psql -U postgres -d reparto_yogurt -f migraciones/NNN_*.sql` (son repetibles). La API está en [`../server`](../server/README.md).
+
 ## Notas para la API
 
 - La contraseña se hashea con Argon2id en la API; la base sólo acepta hashes `$argon2id$…`.

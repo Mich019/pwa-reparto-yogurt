@@ -37,8 +37,12 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 - Pronóstico en `src/lib/pronostico.ts`.
 - Base de datos del backend en `db/`: versión PostgreSQL (ver `db/README.md`) y versión MySQL 8 lista para migrar a la nube (ver `db/mysql/README.md`).
 
+## Servidor
+
+La API (`server/`, ver [su README](server/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL`; sin esa variable la app sigue siendo sólo local. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
+
 ## Pendiente (siguientes pasos)
 
-- Servidor (PostgreSQL + API), login por rol y sincronización en segundo plano (RF-001 a RF-006, RF-052, RF-053).
+- Recuperación de contraseña por correo (RF-002), cierre de sesión que no dependa de la señal.
 - QR y NFC por cliente (RF-015 a RF-022).
 - Panel de vendedores, stock diario, exportar a Excel, notificaciones push.

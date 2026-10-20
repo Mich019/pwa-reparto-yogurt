@@ -274,6 +274,7 @@ CREATE TABLE operaciones_sync (
 );
 CREATE INDEX sync_usuario_fecha ON operaciones_sync (id_usuario, recibido_en DESC);
 CREATE INDEX sync_conflictos ON operaciones_sync (recibido_en) WHERE estado = 'conflicto';
+CREATE INDEX sync_registro ON operaciones_sync (tabla, id_registro, recibido_en DESC);  -- quién cambió por última vez un registro (RF-053)
 
 -- Registros borrados, para que los teléfonos también los borren al sincronizar.
 CREATE TABLE eliminaciones (
