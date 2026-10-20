@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AlertCircle, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
-import { cerrarSesion, iniciarSesion } from '../../lib/sesion'
-import { ErrorApi, ErrorRed } from '../../lib/api'
+import { cerrarSesion, iniciarSesion, mensajeErrorLogin } from '../../lib/sesion'
+import { ErrorApi } from '../../lib/api'
 import { Logo } from '../../components/Logo'
 import { Campo, claseInput } from '../../components/ui'
 import { FormPassword } from './Cuenta'
@@ -19,7 +19,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
     const c = correo.trim()
     const p = password.trim()
     if (!c || !p) {
-      setError('Credenciales inválidas')
+      setError('Escribe tu correo y tu contraseña')
       return
     }
     setCargando(true)
@@ -29,20 +29,8 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
     try {
       await iniciarSesion(c, p)
     } catch (e: unknown) {
-      if (e instanceof ErrorApi) {
-        if (e.status === 423 || e.codigo === 'BLOQUEADA') {
-          setEsBloqueo(true)
-          setError('Cuenta bloqueada temporalmente tras 5 intentos fallidos. Intenta más tarde.')
-        } else if (e.status === 401 || e.status === 403) {
-          setError('Credenciales inválidas')
-        } else {
-          setError('Algo salió mal...')
-        }
-      } else if (e instanceof ErrorRed) {
-        setError('Algo salió mal...')
-      } else {
-        setError('Algo salió mal...')
-      }
+      setEsBloqueo(e instanceof ErrorApi && e.codigo === 'BLOQUEADA')
+      setError(mensajeErrorLogin(e))
     } finally {
       setCargando(false)
     }

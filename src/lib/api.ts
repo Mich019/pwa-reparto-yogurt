@@ -1,5 +1,5 @@
 // Conexión con el servidor. En Vercel o con proxy local apunta a /api por defecto.
-export const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? '/api').replace(/\/+$/, '')
+export const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) || '/api').replace(/\/+$/, '')
 export const MODO_SERVIDOR = import.meta.env.VITE_OFFLINE_SOLO === 'true' ? false : true
 
 export class ErrorApi extends Error {

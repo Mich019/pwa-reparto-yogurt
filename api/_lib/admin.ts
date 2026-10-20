@@ -1,17 +1,26 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { z } from 'zod'
 import type { Contexto } from './app.js'
+import { hoyEn } from './fechas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
 export async function rutasAdmin(
   app: FastifyInstance,
-  { db }: Contexto,
+  { db, config }: Contexto,
   { requiereAdmin }: { requiereAdmin: Guardia },
 ) {
   const pre = { preHandler: requiereAdmin }
+  const query = z.object({ fecha: z.iso.date().optional() })
 
   // Métricas y KPIs en tiempo real para el Dashboard del Administrador
-  app.get('/admin/stats', pre, async () => {
+  // «Hoy» es el de la zona del negocio, no el de la base (Supabase corre en UTC: a las 6 de la tarde en México ya sería mañana).
+  // Los pedidos cancelados no cuentan para lo esperado, los litros ni los sabores.
+  app.get('/admin/stats', pre, async (req, rep) => {
+    const q = query.safeParse(req.query)
+    if (!q.success) return rep.code(400).send({ error: 'Fecha inválida (AAAA-MM-DD)' })
+    const fecha = q.data.fecha ?? hoyEn(config.zonaHoraria)
+
     // 1. Usuarios / Vendedores
     const { rows: [u] } = await db.query(`
       SELECT 
@@ -49,10 +58,10 @@ export async function rutasAdmin(
         count(*) FILTER (WHERE estado = 'omitido')::int AS omitidos,
         count(*) FILTER (WHERE estado = 'cancelado')::int AS cancelados,
         coalesce(sum(total) FILTER (WHERE estado = 'entregado'), 0)::float8 AS total_cobrado,
-        coalesce(sum(total), 0)::float8 AS total_esperado
+        coalesce(sum(total) FILTER (WHERE estado <> 'cancelado'), 0)::float8 AS total_esperado
       FROM pedidos
-      WHERE fecha = CURRENT_DATE
-    `)
+      WHERE fecha = $1
+    `, [fecha])
 
     // 5. Litros programados / vendidos hoy
     const { rows: [lit] } = await db.query(`
@@ -61,8 +70,8 @@ export async function rutasAdmin(
       FROM detalle_pedido d
       JOIN pedidos ped ON d.id_pedido = ped.id_pedido
       JOIN productos prod ON d.id_producto = prod.id_producto
-      WHERE ped.fecha = CURRENT_DATE
-    `)
+      WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
+    `, [fecha])
 
     // 6. Sabores con más demanda hoy
     const { rows: saboresTop } = await db.query(`
@@ -73,13 +82,14 @@ export async function rutasAdmin(
       FROM detalle_pedido d
       JOIN pedidos ped ON d.id_pedido = ped.id_pedido
       JOIN productos prod ON d.id_producto = prod.id_producto
-      WHERE ped.fecha = CURRENT_DATE
+      WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
       GROUP BY prod.sabor, prod.color_hex
       ORDER BY litros DESC
       LIMIT 4
-    `)
+    `, [fecha])
 
     return {
+      fecha,
       vendedores: {
         total: u?.total_vendedores ?? 0,
         activos: u?.vendedores_activos ?? 0,

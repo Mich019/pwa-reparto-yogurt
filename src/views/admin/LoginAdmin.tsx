@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
-import { ErrorApi, ErrorRed } from '../../lib/api'
-import { cerrarSesion, iniciarSesion, restablecerPassword, sesionActual, solicitarRecuperacion } from '../../lib/sesion'
+import { ErrorApi } from '../../lib/api'
+import { cerrarSesion, iniciarSesion, mensajeErrorLogin, restablecerPassword, sesionActual, solicitarRecuperacion } from '../../lib/sesion'
 import { Logo } from '../../components/Logo'
 import { Campo, claseInput } from '../../components/ui'
 
@@ -34,7 +34,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
     const c = correo.trim()
     const p = password.trim()
     if (!c || !p) {
-      setError('Credenciales inválidas')
+      setError('Escribe tu correo y tu contraseña')
       return
     }
     setCargando(true)
@@ -54,22 +54,8 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
 
       onLoginExitoso?.()
     } catch (err: unknown) {
-      if (err instanceof ErrorApi) {
-        if (err.status === 423 || err.codigo === 'BLOQUEADA') {
-          // Bloqueo temporal por 5 intentos fallidos
-          setEsBloqueo(true)
-          setError('Cuenta bloqueada temporalmente tras 5 intentos fallidos. Intenta más tarde.')
-        } else if (err.status === 401 || err.status === 403) {
-          setError('Credenciales inválidas')
-        } else {
-          // Errores de servidor (500, 502, etc.)
-          setError('Algo salió mal...')
-        }
-      } else if (err instanceof ErrorRed) {
-        setError('Algo salió mal...')
-      } else {
-        setError('Algo salió mal...')
-      }
+      setEsBloqueo(err instanceof ErrorApi && err.codigo === 'BLOQUEADA')
+      setError(mensajeErrorLogin(err))
     } finally {
       setCargando(false)
     }
@@ -89,11 +75,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
       setMinutosVence(res.minutos ?? 15)
       setModo('codigo')
     } catch (err: unknown) {
-      if (err instanceof ErrorRed || (err instanceof ErrorApi && err.status >= 500)) {
-        setError('Algo salió mal...')
-      } else {
-        setError('Algo salió mal...')
-      }
+      setError(mensajeErrorLogin(err))
     } finally {
       setCargando(false)
     }

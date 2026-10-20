@@ -66,12 +66,12 @@ export const dispositivoId = () => {
   return id
 }
 
-// Un teléfono guarda los datos de una sola cuenta de vendedor. Cambiar de cuenta con cambios sin enviar los perdería.
-// Para administradores (que gestionan vía web central), no se bloquea por la cola local del repartidor.
+// Un teléfono guarda los datos de una sola cuenta. Cambiar de cuenta con cambios sin enviar los borraría (p. ej. las
+// ventas del día de un vendedor si un administrador entra en su teléfono), así que se pide entrar antes con esa cuenta.
 async function adoptarUsuario(u: UsuarioSesion) {
   const previo = (await db.meta.get('usuarioId'))?.valor as string | undefined
   if (previo && previo !== u.id) {
-    if (u.rol !== 'administrador' && (await db.cola.count()) > 0) {
+    if ((await db.cola.count()) > 0) {
       throw new Error('Este teléfono tiene cambios sin enviar de otra cuenta. Entra con esa cuenta para sincronizarlos primero.')
     }
     await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta, db.problemas, db.stock, db.avisos], async () => {
@@ -97,6 +97,15 @@ export async function iniciarSesion(correo: string, password: string) {
   }
   ultimoPasswordSesion = p
   fijar({ accessToken: r.accessToken, expiraEn: r.expiraEn, refreshToken: r.refreshToken, usuario: r.usuario })
+}
+
+// Mensaje para quien intenta entrar. Los del servidor ya están pensados para mostrarse (cuenta bloqueada o dada de baja);
+// sin señal hay que decirlo, porque la primera vez en un teléfono no se puede entrar sin conexión.
+export function mensajeErrorLogin(e: unknown): string {
+  if (e instanceof ErrorRed) return 'Sin conexión con el servidor. Para entrar la primera vez necesitas internet.'
+  if (e instanceof ErrorApi) return e.status >= 500 ? 'El servidor no respondió bien. Intenta de nuevo en un momento.' : e.message
+  if (e instanceof Error) return e.message // p. ej. cambios sin enviar de otra cuenta en este teléfono
+  return 'No se pudo entrar'
 }
 
 let renovando: Promise<string | null> | null = null
@@ -197,7 +206,7 @@ export async function solicitarRecuperacion(correo: string): Promise<{ ok: boole
 // RF-002: Valida el código de 6 dígitos y define la nueva contraseña
 export async function restablecerPassword(correo: string, codigo: string, nueva: string): Promise<void> {
   await api('/auth/restablecer', {
-    cuerpo: { correo: correo.trim(), codigo: codigo.trim(), nueva },
+    cuerpo: { correo: correo.trim(), codigo: codigo.trim(), nueva: nueva.trim() }, // el inicio de sesión también recorta
   })
 }
 

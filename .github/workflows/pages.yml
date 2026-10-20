@@ -28,6 +28,8 @@ jobs:
         env:
           # Dirección del servidor (Settings > Variables > API_URL). Vacía = la app funciona sólo en el teléfono.
           VITE_API_URL: ${{ vars.API_URL }}
+          # Sin servidor, la copia de GitHub Pages trabaja sin cuentas (si no, pediría entrar contra una API que no existe).
+          VITE_OFFLINE_SOLO: ${{ vars.API_URL == '' && 'true' || 'false' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
