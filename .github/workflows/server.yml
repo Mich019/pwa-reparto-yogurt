@@ -1,0 +1,41 @@
+name: Probar el servidor
+
+on:
+  push:
+    paths: ['server/**', 'db/**', '.github/workflows/server.yml']
+  pull_request:
+    paths: ['server/**', 'db/**', '.github/workflows/server.yml']
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: test
+      DATABASE_URL: postgres://postgres:test@localhost:5432/reparto_yogurt_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Crear la base de pruebas
+        run: |
+          psql -h localhost -U postgres -c "CREATE DATABASE reparto_yogurt_test ENCODING 'UTF8' TEMPLATE template0"
+          for f in 01_esquema 02_vistas 03_datos_iniciales; do
+            psql -h localhost -U postgres -d reparto_yogurt_test -v ON_ERROR_STOP=1 -f db/$f.sql
+          done
+      - run: npm ci
+        working-directory: server
+      - run: npm run typecheck
+        working-directory: server
+      - run: npm test
+        working-directory: server

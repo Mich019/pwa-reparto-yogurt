@@ -21,6 +21,19 @@ async function recortar() {
   for (let i = 0; i < ks.length - MAX_MOSAICOS; i++) await c.delete(ks[i])
 }
 
+// RF-052: al volver la conexión el navegador despierta este evento y se lo pasa a la app para que sincronice.
+// La cola vive en IndexedDB y el token en la sesión de la app, así que la sincronización la hace la propia
+// app; si no hay ninguna ventana abierta, sincroniza al abrirse (o al recuperar el foco).
+self.addEventListener('sync', (e) => {
+  if (e.tag !== 'sync-cola') return
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ventanas) => {
+      if (!ventanas.length) throw new Error('Sin ventanas abiertas: reintentar luego')
+      ventanas.forEach((v) => v.postMessage({ tipo: 'sincronizar' }))
+    }),
+  )
+})
+
 self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET') return
@@ -44,6 +57,7 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== location.origin) return
+  if (url.pathname.startsWith('/auth/') || url.pathname.startsWith('/sync/')) return
 
   // Navegación: red primero, si no hay conexión la copia guardada.
   if (req.mode === 'navigate') {
