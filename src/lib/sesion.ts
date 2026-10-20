@@ -66,11 +66,12 @@ export const dispositivoId = () => {
   return id
 }
 
-// Un teléfono guarda los datos de una sola cuenta. Cambiar de cuenta con cambios sin enviar los perdería.
+// Un teléfono guarda los datos de una sola cuenta de vendedor. Cambiar de cuenta con cambios sin enviar los perdería.
+// Para administradores (que gestionan vía web central), no se bloquea por la cola local del repartidor.
 async function adoptarUsuario(u: UsuarioSesion) {
   const previo = (await db.meta.get('usuarioId'))?.valor as string | undefined
   if (previo && previo !== u.id) {
-    if ((await db.cola.count()) > 0) {
+    if (u.rol !== 'administrador' && (await db.cola.count()) > 0) {
       throw new Error('Este teléfono tiene cambios sin enviar de otra cuenta. Entra con esa cuenta para sincronizarlos primero.')
     }
     await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta, db.problemas, db.stock, db.avisos], async () => {
@@ -80,14 +81,21 @@ async function adoptarUsuario(u: UsuarioSesion) {
   await db.meta.put({ clave: 'usuarioId', valor: u.id })
 }
 
+let ultimoPasswordSesion: string | null = null
+export const obtenerUltimoPassword = () => ultimoPasswordSesion
+export const limpiarUltimoPassword = () => { ultimoPasswordSesion = null }
+
 export async function iniciarSesion(correo: string, password: string) {
-  const r = await api<Sesion>('/auth/login', { cuerpo: { correo, password, dispositivo: dispositivoId() } })
+  const c = correo.trim()
+  const p = password.trim()
+  const r = await api<Sesion>('/auth/login', { cuerpo: { correo: c, password: p, dispositivo: dispositivoId() } })
   try {
     await adoptarUsuario(r.usuario)
   } catch (e) {
     await api('/auth/logout', { cuerpo: { refreshToken: r.refreshToken } }).catch(() => {})
     throw e
   }
+  ultimoPasswordSesion = p
   fijar({ accessToken: r.accessToken, expiraEn: r.expiraEn, refreshToken: r.refreshToken, usuario: r.usuario })
 }
 
@@ -155,7 +163,8 @@ export function marcarPasswordPendiente(pendiente: boolean) {
 export async function cambiarPassword(actualPassword: string, nueva: string) {
   const token = await tokenValido()
   if (!token) throw new ErrorRed('Necesitas conexión para cambiar la contraseña')
-  await api('/auth/cambiar-password', { token, cuerpo: { actual: actualPassword, nueva } })
+  await api('/auth/cambiar-password', { token, cuerpo: { actual: actualPassword.trim(), nueva: nueva.trim() } })
+  limpiarUltimoPassword()
   marcarPasswordPendiente(false)
 }
 
@@ -168,6 +177,7 @@ export function alCerrarSesion(tarea: () => Promise<unknown>) {
 
 // Los datos del teléfono se conservan: si quedaron cambios sin enviar, se mandan al volver a entrar.
 export async function cerrarSesion() {
+  limpiarUltimoPassword()
   const s = actual
   if (s) {
     // Mejor esfuerzo y con tope de tiempo: sin señal, cerrar sesión no debe quedarse esperando.

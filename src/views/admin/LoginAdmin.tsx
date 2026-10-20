@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Lock, Mail, ShieldAlert } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
-import { iniciarSesion, restablecerPassword, solicitarRecuperacion } from '../../lib/sesion'
+import { cerrarSesion, iniciarSesion, restablecerPassword, sesionActual, solicitarRecuperacion } from '../../lib/sesion'
 import { Logo } from '../../components/Logo'
 import { Campo, claseInput } from '../../components/ui'
 
@@ -26,52 +26,60 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
   const [esBloqueo, setEsBloqueo] = useState(false)
-  const [rolNoAutorizado, setRolNoAutorizado] = useState(false)
   const [minutosVence, setMinutosVence] = useState(15)
 
-  // RF-001 / RF-003 / RF-005: Inicio de sesión con validación de rol
+  // Login para rol Administrador (solo 2 roles: administrador y vendedor)
   async function manejarLogin(e: React.FormEvent) {
     e.preventDefault()
-    if (!correo.trim() || !password) {
-      setError('Por favor ingresa tu correo y contraseña')
+    const c = correo.trim()
+    const p = password.trim()
+    if (!c || !p) {
+      setError('Credenciales inválidas')
       return
     }
     setCargando(true)
     setError('')
     setEsBloqueo(false)
-    setRolNoAutorizado(false)
 
     try {
-      await iniciarSesion(correo.trim(), password)
+      await iniciarSesion(c, p)
+      const sesion = sesionActual()
+
+      // Restricción de rol: Solo Administrador puede ingresar al panel de admin
+      if (sesion && sesion.usuario.rol !== 'administrador') {
+        await cerrarSesion()
+        setError('Acceso no autorizado: esta cuenta es de vendedor')
+        return
+      }
+
       onLoginExitoso?.()
     } catch (err: unknown) {
       if (err instanceof ErrorApi) {
         if (err.status === 423 || err.codigo === 'BLOQUEADA') {
-          // RF-003: Bloqueo tras 5 intentos fallidos
+          // Bloqueo temporal por 5 intentos fallidos
           setEsBloqueo(true)
-          setError('Cuenta bloqueada temporalmente tras 5 intentos fallidos. Intenta nuevamente en 15 minutos o contacta al administrador.')
-        } else if (err.codigo === 'CUENTA_SUSPENDIDA') {
-          setError('Esta cuenta está dada de baja o suspendida.')
+          setError('Cuenta bloqueada temporalmente tras 5 intentos fallidos. Intenta más tarde.')
+        } else if (err.status === 401 || err.status === 403) {
+          setError('Credenciales inválidas')
         } else {
-          setError(err.message || 'Correo o contraseña incorrectos.')
+          // Errores de servidor (500, 502, etc.)
+          setError('Algo salió mal...')
         }
       } else if (err instanceof ErrorRed) {
-        setError('No se pudo conectar con el servidor. Revisa tu conexión a internet.')
-      } else if (err instanceof Error) {
-        setError(err.message)
+        setError('Algo salió mal...')
       } else {
-        setError('Ocurrió un error inesperado al intentar iniciar sesión.')
+        setError('Algo salió mal...')
       }
     } finally {
       setCargando(false)
     }
   }
 
-  // RF-002: Solicitar código de recuperación por correo
+  // Solicitar código de recuperación por correo
   async function manejarSolicitarCodigo(e: React.FormEvent) {
     e.preventDefault()
     if (!correo.trim()) {
-      setError('Ingresa el correo asociado a tu cuenta.')
+      setError('Credenciales inválidas')
       return
     }
     setCargando(true)
@@ -81,31 +89,29 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
       setMinutosVence(res.minutos ?? 15)
       setModo('codigo')
     } catch (err: unknown) {
-      if (err instanceof ErrorRed) {
-        setError('Sin conexión con el servidor para enviar el código.')
-      } else if (err instanceof Error) {
-        setError(err.message)
+      if (err instanceof ErrorRed || (err instanceof ErrorApi && err.status >= 500)) {
+        setError('Algo salió mal...')
       } else {
-        setError('No se pudo enviar el código de recuperación.')
+        setError('Algo salió mal...')
       }
     } finally {
       setCargando(false)
     }
   }
 
-  // RF-002 / RF-004: Restablecer contraseña con código de 6 dígitos
+  // Restablecer contraseña con código de 6 dígitos
   async function manejarRestablecer(e: React.FormEvent) {
     e.preventDefault()
     if (!codigo.trim() || codigo.trim().length !== 6) {
-      setError('Ingresa el código de 6 dígitos enviado a tu correo.')
+      setError('Ingresa el código de 6 dígitos')
       return
     }
     if (nuevaPassword.length < 8 || !/[A-Za-z]/.test(nuevaPassword) || !/\d/.test(nuevaPassword)) {
-      setError('La nueva contraseña debe tener al menos 8 caracteres, con letras y números.')
+      setError('La nueva contraseña debe tener al menos 8 caracteres con letras y números')
       return
     }
     if (nuevaPassword !== confirmarPassword) {
-      setError('Las contraseñas no coinciden.')
+      setError('Las contraseñas no coinciden')
       return
     }
 
@@ -119,12 +125,10 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
       setNuevaPassword('')
       setConfirmarPassword('')
     } catch (err: unknown) {
-      if (err instanceof ErrorApi) {
-        setError(err.message || 'El código es inválido o ha expirado.')
-      } else if (err instanceof ErrorRed) {
-        setError('Sin conexión con el servidor.')
+      if (err instanceof ErrorApi && err.status < 500) {
+        setError(err.message || 'El código es incorrecto o ya venció')
       } else {
-        setError('No se pudo restablecer la contraseña. Intenta pedir un nuevo código.')
+        setError('Algo salió mal...')
       }
     } finally {
       setCargando(false)
@@ -135,28 +139,18 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
     <div className="flex min-h-dvh flex-col justify-center bg-niebla/50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-md">
         
-        {/* Cabecera y Logo */}
+        {/* Cabecera limpia sin textos adicionales */}
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="h-14 w-14 shadow-sm" textoClassName="text-2xl font-black" />
-          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-tinta px-3 py-1 text-xs font-semibold text-white">
-            <Lock size={12} className="text-azul" />
-            Panel de Administración
-          </div>
-          <p className="mt-2 text-sm text-apagado">
-            {modo === 'login' && 'Ingresa tus credenciales de administrador para continuar'}
-            {modo === 'olvido' && 'Restablecimiento de contraseña por correo (RF-002)'}
-            {modo === 'codigo' && 'Ingresa el código de verificación recibido'}
-            {modo === 'exito' && 'Tu contraseña ha sido actualizada'}
-          </p>
+          <Logo className="h-16 w-16 shadow-sm" textoClassName="text-3xl font-black" />
         </div>
 
-        {/* Tarjeta principal con estilo Uber / PWA */}
+        {/* Tarjeta principal */}
         <div className="rounded-3xl border border-linea bg-papel p-6 shadow-tarjeta sm:p-8">
           
-          {/* MODO 1: LOGIN MULTIRROL (RF-001 / RF-003 / RF-005) */}
+          {/* MODO 1: LOGIN */}
           {modo === 'login' && (
             <form onSubmit={manejarLogin} className="space-y-5">
-              <Campo etiqueta="Correo institucional o de administrador">
+              <Campo etiqueta="Correo">
                 <div className="relative">
                   <input
                     type="email"
@@ -164,7 +158,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                     autoComplete="email"
                     value={correo}
                     onChange={(e) => setCorreo(e.target.value)}
-                    placeholder="admin@yogurt.local"
+                    placeholder="correo@ejemplo.com"
                     className={`${claseInput} pl-11`}
                   />
                   <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
@@ -194,8 +188,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                 </div>
               </Campo>
 
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-apagado">Argon2id protegido (RF-004)</span>
+              <div className="flex items-center justify-end text-xs font-semibold">
                 <button
                   type="button"
                   onClick={() => { setError(''); setModo('olvido') }}
@@ -205,7 +198,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                 </button>
               </div>
 
-              {/* Banner de error o bloqueo temporal (RF-003) */}
+              {/* Mensaje de error / bloqueo */}
               {error && (
                 <div
                   role="alert"
@@ -213,15 +206,11 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                     esBloqueo ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rojo/10 text-rojo'
                   }`}
                 >
-                  {esBloqueo ? <ShieldAlert size={20} className="shrink-0 mt-0.5" /> : <AlertCircle size={20} className="shrink-0 mt-0.5" />}
-                  <div>
-                    <p className="font-semibold">{esBloqueo ? 'Protección activa contra fuerza bruta' : 'Error al ingresar'}</p>
-                    <p className="mt-0.5">{error}</p>
-                  </div>
+                  {esBloqueo ? <ShieldAlert size={18} className="shrink-0 mt-0.5" /> : <AlertCircle size={18} className="shrink-0 mt-0.5" />}
+                  <span>{error}</span>
                 </div>
               )}
 
-              {/* Botón de envío */}
               <button
                 type="submit"
                 disabled={cargando}
@@ -230,19 +219,19 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                 {cargando ? (
                   <>
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Validando credenciales…
+                    Entrando…
                   </>
                 ) : (
-                  'Entrar al Panel'
+                  'Iniciar sesión'
                 )}
               </button>
             </form>
           )}
 
-          {/* MODO 2: RECUPERACIÓN - PASO 1 (RF-002) */}
+          {/* MODO 2: SOLICITUD DE CÓDIGO */}
           {modo === 'olvido' && (
             <form onSubmit={manejarSolicitarCodigo} className="space-y-5">
-              <Campo etiqueta="Correo registrado">
+              <Campo etiqueta="Correo">
                 <div className="relative">
                   <input
                     type="email"
@@ -250,7 +239,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                     autoFocus
                     value={correo}
                     onChange={(e) => setCorreo(e.target.value)}
-                    placeholder="tu@correo.com"
+                    placeholder="correo@ejemplo.com"
                     className={`${claseInput} pl-11`}
                   />
                   <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
@@ -258,7 +247,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
               </Campo>
 
               <p className="text-xs text-apagado leading-relaxed">
-                Te enviaremos un código de seguridad de 6 dígitos con validez de 15 minutos para que puedas definir una nueva contraseña.
+                Ingresa tu correo para recibir un código de recuperación de 6 dígitos.
               </p>
 
               {error && (
@@ -273,7 +262,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                 disabled={cargando}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white transition-all active:bg-neutral-800 disabled:opacity-40"
               >
-                {cargando ? 'Enviando código…' : 'Enviar código de recuperación'}
+                {cargando ? 'Enviando código…' : 'Enviar código'}
               </button>
 
               <button
@@ -286,7 +275,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
             </form>
           )}
 
-          {/* MODO 3: RECUPERACIÓN - PASO 2: CÓDIGO Y NUEVA CONTRASEÑA (RF-002) */}
+          {/* MODO 3: CÓDIGO Y NUEVA CONTRASEÑA */}
           {modo === 'codigo' && (
             <form onSubmit={manejarRestablecer} className="space-y-5">
               <div className="rounded-2xl bg-niebla p-3.5 text-xs text-apagado">
@@ -372,7 +361,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
             </form>
           )}
 
-          {/* MODO 4: CONFIRMACIÓN EXITOSA */}
+          {/* MODO 4: ÉXITO */}
           {modo === 'exito' && (
             <div className="py-4 text-center space-y-4">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-verde/10 text-verde">
@@ -380,29 +369,31 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
               </div>
               <h3 className="text-xl font-bold tracking-tight text-tinta">¡Contraseña restablecida!</h3>
               <p className="text-sm text-apagado leading-relaxed">
-                Tu clave ha sido actualizada con éxito bajo el cifrado seguro Argon2id. Ya puedes entrar con tus nuevas credenciales.
+                Tu contraseña ha sido actualizada con éxito. Ya puedes iniciar sesión con tu nueva clave.
               </p>
               <button
                 onClick={() => { setError(''); setModo('login') }}
                 className="w-full rounded-xl bg-tinta py-3.5 text-base font-semibold text-white active:bg-neutral-800"
               >
-                Iniciar sesión ahora
+                Iniciar sesión
               </button>
             </div>
           )}
 
         </div>
 
-        {/* Enlace para cambiar a la vista de la PWA Móvil */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={onIrAPwa}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-apagado transition-colors hover:text-tinta"
-          >
-            <ArrowLeft size={14} />
-            Cambiar a la App Móvil de Reparto (PWA)
-          </button>
-        </div>
+        {/* Enlace sutil para ir a la PWA */}
+        {onIrAPwa && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={onIrAPwa}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-apagado transition-colors hover:text-tinta"
+            >
+              <ArrowLeft size={14} />
+              Ir a la App Móvil de Reparto
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
