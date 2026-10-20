@@ -2,16 +2,25 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from '../app.js'
 import { tx } from '../db.js'
+import { hoyEn } from '../fechas.js'
+import type { Despachador } from '../notificaciones.js'
 import { ADAPTADORES } from './adaptadores.js'
-import { conCostos, procesarOperacion, type Resultado } from './aplicar.js'
+import { conCostos, procesarOperacion, type Efectos, type Resultado } from './aplicar.js'
 import { bodyPush, TABLAS } from './esquemas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
 const queryPull = z.object({ desde: z.coerce.number().int().min(0).default(0) })
 const SOLAPE_MS = 5000 // el siguiente pull repite los últimos segundos, por si una transacción confirmó tarde
+const DIAS_DE_STOCK = 3 // el teléfono guarda el stock de hoy y de unos días atrás (el reloj del servidor es UTC, el del negocio no)
+const MAX_AVISOS = 100
 
-export async function rutasSync(app: FastifyInstance, { db }: Contexto, { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia }) {
+export async function rutasSync(
+  app: FastifyInstance,
+  { db, config }: Contexto,
+  { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia },
+  despachador: Despachador,
+) {
   // RF-052: el teléfono envía su cola de cambios. Cada operación es independiente.
   app.post('/sync/push', { preHandler: requiereSesion, config: { rateLimit: { max: 120, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.headers.authorization ?? req.ip } } }, async (req, rep) => {
     const body = bodyPush.safeParse(req.body)
@@ -19,7 +28,13 @@ export async function rutasSync(app: FastifyInstance, { db }: Contexto, { requie
     const ahoraMs = Date.now()
     const reloj = { dispositivo: body.data.dispositivo, skewMs: ahoraMs - body.data.ahoraCliente, ahoraMs }
     const resultados: Resultado[] = []
-    for (const op of body.data.operaciones) resultados.push(await procesarOperacion(db, req.usuario, op, reloj))
+    const efectos: Efectos = { hoy: hoyEn(config.zonaHoraria), avisos: [] }
+    try {
+      for (const op of body.data.operaciones) resultados.push(await procesarOperacion(db, req.usuario, op, reloj, efectos))
+    } finally {
+      // Lo ya confirmado se avisa aunque una operación posterior haya fallado.
+      await despachador.despachar(efectos.avisos)
+    }
     return { ahora: ahoraMs, resultados }
   })
 
@@ -51,7 +66,31 @@ export async function rutasSync(app: FastifyInstance, { db }: Contexto, { requie
         )
         for (const r of retiros) eliminados.push({ tabla: r.tabla, id: r.id_registro })
       }
-      return { ahora, cursor: Math.max(0, Math.floor(ahora) - SOLAPE_MS), ...datos, eliminados }
+
+      // RF-037: el vendedor recibe su stock de los últimos días; el administrador lo maneja por /stock.
+      const { rows: filasStock } = vendedor
+        ? await c.query(
+            `SELECT id_stock, fecha, id_producto, cantidad_asignada::float8 AS asignada, cantidad_devuelta::float8 AS devuelta, version
+               FROM stock_diario
+              WHERE id_vendedor = $1 AND fecha >= (now() AT TIME ZONE 'UTC')::date - $2::int
+                AND ($3::bigint IS NULL OR actualizado_en > to_timestamp(($3::bigint) / 1000.0))
+              ORDER BY fecha, id_producto`,
+            [vendedor, DIAS_DE_STOCK, desde ?? null],
+          )
+        : { rows: [] }
+      const stock = filasStock.map((r) => ({ id: r.id_stock, fecha: r.fecha, productoId: r.id_producto, asignada: r.asignada, devuelta: r.devuelta, version: r.version }))
+
+      // RF-054: sus avisos nuevos. En la primera descarga, los de los últimos días.
+      const { rows: filasAvisos } = await c.query(
+        `SELECT id_notificacion, tipo, titulo, cuerpo, datos, (extract(epoch from creado_en) * 1000)::float8 AS creado_ms
+           FROM notificaciones
+          WHERE id_usuario = $1 AND creado_en > coalesce(to_timestamp(($2::bigint) / 1000.0), now() - interval '3 days')
+          ORDER BY creado_en DESC LIMIT $3`,
+        [u.id, desde ?? null, MAX_AVISOS],
+      )
+      const avisos = filasAvisos.reverse().map((r) => ({ id: r.id_notificacion, tipo: r.tipo, titulo: r.titulo, cuerpo: r.cuerpo ?? '', datos: r.datos ?? {}, creado: r.creado_ms }))
+
+      return { ahora, cursor: Math.max(0, Math.floor(ahora) - SOLAPE_MS), ...datos, stock, avisos, eliminados }
     })
   })
 

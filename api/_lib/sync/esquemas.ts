@@ -49,6 +49,7 @@ export const pedidoWire = z.object({
   total: z.number().min(0).optional(),
   metodo_pago: z.enum(['EFECTIVO', 'TRANSFERENCIA']).optional(),
   orden_ruta: z.number().int().min(0).max(32000).optional(),
+  urgente: z.boolean().optional(), // lo marca el administrador (RF-054); si no viene, se conserva el valor del servidor
   fecha_entregado_real: ms.optional(),
   creado: ms,
   actualizado: ms,

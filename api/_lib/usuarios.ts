@@ -48,7 +48,11 @@ function wire(r: any) {
 const leer = async (c: Cx, id: string) => (await c.query(`SELECT ${COLUMNAS} FROM usuarios u WHERE u.id_usuario = $1`, [id])).rows[0]
 const otroAdminActivo = async (c: Cx, excepto: string) =>
   (await c.query(`SELECT 1 FROM usuarios WHERE rol = 'administrador' AND activo AND id_usuario <> $1 LIMIT 1`, [excepto])).rows.length > 0
-const cerrarSesiones = (c: Cx, id: string) => c.query(`UPDATE sesiones SET revocado_en = now() WHERE id_usuario = $1 AND revocado_en IS NULL`, [id])
+// Sin sesiones tampoco quedan teléfonos suscritos a sus avisos (RF-054): un teléfono que ya no es suyo no debe seguir recibiéndolos.
+async function cerrarSesiones(c: Cx, id: string) {
+  await c.query(`UPDATE sesiones SET revocado_en = now() WHERE id_usuario = $1 AND revocado_en IS NULL`, [id])
+  await c.query(`DELETE FROM suscripciones_push WHERE id_usuario = $1`, [id])
+}
 
 type Falla = { status: number; error: string; codigo?: string }
 const falla = (status: number, error: string, codigo?: string): Falla => ({ status, error, codigo })

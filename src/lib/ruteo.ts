@@ -8,6 +8,7 @@ export interface Parada {
   id: string
   punto: Punto
   ventana: 'MAÑANA' | 'TARDE'
+  urgente?: boolean // RF-054: el administrador lo marcó para ya; va antes que todo
 }
 
 export interface Ruta {
@@ -65,9 +66,10 @@ async function tramoOsrm(inicio: Punto, paradas: Parada[]) {
   }
 }
 
-// Primero las paradas de la mañana, luego las de la tarde (RF-029), cada grupo optimizado.
+// Primero las urgentes, luego las de la mañana y al final las de la tarde (RF-029), cada grupo optimizado.
 export async function calcularRuta(inicio: Punto, paradas: Parada[]): Promise<Ruta> {
-  const grupos = [paradas.filter((p) => p.ventana === 'MAÑANA'), paradas.filter((p) => p.ventana === 'TARDE')]
+  const normales = paradas.filter((p) => !p.urgente)
+  const grupos = [paradas.filter((p) => p.urgente), normales.filter((p) => p.ventana === 'MAÑANA'), normales.filter((p) => p.ventana === 'TARDE')]
   const ruta: Ruta = { orden: [], linea: [inicio], distancia_m: 0, duracion_s: 0, porCalles: true }
   let desde = inicio
   for (const grupo of grupos) {

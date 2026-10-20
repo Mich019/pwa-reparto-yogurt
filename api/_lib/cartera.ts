@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { tx } from './db.js'
+import type { AvisoPendiente, Despachador } from './notificaciones.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
@@ -18,7 +19,9 @@ const bodyReasignar = z
 type Falla = { status: number; error: string }
 type Exito = { clientes: number; pedidos: number; recordatorios: number }
 
-export async function rutasCartera(app: FastifyInstance, { db }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
+const clientesTexto = (n: number) => (n === 1 ? '1 cliente' : `${n} clientes`)
+
+export async function rutasCartera(app: FastifyInstance, { db }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }, despachador: Despachador) {
   // Con los clientes viajan sus pedidos agendados y recordatorios pendientes. El historial entregado se queda con
   // quien lo vendió (sus ventas no cambian de dueño); sólo se "toca" para que el vendedor nuevo lo descargue.
   // El teléfono del vendedor anterior quita su copia al sincronizar (tabla retiros_vendedor).
@@ -27,6 +30,7 @@ export async function rutasCartera(app: FastifyInstance, { db }: Contexto, { req
     if (!b.success) return rep.code(400).send({ error: 'Indica a qué vendedor pasan los clientes y cuáles' })
     const { hacia, clienteIds, desde } = b.data
 
+    const avisos: AvisoPendiente[] = []
     const r = await tx<Falla | Exito>(db, req.usuario.id, async (c) => {
       if (hacia) {
         const { rows } = await c.query(`SELECT activo FROM usuarios WHERE id_usuario = $1`, [hacia])
@@ -74,9 +78,21 @@ export async function rutasCartera(app: FastifyInstance, { db }: Contexto, { req
       if (peds.length) await c.query(`UPDATE pedidos SET id_vendedor = $2 WHERE id_pedido = ANY($1::uuid[])`, [peds.map((p) => p.id_pedido), hacia])
       if (recs.length) await c.query(`UPDATE recordatorios SET id_vendedor = $2 WHERE id_recordatorio = ANY($1::uuid[])`, [recs.map((x) => x.id_recordatorio), hacia])
       await c.query(`UPDATE pedidos SET id_cliente = id_cliente WHERE id_cliente = ANY($1::uuid[]) AND estado NOT IN ('pendiente', 'en_camino')`, [ids])
+
+      // RF-054: cada vendedor se entera de lo que le toca o le quitan.
+      const perdidos = new Map<string, number>()
+      for (const m of mover) if (m.id_vendedor && m.id_vendedor !== hacia) perdidos.set(m.id_vendedor, (perdidos.get(m.id_vendedor) ?? 0) + 1)
+      for (const [vendedor, n] of perdidos) {
+        avisos.push({ para: vendedor, tipo: 'ruta_modificada', titulo: 'Tu cartera cambió', cuerpo: `${clientesTexto(n)} ya no ${n === 1 ? 'es' : 'son'} tuyo${n === 1 ? '' : 's'}`, datos: { pestana: 'clientes' } })
+      }
+      if (hacia) {
+        const agendados = peds.length ? ` con ${peds.length === 1 ? '1 pedido agendado' : `${peds.length} pedidos agendados`}` : ''
+        avisos.push({ para: hacia, tipo: 'ruta_modificada', titulo: 'Tu cartera cambió', cuerpo: `${clientesTexto(ids.length)} ${ids.length === 1 ? 'pasó' : 'pasaron'} a tu cartera${agendados}`, datos: { pestana: 'ruta' } })
+      }
       return { clientes: ids.length, pedidos: peds.length, recordatorios: recs.length }
     })
     if ('status' in r) return rep.code(r.status).send({ error: r.error })
+    await despachador.despachar(avisos.filter((a) => a.para !== req.usuario.id))
     return r
   })
 }

@@ -20,7 +20,7 @@ const sql = (f: string) => readFileSync(join(DIR, f), 'utf8')
 
 const TABLAS = [
   'notificaciones', 'suscripciones_push', 'eliminaciones', 'retiros_vendedor', 'operaciones_sync', 'auditoria',
-  'recordatorios', 'detalle_pedido', 'pedidos', 'stock_diario', 'productos', 'clientes',
+  'recordatorios', 'detalle_pedido', 'pedidos', 'produccion_diaria', 'stock_diario', 'productos', 'clientes',
   'intentos_login', 'recuperaciones_password', 'sesiones', 'usuarios',
 ]
 const TIPOS = [

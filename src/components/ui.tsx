@@ -131,7 +131,7 @@ export function Avisos() {
   if (!texto) return null
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-center pt-safe">
-      <div className="mt-2 rounded-full bg-tinta px-5 py-3 text-sm font-semibold text-white shadow-tarjeta">{texto}</div>
+      <div className="mt-2 max-w-[92%] rounded-3xl bg-tinta px-5 py-3 text-center text-sm font-semibold text-white shadow-tarjeta">{texto}</div>
     </div>
   )
 }

@@ -15,7 +15,7 @@ import { cerrarSesion, useSesion } from '../../lib/sesion'
 import { Logo } from '../../components/Logo'
 import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
-import { Pronostico } from '../pwa/Pronostico'
+import { Produccion } from '../pwa/Produccion'
 import { Ajustes } from '../pwa/Ajustes'
 import { Reportes } from '../pwa/Reportes'
 
@@ -253,7 +253,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
 
           {seccion === 'equipo' && <div className="p-4 sm:p-6"><Equipo /></div>}
           {seccion === 'clientes' && <div className="p-4 sm:p-6"><Clientes /></div>}
-          {seccion === 'produccion' && <div className="p-4 sm:p-6"><Pronostico /></div>}
+          {seccion === 'produccion' && <div className="p-4 sm:p-6"><Produccion /></div>}
           {seccion === 'sabores' && <div className="p-4 sm:p-6"><Ajustes /></div>}
           {seccion === 'reportes' && <div className="p-4 sm:p-6"><Reportes /></div>}
         </main>

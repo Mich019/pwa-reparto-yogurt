@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { ChevronRight, Crosshair, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
+import { ChevronRight, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
@@ -248,7 +248,10 @@ function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => {
       </div>
       <div className="text-right">
         <div className="text-sm font-semibold tabular-nums">{dinero(p.total)}</div>
-        <div className="text-[10px] text-apagado">{ETIQUETA_ESTADO[p.estado]}</div>
+        <div className={`flex items-center justify-end gap-0.5 text-[10px] ${p.urgente && p.estado === 'PENDIENTE' ? 'font-bold text-rojo' : 'text-apagado'}`}>
+          {p.urgente && p.estado === 'PENDIENTE' && <Flame size={10} />}
+          {p.urgente && p.estado === 'PENDIENTE' ? 'Urgente' : ETIQUETA_ESTADO[p.estado]}
+        </div>
       </div>
     </button>
   )

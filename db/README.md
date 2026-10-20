@@ -45,13 +45,13 @@ El diseño base era correcto en lo esencial: cuatro entidades (Clientes, Product
 |---|---|---|
 | `usuarios`, `sesiones`, `recuperaciones_password`, `intentos_login` | Login por rol, Argon2id, bloqueo tras intentos, cierre de sesión | RF-001 a RF-006, RF-038 a RF-040 |
 | `clientes` | Cartera con GPS, frecuencia, horario, QR y NFC | RF-007 a RF-022, RF-041 |
-| `productos`, `stock_diario` | Sabores, precios, costos y litros asignados por día | RF-032 a RF-037 |
-| `pedidos`, `detalle_pedido` | Ventas en ruta, pedidos agendados, visitas sin venta, orden de ruta | RF-023 a RF-031 |
+| `productos`, `stock_diario`, `produccion_diaria` | Sabores, precios, costos, litros producidos por día y litros asignados y devueltos a cada vendedor | RF-032 a RF-037 |
+| `pedidos`, `detalle_pedido` | Ventas en ruta, pedidos agendados, visitas sin venta, orden de ruta y marca de pedido urgente (`pedidos.urgente`) | RF-023 a RF-031, RF-054 |
 | `recordatorios` | "Recordar más tarde" del flujo post-entrega | Flujo B |
 | `auditoria` | Bitácora de precios, usuarios, cartera y borrados | RF-042 |
 | `operaciones_sync`, `eliminaciones` | Cola de cambios hechos sin conexión, sin duplicados, y borrados por sincronizar | RF-051 a RF-053 |
 | `retiros_vendedor` | Clientes, pedidos y recordatorios que salieron de la cartera de un vendedor al reasignar (no son borrados: sólo ese teléfono los quita) | RF-041 |
-| `suscripciones_push`, `notificaciones` | Avisos al vendedor | RF-054, RF-055 |
+| `suscripciones_push`, `notificaciones` | Teléfonos suscritos a push y avisos guardados para cada vendedor (pedido urgente, ruta, carga de stock) | RF-054, RF-055 |
 
 Vistas: `v_ruta_del_dia` (RF-027), `v_ventas_diarias` (RF-043, RF-044, RF-047), `v_ventas_por_sabor` (RF-045, RF-046), `v_resumen_cliente` (RF-012, RF-013). La API de reportes (`api/_lib/reportes.ts`) usa el mismo criterio sobre todo el rango pedido en lugar de sumar día por día.
 Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor a producir (agendados + estimado por historial).
@@ -65,5 +65,6 @@ Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor 
 - La contraseña se hashea con Argon2id en la API; la base sólo acepta hashes `$argon2id$…`.
 - Para que la auditoría registre quién hizo el cambio, la API ejecuta `SET LOCAL app.id_usuario = '<uuid>'` dentro de cada transacción.
 - Un pedido entregado, omitido o cancelado no permite cambiar su detalle. Para una corrección de administrador: `SET LOCAL app.permitir_correccion = 'on'`.
+- Stock y avisos (migración `004_stock_y_avisos.sql`): agrega `pedidos.urgente`, la tabla `produccion_diaria` y los índices de sincronización de `stock_diario` y de `notificaciones`. Los avisos se insertan en la misma transacción que el cambio que los origina.
 - Reasignar clientes: la API cambia `clientes.id_vendedor` (queda en `auditoria`), anota en `retiros_vendedor` lo que pierde el vendedor anterior y «toca» los pedidos cerrados del cliente para que el vendedor nuevo los descargue. La tabla `eliminaciones` es global y no sirve para esto.
 - Sincronización: cada tabla tiene `actualizado_en` y `version` (sube sola en cada cambio). El teléfono pide "lo cambiado desde mi última sincronización" y la tabla `eliminaciones` le dice qué borrar. Si la `version` que mandó el teléfono no coincide con la actual, la operación se guarda como `conflicto`.

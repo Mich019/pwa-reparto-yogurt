@@ -6,7 +6,10 @@ import type { Config } from './config.js'
 import type { Db } from './db.js'
 import { rutasAuth } from './auth.js'
 import { rutasCartera } from './cartera.js'
+import { crearDespachador, rutasNotificaciones } from './notificaciones.js'
+import { crearEnviador, type Enviador } from './push.js'
 import { rutasReportes } from './reportes.js'
+import { rutasStock } from './stock.js'
 import { rutasUsuarios } from './usuarios.js'
 import { rutasSync } from './sync/rutas.js'
 import { rutasRecuperacion } from './recuperacion.js'
@@ -28,6 +31,7 @@ declare module 'fastify' {
 export interface Contexto {
   db: Db
   config: Config
+  enviador?: Enviador | null // cómo mandar un push; por defecto el de las claves VAPID de config (null = sin push). Las pruebas ponen uno falso.
 }
 
 export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
@@ -46,7 +50,7 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
     return rep.code(500).send({ error: 'Error interno del servidor' })
   })
 
-  await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PATCH', 'OPTIONS'] })
+  await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'] })
   await app.register(rateLimit, { global: false, allowList: () => ctx.config.sinLimiteDePeticiones })
   await app.register(jwt, { secret: ctx.config.jwtSecret, sign: { expiresIn: `${ctx.config.accesoMinutos}m` } })
 
@@ -81,12 +85,18 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
 
   app.get('/health', async () => ({ ok: true }))
 
+  // RF-054: los avisos para los vendedores (guardados y, con claves VAPID, por push).
+  const enviador = ctx.enviador !== undefined ? ctx.enviador : crearEnviador(ctx.config)
+  const despachador = crearDespachador(ctx.db, enviador, app.log)
+
   await rutasAuth(app, ctx, { requiereSesionAunConPasswordPendiente })
   await rutasRecuperacion(app, ctx)
-  await rutasSync(app, ctx, { requiereSesion, requiereAdmin })
+  await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })
-  await rutasCartera(app, ctx, { requiereAdmin })
+  await rutasCartera(app, ctx, { requiereAdmin }, despachador)
   await rutasReportes(app, ctx, { requiereAdmin })
+  await rutasStock(app, ctx, { requiereAdmin }, despachador)
+  await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
 
   return app
 }

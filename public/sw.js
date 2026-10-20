@@ -34,6 +34,49 @@ self.addEventListener('sync', (e) => {
   )
 })
 
+// RF-054 · Notificaciones push. El servidor manda { id, tipo, titulo, cuerpo, datos: { pestana } } cifrado; el navegador
+// despierta este service worker aunque la app esté cerrada.
+self.addEventListener('push', (e) => {
+  let aviso = {}
+  try {
+    aviso = e.data ? e.data.json() : {}
+  } catch {
+    aviso = { titulo: 'Reparto Yogurt', cuerpo: e.data ? e.data.text() : '' }
+  }
+  e.waitUntil(
+    (async () => {
+      const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      ventanas.forEach((v) => v.postMessage({ tipo: 'sincronizar' })) // trae el pedido o el cambio ya, sin esperar el minuto
+      // Con la app a la vista no hace falta la notificación del sistema: la propia app muestra el aviso al sincronizar.
+      if (ventanas.some((v) => v.visibilityState === 'visible')) return
+      await self.registration.showNotification(aviso.titulo || 'Reparto Yogurt', {
+        body: aviso.cuerpo || '',
+        tag: aviso.id || undefined,
+        data: { pestana: aviso.datos && aviso.datos.pestana },
+      })
+    })(),
+  )
+})
+
+// Tocar la notificación abre la app en la pestaña que corresponde (también las locales de stock y de ventas sin enviar).
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const pestana = e.notification.data && e.notification.data.pestana
+  e.waitUntil(
+    (async () => {
+      const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const v = ventanas.find((x) => x.visibilityState === 'visible') || ventanas[0]
+      if (v) {
+        try { await v.focus() } catch { /* el navegador no siempre lo permite */ }
+        if (pestana) v.postMessage({ tipo: 'abrir', pestana })
+        v.postMessage({ tipo: 'sincronizar' })
+        return
+      }
+      await self.clients.openWindow(pestana ? `./?abrir=${encodeURIComponent(pestana)}` : './')
+    })(),
+  )
+})
+
 self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET') return
@@ -57,7 +100,8 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== location.origin) return
-  if (url.pathname.startsWith('/auth/') || url.pathname.startsWith('/sync/')) return
+  // La API (en Vercel es /api/..., en local /auth, /sync…) siempre va en vivo: lo que responde cambia a cada rato.
+  if (/^\/(api|auth|sync)\//.test(url.pathname)) return
 
   // Navegación: red primero, si no hay conexión la copia guardada.
   if (req.mode === 'navigate') {
@@ -69,9 +113,10 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Archivos de la app (con hash): caché primero.
+  // Archivos de la app (con hash): caché primero. Hay servidores que responden `Vary: Origin` y entonces los módulos
+  // (que viajan con Origin) no encontrarían la copia guardada al instalar: aquí el nombre con hash basta.
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+    caches.match(req, { ignoreVary: true }).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok) { const copia = res.clone(); caches.open(APP).then((c) => c.put(req, copia)) }
       return res
     })),
