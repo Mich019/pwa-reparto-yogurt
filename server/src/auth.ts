@@ -74,6 +74,11 @@ export async function rutasAuth(
     }
 
     const claveCorrecta = await verificar(u.password_hash, password) // se verifica siempre, para que la respuesta tarde igual
+    // RF-040: con la contraseña correcta se le dice por qué no entra (sin contarlo como intento fallido).
+    if (claveCorrecta && !u.activo) {
+      await registrar(false)
+      return rep.code(403).send({ error: 'Tu cuenta está dada de baja. Habla con el administrador.', codigo: 'CUENTA_SUSPENDIDA' })
+    }
     const ok = u.activo && claveCorrecta
     if (!ok) {
       await registrar(false)

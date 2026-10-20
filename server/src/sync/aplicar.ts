@@ -10,6 +10,7 @@ export interface Resultado {
   estado: EstadoOperacion
   registro?: unknown // cómo quedó (o cómo está) el registro en el servidor, para que el teléfono lo adopte
   eliminado?: boolean // el registro ya no existe en el servidor
+  retirado?: boolean // sigue existiendo, pero ya no es de la cartera de quien lo mandó (RF-041): debe quitar su copia
   error?: string
 }
 
@@ -111,7 +112,13 @@ export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrant
       [op.id, u.id, reloj.dispositivo, op.tabla, op.registroId, op.op === 'delete' ? 'delete' : 'update', op.version ?? null, JSON.stringify(op.datos ?? {}), tsMs, estado, nota ?? null],
     )
     // Datos de rechazos de permisos no deben filtrar registros ajenos: estadoActual ya filtra por cartera.
-    return { id: op.id, estado, error: nota, ...(await estadoActual(c, u, op)) }
+    const actual = await estadoActual(c, u, op)
+    let retirado: boolean | undefined
+    if (estado === 'rechazada' && actual.eliminado && u.rol === 'vendedor') {
+      // ¿no existe, o existe pero ya es de otro vendedor?
+      retirado = (await ADAPTADORES[op.tabla].listar(c, { id: op.registroId })).length > 0 || undefined
+    }
+    return { id: op.id, estado, error: nota, ...actual, ...(retirado ? { retirado } : {}) }
   })
 }
 

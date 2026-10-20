@@ -42,7 +42,16 @@ export async function rutasSync(app: FastifyInstance, { db }: Contexto, { requie
         `SELECT tabla, id_registro FROM eliminaciones WHERE tabla = ANY($1::text[]) AND ($2::bigint IS NULL OR eliminado_en > to_timestamp(($2::bigint) / 1000.0))`,
         [TABLAS, desde ?? null],
       )
-      return { ahora, cursor: Math.max(0, Math.floor(ahora) - SOLAPE_MS), ...datos, eliminados: elim.map((e) => ({ tabla: e.tabla, id: e.id_registro })) }
+      const eliminados = elim.map((e) => ({ tabla: e.tabla as string, id: e.id_registro as string }))
+      if (vendedor) {
+        // Lo que le pasaron a otro vendedor (RF-041) no es un borrado, pero su teléfono debe quitar la copia.
+        const { rows: retiros } = await c.query(
+          `SELECT tabla, id_registro FROM retiros_vendedor WHERE id_vendedor = $1 AND tabla = ANY($2::text[]) AND ($3::bigint IS NULL OR retirado_en > to_timestamp(($3::bigint) / 1000.0))`,
+          [vendedor, TABLAS, desde ?? null],
+        )
+        for (const r of retiros) eliminados.push({ tabla: r.tabla, id: r.id_registro })
+      }
+      return { ahora, cursor: Math.max(0, Math.floor(ahora) - SOLAPE_MS), ...datos, eliminados }
     })
   })
 

@@ -25,6 +25,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 | Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
 | Producción | Litros por sabor para los próximos 7 días = pedidos agendados + estimado por historial de clientes a los que les toca visita. Ventas de hoy / 7 / 30 días, ganancia neta, más y menos vendido. |
 | Sabores | Alta/edición de sabores, precio y costo por litro, color, disponible sí/no. Respaldo y restauración en JSON. |
+| Equipo | Sólo administrador y sólo con servidor. Altas, ediciones y bajas de cuentas, contraseña temporal, y pasar clientes de un vendedor a otro (ver abajo). |
 
 ## Técnico
 
@@ -41,6 +42,16 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 
 La API (`server/`, ver [su README](server/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL`; sin esa variable la app sigue siendo sólo local. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
 
+## Equipo y cartera
+
+La pestaña **Equipo** (sólo para el administrador y con servidor) cubre las altas, bajas y reasignaciones. Necesita conexión: son cambios que el servidor aplica al instante.
+
+- **Nueva cuenta**: nombre, correo, teléfono (opcional) y puesto (vendedor o administrador). El servidor genera una contraseña temporal (`kP7x-Ym3Q-aR9d`) que se muestra **una sola vez**, con botones para copiar el mensaje, mandarlo por WhatsApp o compartirlo. Al entrar, la persona debe elegir su propia contraseña.
+- **Editar**: nombre, correo, teléfono y puesto. Nadie puede cambiar su propio puesto, y siempre debe quedar al menos un administrador activo.
+- **Contraseña**: restablecimiento manual. Genera otra temporal, cierra las sesiones abiertas de esa persona y quita un bloqueo por intentos fallidos.
+- **Dar de baja / Reactivar**: la baja corta el acceso al instante en todos sus teléfonos (el token se valida contra la base en cada petición) y al intentar entrar se le dice que su cuenta está dada de baja. No se borra nada: clientes e historial se conservan. Al dar de baja se puede decidir qué pasa con sus clientes (pasarlos a otro vendedor, dejarlos sin vendedor o decidir después).
+- **Pasar cartera**: de un vendedor a otro (o a «sin vendedor», que sólo ve el administrador), toda de una vez o eligiendo clientes. También se puede cambiar un cliente suelto desde su perfil (renglón **Vendedor**). Con el cliente viajan sus pedidos agendados y recordatorios pendientes; lo ya entregado sigue siendo venta de quien lo hizo, pero el nuevo vendedor lo ve en el historial. El teléfono del vendedor anterior quita esos clientes al sincronizar, aunque los haya editado sin conexión.
+
 ## QR, NFC y cámara
 
 Cada cliente tiene un QR único (`YGT1:<uuid del cliente>`) que se genera al darlo de alta y no necesita internet.
@@ -54,4 +65,4 @@ Cada cliente tiene un QR único (`YGT1:<uuid del cliente>`) que se genera al dar
 ## Pendiente (siguientes pasos)
 
 - Recuperación de contraseña por correo (RF-002), cierre de sesión que no dependa de la señal.
-- Panel de vendedores, stock diario, exportar a Excel, notificaciones push.
+- Stock diario, exportar a Excel, notificaciones push.

@@ -34,7 +34,10 @@ describe('login y sesiones (M01)', () => {
 
   it('un usuario desactivado no entra', async () => {
     const u = await crearUsuario('vendedor', { activo: false })
-    assert.equal((await login(u.correo)).status, 401)
+    const r = await login(u.correo)
+    assert.equal(r.status, 403) // con la contraseña correcta se le avisa por qué (RF-040)
+    assert.equal(r.body.codigo, 'CUENTA_SUSPENDIDA')
+    assert.equal((await login(u.correo, 'otra-clave-1')).status, 401) // sin ella no se revela nada de la cuenta
   })
 
   it('RF-006: cerrar sesión invalida el token de acceso y el de renovación', async () => {

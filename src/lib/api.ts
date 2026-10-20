@@ -18,7 +18,7 @@ export class ErrorApi extends Error {
 // No se pudo llegar al servidor (sin señal, servidor caído): se reintenta más tarde.
 export class ErrorRed extends Error {}
 
-export async function api<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST'; cuerpo?: unknown; token?: string } = {}): Promise<T> {
+export async function api<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PATCH'; cuerpo?: unknown; token?: string } = {}): Promise<T> {
   let r: Response
   try {
     r = await fetch(API_URL + ruta, {

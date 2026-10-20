@@ -122,6 +122,25 @@ export function expirarToken() {
 // El servidor dijo que esta sesión ya no sirve.
 export const sesionRevocada = () => fijar(null)
 
+// Llamada al servidor con la sesión de este teléfono: renueva el token si hace falta y, si el servidor lo
+// rechaza, pide uno nuevo y reintenta una vez. Si la sesión se revocó, vuelve la pantalla de entrada.
+export async function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PATCH'; cuerpo?: unknown } = {}): Promise<T> {
+  for (let intento = 0; ; intento++) {
+    const token = await tokenValido()
+    if (!token) throw new ErrorRed(actual ? 'Sin conexión' : 'Sin sesión')
+    try {
+      return await api<T>(ruta, { ...opciones, token })
+    } catch (e) {
+      if (e instanceof ErrorApi && e.status === 401 && intento === 0) {
+        expirarToken()
+        continue
+      }
+      if (e instanceof ErrorApi && e.status === 403 && e.codigo === 'CAMBIAR_PASSWORD') marcarPasswordPendiente(true)
+      throw e
+    }
+  }
+}
+
 export function marcarPasswordPendiente(pendiente: boolean) {
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, debeCambiarPassword: pendiente } })
 }

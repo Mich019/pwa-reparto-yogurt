@@ -3,19 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CloudOff, LogOut, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { db } from '../lib/db'
 import { ErrorApi, ErrorRed } from '../lib/api'
+import { hace } from '../lib/fechas'
 import { cambiarPassword, cerrarSesion, useSesion } from '../lib/sesion'
 import { sincronizar, useEstadoSync } from '../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from './ui'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
-
-function hace(ms: number) {
-  const min = Math.floor((Date.now() - ms) / 60_000)
-  if (min < 1) return 'hace un momento'
-  if (min < 60) return `hace ${min} min`
-  const h = Math.floor(min / 60)
-  return h < 24 ? `hace ${h} h` : `hace ${Math.floor(h / 24)} d`
-}
 
 export function FormPassword({ onListo }: { onListo?: () => void }) {
   const [actual, setActual] = useState('')

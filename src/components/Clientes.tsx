@@ -1,12 +1,16 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { ChevronRight, Crosshair, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserX, UserCheck } from 'lucide-react'
+import { ChevronRight, Crosshair, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
+import { MODO_SERVIDOR } from '../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../lib/db'
+import { cargarEquipo, useEquipo } from '../lib/equipo'
 import { DIAS_CORTOS, dinero, textoFecha, textoFrecuencia } from '../lib/fechas'
 import { ubicacionActual, type Punto } from '../lib/ruteo'
+import { useRol } from '../lib/sesion'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
+import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { IconoSabor } from './Fruta'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from './ui'
@@ -141,6 +145,15 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
 }) {
   const [editor, setEditor] = useState<{ pedido?: Pedido } | null>(null)
   const [codigos, setCodigos] = useState(false)
+  const [cambiandoVendedor, setCambiandoVendedor] = useState(false)
+  // RF-041: el administrador ve de quién es el cliente y puede pasarlo a otro vendedor (sólo si ya está en el servidor).
+  const rol = useRol()
+  const gestiona = MODO_SERVIDOR && rol === 'administrador' && cliente.version != null
+  const equipo = useEquipo()
+  useEffect(() => {
+    if (gestiona && !equipo) void cargarEquipo().catch(() => {})
+  }, [gestiona]) // eslint-disable-line react-hooks/exhaustive-deps
+  const vendedor = cliente.vendedorId ? equipo?.usuarios.find((u) => u.id === cliente.vendedorId)?.nombre ?? 'Asignado' : 'Sin vendedor'
   const ordenados = [...pedidos].sort((a, b) => b.fecha.localeCompare(a.fecha))
   const pendientes = ordenados.filter((p) => p.estado === 'PENDIENTE')
   const historial = ordenados.filter((p) => p.estado !== 'PENDIENTE').slice(0, 15)
@@ -170,6 +183,16 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
             texto={cliente.activo ? 'Archivar' : 'Activar'}
           />
         </div>
+        {gestiona && (
+          <button onClick={() => setCambiandoVendedor(true)} className="flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-3 text-left active:bg-linea">
+            <UserCog size={20} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs text-apagado">Vendedor</span>
+              <span className="block truncate font-semibold">{vendedor}</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+          </button>
+        )}
         <Boton className="w-full" onClick={() => setEditor({})}><Plus size={20} /> Nuevo pedido</Boton>
 
         {pendientes.length > 0 && (
@@ -186,6 +209,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
       </div>
       {editor && <EditorPedido abierto cliente={cliente} pedido={editor.pedido} base={base} onCerrar={() => setEditor(null)} />}
       {codigos && <FichaCodigos cliente={cliente} onCerrar={() => setCodigos(false)} />}
+      {cambiandoVendedor && <CambiarVendedor cliente={cliente} onCerrar={() => setCambiandoVendedor(false)} />}
     </Hoja>
   )
 }

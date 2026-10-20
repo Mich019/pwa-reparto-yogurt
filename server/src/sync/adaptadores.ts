@@ -120,7 +120,8 @@ const clientes: Adaptador<ClienteWire> = {
     return ex.dueno === u.id ? null : 'Ese cliente no está en tu cartera'
   },
   async escribir(c, u, w, ex) {
-    const dueno = esAdmin(u) ? (w.vendedorId ?? ex?.dueno ?? null) : ex ? ex.dueno : u.id
+    // El vendedor de un cliente que ya existe sólo cambia con /clientes/reasignar (RF-041); una copia vieja no lo deshace.
+    const dueno = ex ? ex.dueno : esAdmin(u) ? (w.vendedorId ?? null) : u.id
     const intervalo = w.frecuencia.tipo === 'intervalo'
     const dias = w.frecuencia.tipo === 'semana' ? [...new Set(w.frecuencia.dias)].sort() : []
     const datos = [
@@ -244,7 +245,7 @@ const pedidos: Adaptador<PedidoWire> = {
   },
   async escribir(c, u, w, ex) {
     const { rows: cl } = await c.query(`SELECT id_vendedor FROM clientes WHERE id_cliente = $1`, [w.clienteId])
-    const dueno = esAdmin(u) ? (w.vendedorId ?? ex?.dueno ?? cl[0].id_vendedor ?? null) : ex ? ex.dueno : u.id
+    const dueno = ex ? ex.dueno : esAdmin(u) ? (w.vendedorId ?? cl[0].id_vendedor ?? null) : u.id // igual que en clientes: lo cambia /clientes/reasignar
     const estado = ESTADO_A_DB[w.estado]
     const entregado = estado === 'entregado'
     if (ex?.final) await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`) // corrección de administrador

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
-import { api, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
+import { ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db, uid, type Cambio, type Tabla } from './db'
-import { dispositivoId, expirarToken, marcarPasswordPendiente, sesionActual, tokenValido } from './sesion'
+import { dispositivoId, llamarAutenticado, sesionActual } from './sesion'
 
 // Sincronización con el servidor (RF-051 a RF-053).
 //  · Cada cambio local queda en `cola` (db.ts). `enviar` manda el estado actual de cada registro tocado,
@@ -34,6 +34,7 @@ interface Resultado {
   estado: 'aplicada' | 'conflicto' | 'rechazada'
   registro?: { id: string; version: number; [k: string]: unknown }
   eliminado?: boolean
+  retirado?: boolean // ya no es de tu cartera (el administrador lo pasó a otro vendedor)
   error?: string
 }
 interface Bajada {
@@ -46,22 +47,7 @@ interface Bajada {
 }
 type Registro = { id: string; version: number; [k: string]: unknown }
 
-async function llamar<T>(ruta: string, cuerpo?: unknown): Promise<T> {
-  for (let intento = 0; ; intento++) {
-    const token = await tokenValido()
-    if (!token) throw new ErrorRed(sesionActual() ? 'Sin conexión' : 'Sin sesión')
-    try {
-      return await api<T>(ruta, { token, cuerpo })
-    } catch (e) {
-      if (e instanceof ErrorApi && e.status === 401 && intento === 0) {
-        expirarToken() // el siguiente tokenValido() pide uno nuevo; si la sesión fue revocada, vuelve el login
-        continue
-      }
-      if (e instanceof ErrorApi && e.status === 403 && e.codigo === 'CAMBIAR_PASSWORD') marcarPasswordPendiente(true)
-      throw e
-    }
-  }
-}
+const llamar = <T>(ruta: string, cuerpo?: unknown) => llamarAutenticado<T>(ruta, { cuerpo })
 
 // ------------------------------------------------------------------ primera vez en este teléfono
 // Un teléfono que ya trabajaba sin servidor trae datos propios: se unen con los del servidor sin duplicar.
@@ -109,7 +95,7 @@ async function aplicarResultado(tabla: Tabla, registroId: string, maxId: number,
     if (r.registro) {
       if (!editadoDespues) await db.table(tabla).put(r.registro) // el servidor manda: así queda tal como él lo guardó
       else if (local) await db.table(tabla).put({ ...local, version: r.registro.version })
-    } else if (r.eliminado && r.estado !== 'rechazada' && !editadoDespues) {
+    } else if (((r.eliminado && r.estado !== 'rechazada') || r.retirado) && !editadoDespues) {
       await db.table(tabla).delete(registroId)
     }
 

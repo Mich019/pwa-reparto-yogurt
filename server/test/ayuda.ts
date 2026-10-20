@@ -44,12 +44,12 @@ export async function otroTelefono(s: { correo: string; id: string }, dispositiv
 type S = { token: string; dispositivo: string }
 const auth = (s: S) => ({ authorization: `Bearer ${s.token}` })
 
-export async function push(s: S, operaciones: unknown[], ahoraCliente = Date.now()) {
-  const r = await app.inject({ method: 'POST', url: '/sync/push', headers: auth(s), payload: { dispositivo: s.dispositivo, ahoraCliente, operaciones } })
+export async function push(s: S, operaciones: unknown[], ahoraCliente = Date.now(), servidor: FastifyInstance = app) {
+  const r = await servidor.inject({ method: 'POST', url: '/sync/push', headers: auth(s), payload: { dispositivo: s.dispositivo, ahoraCliente, operaciones } })
   return { status: r.statusCode, body: r.json() }
 }
-export async function pull(s: S, desde = 0) {
-  const r = await app.inject({ method: 'GET', url: `/sync/pull?desde=${desde}`, headers: auth(s) })
+export async function pull(s: S, desde = 0, servidor: FastifyInstance = app) {
+  const r = await servidor.inject({ method: 'GET', url: `/sync/pull?desde=${desde}`, headers: auth(s) })
   return { status: r.statusCode, body: r.json() }
 }
 export async function get(s: S, url: string) {

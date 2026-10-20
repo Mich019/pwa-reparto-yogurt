@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BarChart3, IceCreamBowl, Map, User, Users } from 'lucide-react'
+import { BarChart3, IceCreamBowl, Map, User, UserCog, Users } from 'lucide-react'
 import { Ruta } from './components/Ruta'
 import { Clientes } from './components/Clientes'
 import { Pronostico } from './components/Pronostico'
 import { Ajustes } from './components/Ajustes'
 import { Cuenta } from './components/Cuenta'
+import { Equipo } from './components/Equipo'
 import { CambioObligatorio, Login } from './components/Login'
 import { Avisos, aviso } from './components/ui'
 import { MODO_SERVIDOR } from './lib/api'
@@ -13,7 +14,7 @@ import { db } from './lib/db'
 import { useSesion, type Rol } from './lib/sesion'
 import { iniciarSincronizacionAutomatica } from './lib/sync'
 
-type Pestana = 'ruta' | 'clientes' | 'produccion' | 'sabores' | 'cuenta'
+type Pestana = 'ruta' | 'clientes' | 'produccion' | 'sabores' | 'equipo' | 'cuenta'
 
 // RF-005: el vendedor ve su ruta y sus clientes; costos, márgenes, producción y sabores son del administrador.
 const PESTANAS: { id: Pestana; texto: string; icono: typeof Map; roles: Rol[]; soloServidor?: boolean }[] = [
@@ -21,6 +22,7 @@ const PESTANAS: { id: Pestana; texto: string; icono: typeof Map; roles: Rol[]; s
   { id: 'clientes', texto: 'Clientes', icono: Users, roles: ['administrador', 'vendedor'] },
   { id: 'produccion', texto: 'Producción', icono: BarChart3, roles: ['administrador'] },
   { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl, roles: ['administrador'] },
+  { id: 'equipo', texto: 'Equipo', icono: UserCog, roles: ['administrador'], soloServidor: true },
   { id: 'cuenta', texto: 'Cuenta', icono: User, roles: ['administrador', 'vendedor'], soloServidor: true },
 ]
 
@@ -54,6 +56,7 @@ function Principal({ rol }: { rol: Rol }) {
         {actual === 'clientes' && <Clientes />}
         {actual === 'produccion' && <Pronostico />}
         {actual === 'sabores' && <Ajustes />}
+        {actual === 'equipo' && <Equipo />}
         {actual === 'cuenta' && <Cuenta />}
       </main>
       <nav className="z-30 grid border-t border-linea bg-papel pb-safe" style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}>

@@ -5,6 +5,8 @@ import rateLimit from '@fastify/rate-limit'
 import type { Config } from './config.ts'
 import type { Db } from './db.ts'
 import { rutasAuth } from './auth.ts'
+import { rutasCartera } from './cartera.ts'
+import { rutasUsuarios } from './usuarios.ts'
 import { rutasSync } from './sync/rutas.ts'
 
 export type Rol = 'administrador' | 'vendedor'
@@ -36,7 +38,7 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
     return rep.code(500).send({ error: 'Error interno del servidor' })
   })
 
-  await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'OPTIONS'] })
+  await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PATCH', 'OPTIONS'] })
   await app.register(rateLimit, { global: false, allowList: () => ctx.config.sinLimiteDePeticiones })
   await app.register(jwt, { secret: ctx.config.jwtSecret, sign: { expiresIn: `${ctx.config.accesoMinutos}m` } })
 
@@ -73,6 +75,8 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
 
   await rutasAuth(app, ctx, { requiereSesionAunConPasswordPendiente })
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin })
+  await rutasUsuarios(app, ctx, { requiereAdmin })
+  await rutasCartera(app, ctx, { requiereAdmin })
 
   return app
 }

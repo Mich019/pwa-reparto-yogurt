@@ -285,6 +285,17 @@ CREATE TABLE eliminaciones (
 );
 CREATE INDEX eliminaciones_fecha ON eliminaciones (eliminado_en);
 
+-- Registros que salieron de la cartera de un vendedor (RF-041). No son borrados (el registro sigue existiendo para
+-- los demás): al sincronizar, el teléfono del vendedor anterior sólo quita su copia.
+CREATE TABLE retiros_vendedor (
+  id_vendedor uuid NOT NULL REFERENCES usuarios (id_usuario) ON DELETE CASCADE,
+  tabla       varchar(50) NOT NULL,
+  id_registro uuid NOT NULL,
+  retirado_en timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (id_vendedor, tabla, id_registro)
+);
+CREATE INDEX retiros_vendedor_fecha ON retiros_vendedor (id_vendedor, retirado_en);
+
 -- =============================================================================
 -- M10 · Notificaciones (RF-054, RF-055)
 -- =============================================================================

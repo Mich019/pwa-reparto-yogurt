@@ -12,7 +12,7 @@ set -a; . ./.env; set +a    # carga las variables (en Windows, defínelas en Pow
 npm start                   # http://localhost:3000   (npm run dev recarga al editar)
 ```
 
-La base se crea con `db/crear_bd.sql` (ver `db/README.md`). Si ya la tenías creada antes de esta API, aplica además `db/migraciones/001_indice_sync.sql`.
+La base se crea con `db/crear_bd.sql` (ver `db/README.md`). Si ya la tenías creada antes de esta API, aplica además `db/migraciones/001_indice_sync.sql` y `002_retiros_vendedor.sql`.
 
 Cuentas de prueba (sólo con los datos demo): `admin@yogurt.local` y `vendedor@yogurt.local`, contraseña `Yogurt2026!`. La primera vez piden elegir una contraseña propia.
 
@@ -38,6 +38,12 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 | `POST /sync/push` | sesión | El teléfono manda su cola de cambios (hasta 200 por envío). |
 | `GET /sync/pull?desde=` | sesión | Lo que cambió desde la última vez, más los borrados. |
 | `GET /sync/conflictos` | administrador | Cambios que no se aplicaron, con sus datos. |
+| `GET /usuarios` | administrador | Cuentas con cuántos clientes tiene cada una, y cuántos clientes no tienen vendedor. |
+| `POST /usuarios` | administrador | Alta (RF-038): nombre, correo, teléfono, rol. Devuelve una contraseña temporal; la persona debe cambiarla al entrar. |
+| `PATCH /usuarios/:id` | administrador | Edición (RF-039): nombre, correo, teléfono, rol. |
+| `POST /usuarios/:id/password` | administrador | Restablece la contraseña (RF-039): temporal nueva, cierra sus sesiones, quita el bloqueo. |
+| `POST /usuarios/:id/baja` y `/reactivar` | administrador | Suspensión y baja (RF-040): corta el acceso al instante y cierra sus sesiones. Reactivar quita bloqueo e intentos. |
+| `POST /clientes/reasignar` | administrador | Pasa clientes a otro vendedor (RF-041): `{ hacia, clienteIds }` o `{ hacia, desde }` para toda una cartera. `null` = sin vendedor. |
 
 Contraseñas con Argon2id (RF-004). El token de acceso lleva la sesión: si se cierra la sesión, se desactiva al usuario o cambia su rol, el servidor lo nota en la siguiente petición (RF-005, RF-006).
 
@@ -49,6 +55,15 @@ Contraseñas con Argon2id (RF-004). El token de acceso lleva la sesión: si se c
 | Pedidos y recordatorios | todos; puede corregir uno ya entregado | los de su cartera; un pedido entregado ya no se edita |
 | Sabores y precios | los ve y los cambia | los ve **sin costos**; no los cambia |
 | Costos, márgenes, producción | sí | no (el servidor ni los envía) |
+
+## Cuentas y cartera (M07)
+
+- **Contraseña temporal**: 12 caracteres sin ambigüedades (sin `0/O`, `1/l/I`), siempre con letras y números, en grupos de 4 (`kP7x-Ym3Q-aR9d`). Se genera con `crypto.randomInt`, sólo se devuelve en la respuesta de alta o restablecimiento y la cuenta queda con `debe_cambiar_password`. Si el administrador manda `password` al crear, se usa esa y no se repite en la respuesta.
+- **Baja inmediata**: el token de acceso se valida contra `sesiones` y `usuarios.activo` en cada petición, así que la baja surte efecto en la siguiente llamada, no a los 15 minutos. Con la contraseña correcta, el login de una cuenta dada de baja responde `403 CUENTA_SUSPENDIDA`; con una incorrecta, el 401 de siempre (no revela si la cuenta existe).
+- **Siempre un administrador**: nadie puede darse de baja ni cambiarse el rol a sí mismo, y un administrador no se puede dar de baja ni degradar si es el último activo. Los cambios que lo afectan se serializan con un candado (`pg_advisory_xact_lock`), de modo que dos administradores que se quiten el puesto a la vez no dejan el sistema sin ninguno.
+- **Reasignar**: pasa los clientes y, con ellos, sus pedidos `pendiente`/`en_camino` y recordatorios pendientes. Los pedidos cerrados siguen siendo venta del vendedor que los hizo (sus ventas y su historial no cambian), pero se «tocan» para que el vendedor nuevo los descargue como historial. El vendedor anterior se entera por la tabla `retiros_vendedor`: su siguiente `pull` los trae en `eliminados` (no se usa `eliminaciones`, que es global y borraría el cliente también al vendedor nuevo y al administrador). Si el cliente vuelve a un vendedor que lo tuvo, se borra su retiro. No se puede pasar a un usuario dado de baja.
+- **Copias viejas**: el vendedor de un cliente o pedido que ya existe sólo cambia con `/clientes/reasignar`; un administrador con una copia desactualizada que sincroniza no lo deshace. Si el vendedor anterior manda una edición sin conexión de algo que ya no es suyo, la operación se rechaza con `retirado: true` y su teléfono lo quita, sin recibir datos del cliente.
+- La baja **no** reasigna sola la cartera por la API; la app lo ofrece en el mismo paso. Todo queda en `auditoria` con quién lo hizo.
 
 ## Sincronización y conflictos
 
@@ -74,11 +89,12 @@ for f in 01_esquema 02_vistas 03_datos_iniciales; do psql -U postgres -d reparto
 DATABASE_URL=postgres://postgres:CLAVE@localhost:5432/reparto_yogurt_test npm test
 ```
 
-31 pruebas contra PostgreSQL real: login, bloqueo, cierre de sesión, roles, sincronización, idempotencia y cada regla de conflicto. También corren en GitHub Actions (`.github/workflows/server.yml`).
+56 pruebas contra PostgreSQL real: login, bloqueo, cierre de sesión, roles, sincronización, idempotencia, cada regla de conflicto, altas, ediciones, bajas, contraseñas temporales y reasignación de cartera. La del «último administrador» corre en un esquema de Postgres propio para poder dejar un solo administrador sin afectar a las demás. También corren en GitHub Actions (`.github/workflows/server.yml`).
 
 ## Lo que todavía no hace
 
 - **Sólo PostgreSQL.** Los triggers y el SQL son de PostgreSQL; la versión MySQL de `db/mysql` no está conectada a esta API.
 - **Sincronización con la app cerrada.** El Background Sync del service worker despierta la app si hay una ventana abierta; con la app totalmente cerrada, sincroniza al abrirla.
-- Recuperación de contraseña por correo (RF-002), alta de vendedores desde la app (RF-038 a RF-041) y notificaciones push (M10).
-- `pull` baja todo el historial la primera vez (sin paginar); un cliente reasignado a otro vendedor no arrastra sus pedidos viejos.
+- Recuperación de contraseña por correo (RF-002): hoy un administrador restablece la contraseña a mano. Tampoco hay notificaciones push (M10).
+- `pull` baja todo el historial la primera vez (sin paginar).
+- Un teléfono de un vendedor dado de baja conserva en su navegador lo que ya tenía (y lo que no alcanzó a enviar) hasta que alguien entre ahí con esa cuenta; el servidor ya no le acepta nada.
