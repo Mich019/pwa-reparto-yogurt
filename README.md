@@ -42,7 +42,7 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo*
 
 ## Servidor
 
-La API (`api/`, ver [su README](api/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL` (en Vercel, `/api`); con `VITE_OFFLINE_SOLO=true` la app es sólo local y sin cuentas. El administrador trabaja en el panel `/admin`. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
+La API (`api/`, ver [su README](api/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. La app usa el servidor por omisión: llama a `/api`, o a `VITE_API_URL` si la API vive en otro dominio (variables en [`.env.example`](.env.example)). Con `VITE_OFFLINE_SOLO=true` es sólo local y sin cuentas. El administrador trabaja en el panel `/admin`. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
 
 ## Equipo y cartera
 
