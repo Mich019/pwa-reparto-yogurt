@@ -15,7 +15,7 @@ El script crea la base `reparto_yogurt` y se detiene si ya existe. Para volver a
 
 | Archivo | Contenido |
 |---|---|
-| `01_esquema.sql` | Tipos, 15 tablas, índices, restricciones y triggers |
+| `01_esquema.sql` | Tipos, 16 tablas, índices, restricciones y triggers |
 | `02_vistas.sql` | Vistas de reportes y la función de pronóstico |
 | `03_datos_iniciales.sql` | Los 6 sabores con sus colores |
 | `04_datos_demo.sql` | Sólo desarrollo: admin y vendedor (contraseña `Yogurt2026!`), 10 clientes, 4 semanas de historial y la ruta de hoy |
@@ -50,14 +50,20 @@ El diseño base era correcto en lo esencial: cuatro entidades (Clientes, Product
 | `recordatorios` | "Recordar más tarde" del flujo post-entrega | Flujo B |
 | `auditoria` | Bitácora de precios, usuarios, cartera y borrados | RF-042 |
 | `operaciones_sync`, `eliminaciones` | Cola de cambios hechos sin conexión, sin duplicados, y borrados por sincronizar | RF-051 a RF-053 |
+| `retiros_vendedor` | Clientes, pedidos y recordatorios que salieron de la cartera de un vendedor al reasignar (no son borrados: sólo ese teléfono los quita) | RF-041 |
 | `suscripciones_push`, `notificaciones` | Avisos al vendedor | RF-054, RF-055 |
 
 Vistas: `v_ruta_del_dia` (RF-027), `v_ventas_diarias` (RF-043, RF-044, RF-047), `v_ventas_por_sabor` (RF-045, RF-046), `v_resumen_cliente` (RF-012, RF-013).
 Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor a producir (agendados + estimado por historial).
+
+## Bases ya creadas
+
+`migraciones/` trae los cambios al esquema posteriores a la primera versión. Aplícalos en orden con `psql -U postgres -d reparto_yogurt -f migraciones/NNN_*.sql` (son repetibles). La API está en [`../server`](../server/README.md).
 
 ## Notas para la API
 
 - La contraseña se hashea con Argon2id en la API; la base sólo acepta hashes `$argon2id$…`.
 - Para que la auditoría registre quién hizo el cambio, la API ejecuta `SET LOCAL app.id_usuario = '<uuid>'` dentro de cada transacción.
 - Un pedido entregado, omitido o cancelado no permite cambiar su detalle. Para una corrección de administrador: `SET LOCAL app.permitir_correccion = 'on'`.
+- Reasignar clientes: la API cambia `clientes.id_vendedor` (queda en `auditoria`), anota en `retiros_vendedor` lo que pierde el vendedor anterior y «toca» los pedidos cerrados del cliente para que el vendedor nuevo los descargue. La tabla `eliminaciones` es global y no sirve para esto.
 - Sincronización: cada tabla tiene `actualizado_en` y `version` (sube sola en cada cambio). El teléfono pide "lo cambiado desde mi última sincronización" y la tabla `eliminaciones` le dice qué borrar. Si la `version` que mandó el teléfono no coincide con la actual, la operación se guarda como `conflicto`.

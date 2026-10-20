@@ -23,6 +23,9 @@ export interface Cliente {
   activo: boolean
   creado: number
   actualizado: number
+  // Los pone el servidor al sincronizar (src/lib/sync.ts); la app no los edita.
+  version?: number
+  vendedorId?: string
 }
 
 export interface Producto {
@@ -32,6 +35,7 @@ export interface Producto {
   costo_litro: number
   color_hex: string
   disponible: boolean
+  version?: number
 }
 
 export interface DetallePedido {
@@ -52,6 +56,8 @@ export interface Pedido {
   fecha_entregado_real?: number
   creado: number
   actualizado: number
+  version?: number
+  vendedorId?: string
 }
 
 export interface Recordatorio {
@@ -59,15 +65,35 @@ export interface Recordatorio {
   clienteId: string
   creado: number
   hecho: boolean
+  version?: number
 }
 
-// Cola de cambios para sincronizar con el backend cuando exista (RF-051).
+// Cola de cambios por sincronizar con el servidor (RF-051). Guarda qué registro cambió, no una copia:
+// al sincronizar se manda su estado actual, así varias ediciones seguidas viajan como una sola.
 export interface Cambio {
   id?: number
-  tabla: string
+  opId: string // identifica la operación en el servidor: reenviarla nunca la aplica dos veces (RF-053)
+  tabla: Tabla
   registroId: string
   op: 'put' | 'delete'
   ts: number
+  version?: number // al borrar: versión del servidor que tenía el registro
+}
+
+export interface Meta {
+  clave: string
+  valor: unknown
+}
+
+// Cambios que el servidor no aceptó o que perdieron contra otro dispositivo; la persona debe enterarse.
+export interface Problema {
+  id: string
+  tabla: Tabla
+  registroId: string
+  tipo: 'conflicto' | 'rechazada'
+  mensaje: string
+  ts: number
+  visto: boolean
 }
 
 export const db = new Dexie('reparto-yogurt') as Dexie & {
@@ -76,6 +102,8 @@ export const db = new Dexie('reparto-yogurt') as Dexie & {
   pedidos: EntityTable<Pedido, 'id'>
   recordatorios: EntityTable<Recordatorio, 'id'>
   cola: EntityTable<Cambio, 'id'>
+  meta: EntityTable<Meta, 'clave'>
+  problemas: EntityTable<Problema, 'id'>
 }
 
 db.version(1).stores({
@@ -86,21 +114,57 @@ db.version(1).stores({
   cola: '++id, ts',
 })
 
+db.version(2)
+  .stores({ cola: '++id, ts, registroId, opId', meta: 'clave', problemas: 'id, ts, visto' })
+  .upgrade((t) => t.table('cola').toCollection().modify((c) => { c.opId = crypto.randomUUID() }))
+
 export const uid = () => crypto.randomUUID()
 
-type Tabla = 'clientes' | 'productos' | 'pedidos' | 'recordatorios'
+export type Tabla = 'clientes' | 'productos' | 'pedidos' | 'recordatorios'
+
+const encolar = (tabla: Tabla, registroId: string, op: Cambio['op'], version?: number) =>
+  db.cola.add({ opId: uid(), tabla, registroId, op, ts: Date.now(), version })
+
+// Lo que el servidor puso en el registro no se pierde si la pantalla arma un objeto nuevo al editar.
+async function conservarDelServidor<T extends { id: string; version?: number; vendedorId?: string }>(tabla: Tabla, r: T): Promise<T> {
+  const previo = (await db.table(tabla).get(r.id)) as T | undefined
+  if (!previo) return r
+  return { ...r, version: r.version ?? previo.version, vendedorId: r.vendedorId ?? previo.vendedorId }
+}
 
 export async function guardar<T extends { id: string }>(tabla: Tabla, registro: T) {
   await db.transaction('rw', db.table(tabla), db.cola, async () => {
-    await db.table(tabla).put({ ...registro, actualizado: Date.now() })
-    await db.cola.add({ tabla, registroId: registro.id, op: 'put', ts: Date.now() })
+    const r = await conservarDelServidor(tabla, registro)
+    await db.table(tabla).put({ ...r, actualizado: Date.now() })
+    await encolar(tabla, registro.id, 'put')
+  })
+}
+
+export async function guardarVarios<T extends { id: string }>(tabla: Tabla, registros: T[]) {
+  await db.transaction('rw', db.table(tabla), db.cola, async () => {
+    for (const registro of registros) {
+      const r = await conservarDelServidor(tabla, registro)
+      await db.table(tabla).put(r)
+      await encolar(tabla, registro.id, 'put')
+    }
   })
 }
 
 export async function borrar(tabla: Tabla, id: string) {
   await db.transaction('rw', db.table(tabla), db.cola, async () => {
+    const previo = await db.table(tabla).get(id)
     await db.table(tabla).delete(id)
-    await db.cola.add({ tabla, registroId: id, op: 'delete', ts: Date.now() })
+    await encolar(tabla, id, 'delete', previo?.version)
+  })
+}
+
+export async function borrarVarios(tabla: Tabla, ids: string[]) {
+  await db.transaction('rw', db.table(tabla), db.cola, async () => {
+    for (const id of ids) {
+      const previo = await db.table(tabla).get(id)
+      await db.table(tabla).delete(id)
+      await encolar(tabla, id, 'delete', previo?.version)
+    }
   })
 }
 

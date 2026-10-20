@@ -1,4 +1,5 @@
-import { asegurarCatalogo, db, totalDe, uid, type Cliente, type Pedido } from './db'
+import { asegurarCatalogo, borrarVarios, db, guardarVarios, totalDe, uid, type Cliente, type Pedido } from './db'
+import { MODO_SERVIDOR } from './api'
 import { hoy, sumarDias, tocaVisita } from './fechas'
 import type { Punto } from './ruteo'
 
@@ -10,7 +11,7 @@ const CALLES = ['Av. Juárez', 'Calle Morelos', 'Hidalgo', 'Av. Reforma', 'Allen
 
 // Carga clientes y pedidos de ejemplo alrededor de `centro` para probar la app.
 export async function cargarDemo(centro: Punto) {
-  await asegurarCatalogo()
+  if (!MODO_SERVIDOR) await asegurarCatalogo()
   const productos = (await db.productos.toArray()).filter((p) => p.disponible)
   const rnd = (n: number) => Math.floor(Math.random() * n)
   const ahora = Date.now()
@@ -55,12 +56,17 @@ export async function cargarDemo(centro: Punto) {
     pedidos.push({ id: uid(), clienteId: c.id, fecha: hoyIso, estado: 'PENDIENTE', items: it, total: totalDe(it), creado: ahora, actualizado: ahora })
   })
 
-  await db.transaction('rw', db.clientes, db.pedidos, async () => {
-    await db.clientes.bulkPut(clientes)
-    await db.pedidos.bulkPut(pedidos)
-  })
+  await guardarVarios('clientes', clientes)
+  await guardarVarios('pedidos', pedidos)
 }
 
 export async function borrarTodo() {
-  await Promise.all([db.clientes.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear()])
+  if (!MODO_SERVIDOR) {
+    await Promise.all([db.clientes.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear()])
+    return
+  }
+  // Con servidor el borrado se sincroniza: hay que borrar registro por registro, no vaciar las tablas.
+  await borrarVarios('recordatorios', await db.recordatorios.toCollection().primaryKeys())
+  await borrarVarios('pedidos', await db.pedidos.toCollection().primaryKeys())
+  await borrarVarios('clientes', await db.clientes.toCollection().primaryKeys())
 }

@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { ChevronRight, Crosshair, MessageCircle, Moon, Pencil, Phone, Plus, Search, Star, Sun, UserX, UserCheck } from 'lucide-react'
+import { ChevronRight, Crosshair, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
+import { MODO_SERVIDOR } from '../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../lib/db'
+import { cargarEquipo, useEquipo } from '../lib/equipo'
 import { DIAS_CORTOS, dinero, textoFecha, textoFrecuencia } from '../lib/fechas'
 import { ubicacionActual, type Punto } from '../lib/ruteo'
+import { useRol } from '../lib/sesion'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
+import { CambiarVendedor } from './Equipo'
+import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { IconoSabor } from './Fruta'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from './ui'
+
+const Escaner = lazy(() => import('./Escaner'))
 
 export function Clientes() {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), []) ?? []
@@ -18,6 +25,8 @@ export function Clientes() {
   const [verInactivos, setVerInactivos] = useState(false)
   const [form, setForm] = useState<Cliente | 'nuevo' | null>(null)
   const [perfilId, setPerfilId] = useState<string | null>(null)
+  const [escaner, setEscaner] = useState(false)
+  const [imprimir, setImprimir] = useState(false)
 
   const prod = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
   const stats = useMemo(() => {
@@ -53,11 +62,19 @@ export function Clientes() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-4 pt-safe">
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
-          <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-full bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
-            {verInactivos ? 'Ver activos' : 'Ver archivados'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setEscaner(true)} aria-label="Escanear QR o tarjeta" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
+              <ScanLine size={20} />
+            </button>
+            <button onClick={() => setImprimir(true)} aria-label="Imprimir QR" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
+              <Printer size={20} />
+            </button>
+            <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-full bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
+              {verInactivos ? 'Activos' : 'Archivados'}
+            </button>
+          </div>
         </div>
         <div className="relative mt-4">
           <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
@@ -96,6 +113,12 @@ export function Clientes() {
       </button>
 
       {form && <FormCliente cliente={form === 'nuevo' ? undefined : form} onCerrar={() => setForm(null)} />}
+      {imprimir && <ImpresionMasiva clientes={clientes} onCerrar={() => setImprimir(false)} />}
+      {escaner && (
+        <Suspense fallback={null}>
+          <Escaner onCliente={(c) => { setEscaner(false); setPerfilId(c.id) }} onCerrar={() => setEscaner(false)} />
+        </Suspense>
+      )}
       {perfil && (
         <Perfil
           cliente={perfil}
@@ -121,6 +144,16 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
   onEditar: () => void
 }) {
   const [editor, setEditor] = useState<{ pedido?: Pedido } | null>(null)
+  const [codigos, setCodigos] = useState(false)
+  const [cambiandoVendedor, setCambiandoVendedor] = useState(false)
+  // RF-041: el administrador ve de quién es el cliente y puede pasarlo a otro vendedor (sólo si ya está en el servidor).
+  const rol = useRol()
+  const gestiona = MODO_SERVIDOR && rol === 'administrador' && cliente.version != null
+  const equipo = useEquipo()
+  useEffect(() => {
+    if (gestiona && !equipo) void cargarEquipo().catch(() => {})
+  }, [gestiona]) // eslint-disable-line react-hooks/exhaustive-deps
+  const vendedor = cliente.vendedorId ? equipo?.usuarios.find((u) => u.id === cliente.vendedorId)?.nombre ?? 'Asignado' : 'Sin vendedor'
   const ordenados = [...pedidos].sort((a, b) => b.fecha.localeCompare(a.fecha))
   const pendientes = ordenados.filter((p) => p.estado === 'PENDIENTE')
   const historial = ordenados.filter((p) => p.estado !== 'PENDIENTE').slice(0, 15)
@@ -136,9 +169,10 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
           <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={favorito ? <IconoSabor sabor={favorito} size={13} className="inline" /> : <Star size={12} className="inline" />} />
           <Dato valor={ultima ? textoFecha(ultima.fecha) : '—'} etiqueta="Última visita" />
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-1">
           <Accion href={`tel:${cliente.telefono}`} icono={<Phone size={22} />} texto="Llamar" />
           <Accion href={`https://wa.me/${telLimpio(cliente.telefono)}`} icono={<MessageCircle size={22} />} texto="WhatsApp" />
+          <Accion onClick={() => setCodigos(true)} icono={<QrCode size={22} />} texto="Código QR" />
           <Accion onClick={onEditar} icono={<Pencil size={22} />} texto="Editar" />
           <Accion
             onClick={async () => {
@@ -149,6 +183,16 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
             texto={cliente.activo ? 'Archivar' : 'Activar'}
           />
         </div>
+        {gestiona && (
+          <button onClick={() => setCambiandoVendedor(true)} className="flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-3 text-left active:bg-linea">
+            <UserCog size={20} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs text-apagado">Vendedor</span>
+              <span className="block truncate font-semibold">{vendedor}</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+          </button>
+        )}
         <Boton className="w-full" onClick={() => setEditor({})}><Plus size={20} /> Nuevo pedido</Boton>
 
         {pendientes.length > 0 && (
@@ -164,6 +208,8 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
         </Seccion>
       </div>
       {editor && <EditorPedido abierto cliente={cliente} pedido={editor.pedido} base={base} onCerrar={() => setEditor(null)} />}
+      {codigos && <FichaCodigos cliente={cliente} onCerrar={() => setCodigos(false)} />}
+      {cambiandoVendedor && <CambiarVendedor cliente={cliente} onCerrar={() => setCambiandoVendedor(false)} />}
     </Hoja>
   )
 }

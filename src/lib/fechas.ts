@@ -54,3 +54,11 @@ export function textoFrecuencia(f: Frecuencia) {
 
 export const dinero = (n: number) =>
   n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
+
+export function hace(ms: number) {
+  const min = Math.floor((Date.now() - ms) / 60_000)
+  if (min < 1) return 'hace un momento'
+  if (min < 60) return `hace ${min} min`
+  const h = Math.floor(min / 60)
+  return h < 24 ? `hace ${h} h` : `hace ${Math.floor(h / 24)} d`
+}

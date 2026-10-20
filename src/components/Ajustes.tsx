@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Download, Plus, Trash2, Upload } from 'lucide-react'
-import { borrar, db, guardar, uid, type Producto } from '../lib/db'
+import { borrar, db, guardar, guardarVarios, uid, type Producto } from '../lib/db'
 import { dinero, hoy } from '../lib/fechas'
 import { borrarTodo } from '../lib/demo'
+import { MODO_SERVIDOR } from '../lib/api'
 import { Insignia } from './Fruta'
 import { Boton, Campo, Hoja, aviso, claseInput } from './ui'
 
@@ -37,12 +38,11 @@ export function Ajustes() {
     try {
       const d = JSON.parse(await f.text())
       if (d.version !== 1) throw new Error()
-      await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios], async () => {
-        await db.clientes.bulkPut(d.clientes)
-        await db.productos.bulkPut(d.productos)
-        await db.pedidos.bulkPut(d.pedidos)
-        await db.recordatorios.bulkPut(d.recordatorios ?? [])
-      })
+      // Pasa por la cola para que, con servidor, lo restaurado también se sincronice.
+      await guardarVarios('productos', d.productos)
+      await guardarVarios('clientes', d.clientes)
+      await guardarVarios('pedidos', d.pedidos)
+      await guardarVarios('recordatorios', d.recordatorios ?? [])
       aviso('Respaldo restaurado')
     } catch {
       aviso('Ese archivo no es un respaldo válido')
@@ -69,8 +69,10 @@ export function Ajustes() {
 
       <h2 className="mt-8 text-2xl font-semibold tracking-tight">Tus datos</h2>
       <p className="mt-1 text-sm text-apagado">
-        Todo se guarda en este teléfono y funciona sin internet. Mientras no haya servidor, descarga un respaldo seguido.
-        {cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}
+        Todo se guarda en este teléfono y funciona sin internet.
+        {MODO_SERVIDOR
+          ? cola > 0 ? <> Hay {cola} cambios por enviar al servidor; salen solos cuando haya señal.</> : <> Se sincroniza solo con el servidor.</>
+          : <> Mientras no haya servidor, descarga un respaldo seguido.{cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}</>}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Boton variante="secundario" onClick={exportar}><Download size={18} /> Respaldo</Boton>
@@ -91,7 +93,7 @@ export function Ajustes() {
       <Hoja abierta={confirmarBorrado} onCerrar={() => setConfirmarBorrado(false)} titulo="¿Borrar todo?">
         <div className="space-y-3 pb-3">
           <p className="text-apagado">Se borran clientes, pedidos y recordatorios de este teléfono. Los sabores se quedan. No se puede deshacer.</p>
-          <Boton variante="peligro" className="w-full" onClick={async () => { await borrarTodo(); localStorage.clear(); setConfirmarBorrado(false); aviso('Datos borrados') }}>Sí, borrar</Boton>
+          <Boton variante="peligro" className="w-full" onClick={async () => { await borrarTodo(); localStorage.removeItem('ruta-del-dia'); setConfirmarBorrado(false); aviso('Datos borrados') }}>Sí, borrar</Boton>
         </div>
       </Hoja>
     </div>
