@@ -41,8 +41,17 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 
 La API (`server/`, ver [su README](server/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL`; sin esa variable la app sigue siendo sólo local. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
 
+## QR, NFC y cámara
+
+Cada cliente tiene un QR único (`YGT1:<uuid del cliente>`) que se genera al darlo de alta y no necesita internet.
+
+- **Imprimir** (Clientes → cliente → **Código QR**): etiqueta de 60 × 75 mm para imán, en un PDF del tamaño exacto; se comparte o imprime desde la hoja de compartir del teléfono, o se descarga donde no existe. En Clientes, el botón de la impresora arma un PDF con 9 etiquetas por hoja Carta y guías de corte, para los clientes que elijas.
+- **Reponer QR**: genera un QR nuevo y el anterior deja de abrir al cliente (pide confirmación). **Imprimir** sólo vuelve a sacar el mismo QR.
+- **Tarjeta NFC**: se liga con el UID de la tarjeta. Si ya era de otro cliente, pide confirmar y se la quita. Donde el navegador no lee NFC se puede teclear el UID (lector USB).
+- **Escanear** (botón del visor en Ruta y en Clientes): la cámara lee el QR y, en Android con Chrome, la misma pantalla escucha tarjetas NFC. En Ruta, un cliente con entrega hoy abre su parada; uno sin entrega abre un pedido para hoy con lo del pedido anterior. En Clientes abre su perfil. Códigos que no son de la app, de clientes archivados o que no existen se avisan sin cerrar el visor.
+- La cámara usa el lector nativo del navegador (`BarcodeDetector`: QR y códigos de barras comunes) y, donde no existe (Safari, Firefox), `jsqr` sólo para QR. Web NFC existe únicamente en Chrome para Android y pide HTTPS. El PDF se escribe a mano en `src/lib/pdf.ts`.
+
 ## Pendiente (siguientes pasos)
 
 - Recuperación de contraseña por correo (RF-002), cierre de sesión que no dependa de la señal.
-- QR y NFC por cliente (RF-015 a RF-022).
 - Panel de vendedores, stock diario, exportar a Excel, notificaciones push.

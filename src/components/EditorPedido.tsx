@@ -7,12 +7,13 @@ import { SelectorSabores, aCantidades, aItems, type Cantidades } from './Selecto
 import { Boton, Hoja, aviso, claseInput } from './ui'
 
 // Crear un pedido nuevo (RF-024) o editar uno pendiente (RF-025): sabores, litros y fecha.
-export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuardado }: {
+export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaInicial, onGuardado }: {
   abierto: boolean
   onCerrar: () => void
   cliente: Cliente
   pedido?: Pedido // si viene, se edita
   base?: Cantidades // cantidades iniciales para un pedido nuevo
+  fechaInicial?: string // para un pedido nuevo; si no, la siguiente visita según su frecuencia
   onGuardado?: (p: Pedido) => void
 }) {
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
@@ -22,8 +23,8 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, onGuard
   useEffect(() => {
     if (!abierto) return
     setCant(pedido ? aCantidades(pedido.items) : (base ?? {}))
-    setFecha(pedido?.fecha ?? siguienteVisita(cliente.frecuencia))
-  }, [abierto, pedido, base, cliente])
+    setFecha(pedido?.fecha ?? fechaInicial ?? siguienteVisita(cliente.frecuencia))
+  }, [abierto, pedido, base, cliente, fechaInicial])
 
   const sugerida = siguienteVisita(cliente.frecuencia)
   const opciones = [...new Set([sugerida, sumarDias(hoy(), 1), sumarDias(hoy(), 2), sumarDias(hoy(), 7), hoy()])]

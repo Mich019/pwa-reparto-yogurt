@@ -1,18 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Navigation, Pencil, Phone, PlusCircle, RefreshCw, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
+  Navigation, Pencil, Phone, PlusCircle, RefreshCw, ScanLine, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../lib/fechas'
 import { calcularRuta, distancia, enlaceNavegar, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../lib/ruteo'
 import { cargarDemo } from '../lib/demo'
+import { baseDelUltimoPedido } from '../lib/codigos'
 import { Mapa, type Pin } from './Mapa'
 import { IconoSabor } from './Fruta'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { Accion, Boton, Hoja, Segmentado, aviso, telLimpio } from './ui'
+
+const Escaner = lazy(() => import('./Escaner'))
 
 const CLAVE_RUTA = 'ruta-del-dia'
 interface RutaGuardada extends RutaCalc { fecha: string; claves: string }
@@ -70,7 +73,8 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
   const [pago, setPago] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO')
   const [postEntrega, setPostEntrega] = useState<Pedido | null>(null)
   const [paso, setPaso] = useState<'opciones' | 'nuevo'>('opciones')
-  const [editor, setEditor] = useState<{ cliente: Cliente; pedido?: Pedido; base?: Cantidades } | null>(null)
+  const [editor, setEditor] = useState<{ cliente: Cliente; pedido?: Pedido; base?: Cantidades; paraHoy?: boolean } | null>(null)
+  const [escaner, setEscaner] = useState(false)
   const [verRecordatorios, setVerRecordatorios] = useState(false)
   const [omitir, setOmitir] = useState<Pedido | null>(null)
 
@@ -155,6 +159,19 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
     setPostEntrega(entregado)
   }
 
+  // RF-022: tras leer el QR o la tarjeta, si el cliente tiene entrega hoy se va directo a su parada; si no,
+  // se abre un pedido para hoy con lo que pidió la vez anterior.
+  async function abrirEscaneado(c: Cliente) {
+    setEscaner(false)
+    const deHoy = pendientes.find((p) => p.clienteId === c.id)
+    if (deHoy) {
+      seleccionar(deHoy.id)
+      setExpandida(true)
+      return aviso(`${c.nombre}: entrega de hoy`)
+    }
+    setEditor({ cliente: c, base: await baseDelUltimoPedido(c.id), paraHoy: true })
+  }
+
   function siguiente(texto?: string) {
     setPostEntrega(null)
     if (texto) aviso(texto)
@@ -200,6 +217,11 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
               {recordatorios.length > 0 && (
                 <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-tinta px-1 text-[11px] font-bold text-white ring-2 ring-papel">{recordatorios.length}</span>
               )}
+            </BotonRedondo>
+          </div>
+          <div className="pointer-events-auto absolute right-0">
+            <BotonRedondo onClick={() => setEscaner(true)} etiqueta="Escanear QR o tarjeta">
+              <ScanLine size={20} />
             </BotonRedondo>
           </div>
           <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-papel px-5 py-2.5 shadow-tarjeta">
@@ -418,7 +440,21 @@ export function Ruta({ irAClientes }: { irAClientes: () => void }) {
       </Hoja>
 
       {editor && (
-        <EditorPedido abierto onCerrar={() => setEditor(null)} cliente={editor.cliente} pedido={editor.pedido} base={editor.base} />
+        <EditorPedido
+          abierto
+          onCerrar={() => setEditor(null)}
+          cliente={editor.cliente}
+          pedido={editor.pedido}
+          base={editor.base}
+          fechaInicial={editor.paraHoy ? fecha : undefined}
+          onGuardado={editor.paraHoy ? (p) => seleccionar(p.id) : undefined}
+        />
+      )}
+
+      {escaner && (
+        <Suspense fallback={null}>
+          <Escaner onCliente={abrirEscaneado} onCerrar={() => setEscaner(false)} />
+        </Suspense>
       )}
 
       {/* Omitir visita (RF-026) */}
