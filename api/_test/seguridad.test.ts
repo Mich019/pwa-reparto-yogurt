@@ -15,7 +15,7 @@ const restablecer = (correo: string, codigo: string, nueva: string) =>
   app.inject({ method: 'POST', url: '/auth/restablecer', payload: { correo, codigo, nueva }, remoteAddress: ipAleatoria() })
 // El código viaja por correo; en la prueba se pone uno conocido en el último pedido de la cuenta.
 async function fijarCodigo(idUsuario: string, codigo: string) {
-  const hash = createHmac('sha256', config.jwtSecret).update(`recuperacion:${codigo}`).digest('hex')
+  const hash = createHmac('sha256', config.pimienta).update(`recuperacion:${codigo}`).digest('hex')
   await db.query(
     `UPDATE recuperaciones_password SET codigo_hash = $2
       WHERE id_recuperacion = (SELECT id_recuperacion FROM recuperaciones_password WHERE id_usuario = $1 ORDER BY creado_en DESC LIMIT 1)`,

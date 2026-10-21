@@ -103,13 +103,14 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
       </main>
 
       {/* Barra inferior. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin servidor: Ruta, Clientes, Producción y Sabores. */}
-      <nav className="z-30 grid border-t border-linea bg-papel pb-safe" style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}>
+      <nav aria-label="Secciones" className="z-30 grid border-t border-linea bg-papel pb-safe" style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}>
         {visibles.map(({ id, texto, icono: Icono }) => {
           const activa = actual === id
           return (
             <button
               key={id}
               onClick={() => setPestana(id)}
+              aria-current={activa ? 'page' : undefined}
               className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] ${
                 activa ? 'font-semibold text-tinta' : 'font-medium text-apagado'
               }`}

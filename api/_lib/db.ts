@@ -7,7 +7,11 @@ export type Cx = pg.PoolClient
 export type Db = pg.Pool
 
 export function crearPool(conexion: string | pg.PoolConfig): Db {
-  return new pg.Pool(typeof conexion === 'string' ? { connectionString: conexion, max: 10 } : conexion)
+  const pool = new pg.Pool(typeof conexion === 'string' ? { connectionString: conexion, max: 10 } : conexion)
+  // Si la base o su proxy cortan una conexión ociosa (reinicio, mantenimiento), el pool la descarta y abre otra.
+  // Sin este manejador, ese error tumbaría el proceso.
+  pool.on('error', (e) => console.error('Conexión a la base perdida (se abrirá otra):', e.message))
+  return pool
 }
 
 // Transacción; id_usuario queda disponible para la bitácora (db/README.md, "Notas para la API").

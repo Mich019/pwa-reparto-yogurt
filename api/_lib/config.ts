@@ -6,20 +6,67 @@ function requerido(nombre: string): string {
   return v
 }
 
-// Conexión: DATABASE_URL completa, o por partes (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SSL).
-// Supabase: usar el Transaction Pooler (puerto 6543), que aguanta muchas funciones serverless a la vez.
+const PARAMETROS_SSL = ['sslmode', 'ssl', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat']
+
+// Cifrado de la conexión, con los niveles de libpq:
+//  · cifrar sin verificar (lo predeterminado con Railway, que usa un certificado propio que Node no reconoce): evita que
+//    se lea el tráfico, pero no confirma que del otro lado esté la base.
+//  · DB_SSL_CA (el certificado de la base o de su autoridad, en PEM o base64), o sslmode=verify-ca: además exige que el
+//    certificado venga de esa autoridad. Es lo recomendable con Railway (ver docs/produccion-railway.md).
+//  · sslmode=verify-full o DB_SSL=verify-full: además exige que el certificado sea del nombre del servidor.
+// DB_SSL=true|false|verify-full manda; si no viene, se cifra cuando la dirección lo pide (?sslmode=…) o es la pública de
+// Railway (*.rlwy.net). La red privada de Railway (*.railway.internal) y localhost van sin cifrar.
+function leerSsl(host: string, sslmode: string | null): PoolConfig['ssl'] {
+  const caTexto = process.env.DB_SSL_CA?.trim()
+  const ca = caTexto ? (caTexto.startsWith('-----') ? caTexto : Buffer.from(caTexto, 'base64').toString('utf8')) : undefined
+  const pedido = process.env.DB_SSL ?? ''
+  const modo = pedido === 'verify-full' ? 'verify-full' : pedido === 'true' || pedido === 'false' ? null : sslmode
+  if (pedido === 'false' || modo === 'disable') return undefined
+  if (modo === 'verify-full') return { rejectUnauthorized: true, ...(ca ? { ca } : {}) }
+  if (ca || modo === 'verify-ca') {
+    if (!ca) throw new Error('sslmode=verify-ca necesita el certificado de la base en DB_SSL_CA')
+    return { rejectUnauthorized: true, ca, checkServerIdentity: () => undefined }
+  }
+  const cifrar = pedido === 'true' || /^(require|prefer)$/.test(modo ?? '') || /\.rlwy\.net$/i.test(host)
+  return cifrar ? { rejectUnauthorized: false } : undefined
+}
+
+// Conexión: DATABASE_URL completa (Railway: la «DATABASE_PUBLIC_URL» de su servicio Postgres si la API está fuera de
+// Railway, o la «DATABASE_URL» privada si corre dentro), o por partes (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD).
 function leerConexion(): PoolConfig {
-  const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
-  const max = Number(process.env.DB_POOL_MAX ?? (process.env.VERCEL ? 3 : 10))
-  if (process.env.DATABASE_URL) return { connectionString: process.env.DATABASE_URL, ssl, max }
+  const serverless = !!process.env.VERCEL
+  const comunes: PoolConfig = {
+    max: Number(process.env.DB_POOL_MAX ?? (serverless ? 3 : 10)),
+    // Una función serverless se congela entre peticiones: las conexiones ociosas se sueltan pronto para no agotar la base.
+    idleTimeoutMillis: serverless ? 10_000 : 30_000,
+    connectionTimeoutMillis: 10_000, // si la base no contesta, error claro en 10 s en lugar de quedarse colgado
+    keepAlive: true,
+    statement_timeout: 30_000, // ninguna consulta acapara la base más de 30 s
+  }
+  const url = process.env.DATABASE_URL?.trim()
+  if (url) {
+    let u: URL
+    try {
+      u = new URL(url)
+    } catch {
+      throw new Error('DATABASE_URL no es una dirección válida (ejemplo: postgresql://usuario:clave@host:5432/base)')
+    }
+    if (!/^postgres(ql)?:$/.test(u.protocol)) throw new Error('DATABASE_URL debe empezar con postgresql://')
+    // pg deja que los parámetros SSL de la dirección pisen la opción ssl (y trata «require» como «verificar»): se quitan
+    // de la dirección y se decide aquí, para que pegar tal cual la dirección de Railway funcione.
+    const sslmode = u.searchParams.get('sslmode')
+    for (const p of PARAMETROS_SSL) u.searchParams.delete(p)
+    return { ...comunes, connectionString: u.toString(), ssl: leerSsl(u.hostname, sslmode) }
+  }
+  const host = requerido('DB_HOST')
   return {
-    host: requerido('DB_HOST'),
+    ...comunes,
+    host,
     port: Number(process.env.DB_PORT ?? 5432),
     database: requerido('DB_NAME'),
     user: requerido('DB_USER'),
     password: requerido('DB_PASSWORD'),
-    ssl,
-    max,
+    ssl: leerSsl(host, null),
   }
 }
 
@@ -93,6 +140,7 @@ export function leerConfig() {
     recuperacionMinutos: 15,
     recuperacionMaxIntentos: 5,
     recuperacionPorHoraCuenta: 3, // códigos por cuenta y por hora; pasado el tope no se manda otro (sin decirlo)
+    recuperacionPorDiaCuenta: 6, // y por día: con 5 intentos por código, como mucho 30 intentos de adivinarlo al día
     recuperacionPorHoraIp: 10,
     recuperacionPisoMs: prueba ? 300 : 2000, // /auth/recuperar tarda siempre lo mismo: el tiempo no dice si el correo existe
     // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.

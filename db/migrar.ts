@@ -6,9 +6,14 @@
 //   npm run db:migrar -- --demo            además carga 04_datos_demo y muestra las contraseñas temporales
 //                                          de admin@yogurt.local y vendedor@yogurt.local (sólo en una base de prueba)
 //   npm run db:migrar -- --reiniciar       BORRA las tablas y tipos de la app y la vuelve a crear
+//                                          (si ya hay usuarios, pide además --confirmo-borrar-todo)
 //
 // --reiniciar hace falta si la base se creó con otro script (p. ej. db.txt): la API usa los
 // triggers, vistas y tipos de 01_esquema.sql y no funciona sobre un esquema distinto.
+//
+// Cada paso va en una transacción: si algo falla, la base queda como estaba y se puede volver a correr.
+// Railway: con la CLI, `railway run npm run db:migrar` toma DATABASE_URL del proyecto sin necesidad de .env
+// (usa la DATABASE_PUBLIC_URL del servicio Postgres si lo corres desde tu computadora).
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +25,8 @@ import { passwordTemporal } from '../api/_lib/seguridad.js'
 const DIR = dirname(fileURLToPath(import.meta.url))
 const args = new Set(process.argv.slice(2))
 const sql = (f: string) => readFileSync(join(DIR, f), 'utf8')
+// Los scripts traen su propio BEGIN/COMMIT (para correrlos sueltos con psql); aquí van juntos en una sola transacción.
+const sinTransaccion = (texto: string) => texto.replace(/^\s*(BEGIN|COMMIT);\s*$/gim, '')
 
 const TABLAS = [
   'notificaciones', 'suscripciones_push', 'eliminaciones', 'retiros_vendedor', 'operaciones_sync', 'auditoria',
@@ -38,6 +45,8 @@ const config = leerConfig()
 const cx = new pg.Client(config.conexion)
 const cuentasDemo: string[] = []
 await cx.connect()
+// Dos migraciones a la vez (dos despliegues, dos terminales) se esperan en lugar de pisarse.
+await cx.query(`SELECT pg_advisory_lock(hashtext('reparto_yogurt_migrar'))`)
 
 try {
   const existe = async (tabla: string) => (await cx.query(`SELECT to_regclass($1) AS t`, [`public.${tabla}`])).rows[0].t !== null
@@ -46,6 +55,12 @@ try {
 
   if (args.has('--reiniciar')) {
     const { rows } = (await existe('usuarios')) ? await cx.query(`SELECT count(*)::int AS n FROM usuarios`) : { rows: [{ n: 0 }] }
+    if (rows[0].n > 0 && !args.has('--confirmo-borrar-todo')) {
+      throw new Error(
+        `La base tiene ${rows[0].n} usuario(s): --reiniciar borraría todos sus datos.\n` +
+        'Si de verdad quieres borrarlo todo:  npm run db:migrar -- --reiniciar --confirmo-borrar-todo',
+      )
+    }
     console.log(`Borrando tablas y tipos de la app (usuarios actuales: ${rows[0].n})…`)
     await cx.query(`BEGIN`)
     await cx.query(`DROP VIEW IF EXISTS v_ruta_del_dia, v_ventas_diarias, v_ventas_por_sabor, v_resumen_cliente CASCADE`)
@@ -56,10 +71,12 @@ try {
   }
 
   if (!(await existe('usuarios'))) {
+    await cx.query(`BEGIN`)
     for (const f of ['01_esquema.sql', '02_vistas.sql', '03_datos_iniciales.sql']) {
       console.log(`→ ${f}`)
-      await cx.query(sql(f))
+      await cx.query(sinTransaccion(sql(f)))
     }
+    await cx.query(`COMMIT`)
     if (args.has('--demo')) {
       console.log('→ 04_datos_demo.sql')
       await cx.query(sql('04_datos_demo.sql'))
@@ -81,13 +98,19 @@ try {
   if (process.exitCode !== 1) {
     for (const f of readdirSync(join(DIR, 'migraciones')).filter((f) => f.endsWith('.sql')).sort()) {
       console.log(`→ migraciones/${f}`)
-      await cx.query(sql(join('migraciones', f)))
+      await cx.query(`BEGIN`)
+      await cx.query(sinTransaccion(sql(join('migraciones', f))))
+      await cx.query(`COMMIT`)
     }
     const { rows } = await cx.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'administrador' AND activo`)
     console.log(`\nBase lista. Administradores activos: ${rows[0].n}.`)
     if (cuentasDemo.length) console.log(`Cuentas de prueba (contraseña temporal; al entrar se pide elegir otra):\n${cuentasDemo.join('\n')}`)
     if (rows[0].n === 0) console.log('Crea el primero con:  npm run db:admin -- tu@correo.com "Tu Nombre"')
   }
+} catch (e) {
+  await cx.query(`ROLLBACK`).catch(() => {})
+  console.error(`\nNo se aplicó el paso que falló (la base quedó como antes de ese paso):\n${(e as Error).message}`)
+  process.exitCode = 1
 } finally {
   await cx.end()
 }

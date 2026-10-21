@@ -9,8 +9,10 @@ import { ipCliente } from './seguridad.js'
 
 // RF-002: recuperación de contraseña con un código de 6 dígitos enviado por correo.
 // - /auth/recuperar responde siempre lo mismo y tarda siempre lo mismo: no revela si el correo existe, ni si se mandó.
-// - Como mucho 3 códigos por cuenta y 10 por conexión cada hora; pasado el tope no se manda otro, sin decirlo.
-// - Sólo se guarda un HMAC del código (con JWT_SECRET): un respaldo filtrado de la base no basta para usarlo.
+// - Como mucho 3 códigos por cuenta cada hora y 6 al día, y 10 por conexión cada hora; pasado el tope no se manda otro,
+//   sin decirlo. Así, adivinar un código (5 intentos por código) queda en 30 intentos al día por cuenta.
+// - Sólo se guarda un HMAC del código (con AUTH_PEPPER_SECRET, que no vive en la base): un respaldo filtrado de la base
+//   no basta para usarlo.
 // - Vence en 15 min; tras 5 códigos incorrectos se invalida. Pedir uno nuevo invalida el anterior.
 // - Al restablecer: contraseña nueva (Argon2id con pepper), cuenta desbloqueada y todas sus sesiones cerradas.
 
@@ -25,7 +27,7 @@ const MENSAJE_CODIGO = 'El código es incorrecto o ya venció. Pide uno nuevo.'
 const esperarHasta = (t: number) => new Promise((r) => setTimeout(r, Math.max(0, t - Date.now())))
 
 export async function rutasRecuperacion(app: FastifyInstance, { db, config }: Contexto) {
-  const hmac = (codigo: string) => createHmac('sha256', config.jwtSecret).update(`recuperacion:${codigo}`).digest('hex')
+  const hmac = (codigo: string) => createHmac('sha256', config.pimienta).update(`recuperacion:${codigo}`).digest('hex')
   const iguales = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 
   // Manda un código a la cuenta activa con ese correo, si la hay y no pasó del tope.
@@ -37,11 +39,13 @@ export async function rutasRecuperacion(app: FastifyInstance, { db, config }: Co
     const nuevo = await tx(db, null, async (c) => {
       await c.query(`SELECT pg_advisory_xact_lock(hashtext('recuperar:' || $1))`, [u.id_usuario])
       const { rows: [n] } = await c.query(
-        `SELECT count(*) FILTER (WHERE id_usuario = $1)::int AS cuenta, count(*) FILTER (WHERE ip = $2)::int AS ip
-           FROM recuperaciones_password WHERE creado_en > now() - interval '1 hour' AND (id_usuario = $1 OR ip = $2)`,
+        `SELECT count(*) FILTER (WHERE id_usuario = $1 AND creado_en > now() - interval '1 hour')::int AS cuenta,
+                count(*) FILTER (WHERE id_usuario = $1)::int AS cuenta_dia,
+                count(*) FILTER (WHERE ip = $2 AND creado_en > now() - interval '1 hour')::int AS ip
+           FROM recuperaciones_password WHERE creado_en > now() - interval '1 day' AND (id_usuario = $1 OR ip = $2)`,
         [u.id_usuario, ip],
       )
-      if (n.cuenta >= config.recuperacionPorHoraCuenta || n.ip >= config.recuperacionPorHoraIp) return false
+      if (n.cuenta >= config.recuperacionPorHoraCuenta || n.cuenta_dia >= config.recuperacionPorDiaCuenta || n.ip >= config.recuperacionPorHoraIp) return false
       await c.query(`UPDATE recuperaciones_password SET usado_en = now() WHERE id_usuario = $1 AND usado_en IS NULL`, [u.id_usuario])
       await c.query(
         `INSERT INTO recuperaciones_password (id_usuario, codigo_hash, expira_en, ip) VALUES ($1, $2, now() + make_interval(mins => $3), $4)`,
@@ -103,6 +107,8 @@ export async function rutasRecuperacion(app: FastifyInstance, { db, config }: Co
       // password_cambiado_en también deja sin efecto los intentos fallidos de antes (RF-003).
       await c.query(`UPDATE usuarios SET password_hash = $2, debe_cambiar_password = false, password_cambiado_en = now() WHERE id_usuario = $1`, [r.id_usuario, hash])
       await c.query(`UPDATE sesiones SET revocado_en = now() WHERE id_usuario = $1 AND revocado_en IS NULL`, [r.id_usuario])
+      // Los avisos (con nombres de clientes) dejan de llegar a los navegadores que tenían la cuenta abierta.
+      await c.query(`DELETE FROM suscripciones_push WHERE id_usuario = $1`, [r.id_usuario])
       return true
     })
     if (!aplicado) return rep.code(400).send({ error: MENSAJE_CODIGO, codigo: 'CODIGO_INVALIDO' })

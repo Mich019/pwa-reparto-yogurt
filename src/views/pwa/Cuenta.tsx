@@ -5,7 +5,7 @@ import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
 import { hace } from '../../lib/fechas'
-import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, useEstadoPush } from '../../lib/push'
+import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
 import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
@@ -37,6 +37,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
     setError('')
     try {
       await cambiarPassword(act, nue)
+      void renovarSuscripcion().catch(() => {}) // el servidor quitó los avisos de todos los teléfonos: éste se vuelve a suscribir
       aviso('Contraseña actualizada')
       onListo?.()
     } catch (e) {

@@ -25,3 +25,17 @@ export function ipCliente(req: FastifyRequest, config: { enVercel: boolean }): s
   }
   return req.ip
 }
+
+// Clave de los límites de peticiones para rutas con sesión: el usuario del token. Se lee sin verificar porque el límite
+// corre antes que la autenticación; un token inventado sólo reparte sus intentos entre usuarios falsos y luego recibe
+// 401, mientras que una cuenta real no puede saltarse su límite pidiendo tokens nuevos (todos llevan su id).
+export function claveUsuario(req: FastifyRequest, config: { enVercel: boolean }): string {
+  const token = /^Bearer ([\w-]+)\.([\w-]+)\.[\w-]+$/.exec(req.headers.authorization ?? '')
+  if (token) {
+    try {
+      const sub = JSON.parse(Buffer.from(token[2], 'base64url').toString('utf8'))?.sub
+      if (typeof sub === 'string' && sub.length <= 64) return `u:${sub}`
+    } catch { /* token mal formado: cuenta por conexión */ }
+  }
+  return ipCliente(req, config)
+}

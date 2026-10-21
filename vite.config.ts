@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { build, defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -18,6 +18,33 @@ function precache(): Plugin {
       const lista = JSON.stringify(archivos.map((f) => `./${f}`))
       const version = Date.now().toString(36)
       writeFileSync(sw, readFileSync(sw, 'utf8').replace('self.__ARCHIVOS__', lista).replace('__VERSION__', version))
+    },
+  }
+}
+
+// RF-052: compila src/sw/envio.ts como dist/sw-envio.js, un script clásico (IIFE) que public/sw.js carga con
+// importScripts para enviar la cola con la app cerrada. Va aparte porque un service worker clásico no puede
+// importar módulos, y así comparte el código de envío con la app en lugar de repetirlo.
+function envioEnSegundoPlano(mode: string): Plugin {
+  let salida = 'dist'
+  return {
+    name: 'envio-en-segundo-plano',
+    apply: 'build',
+    writeBundle(opts) {
+      salida = opts.dir!
+    },
+    async closeBundle() {
+      await build({
+        configFile: false,
+        mode,
+        logLevel: 'warn',
+        build: {
+          outDir: salida,
+          emptyOutDir: false,
+          copyPublicDir: false,
+          lib: { entry: resolve('src/sw/envio.ts'), formats: ['iife'], name: 'envioYogurt', fileName: () => 'sw-envio.js' },
+        },
+      })
     },
   }
 }
@@ -52,7 +79,7 @@ function politicaDeContenido(apiUrl: string): Plugin {
 
 export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: [react(), tailwindcss(), precache(), politicaDeContenido(loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL ?? '')],
+  plugins: [react(), tailwindcss(), precache(), envioEnSegundoPlano(mode), politicaDeContenido(loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL ?? '')],
   server: {
     proxy: {
       '/api': {

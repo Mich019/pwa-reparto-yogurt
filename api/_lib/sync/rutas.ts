@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Contexto } from '../app.js'
 import { tx } from '../db.js'
 import { hoyEn } from '../fechas.js'
-import { ipCliente } from '../seguridad.js'
+import { claveUsuario } from '../seguridad.js'
 import type { Despachador } from '../notificaciones.js'
 import { ADAPTADORES } from './adaptadores.js'
 import { conCostos, procesarOperacion, type Efectos, type Resultado } from './aplicar.js'
@@ -15,6 +15,7 @@ const queryPull = z.object({ desde: z.coerce.number().int().min(0).default(0) })
 const SOLAPE_MS = 5000 // el siguiente pull repite los últimos segundos, por si una transacción confirmó tarde
 const DIAS_DE_STOCK = 3 // el teléfono guarda el stock de hoy y de unos días atrás (el reloj del servidor es UTC, el del negocio no)
 const MAX_AVISOS = 100
+const MAX_OPS_POR_HORA = 5000
 
 export async function rutasSync(
   app: FastifyInstance,
@@ -23,9 +24,23 @@ export async function rutasSync(
   despachador: Despachador,
 ) {
   // RF-052: el teléfono envía su cola de cambios. Cada operación es independiente.
-  app.post('/sync/push', { preHandler: requiereSesion, bodyLimit: 5 * 1024 * 1024, config: { rateLimit: { max: 120, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.headers.authorization ?? ipCliente(req, config) } } }, async (req, rep) => {
+  // La sesión se revisa en onRequest, antes de leer el cuerpo (hasta 5 MB): sin sesión, no se procesa nada.
+  app.post('/sync/push', {
+    onRequest: requiereSesion,
+    bodyLimit: 5 * 1024 * 1024,
+    config: { rateLimit: { max: 60, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => claveUsuario(req, config) } },
+  }, async (req, rep) => {
     const body = bodyPush.safeParse(req.body)
     if (!body.success) return rep.code(400).send({ error: 'Datos de sincronización inválidos', detalles: body.error.issues.slice(0, 5) })
+    // Tope por cuenta: un día normal son unos cientos de operaciones. Más de MAX_OPS_POR_HORA en una hora es un abuso
+    // (o un error del teléfono) y llenaría la base; el teléfono conserva su cola y reintenta más tarde.
+    const { rows: [{ n }] } = await db.query(
+      `SELECT count(*)::int AS n FROM operaciones_sync WHERE id_usuario = $1 AND recibido_en > now() - interval '1 hour'`,
+      [req.usuario.id],
+    )
+    if (n + body.data.operaciones.length > MAX_OPS_POR_HORA) {
+      return rep.code(429).send({ error: 'Demasiados cambios en poco tiempo. Se volverán a enviar más tarde.', codigo: 'LIMITE_SYNC' })
+    }
     const ahoraMs = Date.now()
     const reloj = { dispositivo: body.data.dispositivo, skewMs: ahoraMs - body.data.ahoraCliente, ahoraMs }
     const resultados: Resultado[] = []
