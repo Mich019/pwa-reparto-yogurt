@@ -1,0 +1,90 @@
+/* Tema del panel de administración (/admin): crema, tarjetas beige y los colores de la marca Danelle.
+ *
+ * Varias secciones del panel reutilizan pantallas de la app de reparto (equipo, clientes, producción, reportes).
+ * Para que se vean del mismo mundo sin tocar la app del vendedor, el tema vive en la clase `.tema-admin` (App.tsx la
+ * pone sólo en el panel): redefine los colores de siempre y ahí se quedan. Fuera de `.tema-admin` nada cambia.
+ *
+ * Marca (del logo): verde #035d38 (acciones y selección), amarillo #f9dc07 (detalles), negro #000101.
+ * Los gráficos usan el verde #1b8d5a y el dorado #d2a408 (el dato del periodo en curso): validados con la
+ * herramienta de la skill dataviz; el verde de la marca es muy oscuro para ser una serie.
+ */
+.tema-admin {
+  /* Superficies: crema de fondo, beige para las tarjetas, blanco cálido para lo que flota. */
+  --color-papel: #fdfdf8;
+  --color-niebla: #ecebd8;
+  --color-linea: #dcdac7;
+  --color-tinta: #002014;
+  --color-apagado: #4d6151;
+
+  /* Acento y estados, todos con contraste de texto sobre crema y beige. */
+  --color-azul: #0b7643;
+  --color-verde: #0b7643;
+  --color-rojo: #be241b;
+  --color-ambar: #f2a516;
+
+  /* Los grises y ámbar de Tailwind que usan las pantallas compartidas, llevados a la paleta. */
+  --color-neutral-700: #04492c;
+  --color-neutral-800: #033a24;
+  --color-amber-600: #945a00;
+
+  background-color: var(--color-lienzo);
+  color: var(--color-tinta);
+  accent-color: var(--color-marca);
+  caret-color: var(--color-marca);
+  scrollbar-color: #c3c1a8 transparent;
+}
+
+/* Detrás del panel, el mismo crema al rebotar la pantalla o dejar espacio sin contenido. */
+html:has(.tema-admin),
+html:has(.tema-admin) body,
+html:has(.tema-admin) #root {
+  background-color: #f8f6ec;
+}
+
+.tema-admin ::selection {
+  background-color: var(--color-limon);
+  color: var(--color-tinta);
+}
+
+/* Lo de abajo va en las capas de Tailwind (base, componentes, utilidades) y no suelto: una regla sin capa le gana a toda
+ * utilidad, y eso apagaría el `hover:` y el `active:` de los botones de las pantallas compartidas. */
+
+/* Títulos con la letra de la marca; botones, tablas y etiquetas siguen en Inter. */
+@layer base {
+  .tema-admin :is(h1, h2) {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+}
+
+/* Cifras grandes: proporcionales, como pide la skill de gráficos; las columnas de tablas sí van tabulares. */
+@layer components {
+  .tema-admin .cifra {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: proportional-nums;
+  }
+}
+
+/* Lo que en la app del vendedor es negro (botones, pestaña elegida, casillas marcadas) aquí es el verde de la marca.
+ * `:where()` deja la regla con la misma fuerza que la utilidad, y como va después gana el empate; `hover:` y
+ * `active:` tienen más fuerza y siguen funcionando. */
+@layer utilities {
+  :where(.tema-admin) .bg-tinta {
+    background-color: var(--color-marca);
+  }
+  :where(.tema-admin) .border-tinta,
+  :where(.tema-admin) .focus\:border-tinta:focus {
+    border-color: var(--color-marca);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tema-admin * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

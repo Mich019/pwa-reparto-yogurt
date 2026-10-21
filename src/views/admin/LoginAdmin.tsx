@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
-import { ErrorApi, ErrorRed } from '../../lib/api'
-import { cerrarSesion, iniciarSesion, restablecerPassword, sesionActual, solicitarRecuperacion } from '../../lib/sesion'
-import { Logo } from '../../components/Logo'
+import { AlertCircle, ArrowLeft, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
+import { ErrorApi } from '../../lib/api'
+import { cerrarSesion, iniciarSesion, mensajeErrorLogin, sesionActual } from '../../lib/sesion'
+import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { Campo, claseInput } from '../../components/ui'
+import { AveDanelle, LogoDanelle } from './marca'
 
-type Modo = 'login' | 'olvido' | 'codigo' | 'exito'
+type Modo = 'login' | 'recuperar'
 
 export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
   onLoginExitoso?: () => void
@@ -17,16 +18,11 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
   const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
   const [verPassword, setVerPassword] = useState(false)
-  const [codigo, setCodigo] = useState('')
-  const [nuevaPassword, setNuevaPassword] = useState('')
-  const [confirmarPassword, setConfirmarPassword] = useState('')
-  const [verNuevaPassword, setVerNuevaPassword] = useState(false)
 
   // Estados de carga y error
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
   const [esBloqueo, setEsBloqueo] = useState(false)
-  const [minutosVence, setMinutosVence] = useState(15)
 
   // Login para rol Administrador (solo 2 roles: administrador y vendedor)
   async function manejarLogin(e: React.FormEvent) {
@@ -34,7 +30,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
     const c = correo.trim()
     const p = password.trim()
     if (!c || !p) {
-      setError('Credenciales inválidas')
+      setError('Escribe tu correo y tu contraseña')
       return
     }
     setCargando(true)
@@ -54,99 +50,27 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
 
       onLoginExitoso?.()
     } catch (err: unknown) {
-      if (err instanceof ErrorApi) {
-        if (err.status === 423 || err.codigo === 'BLOQUEADA') {
-          // Bloqueo temporal por 5 intentos fallidos
-          setEsBloqueo(true)
-          setError('Cuenta bloqueada temporalmente tras 5 intentos fallidos. Intenta más tarde.')
-        } else if (err.status === 401 || err.status === 403) {
-          setError('Credenciales inválidas')
-        } else {
-          // Errores de servidor (500, 502, etc.)
-          setError('Algo salió mal...')
-        }
-      } else if (err instanceof ErrorRed) {
-        setError('Algo salió mal...')
-      } else {
-        setError('Algo salió mal...')
-      }
-    } finally {
-      setCargando(false)
-    }
-  }
-
-  // Solicitar código de recuperación por correo
-  async function manejarSolicitarCodigo(e: React.FormEvent) {
-    e.preventDefault()
-    if (!correo.trim()) {
-      setError('Credenciales inválidas')
-      return
-    }
-    setCargando(true)
-    setError('')
-    try {
-      const res = await solicitarRecuperacion(correo.trim())
-      setMinutosVence(res.minutos ?? 15)
-      setModo('codigo')
-    } catch (err: unknown) {
-      if (err instanceof ErrorRed || (err instanceof ErrorApi && err.status >= 500)) {
-        setError('Algo salió mal...')
-      } else {
-        setError('Algo salió mal...')
-      }
-    } finally {
-      setCargando(false)
-    }
-  }
-
-  // Restablecer contraseña con código de 6 dígitos
-  async function manejarRestablecer(e: React.FormEvent) {
-    e.preventDefault()
-    if (!codigo.trim() || codigo.trim().length !== 6) {
-      setError('Ingresa el código de 6 dígitos')
-      return
-    }
-    if (nuevaPassword.length < 8 || !/[A-Za-z]/.test(nuevaPassword) || !/\d/.test(nuevaPassword)) {
-      setError('La nueva contraseña debe tener al menos 8 caracteres con letras y números')
-      return
-    }
-    if (nuevaPassword !== confirmarPassword) {
-      setError('Las contraseñas no coinciden')
-      return
-    }
-
-    setCargando(true)
-    setError('')
-    try {
-      await restablecerPassword(correo.trim(), codigo.trim(), nuevaPassword)
-      setModo('exito')
-      setPassword('')
-      setCodigo('')
-      setNuevaPassword('')
-      setConfirmarPassword('')
-    } catch (err: unknown) {
-      if (err instanceof ErrorApi && err.status < 500) {
-        setError(err.message || 'El código es incorrecto o ya venció')
-      } else {
-        setError('Algo salió mal...')
-      }
+      setEsBloqueo(err instanceof ErrorApi && err.codigo === 'BLOQUEADA')
+      setError(mensajeErrorLogin(err))
     } finally {
       setCargando(false)
     }
   }
 
   return (
-    <div className="flex min-h-dvh flex-col justify-center bg-niebla/50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="relative isolate flex min-h-dvh flex-col justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
+      {/* El ave de la marca, enorme y casi transparente, asomando por la esquina */}
+      <AveDanelle className="pointer-events-none absolute -bottom-20 -right-6 -z-10 hidden h-[36rem] opacity-[0.09] sm:block lg:right-[10%]" />
+
       <div className="mx-auto w-full max-w-md">
-        
-        {/* Cabecera limpia sin textos adicionales */}
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="h-16 w-16 shadow-sm" textoClassName="text-3xl font-black" />
+          <LogoDanelle className="h-24" />
+          <h1 className="mt-6 text-[2rem] font-semibold leading-tight">Panel de administración</h1>
         </div>
 
         {/* Tarjeta principal */}
-        <div className="rounded-3xl border border-linea bg-papel p-6 shadow-tarjeta sm:p-8">
-          
+        <div className="rounded-[28px] border border-linea bg-papel p-6 shadow-[0_16px_48px_rgba(0,32,20,0.08)] sm:p-8">
+
           {/* MODO 1: LOGIN */}
           {modo === 'login' && (
             <form onSubmit={manejarLogin} className="space-y-5">
@@ -180,7 +104,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                   <button
                     type="button"
                     onClick={() => setVerPassword(!verPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-apagado transition-colors hover:text-tinta"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-apagado transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-marca"
                     aria-label="Ver u ocultar contraseña"
                   >
                     {verPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -191,8 +115,8 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
               <div className="flex items-center justify-end text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={() => { setError(''); setModo('olvido') }}
-                  className="text-azul hover:underline"
+                  onClick={() => { setError(''); setModo('recuperar') }}
+                  className="rounded-md py-1 text-azul hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
@@ -214,7 +138,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
               <button
                 type="submit"
                 disabled={cargando}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white transition-all active:scale-[0.99] active:bg-neutral-800 disabled:opacity-40"
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-colors hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40"
               >
                 {cargando ? (
                   <>
@@ -228,166 +152,19 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
             </form>
           )}
 
-          {/* MODO 2: SOLICITUD DE CÓDIGO */}
-          {modo === 'olvido' && (
-            <form onSubmit={manejarSolicitarCodigo} className="space-y-5">
-              <Campo etiqueta="Correo">
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    placeholder="correo@ejemplo.com"
-                    className={`${claseInput} pl-11`}
-                  />
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
-                </div>
-              </Campo>
-
-              <p className="text-xs text-apagado leading-relaxed">
-                Ingresa tu correo para recibir un código de recuperación de 6 dígitos.
-              </p>
-
-              {error && (
-                <div role="alert" className="flex items-center gap-2.5 rounded-2xl bg-rojo/10 p-3.5 text-sm font-medium text-rojo">
-                  <AlertCircle size={18} className="shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={cargando}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white transition-all active:bg-neutral-800 disabled:opacity-40"
-              >
-                {cargando ? 'Enviando código…' : 'Enviar código'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setError(''); setModo('login') }}
-                className="flex w-full items-center justify-center gap-1.5 py-2 text-sm font-semibold text-apagado hover:text-tinta"
-              >
-                <ArrowLeft size={16} /> Volver a iniciar sesión
-              </button>
-            </form>
-          )}
-
-          {/* MODO 3: CÓDIGO Y NUEVA CONTRASEÑA */}
-          {modo === 'codigo' && (
-            <form onSubmit={manejarRestablecer} className="space-y-5">
-              <div className="rounded-2xl bg-niebla p-3.5 text-xs text-apagado">
-                Código enviado a <strong className="text-tinta">{correo}</strong>. Expira en {minutosVence} minutos.
-              </div>
-
-              <Campo etiqueta="Código de 6 dígitos">
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={codigo}
-                  onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  className={`${claseInput} text-center tracking-[0.5em] text-2xl font-bold`}
-                />
-              </Campo>
-
-              <Campo etiqueta="Nueva contraseña">
-                <div className="relative">
-                  <input
-                    type={verNuevaPassword ? 'text' : 'password'}
-                    required
-                    value={nuevaPassword}
-                    onChange={(e) => setNuevaPassword(e.target.value)}
-                    placeholder="Mínimo 8 caracteres (letras y números)"
-                    className={`${claseInput} pr-11`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setVerNuevaPassword(!verNuevaPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-apagado transition-colors hover:text-tinta"
-                  >
-                    {verNuevaPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </Campo>
-
-              <Campo etiqueta="Confirmar nueva contraseña">
-                <input
-                  type="password"
-                  required
-                  value={confirmarPassword}
-                  onChange={(e) => setConfirmarPassword(e.target.value)}
-                  placeholder="Repite tu nueva contraseña"
-                  className={claseInput}
-                />
-              </Campo>
-
-              {error && (
-                <div role="alert" className="flex items-center gap-2.5 rounded-2xl bg-rojo/10 p-3.5 text-sm font-medium text-rojo">
-                  <AlertCircle size={18} className="shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={cargando}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white transition-all active:bg-neutral-800 disabled:opacity-40"
-              >
-                {cargando ? 'Actualizando contraseña…' : 'Restablecer contraseña'}
-              </button>
-
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => { setError(''); setModo('olvido') }}
-                  className="text-apagado hover:text-tinta"
-                >
-                  Solicitar otro código
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setError(''); setModo('login') }}
-                  className="text-azul hover:underline"
-                >
-                  Cancelar y volver
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* MODO 4: ÉXITO */}
-          {modo === 'exito' && (
-            <div className="py-4 text-center space-y-4">
-              <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-verde/10 text-verde">
-                <CheckCircle2 size={36} />
-              </div>
-              <h3 className="text-xl font-bold tracking-tight text-tinta">¡Contraseña restablecida!</h3>
-              <p className="text-sm text-apagado leading-relaxed">
-                Tu contraseña ha sido actualizada con éxito. Ya puedes iniciar sesión con tu nueva clave.
-              </p>
-              <button
-                onClick={() => { setError(''); setModo('login') }}
-                className="w-full rounded-xl bg-tinta py-3.5 text-base font-semibold text-white active:bg-neutral-800"
-              >
-                Iniciar sesión
-              </button>
-            </div>
+          {/* MODO 2: RECUPERAR CONTRASEÑA (RF-002) */}
+          {modo === 'recuperar' && (
+            <RecuperarPassword correoInicial={correo} onVolver={(c) => { setCorreo(c); setError(''); setModo('login') }} />
           )}
 
         </div>
 
         {/* Enlace sutil para ir a la PWA */}
         {onIrAPwa && (
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             <button
               onClick={onIrAPwa}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-apagado transition-colors hover:text-tinta"
+              className="inline-flex items-center gap-1.5 rounded-md py-1 text-xs font-semibold text-apagado transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
             >
               <ArrowLeft size={14} />
               Ir a la App Móvil de Reparto

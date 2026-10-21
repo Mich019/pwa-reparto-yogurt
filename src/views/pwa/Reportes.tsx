@@ -5,9 +5,8 @@ import {
   agrupacionesPosibles, agrupacionSugerida, cambio, diasDelRango, exportarReporte, mover, rangoDe, TABLAS_CSV, textoPeriodo, textoRango, useReporte,
   type Agrupar, type Formato, type Rango, type Reporte, type TablaCsv, type Vista,
 } from '../../lib/reportes'
-import { aviso, Boton, claseInput, Hoja, Segmentado } from '../../components/ui'
+import { aviso, Boton, claseInput, Hoja, PuntoSabor, Segmentado } from '../../components/ui'
 import { Columnas } from '../../components/graficas'
-import { Insignia } from '../../components/Fruta'
 
 // Reportes del administrador (RF-043 a RF-048): corte del día, comparativos por semana y mes, utilidad por sabor,
 // ranking de sabores, rendimiento de cada vendedor y exportación a Excel o CSV. Los arma el servidor.
@@ -229,7 +228,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
               <div className="mt-2 divide-y divide-linea">
                 {reporte.sabores.map((s, i) => (
                   <div key={s.id} className="flex items-center gap-3 py-3">
-                    <Insignia sabor={s.sabor} color={s.color} size={40} />
+                    <PuntoSabor color={s.color} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="min-w-0 truncate font-semibold">

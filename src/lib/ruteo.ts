@@ -105,16 +105,19 @@ export async function calcularRuta(inicio: Punto, paradas: Parada[]): Promise<Ru
   return ruta
 }
 
-export function ubicacionActual(): Promise<Punto | null> {
+// Posición del GPS y su precisión en metros. `maximoMs`: qué tan vieja puede ser una lectura ya hecha.
+export function posicionActual(maximoMs = 60000): Promise<{ punto: Punto; precision: number } | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null)
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve([p.coords.longitude, p.coords.latitude]),
+      (p) => resolve({ punto: [p.coords.longitude, p.coords.latitude], precision: p.coords.accuracy }),
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: maximoMs },
     )
   })
 }
+
+export const ubicacionActual = async (): Promise<Punto | null> => (await posicionActual())?.punto ?? null
 
 export const enlaceNavegar = (p: Punto) =>
   `https://www.google.com/maps/dir/?api=1&destination=${p[1]},${p[0]}&travelmode=driving`

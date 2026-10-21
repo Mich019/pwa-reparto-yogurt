@@ -3,10 +3,14 @@ const APP = 'app-__VERSION__'
 const MAPA = 'mapa-v1'
 const MAX_MOSAICOS = 3000
 
+// Los archivos de la app (lista generada al compilar). Sólo éstos se guardan en el teléfono: lo demás del mismo
+// dominio (la API, con datos de la cuenta) va siempre a la red y nunca queda en la caché.
+const ARCHIVOS = [...new Set(['./', './index.html', ...self.__ARCHIVOS__, './manifest.webmanifest', './icon.svg'])]
+const PROPIOS = new Set(ARCHIVOS.map((f) => new URL(f, self.location.href).pathname))
+
 self.addEventListener('install', (e) => {
-  // Guarda toda la app (lista generada al compilar) para abrir sin red desde la primera visita.
-  const archivos = self.__ARCHIVOS__
-  e.waitUntil(caches.open(APP).then((c) => c.addAll([...new Set(['./', './index.html', ...archivos, './manifest.webmanifest', './icon.svg'])])))
+  // Guarda toda la app para abrir sin red desde la primera visita.
+  e.waitUntil(caches.open(APP).then((c) => c.addAll(ARCHIVOS)))
   self.skipWaiting()
 })
 
@@ -100,18 +104,25 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== location.origin) return
-  // La API (en Vercel es /api/..., en local /auth, /sync…) siempre va en vivo: lo que responde cambia a cada rato.
-  if (/^\/(api|auth|sync)\//.test(url.pathname)) return
 
-  // Navegación: red primero, si no hay conexión la copia guardada.
+  // Navegación: red primero, si no hay conexión la copia guardada. Sólo una página de la app reemplaza esa copia
+  // (abrir a mano una dirección de la API no debe guardar sus datos ni romper la app sin conexión).
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req)
-        .then((res) => { const copia = res.clone(); caches.open(APP).then((c) => c.put('./index.html', copia)); return res })
+        .then((res) => {
+          if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
+            const copia = res.clone()
+            caches.open(APP).then((c) => c.put('./index.html', copia))
+          }
+          return res
+        })
         .catch(() => caches.match('./index.html')),
     )
     return
   }
+
+  if (!PROPIOS.has(url.pathname)) return
 
   // Archivos de la app (con hash): caché primero. Hay servidores que responden `Vary: Origin` y entonces los módulos
   // (que viajan con Origin) no encontrarían la copia guardada al instalar: aquí el nombre con hash basta.

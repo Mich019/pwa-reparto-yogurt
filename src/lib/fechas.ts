@@ -1,6 +1,7 @@
 import type { Frecuencia } from './db'
 
 export const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+export const DIAS_LARGOS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
 export function iso(d: Date) {
   const m = String(d.getMonth() + 1).padStart(2, '0')

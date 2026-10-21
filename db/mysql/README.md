@@ -19,7 +19,7 @@ Con MySQL Workbench: ejecuta `CREATE DATABASE reparto_yogurt CHARACTER SET utf8m
 | `01_esquema.sql` | 15 tablas, índices, restricciones y triggers |
 | `02_vistas.sql` | Vistas de reportes y el procedimiento de pronóstico |
 | `03_datos_iniciales.sql` | Los 6 sabores con sus colores |
-| `04_datos_demo.sql` | Sólo desarrollo: admin y vendedor (contraseña `Yogurt2026!`), 10 clientes, 4 semanas de historial y la ruta de hoy |
+| `04_datos_demo.sql` | Sólo desarrollo: admin y vendedor (sin contraseña: las genera el servidor con su pepper, como en `db/migrar.ts`), 10 clientes, 4 semanas de historial y la ruta de hoy |
 | `crear_bd.sql` | Crea la base local completa |
 | `crear_bd_nube.sql` | Crea la base vacía en la nube (sólo `01` y `02`) |
 | `importar_datos.sql` | Carga en la nube los datos exportados de la base local |

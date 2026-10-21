@@ -3,8 +3,7 @@ import { ChevronLeft, ChevronRight, ChevronsRight, Copy, RefreshCw, TriangleAler
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { copiarCarga, guardarCarga, guardarProduccion, useDiaStock, type DiaStock } from '../../lib/stock'
-import { Insignia } from '../../components/Fruta'
-import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
+import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
 
 // RF-037 · El administrador registra, para un día, los litros producidos de cada sabor y los que le entrega a cada vendedor
 // al empezar la jornada (y, al cerrar, lo que devuelven). Se hace por internet: el servidor es quien lleva las cuentas.
@@ -102,7 +101,7 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
           <div className="mt-1 divide-y divide-linea">
             {cuentas.filas.map(({ producto, producido, asignado, entregado, libre }) => (
               <div key={producto.id} className="flex items-center gap-3 py-3" data-sabor={producto.sabor}>
-                <Insignia sabor={producto.sabor} color={producto.color} size={40} />
+                <PuntoSabor color={producto.color} className="h-5 w-5" />
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold">{producto.sabor}</div>
                   <div className="text-xs text-apagado">
@@ -183,11 +182,11 @@ function Fila({ producto, children, nota }: { producto: Sabores[number]; childre
   return (
     <div className="py-3">
       <div className="flex items-center gap-3">
-        <Insignia sabor={producto.sabor} color={producto.color} size={36} />
+        <PuntoSabor color={producto.color} className="h-5 w-5" />
         <div className="min-w-0 flex-1 truncate font-semibold">{producto.sabor}</div>
         <div className="flex shrink-0 items-center gap-2">{children}</div>
       </div>
-      {nota && <div className="mt-1 pl-12 text-xs text-apagado">{nota}</div>}
+      {nota && <div className="mt-1 pl-8 text-xs text-apagado">{nota}</div>}
     </div>
   )
 }

@@ -31,6 +31,8 @@ export interface Cliente {
 export interface Producto {
   id: string
   sabor: string
+  descripcion?: string
+  presentacion?: number // litros por envase (RF-032); sin dato, 1 L. Se fija al crear el sabor.
   precio_litro: number
   costo_litro: number
   color_hex: string
@@ -186,16 +188,6 @@ export async function borrar(tabla: Tabla, id: string) {
     const previo = await db.table(tabla).get(id)
     await db.table(tabla).delete(id)
     await encolar(tabla, id, 'delete', previo?.version)
-  })
-}
-
-export async function borrarVarios(tabla: Tabla, ids: string[]) {
-  await db.transaction('rw', db.table(tabla), db.cola, async () => {
-    for (const id of ids) {
-      const previo = await db.table(tabla).get(id)
-      await db.table(tabla).delete(id)
-      await encolar(tabla, id, 'delete', previo?.version)
-    }
   })
 }
 

@@ -5,17 +5,24 @@ import { ChevronRight, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plu
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
-import { DIAS_CORTOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
+import { DIAS_CORTOS, DIAS_LARGOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
-import { IconoSabor } from '../../components/Fruta'
-import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
+import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
+
+const sinAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+// Lo que encuentra el buscador (RF-011): nombre, teléfono, dirección (con su colonia), días o cada cuánto se le surte, y horario.
+function textoBusqueda(c: Cliente) {
+  const dias = c.frecuencia.tipo === 'semana' ? c.frecuencia.dias.map((d) => DIAS_LARGOS[d]).join(' ') : ''
+  return sinAcentos(`${c.nombre} ${c.telefono} ${c.telefono.replace(/\D/g, '')} ${c.direccion} ${textoFrecuencia(c.frecuencia)} ${dias} ${c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}`)
+}
 
 export function Clientes() {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), []) ?? []
@@ -53,10 +60,8 @@ export function Clientes() {
     return prod.get([...s.sabores.entries()].sort((a, b) => b[1] - a[1])[0][0])
   }
 
-  const t = q.trim().toLowerCase()
-  const lista = clientes.filter(
-    (c) => c.activo !== verInactivos && (!t || `${c.nombre} ${c.telefono} ${c.direccion}`.toLowerCase().includes(t)),
-  )
+  const t = sinAcentos(q.trim())
+  const lista = clientes.filter((c) => c.activo !== verInactivos && (!t || textoBusqueda(c).includes(t)))
   const perfil = clientes.find((c) => c.id === perfilId)
 
   return (
@@ -78,7 +83,7 @@ export function Clientes() {
         </div>
         <div className="relative mt-4">
           <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono o calle" className={`${claseInput} pl-11`} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono, colonia o día" className={`${claseInput} pl-11`} />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28">
@@ -99,7 +104,8 @@ export function Clientes() {
                 <div className="truncate text-base leading-5 font-semibold">{c.nombre}</div>
                 <div className="mt-0.5 truncate text-sm text-apagado">
                   {textoFrecuencia(c.frecuencia)} · {c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}
-                  {fav && <span className="inline-flex items-center gap-1 align-middle"> · <IconoSabor sabor={fav.sabor} size={15} /> {fav.sabor}</span>}
+                  {/* En línea con el texto: si no cabe, se recorta el nombre del sabor y no desaparece entero. */}
+                  {fav && <> · <PuntoSabor color={fav.color_hex} className="h-2.5 w-2.5 align-middle" /> {fav.sabor}</>}
                 </div>
               </div>
               {s?.proximo && <div className="rounded-full bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
@@ -112,7 +118,6 @@ export function Clientes() {
         <Plus size={30} />
       </button>
 
-      {form && <FormCliente cliente={form === 'nuevo' ? undefined : form} onCerrar={() => setForm(null)} />}
       {imprimir && <ImpresionMasiva clientes={clientes} onCerrar={() => setImprimir(false)} />}
       {escaner && (
         <Suspense fallback={null}>
@@ -124,12 +129,14 @@ export function Clientes() {
           cliente={perfil}
           pedidos={pedidos.filter((p) => p.clienteId === perfil.id)}
           litros={stats.get(perfil.id)?.litros ?? 0}
-          favorito={favorito(perfil.id)?.sabor}
+          favorito={favorito(perfil.id)}
           sabor={(id) => prod.get(id)}
           onCerrar={() => setPerfilId(null)}
           onEditar={() => setForm(perfil)}
         />
       )}
+      {/* Después del perfil: al editar desde él, el formulario queda encima y no detrás. */}
+      {form && <FormCliente cliente={form === 'nuevo' ? undefined : form} onCerrar={() => setForm(null)} />}
     </div>
   )
 }
@@ -138,7 +145,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
   cliente: Cliente
   pedidos: Pedido[]
   litros: number
-  favorito?: string
+  favorito?: { sabor: string; color_hex: string }
   sabor: (id: string) => { sabor: string; color_hex: string } | undefined
   onCerrar: () => void
   onEditar: () => void
@@ -166,7 +173,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
         <div className="text-sm text-apagado">{cliente.direccion} · {textoFrecuencia(cliente.frecuencia)} · {cliente.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <Dato valor={`${litros} L`} etiqueta="Consumidos" />
-          <Dato valor={favorito ?? '—'} etiqueta="Favorito" icono={favorito ? <IconoSabor sabor={favorito} size={13} className="inline" /> : <Star size={12} className="inline" />} />
+          <Dato valor={favorito?.sabor ?? '—'} etiqueta="Favorito" icono={favorito ? <PuntoSabor color={favorito.color_hex} className="h-2.5 w-2.5 align-[-1px]" /> : <Star size={12} className="inline" />} />
           <Dato valor={ultima ? textoFecha(ultima.fecha) : '—'} etiqueta="Última visita" />
         </div>
         <div className="grid grid-cols-5 gap-1">
@@ -241,7 +248,7 @@ function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => {
       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
         {p.items.map((i) => (
           <span key={i.productoId} className="flex items-center gap-1 text-xs">
-            <IconoSabor sabor={sabor(i.productoId)?.sabor ?? ''} size={15} />
+            <PuntoSabor color={sabor(i.productoId)?.color_hex} className="h-3 w-3" />
             {i.litros}L {sabor(i.productoId)?.sabor}
           </span>
         ))}

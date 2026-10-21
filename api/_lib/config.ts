@@ -44,20 +44,47 @@ function leerZona(): string {
   return zona
 }
 
+// RF-004: pepper de las contraseñas (ver contrasenas.ts). Sin valor por defecto: sin AUTH_PEPPER_SECRET la API no arranca.
+// Para rotarlo sin dejar a nadie fuera, el de antes va en AUTH_PEPPER_ANTERIOR mientras la gente vuelve a entrar.
+function leerPimienta(jwtSecret: string) {
+  const pimienta = process.env.AUTH_PEPPER_SECRET?.trim() ?? ''
+  if (!pimienta) throw new Error('Falta la variable de entorno AUTH_PEPPER_SECRET (ver .env.example): genera una con  openssl rand -hex 32')
+  if (pimienta.length < 32) throw new Error('AUTH_PEPPER_SECRET debe tener al menos 32 caracteres aleatorios')
+  if (pimienta === jwtSecret) throw new Error('AUTH_PEPPER_SECRET y JWT_SECRET deben ser distintos')
+  const pimientaAnterior = process.env.AUTH_PEPPER_ANTERIOR?.trim() || null // sólo verifica, nunca se usa para guardar
+  return { pimienta, pimientaAnterior }
+}
+
+// Detrás de un proxy, cuántos saltos se le creen a X-Forwarded-For para saber la IP real (límites de intentos).
+// Sólo el del proxy propio: lo que el visitante mande en esa cabecera se puede inventar.
+function leerProxy(): number | false {
+  const v = process.env.TRUST_PROXY ?? ''
+  if (/^\d+$/.test(v)) return Number(v) || false
+  return v === 'true' || process.env.VERCEL ? 1 : false
+}
+
 export function leerConfig() {
   const jwtSecret = requerido('JWT_SECRET')
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET debe tener al menos 32 caracteres')
-  const produccion = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+  // En Vercel cuenta como producción también la vista previa: es pública y no debe escribir códigos en el registro.
+  const produccion = process.env.NODE_ENV === 'production' || !!process.env.VERCEL
+  const prueba = process.env.NODE_ENV === 'test'
   return {
     port: Number(process.env.PORT ?? 3000),
     conexion: leerConexion(),
     jwtSecret,
+    ...leerPimienta(jwtSecret),
     corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',').map((s) => s.trim()).filter(Boolean),
-    trustProxy: process.env.TRUST_PROXY === 'true' || !!process.env.VERCEL,
-    sinLimiteDePeticiones: process.env.NODE_ENV === 'test', // las pruebas inician sesión decenas de veces desde la misma IP
+    trustProxy: leerProxy(),
+    enVercel: !!process.env.VERCEL,
+    sinLimiteDePeticiones: prueba, // las pruebas inician sesión decenas de veces desde la misma IP (los límites de la base sí aplican)
     accesoMinutos: 15,
     sesionDias: 30,
-    maxIntentos: 5, // RF-003
+    // RF-003: tras 5 intentos fallidos seguidos con una cuenta desde una misma conexión, esa conexión espera 15 min
+    // para esa cuenta; y una conexión con 15 fallidos (cualquier cuenta) espera también. Así nadie puede dejar fuera
+    // al dueño de la cuenta desde otro lado, ni probar contraseñas en muchas cuentas.
+    maxIntentos: 5,
+    maxIntentosIp: 15,
     bloqueoMinutos: 15,
     // RF-002: recuperación por correo con Resend. Sin RESEND_API_KEY, fuera de producción el código sale en la consola.
     produccion,
@@ -65,6 +92,9 @@ export function leerConfig() {
     correoRemitente: process.env.MAIL_FROM ?? 'Reparto Yogurt <onboarding@resend.dev>',
     recuperacionMinutos: 15,
     recuperacionMaxIntentos: 5,
+    recuperacionPorHoraCuenta: 3, // códigos por cuenta y por hora; pasado el tope no se manda otro (sin decirlo)
+    recuperacionPorHoraIp: 10,
+    recuperacionPisoMs: prueba ? 300 : 2000, // /auth/recuperar tarda siempre lo mismo: el tiempo no dice si el correo existe
     // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.
     ...leerPush(),
     // Para saber cuál es «hoy» al avisar de cambios en la ruta del día.

@@ -13,25 +13,26 @@ npm run preview    # sirve dist/ para probar el modo sin internet
 
 La carpeta `dist/` ya compilada se puede subir tal cual a cualquier hosting estático con HTTPS (Netlify, Vercel, GitHub Pages, Cloudflare Pages). El GPS y la instalación como app requieren HTTPS.
 
-En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clientes de prueba alrededor de tu ubicación con 4 semanas de historial. Se borran en **Sabores → Borrar clientes y pedidos**.
+En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo** carga 10 clientes de prueba alrededor de tu ubicación con 4 semanas de historial. Se borran en **Sabores → Borrar clientes y pedidos**. Los dos botones sólo aparecen sin servidor: con servidor, los clientes de ejemplo se subirían como reales y el borrado quitaría del servidor los de toda la empresa. Para probar con servidor están los datos de `npm run db:migrar -- --demo`.
 
 ## Qué hace
 
 | Pantalla | Contenido |
 |---|---|
-| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total y **Pedido Realizado**, y una franja con el avance del día. Cada sabor lleva el ícono de su fruta. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
-| Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. |
-| Selector | Tarjetas por sabor con su color, botones grandes − / + por litro, subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
-| Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
+| Ruta | Mapa MapLibre en 3D, gris claro como el de Uber (edificios extruidos, vista inclinada, botón 2D/3D). Ruta óptima por calles reales con OSRM en azul, primero clientes de mañana y luego de tarde. Pines negros numerados por parada. Hoja inferior con cliente, sabores, total, forma de pago (vuelve a efectivo en cada parada) y **Pedido Realizado**, y una franja con el avance del día. Cada sabor se reconoce por su color. Navegar (Google Maps), llamar, WhatsApp, editar, omitir y reprogramar. |
+| Post-entrega | Realizar nuevo pedido (igual que el anterior o desde cero) · Recordar más tarde (campana con WhatsApp prellenado) · Cerrar. Al cerrar, la ruta se recalcula desde tu posición. Si la ubicación guardada del cliente queda lejos de donde se entregó, ofrece guardarla ahí con un toque. |
+| Selector | Tarjetas por sabor con su color arriba y una franja azul marino con nombre, precio y subtotal; botones grandes − / + por envase (1 L si el sabor no dice otra cosa), subtotal y total en vivo, fecha sugerida según la frecuencia del cliente. |
+| Clientes | Alta con GPS y ajuste en mapa, frecuencia (días fijos o cada N días), horario mañana/tarde, búsqueda por nombre, teléfono, colonia, día de visita u horario, perfil con litros consumidos, sabor favorito, historial y pedidos agendados, archivar. |
 | Producción | Litros por sabor para los próximos 7 días = pedidos agendados + estimado por historial de clientes a los que les toca visita. Ventas de hoy / 7 / 30 días, ganancia neta, más y menos vendido. Con servidor, el administrador también ve aquí **Stock del día** (ver abajo). |
 | Stock | Sólo vendedor y sólo con servidor. Su carga del día, lo que ha entregado y lo que le queda de cada sabor, aunque no tenga señal. |
-| Sabores | Alta/edición de sabores, precio y costo por litro, color, disponible sí/no. Respaldo y restauración en JSON. |
+| Sabores | Alta/edición de sabores con descripción, presentación (litros por envase, se elige al crearlo), precio y costo por litro, color, disponible sí/no. Respaldo y restauración en JSON. Con servidor está en el panel `/admin`; sin servidor, en la propia app junto con Producción. |
 | Reportes | Sólo administrador y sólo con servidor. Corte del día, comparativos por semana y mes, utilidad por sabor, ranking, rendimiento por vendedor y exportación a Excel o CSV (ver abajo). |
 | Equipo | Sólo administrador y sólo con servidor. Altas, ediciones y bajas de cuentas, contraseña temporal, y pasar clientes de un vendedor a otro (ver abajo). |
 
 ## Técnico
 
-- Diseño estilo Uber, limpio: fondo blanco, botones negros, tarjetas grises suaves y azul sólo para la ruta. Colores definidos en `src/index.css` (`@theme`). Los íconos de fruta de cada sabor están en `src/components/Fruta.tsx` y se eligen solos por el nombre del sabor (fresa, durazno, mango, nuez, zarzamora, plátano…); un sabor sin fruta conocida usa un vasito de yogurt. Tipografía Inter (licencia OFL en `src/fonts/`), incluida en la app para que se vea igual sin internet.
+- Diseño estilo Uber, limpio: fondo blanco, botones negros, tarjetas grises suaves y azul sólo para la ruta. Colores definidos en `src/index.css` (`@theme`). Cada sabor se identifica por el color que se le elige en Sabores: el selector usa tarjetas de ese color con una franja azul marino (`--color-marino`), y en la ruta, clientes, stock, producción y reportes un punto del mismo color (`PuntoSabor` en `src/components/ui.tsx`). Tipografía Inter (licencia OFL en `src/fonts/`), incluida en la app para que se vea igual sin internet.
+- El panel `/admin` tiene su propio diseño: fondo crema, tarjetas beige y los colores del logo de Danelle (verde `#035d38`, amarillo `#f9dc07`). El tema vive en `src/views/admin/tema.css` y se activa con la clase `.tema-admin`, que `App.tsx` pone sólo en el panel: la app del vendedor no cambia. Equipo, Clientes, Producción y Reportes son las mismas pantallas de la app de reparto, ya con esos colores; Resumen y Sabores son propias y muestran cada sabor como un producto (su envase pintado del color del sabor, ventas de 30 días, margen y 12 meses en la ficha que se abre al tocarlo). Títulos y cifras grandes en Bricolage Grotesque (licencia OFL en `src/fonts/`). El logo y el ave (`src/assets/`) son los de la marca, recortados de los SVG originales, que eran una imagen de mapa de bits de 380 KB dentro de un SVG. Los gráficos del panel (`src/views/admin/graficas.tsx`) llevan una sola serie en verde, el periodo en curso en dorado, tooltip, rejilla fina y una tabla equivalente con el botón «Tabla».
 
 - Vite + React 19 + TypeScript + Tailwind 4. Mapa: `maplibre-gl` con estilo libre de OpenFreeMap (sin llave).
 - Datos en IndexedDB con Dexie (`src/lib/db.ts`). Cada cambio queda también en la tabla `cola` para sincronizar con un servidor cuando exista.
@@ -42,7 +43,9 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Ejemplo** carga 10 clien
 
 ## Servidor
 
-La API (`server/`, ver [su README](server/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. Se activa compilando con `VITE_API_URL`; sin esa variable la app sigue siendo sólo local. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
+La API (`api/`, ver [su README](api/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. La app usa el servidor por omisión: llama a `/api`, o a `VITE_API_URL` si la API vive en otro dominio (variables en [`.env.example`](.env.example)). Con `VITE_OFFLINE_SOLO=true` es sólo local y sin cuentas. El administrador trabaja en el panel `/admin`. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
+
+Las medidas de seguridad (contraseñas con pepper, límites de intentos por conexión, recuperación que no revela cuentas, cabeceras y política de contenido de la app) están en [`api/README.md`](api/README.md#seguridad).
 
 ## Equipo y cartera
 
@@ -93,4 +96,5 @@ Los avisos de stock y de ventas se generan **en el teléfono**, así que funcion
 
 ## Pendiente (siguientes pasos)
 
-- Recuperación de contraseña por correo (RF-002), cierre de sesión que no dependa de la señal.
+- Cierre de sesión que no dependa de la señal.
+- Sincronizar con la app cerrada (RF-052): hoy el service worker despierta a la app al volver la señal y es la app la que envía la cola; con la app cerrada, se envía al abrirla.

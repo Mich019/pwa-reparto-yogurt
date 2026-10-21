@@ -6,14 +6,14 @@ import { ErrorApi, ErrorRed } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
 import { hace } from '../../lib/fechas'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, useEstadoPush } from '../../lib/push'
-import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, useSesion } from '../../lib/sesion'
+import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
 
 export function FormPassword({ onListo }: { onListo?: () => void }) {
-  const [actual, setActual] = useState(() => obtenerUltimoPassword() ?? '')
+  const [actual, setActual] = useState(() => (sesionActual()?.usuario.debeCambiarPassword ? obtenerUltimoPassword() : null) ?? '')
   const [nueva, setNueva] = useState('')
   const [repetir, setRepetir] = useState('')
   const [verActual, setVerActual] = useState(false)
@@ -27,8 +27,8 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
     const nue = nueva.trim()
     const rep = repetir.trim()
     if (!act) return setError('Ingresa tu contraseña actual o temporal')
-    if (nue.length < 8 || !/[A-Za-z]/.test(nue) || !/\d/.test(nue)) {
-      return setError('La nueva contraseña debe tener al menos 8 caracteres, con letras y números')
+    if (nue.length < 10 || !/[A-Za-z]/.test(nue) || !/\d/.test(nue)) {
+      return setError('La nueva contraseña debe tener al menos 10 caracteres, con letras y números')
     }
     if (nue !== rep) return setError('Las contraseñas nuevas no coinciden')
     if (act === nue) return setError('La nueva contraseña debe ser diferente a la actual')
@@ -69,7 +69,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
         </div>
       </Campo>
 
-      <Campo etiqueta="Contraseña nueva (mínimo 8 caract., letras y números)">
+      <Campo etiqueta="Contraseña nueva (mínimo 10 caract., letras y números)">
         <div className="relative">
           <input
             className={`${claseInput} pr-10`}

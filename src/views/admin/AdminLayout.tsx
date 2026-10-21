@@ -1,55 +1,103 @@
-import { useState } from 'react'
-import {
-  BarChart3,
-  ChartLine,
-  IceCreamBowl,
-  LayoutDashboard,
-  LogOut,
-  MapPin,
-  Shield,
-  ShieldAlert,
-  Smartphone,
-  Users
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BarChart3, ChartLine, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, ShieldAlert, Smartphone, Users } from 'lucide-react'
+import { hace } from '../../lib/fechas'
 import { cerrarSesion, useSesion } from '../../lib/sesion'
-import { Logo } from '../../components/Logo'
+import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
+import { AdminSabores } from './AdminSabores'
+import { LogoDanelle } from './marca'
 import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
-import { Ajustes } from '../pwa/Ajustes'
 import { Reportes } from '../pwa/Reportes'
 
-type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes'
+export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes'
+
+const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
+  { id: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
+  { id: 'equipo', texto: 'Vendedores', icono: Users },
+  { id: 'clientes', texto: 'Clientes', icono: MapPin },
+  { id: 'produccion', texto: 'Producción', icono: BarChart3 },
+  { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl },
+  { id: 'reportes', texto: 'Reportes', icono: ChartLine },
+]
+
+// La sección abierta sobrevive a recargar la página (sólo en esta pestaña del navegador).
+const CLAVE_SECCION = 'admin-seccion'
+function seccionGuardada(): SeccionAdmin {
+  try {
+    const s = sessionStorage.getItem(CLAVE_SECCION)
+    return PESTANAS.find((p) => p.id === s)?.id ?? 'resumen'
+  } catch {
+    return 'resumen'
+  }
+}
+
+const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
+// Los botones del encabezado son píldoras blancas con borde fino: sobre el crema sin borde casi no se distinguen.
+const pildora = 'border border-linea/70 bg-papel'
+
+// Estado de la copia local contra el servidor. Con poco espacio queda el punto de color y el texto va en el tooltip.
+function EstadoDatos() {
+  const sync = useEstadoSync()
+  const hayError = !!sync.error
+  const corto = hayError ? (sync.error!.startsWith('Sin conexión') ? 'Sin conexión' : 'Sin sincronizar')
+    : sync.sincronizando ? 'Sincronizando'
+    : sync.ultimaOk ? 'Al día'
+    : 'Esperando datos'
+  const largo = sync.error ?? (sync.sincronizando ? 'Sincronizando…' : sync.ultimaOk ? `Datos al día, ${hace(sync.ultimaOk)}` : 'Esperando la primera sincronización')
+  const alDia = !hayError && !sync.sincronizando && sync.ultimaOk
+  return (
+    // En el teléfono, con todo en orden el punto sobra: el aviso sólo aparece cuando sincroniza o algo falla.
+    <p title={largo} aria-live="polite" className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-xs font-medium text-apagado ${pildora} ${alDia ? 'max-sm:hidden' : ''}`}>
+      {hayError ? <CloudOff size={15} className="shrink-0 text-amber-600" aria-hidden="true" />
+        : sync.sincronizando ? <RefreshCw size={14} className="shrink-0 animate-spin" aria-hidden="true" />
+        : <span className={`h-2 w-2 shrink-0 rounded-full ${alDia ? 'bg-serie' : 'bg-linea'}`} aria-hidden="true" />}
+      <span className="hidden sm:inline">{corto}</span>
+      <span className="sr-only sm:hidden">{largo}</span>
+    </p>
+  )
+}
 
 export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const sesion = useSesion()
-  const [seccion, setSeccion] = useState<SeccionAdmin>('resumen')
+  const [seccion, setSeccionEstado] = useState<SeccionAdmin>(seccionGuardada)
   const [cerrando, setCerrando] = useState(false)
+  const esAdmin = sesion?.usuario.rol === 'administrador'
 
-  // Control de Acceso por Rol (RBAC): Sólo Administradores
+  // Clientes, sabores y producción se leen de la copia local: sin esto el panel abierto directo en /admin se queda
+  // vacío y lo que se edita aquí no llega al servidor hasta abrir la app de reparto.
+  useEffect(() => (esAdmin ? iniciarSincronizacionAutomatica() : undefined), [esAdmin])
+
+  function setSeccion(s: SeccionAdmin) {
+    setSeccionEstado(s)
+    try { sessionStorage.setItem(CLAVE_SECCION, s) } catch { /* sin almacenamiento: sólo no se recuerda */ }
+  }
+
+  // Sólo administradores. El servidor también lo exige en cada llamada; esto evita mostrar un panel que no funcionaría.
   if (sesion && sesion.usuario.rol !== 'administrador') {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-papel px-6 text-center">
-        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-rojo/10 text-rojo">
-          <ShieldAlert size={36} />
+      <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10 text-center">
+        <LogoDanelle className="h-16" />
+        <div className="mt-10 grid h-14 w-14 place-items-center rounded-full bg-rojo/10 text-rojo">
+          <ShieldAlert size={28} aria-hidden="true" />
         </div>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight text-tinta">Acceso Restringido</h1>
-        <p className="mt-2 max-w-md text-sm text-apagado leading-relaxed">
-          Esta cuenta tiene rol de <strong className="text-tinta">Vendedor</strong>. El Panel de Administración es de acceso exclusivo para administradores.
+        <h1 className="mt-4 text-3xl font-semibold">Esta cuenta es de vendedor</h1>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-apagado">
+          El panel es sólo para administradores. Tu ruta y tus clientes están en la app de reparto.
         </p>
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+        <div className="mt-7 flex w-full max-w-xs flex-col gap-3 sm:max-w-sm sm:flex-row">
           {onIrAPwa && (
             <button
               onClick={onIrAPwa}
-              className="flex-1 rounded-xl bg-tinta py-3.5 text-sm font-semibold text-white transition-all active:bg-neutral-800"
+              className={`flex-1 rounded-full bg-tinta py-3.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro ${anillo}`}
             >
-              Ir a la App de Reparto
+              Ir a la app de reparto
             </button>
           )}
           <button
             onClick={() => void cerrarSesion()}
-            className="flex-1 rounded-xl bg-niebla py-3.5 text-sm font-semibold text-tinta transition-all hover:bg-linea"
+            className={`flex-1 rounded-full border border-linea bg-papel py-3.5 text-sm font-semibold text-tinta transition-colors hover:bg-niebla ${anillo}`}
           >
             Cerrar sesión
           </button>
@@ -67,115 +115,114 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
     }
   }
 
-  const pestanas = [
-    { id: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
-    { id: 'equipo', texto: 'Vendedores', icono: Users },
-    { id: 'clientes', texto: 'Clientes', icono: MapPin },
-    { id: 'produccion', texto: 'Producción', icono: BarChart3 },
-    { id: 'sabores', texto: 'Sabores y Precios', icono: IceCreamBowl },
-    { id: 'reportes', texto: 'Reportes', icono: ChartLine },
-  ] as const
-
   return (
-    <div className="flex h-dvh flex-col bg-papel text-tinta antialiased">
-      {/* Barra superior de navegación */}
-      <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-linea bg-papel px-4 sm:px-6">
-        <div className="flex items-center gap-4">
-          <Logo className="h-9 w-9" textoClassName="text-lg font-bold" />
-          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-niebla px-3 py-1 text-xs font-semibold text-tinta">
-            <Shield size={12} className="text-azul" />
-            Administrador
-          </span>
-        </div>
-
-        {/* Info usuario y acciones */}
-        <div className="flex items-center gap-3">
-          {onIrAPwa && (
-            <button
-              onClick={onIrAPwa}
-              title="Abrir vista PWA móvil"
-              className="hidden md:flex items-center gap-1.5 rounded-xl border border-linea px-3 py-2 text-xs font-semibold text-tinta transition-colors hover:bg-niebla"
-            >
-              <Smartphone size={14} />
-              App de Reparto
-            </button>
-          )}
-
-          <div className="flex items-center gap-2.5 rounded-2xl bg-niebla px-3.5 py-1.5 text-left">
-            <div className="grid h-7 w-7 place-items-center rounded-full bg-tinta text-xs font-bold text-white">
-              {sesion?.usuario.nombre.charAt(0) ?? 'A'}
-            </div>
-            <div className="hidden sm:block">
-              <div className="text-xs font-semibold leading-tight">{sesion?.usuario.nombre ?? 'Administrador'}</div>
-              <div className="text-[10px] text-apagado leading-tight">{sesion?.usuario.correo ?? ''}</div>
-            </div>
-          </div>
-
+    <div className="flex h-dvh flex-col text-tinta antialiased">
+      <header className="z-20 flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8 lg:pb-4 lg:pt-4">
+        <div className="flex flex-1 items-center">
           <button
-            onClick={manejarCerrarSesion}
-            disabled={cerrando}
-            title="Cerrar sesión"
-            className="grid h-10 w-10 place-items-center rounded-xl bg-niebla text-tinta transition-colors hover:bg-rojo/10 hover:text-rojo active:bg-linea disabled:opacity-40"
+            type="button"
+            onClick={() => setSeccion('resumen')}
+            aria-label="Ir al resumen"
+            className={`rounded-xl ${anillo}`}
           >
-            <LogOut size={18} />
+            <LogoDanelle className="h-11 lg:h-14" />
           </button>
         </div>
-      </header>
 
-      {/* Contenedor principal con sidebar */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Barra lateral en escritorio */}
-        <nav className="hidden lg:flex w-64 flex-col border-r border-linea bg-papel p-4 space-y-1">
-          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-apagado">
-            Módulos del Sistema
-          </div>
-          {pestanas.map(({ id, texto, icono: Icono }) => {
+        <nav aria-label="Secciones del panel" className="hidden shrink-0 items-center gap-1.5 lg:flex">
+          {PESTANAS.map(({ id, texto }) => {
             const activa = seccion === id
             return (
               <button
                 key={id}
-                onClick={() => setSeccion(id as SeccionAdmin)}
-                className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold transition-colors ${
-                  activa ? 'bg-tinta text-white' : 'text-tinta hover:bg-niebla'
+                type="button"
+                onClick={() => setSeccion(id)}
+                aria-current={activa ? 'page' : undefined}
+                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${anillo} ${
+                  activa ? 'bg-tinta text-white' : `${pildora} text-tinta hover:bg-niebla`
                 }`}
               >
-                <Icono size={18} />
-                <span>{texto}</span>
+                {texto}
               </button>
             )
           })}
         </nav>
 
-        {/* Área de contenido del panel */}
-        <main className="flex-1 overflow-y-auto">
-          {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
-          {seccion === 'equipo' && <div className="p-4 sm:p-6"><Equipo /></div>}
-          {seccion === 'clientes' && <div className="p-4 sm:p-6"><Clientes /></div>}
-          {seccion === 'produccion' && <div className="p-4 sm:p-6"><Produccion /></div>}
-          {seccion === 'sabores' && <div className="p-4 sm:p-6"><Ajustes /></div>}
-          {seccion === 'reportes' && <div className="p-4 sm:p-6"><Reportes /></div>}
-        </main>
-      </div>
-
-      {/* Barra inferior en pantallas móviles */}
-      <nav className="lg:hidden z-30 grid grid-cols-6 border-t border-linea bg-papel pb-safe">
-        {pestanas.map(({ id, texto, icono: Icono }) => {
-          const activa = seccion === id
-          return (
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <EstadoDatos />
+          {onIrAPwa && (
             <button
-              key={id}
-              onClick={() => setSeccion(id as SeccionAdmin)}
-              className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[10px] ${
-                activa ? 'font-semibold text-tinta' : 'font-medium text-apagado'
-              }`}
+              type="button"
+              onClick={onIrAPwa}
+              aria-label="Abrir la app de reparto"
+              title="Abrir la app de reparto"
+              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm font-semibold text-tinta transition-colors hover:bg-niebla xl:px-4 ${pildora} ${anillo}`}
             >
-              <span className={`grid h-7 w-12 place-items-center rounded-full transition-colors ${activa ? 'bg-niebla' : ''}`}>
-                <Icono size={18} strokeWidth={activa ? 2.3 : 1.8} />
-              </span>
-              <span className="truncate max-w-[50px]">{texto}</span>
+              <Smartphone size={17} aria-hidden="true" />
+              <span className="hidden xl:inline">App de reparto</span>
             </button>
-          )
-        })}
+          )}
+          <span
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-semibold text-white"
+            title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : undefined}
+            aria-hidden="true"
+          >
+            {sesion?.usuario.nombre.charAt(0).toUpperCase() ?? 'A'}
+          </span>
+          <button
+            type="button"
+            onClick={manejarCerrarSesion}
+            disabled={cerrando}
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:bg-rojo/10 hover:text-rojo disabled:opacity-40 ${pildora} ${anillo}`}
+          >
+            <LogOut size={17} aria-hidden="true" />
+          </button>
+        </div>
+      </header>
+
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        {/* Abajo queda sitio para la barra flotante del teléfono */}
+        <div className="pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-12">
+          {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
+          {seccion === 'sabores' && <AdminSabores />}
+          {(seccion === 'equipo' || seccion === 'clientes' || seccion === 'produccion' || seccion === 'reportes') && (
+            // Estas cuatro son las pantallas de la app de reparto, que traen su propio margen interior de 16 px.
+            <div className="mx-auto max-w-[1100px] px-0 pt-2 sm:px-4">
+              {seccion === 'equipo' && <Equipo />}
+              {seccion === 'clientes' && <Clientes />}
+              {seccion === 'produccion' && <Produccion />}
+              {seccion === 'reportes' && <Reportes />}
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono */}
+      <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+        <ul className="pointer-events-auto flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel/90 p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.16)] backdrop-blur-xl">
+          {PESTANAS.map(({ id, texto, icono: Icono }) => {
+            const activa = seccion === id
+            return (
+              <li key={id} className={activa ? 'min-w-0 flex-1' : 'shrink-0'}>
+                <button
+                  type="button"
+                  onClick={() => setSeccion(id)}
+                  aria-label={texto}
+                  aria-current={activa ? 'page' : undefined}
+                  title={texto}
+                  className={`flex h-11 items-center justify-center gap-2 rounded-full transition-colors ${anillo} ${
+                    activa ? 'w-full bg-tinta px-3 text-white' : 'w-11 text-apagado hover:bg-niebla max-[380px]:w-10'
+                  }`}
+                >
+                  <Icono size={20} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
+                  {activa && <span className="truncate text-[13px] font-semibold">{texto}</span>}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       </nav>
     </div>
   )

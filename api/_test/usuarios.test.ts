@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import type { FastifyInstance } from 'fastify'
-import { PASSWORD, app, cliente, crearUsuario, db, enBaseAislada, login, op, pedido, pull, push, sabores, sesion } from './ayuda.js'
+import { PASSWORD, app, cliente, crearUsuario, db, enBaseAislada, ipAleatoria, login, op, pedido, pull, push, sabores, sesion } from './ayuda.js'
 
 after(async () => { await app.close(); await db.end() })
 
@@ -132,8 +132,11 @@ describe('altas, cambios y bajas de cuentas (RF-038 a RF-040)', () => {
   it('el restablecimiento cierra sus sesiones, anula la contraseña vieja y quita el bloqueo', async () => {
     const admin = await sesion('administrador')
     const vend = await sesion('vendedor')
-    await db.query(`UPDATE usuarios SET bloqueado_hasta = now() + interval '10 minutes', intentos_fallidos = 3 WHERE id_usuario = $1`, [vend.id])
-    assert.equal((await login(vend.correo)).status, 423)
+    const suTelefono = ipAleatoria()
+    for (let i = 0; i < 5; i++) await login(vend.correo, 'olvide-la-1', 'x', suTelefono) // se le olvidó y se bloqueó
+    assert.equal((await login(vend.correo, PASSWORD, 'x', suTelefono)).status, 429)
+    const lista = await llamar(admin, 'GET', '/usuarios')
+    assert.ok(lista.body.usuarios.find((u: { id: string }) => u.id === vend.id).bloqueadoHasta) // el administrador ve por qué
 
     const r = await llamar(admin, 'POST', `/usuarios/${vend.id}/password`)
     assert.equal(r.status, 200)
@@ -141,7 +144,7 @@ describe('altas, cambios y bajas de cuentas (RF-038 a RF-040)', () => {
 
     assert.equal((await llamar(vend, 'GET', '/me')).status, 401) // su sesión de antes ya no sirve
     assert.equal((await login(vend.correo, PASSWORD)).status, 401)
-    const entra = await login(vend.correo, r.body.passwordTemporal)
+    const entra = await login(vend.correo, r.body.passwordTemporal, 'x', suTelefono) // desde el mismo teléfono, ya sin esperar
     assert.equal(entra.status, 200)
     assert.equal(entra.body.usuario.debeCambiarPassword, true)
 

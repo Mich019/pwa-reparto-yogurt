@@ -1,7 +1,7 @@
 // Crea un administrador con contraseña temporal (debe cambiarla al entrar).
 //   npm run db:admin -- tu@correo.com "Tu Nombre"
 import pg from 'pg'
-import { hashPassword } from '../api/_lib/auth.js'
+import { hashPassword } from '../api/_lib/contrasenas.js'
 import { leerConfig } from '../api/_lib/config.js'
 import { passwordTemporal } from '../api/_lib/seguridad.js'
 
@@ -11,7 +11,8 @@ if (!correo || !nombre) {
   process.exit(1)
 }
 
-const cx = new pg.Client(leerConfig().conexion)
+const config = leerConfig()
+const cx = new pg.Client(config.conexion)
 await cx.connect()
 try {
   const temporal = passwordTemporal()
@@ -19,7 +20,7 @@ try {
     `INSERT INTO usuarios (nombre, correo, password_hash, rol, debe_cambiar_password)
      VALUES ($1, $2, $3, 'administrador', true)
      ON CONFLICT (lower(correo)) DO NOTHING RETURNING id_usuario`,
-    [nombre, correo.trim(), await hashPassword(temporal)],
+    [nombre, correo.trim(), await hashPassword(config, temporal)],
   )
   if (!rows[0]) {
     console.error(`Ya existe una cuenta con ${correo}. Usa "¿Olvidaste tu contraseña?" en el panel.`)

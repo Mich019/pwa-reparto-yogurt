@@ -3,7 +3,8 @@
 //
 //   npm run db:migrar                      base vacía → 01_esquema + 02_vistas + 03_datos_iniciales
 //                                          base ya creada con estos scripts → sólo aplica migraciones/
-//   npm run db:migrar -- --demo            además carga 04_datos_demo (admin@yogurt.local / Yogurt2026!)
+//   npm run db:migrar -- --demo            además carga 04_datos_demo y muestra las contraseñas temporales
+//                                          de admin@yogurt.local y vendedor@yogurt.local (sólo en una base de prueba)
 //   npm run db:migrar -- --reiniciar       BORRA las tablas y tipos de la app y la vuelve a crear
 //
 // --reiniciar hace falta si la base se creó con otro script (p. ej. db.txt): la API usa los
@@ -13,6 +14,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { leerConfig } from '../api/_lib/config.js'
+import { hashPassword } from '../api/_lib/contrasenas.js'
+import { passwordTemporal } from '../api/_lib/seguridad.js'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const args = new Set(process.argv.slice(2))
@@ -31,8 +34,9 @@ const TIPOS = [
   'tabla_sync_enum', 'operacion_sync_enum', 'estado_sync_enum',
 ]
 
-const { conexion } = leerConfig()
-const cx = new pg.Client(conexion)
+const config = leerConfig()
+const cx = new pg.Client(config.conexion)
+const cuentasDemo: string[] = []
 await cx.connect()
 
 try {
@@ -59,6 +63,12 @@ try {
     if (args.has('--demo')) {
       console.log('→ 04_datos_demo.sql')
       await cx.query(sql('04_datos_demo.sql'))
+      // Contraseñas temporales al azar, con el pepper de este servidor: nunca una fija escrita en el repositorio.
+      for (const correo of ['admin@yogurt.local', 'vendedor@yogurt.local']) {
+        const temporal = passwordTemporal()
+        await cx.query(`UPDATE usuarios SET password_hash = $2, debe_cambiar_password = true WHERE correo = $1`, [correo, await hashPassword(config, temporal)])
+        cuentasDemo.push(`  ${correo}  ·  ${temporal}`)
+      }
     }
   } else if (!(await esquemaOficial())) {
     console.error(
@@ -75,6 +85,7 @@ try {
     }
     const { rows } = await cx.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'administrador' AND activo`)
     console.log(`\nBase lista. Administradores activos: ${rows[0].n}.`)
+    if (cuentasDemo.length) console.log(`Cuentas de prueba (contraseña temporal; al entrar se pide elegir otra):\n${cuentasDemo.join('\n')}`)
     if (rows[0].n === 0) console.log('Crea el primero con:  npm run db:admin -- tu@correo.com "Tu Nombre"')
   }
 } finally {

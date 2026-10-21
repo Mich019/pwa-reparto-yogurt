@@ -2,24 +2,25 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Flame, Navigation, Pencil, Phone, PlusCircle, RefreshCw, ScanLine, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
+  Flame, MapPin, Navigation, Pencil, Phone, PlusCircle, RefreshCw, ScanLine, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
-import { calcularRuta, distancia, enlaceNavegar, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../../lib/ruteo'
+import { calcularRuta, distancia, enlaceNavegar, posicionActual, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../../lib/ruteo'
 import { cargarDemo } from '../../lib/demo'
+import { MODO_SERVIDOR } from '../../lib/api'
 import { baseDelUltimoPedido } from '../../lib/codigos'
 import { AlertasRuta } from './AlertasRuta'
 import { Mapa, type Pin } from './Mapa'
-import { IconoSabor } from '../../components/Fruta'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
-import { Accion, Boton, Hoja, Segmentado, aviso, telLimpio } from '../../components/ui'
+import { Accion, Boton, Hoja, PuntoSabor, Segmentado, aviso, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
 
 const CLAVE_RUTA = 'ruta-del-dia'
 interface RutaGuardada extends RutaCalc { fecha: string; claves: string }
+type MetodoPago = NonNullable<Pedido['metodo_pago']>
 
 function leerRuta(): RutaGuardada | null {
   try {
@@ -75,8 +76,9 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
   const [elegido, setElegido] = useState<string | null>(null)
   const [expandida, setExpandida] = useState(false)
   const [modo3D, setModo3D] = useState(true)
-  const [pago, setPago] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO')
+  const [pagoElegido, setPagoElegido] = useState<{ pedidoId: string; metodo: MetodoPago } | null>(null)
   const [postEntrega, setPostEntrega] = useState<Pedido | null>(null)
+  const [nuevaUbicacion, setNuevaUbicacion] = useState<{ clienteId: string; punto: Punto; metros: number } | null>(null)
   const [paso, setPaso] = useState<'opciones' | 'nuevo'>('opciones')
   const [editor, setEditor] = useState<{ cliente: Cliente; pedido?: Pedido; base?: Cantidades; paraHoy?: boolean } | null>(null)
   const [escaner, setEscaner] = useState(false)
@@ -89,7 +91,15 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
     () => (pedidosHoy ?? []).filter((p) => p.estado === 'PENDIENTE' && porId.get(p.clienteId)?.activo),
     [pedidosHoy, porId],
   )
-  const claves = useMemo(() => pendientes.map((p) => p.id + (p.urgente ? '!' : '')).sort().join(','), [pendientes]) // una parada que se vuelve urgente cambia la ruta
+  // La ruta se recalcula si cambian las paradas, si una se vuelve urgente o si un cliente cambia de horario o de lugar (RF-031).
+  const clavesParadas = useMemo(
+    () => pendientes.map((p) => {
+      const c = porId.get(p.clienteId)!
+      return `${p.id}${p.urgente ? '!' : ''}@${c.ventana}@${c.latitud}@${c.longitud}`
+    }),
+    [pendientes, porId],
+  )
+  const claves = useMemo(() => [...clavesParadas].sort().join(','), [clavesParadas])
 
   // Calcula (o recalcula) la ruta cuando cambia el conjunto de pedidos pendientes (RF-030, RF-031).
   const recalcular = useCallback(async (forzar = false) => {
@@ -103,7 +113,8 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
     // Sin red: conserva el orden ya calculado (con sus calles) y sólo quita lo ya atendido.
     if (!navigator.onLine && actual && !forzar) {
       const ids = new Set(pendientes.map((p) => p.id))
-      if (pendientes.every((p) => actual.orden.includes(p.id))) {
+      const previas = new Set(actual.claves.split(','))
+      if (clavesParadas.every((k) => previas.has(k))) {
         const r = { ...actual, orden: actual.orden.filter((id) => ids.has(id)), claves }
         localStorage.setItem(CLAVE_RUTA, JSON.stringify(r))
         return setRuta(r)
@@ -119,7 +130,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
     localStorage.setItem(CLAVE_RUTA, JSON.stringify(r))
     setRuta(r)
     setCalculando(false)
-  }, [claves, pendientes, porId, clientes, fecha])
+  }, [claves, clavesParadas, pendientes, porId, clientes, fecha])
 
   useEffect(() => { recalcular() }, [recalcular])
 
@@ -132,6 +143,8 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
 
   const activoId = elegido && orden.includes(elegido) ? elegido : orden[0]
   const activo = pendientes.find((p) => p.id === activoId) ?? null
+  // La forma de pago es de cada parada: al pasar a otra vuelve a efectivo y no se arrastra la anterior (RF-023).
+  const pago: MetodoPago = pagoElegido && pagoElegido.pedidoId === activoId ? pagoElegido.metodo : 'EFECTIVO'
   const clienteActivo = activo ? porId.get(activo.clienteId) ?? null : null
   const puntoActivo: Punto | null = clienteActivo ? [clienteActivo.longitud, clienteActivo.latitud] : null
 
@@ -162,6 +175,27 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
     setExpandida(false)
     setPaso('opciones')
     setPostEntrega(entregado)
+    void revisarUbicacion(entregado.clienteId)
+  }
+
+  // RF-008: en la visita se lee el GPS. Si la ubicación guardada del cliente queda lejos de donde se entregó, se ofrece
+  // corregirla con un toque (no se cambia sola: el repartidor pudo marcar la entrega desde otro lado).
+  async function revisarUbicacion(clienteId: string) {
+    setNuevaUbicacion(null)
+    const c = porId.get(clienteId)
+    const aqui = await posicionActual(15000)
+    if (!c || !aqui || aqui.precision > 50) return
+    const metros = distancia(aqui.punto, [c.longitud, c.latitud])
+    if (metros > Math.max(100, aqui.precision * 3)) setNuevaUbicacion({ clienteId, punto: aqui.punto, metros })
+  }
+
+  async function guardarUbicacion() {
+    const n = nuevaUbicacion
+    const c = n && porId.get(n.clienteId)
+    if (!n || !c) return
+    await guardar('clientes', { ...c, longitud: n.punto[0], latitud: n.punto[1] })
+    setNuevaUbicacion(null)
+    aviso('Ubicación del cliente actualizada')
   }
 
   // RF-022: tras leer el QR o la tarjeta, si el cliente tiene entrega hoy se va directo a su parada; si no,
@@ -287,7 +321,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                   </div>
                   <div className="text-right">
                     <div className="text-2xl leading-8 font-semibold tracking-tight tabular-nums">{dinero(activo.total)}</div>
-                    <div className="mt-1 text-sm text-apagado">{litrosActivo} L</div>
+                    <div className="mt-1 text-sm text-apagado">{litrosActivo} L · {pago === 'EFECTIVO' ? 'efectivo' : 'transfer'}</div>
                   </div>
                 </button>
 
@@ -296,7 +330,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                     const p = prodPorId.get(i.productoId)
                     return (
                       <span key={i.productoId} className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
-                        <IconoSabor sabor={p?.sabor ?? ''} size={22} />
+                        <PuntoSabor color={p?.color_hex} />
                         {i.litros} L {p?.sabor ?? '¿?'}
                       </span>
                     )
@@ -315,7 +349,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                     <Segmentado
                       className="mt-2"
                       valor={pago}
-                      onChange={setPago}
+                      onChange={(metodo) => setPagoElegido({ pedidoId: activo.id, metodo })}
                       opciones={[
                         { valor: 'EFECTIVO', texto: <><Banknote size={16} /> Efectivo</> },
                         { valor: 'TRANSFERENCIA', texto: <><Smartphone size={16} /> Transfer</> },
@@ -377,21 +411,26 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
           ) : (
             <div className="px-5 pt-3 pb-5">
               <div className="text-2xl leading-8 font-bold tracking-tight">Hoy no hay entregas</div>
-              <div className="mt-1 text-sm text-apagado">Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.</div>
+              <div className="mt-1 text-sm text-apagado">
+                {MODO_SERVIDOR ? 'Agenda pedidos desde Clientes.' : 'Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.'}
+              </div>
               <button onClick={irAClientes} className="mt-4 flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-4 text-left text-lg font-semibold text-apagado active:bg-linea">
                 <ArrowRight size={20} className="text-tinta" /> ¿A quién le llevamos?
               </button>
-              <Boton
-                variante="secundario"
-                className="mt-2 w-full"
-                onClick={async () => {
-                  const centro = yo ?? (await ubicacionActual()) ?? [-99.1332, 19.4326]
-                  await cargarDemo(centro)
-                  aviso('Datos de ejemplo cargados')
-                }}
-              >
-                <Sparkles size={18} /> Cargar datos de ejemplo
-              </Boton>
+              {/* Sólo sin servidor: con servidor los clientes de ejemplo se subirían como clientes reales. */}
+              {!MODO_SERVIDOR && (
+                <Boton
+                  variante="secundario"
+                  className="mt-2 w-full"
+                  onClick={async () => {
+                    const centro = yo ?? (await ubicacionActual()) ?? [-99.1332, 19.4326]
+                    await cargarDemo(centro)
+                    aviso('Datos de ejemplo cargados')
+                  }}
+                >
+                  <Sparkles size={18} /> Cargar datos de ejemplo
+                </Boton>
+              )}
             </div>
           )}
 
@@ -425,6 +464,13 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
       >
         {clientePost && paso === 'opciones' && (
           <div className="space-y-2.5 pb-3">
+            {nuevaUbicacion?.clienteId === clientePost.id && (
+              <div className="flex items-center gap-3 rounded-2xl bg-ambar/25 p-3 text-sm">
+                <MapPin size={20} className="shrink-0" />
+                <span className="min-w-0 flex-1">¿Estás en su domicilio? Su ubicación guardada está a {Math.round(nuevaUbicacion.metros)} m de aquí.</span>
+                <button onClick={() => void guardarUbicacion()} className="shrink-0 rounded-full bg-papel px-3 py-2 font-semibold active:bg-linea">Guardar aquí</button>
+              </div>
+            )}
             <div className="pb-1 text-apagado">¿Qué sigue con <b className="text-tinta">{clientePost.nombre}</b>?</div>
             <OpcionGrande destacada icono={<PlusCircle size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
             <OpcionGrande icono={<Clock size={26} />} titulo="Recordar más tarde" sub="Te aviso para escribirle o llamarle" onClick={recordarMasTarde} />

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, describe, it } from 'node:test'
-import { app, crearUsuario, db, get, login, PASSWORD, pull, sesion } from './ayuda.js'
+import { app, crearUsuario, db, get, ipAleatoria, login, PASSWORD, pull, sesion } from './ayuda.js'
 
 after(async () => { await app.close(); await db.end() })
 
@@ -22,14 +22,18 @@ describe('login y sesiones (M01)', () => {
     assert.equal(a.body.error, b.body.error)
   })
 
-  it('RF-003: bloquea la cuenta tras 5 intentos fallidos, aun con la contraseña correcta', async () => {
+  it('RF-003: tras 5 intentos fallidos seguidos esa conexión queda bloqueada para la cuenta, aun con la contraseña correcta', async () => {
     const u = await crearUsuario('vendedor')
-    for (let i = 0; i < 5; i++) assert.equal((await login(u.correo, 'mala-clave-1')).status, 401)
-    const r = await login(u.correo)
-    assert.equal(r.status, 423)
+    const ip = ipAleatoria()
+    for (let i = 0; i < 5; i++) assert.equal((await login(u.correo, 'mala-clave-1', 'x', ip)).status, 401)
+    const r = await login(u.correo, PASSWORD, 'x', ip)
+    assert.equal(r.status, 429)
     assert.equal(r.body.codigo, 'BLOQUEADA')
-    await db.query(`UPDATE usuarios SET bloqueado_hasta = now() - interval '1 minute' WHERE id_usuario = $1`, [u.id])
-    assert.equal((await login(u.correo)).status, 200)
+    // Quien ataca desde otro lado no deja fuera al dueño: desde su teléfono entra.
+    assert.equal((await login(u.correo, PASSWORD, 'x', ipAleatoria())).status, 200)
+    // Pasada la ventana, la misma conexión vuelve a poder.
+    await db.query(`UPDATE intentos_login SET creado_en = creado_en - interval '16 minutes' WHERE lower(correo) = lower($1) AND ip = $2`, [u.correo, ip])
+    assert.equal((await login(u.correo, PASSWORD, 'x', ip)).status, 200)
   })
 
   it('un usuario desactivado no entra', async () => {

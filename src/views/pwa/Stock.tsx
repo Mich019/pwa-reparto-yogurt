@@ -5,8 +5,7 @@ import { textoFecha, hoy } from '../../lib/fechas'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { useStockDeHoy } from '../../lib/stock'
 import type { Nivel } from '../../lib/stock-calculo'
-import { Insignia } from '../../components/Fruta'
-import { Boton } from '../../components/ui'
+import { Boton, PuntoSabor } from '../../components/ui'
 
 // RF-037 · La carga del vendedor: lo que el administrador le asignó hoy y lo que le va quedando. Las cuentas salen de
 // los pedidos entregados en este mismo teléfono, así funcionan sin internet.
@@ -68,7 +67,7 @@ export function Stock() {
               return (
                 <div key={f.productoId} className="py-3.5" data-sabor={p?.sabor}>
                   <div className="flex items-center gap-3">
-                    <Insignia sabor={p?.sabor ?? ''} color={p?.color_hex ?? '#d4d4d4'} size={44} />
+                    <PuntoSabor color={p?.color_hex} className="h-5 w-5" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate font-semibold">{p?.sabor ?? 'Sabor'}</span>

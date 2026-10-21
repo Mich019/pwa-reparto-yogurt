@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Map, Package, User, Users } from 'lucide-react'
+import { BarChart3, IceCreamBowl, Map, Package, User, Users } from 'lucide-react'
 import { Ruta } from './Ruta'
 import { Clientes } from './Clientes'
 import { Cuenta } from './Cuenta'
 import { Stock } from './Stock'
+import { Produccion } from './Produccion'
+import { Ajustes } from './Ajustes'
 import { Avisos, aviso } from '../../components/ui'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db } from '../../lib/db'
@@ -13,13 +15,16 @@ import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { alCerrarSesion, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica } from '../../lib/sync'
 
-type PestanaPwa = 'ruta' | 'clientes' | 'stock' | 'cuenta'
+type PestanaPwa = 'ruta' | 'clientes' | 'stock' | 'produccion' | 'sabores' | 'cuenta'
 
-const PESTANAS_PWA: { id: PestanaPwa; texto: string; icono: typeof Map; soloVendedor?: boolean }[] = [
+// Sin servidor no hay cuentas ni panel: el teléfono lleva también la producción y el catálogo de sabores (RF-032 a RF-036).
+const PESTANAS_PWA: { id: PestanaPwa; texto: string; icono: typeof Map; solo?: 'vendedor' | 'servidor' | 'sinServidor' }[] = [
   { id: 'ruta', texto: 'Ruta', icono: Map },
   { id: 'clientes', texto: 'Clientes', icono: Users },
-  { id: 'stock', texto: 'Stock', icono: Package, soloVendedor: true }, // RF-037: su carga del día (el administrador la captura en el panel)
-  { id: 'cuenta', texto: 'Cuenta', icono: User },
+  { id: 'stock', texto: 'Stock', icono: Package, solo: 'vendedor' }, // RF-037: su carga del día (el administrador la captura en el panel)
+  { id: 'produccion', texto: 'Producción', icono: BarChart3, solo: 'sinServidor' },
+  { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl, solo: 'sinServidor' },
+  { id: 'cuenta', texto: 'Cuenta', icono: User, solo: 'servidor' },
 ]
 
 // Al tocar una notificación con la app cerrada, se abre en la pestaña que corresponde (?abrir=stock).
@@ -32,7 +37,8 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   const [pestana, setPestana] = useState<PestanaPwa>(pestanaInicial)
   const sesion = useSesion()
   const esAdmin = sesion?.usuario.rol === 'administrador'
-  const visibles = PESTANAS_PWA.filter((p) => !p.soloVendedor || (MODO_SERVIDOR && !esAdmin))
+  const visibles = PESTANAS_PWA.filter((p) =>
+    p.solo === 'vendedor' ? MODO_SERVIDOR && !esAdmin : p.solo === 'servidor' ? MODO_SERVIDOR : p.solo === 'sinServidor' ? !MODO_SERVIDOR : true)
   const actual = visibles.some((p) => p.id === pestana) ? pestana : 'ruta'
   const irA = (p: PestanaPwa) => { if (visibles.some((v) => v.id === p)) setPestana(p) }
 
@@ -91,10 +97,12 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
         {actual === 'ruta' && <Ruta irAClientes={() => setPestana('clientes')} irAStock={visibles.some((p) => p.id === 'stock') ? () => setPestana('stock') : undefined} />}
         {actual === 'clientes' && <Clientes />}
         {actual === 'stock' && <Stock />}
+        {actual === 'produccion' && <Produccion />}
+        {actual === 'sabores' && <Ajustes />}
         {actual === 'cuenta' && <Cuenta irA={irA} />}
       </main>
 
-      {/* Barra de navegación inferior exclusiva para repartidores (3 pestañas, 4 con el control de stock) */}
+      {/* Barra inferior. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin servidor: Ruta, Clientes, Producción y Sabores. */}
       <nav className="z-30 grid border-t border-linea bg-papel pb-safe" style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}>
         {visibles.map(({ id, texto, icono: Icono }) => {
           const activa = actual === id
