@@ -178,7 +178,9 @@ function agrupar(items: PedidoWire['items']) {
 const firmaItems = (items: PedidoWire['items']) =>
   [...agrupar(items)].map(([k, v]) => `${k}:${dinero(v.litros)}`).sort().join()
 
-async function escribirDetalle(c: Cx, idPedido: string, items: PedidoWire['items']) {
+// El precio lo pone el administrador (RF-033). Un vendedor no lo decide desde el teléfono: las líneas nuevas toman el
+// del catálogo (trigger fn_detalle_precios) y las que ya existían conservan el que quedó congelado al venderse.
+async function escribirDetalle(c: Cx, idPedido: string, items: PedidoWire['items'], fijarPrecio: boolean) {
   const grupos = agrupar(items)
   const ids = [...grupos.keys()]
   const { rows: prods } = await c.query(`SELECT id_producto, presentacion_litros::float8 AS pres FROM productos WHERE id_producto = ANY($1::uuid[])`, [ids])
@@ -190,8 +192,9 @@ async function escribirDetalle(c: Cx, idPedido: string, items: PedidoWire['items
     await c.query(
       `INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario)
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id_pedido, id_producto) DO UPDATE SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario`,
-      [idPedido, p.id_producto, dinero(g.litros / p.pres), dinero(g.precio * p.pres)],
+       ON CONFLICT (id_pedido, id_producto) DO UPDATE
+         SET cantidad = EXCLUDED.cantidad, precio_unitario = CASE WHEN $5 THEN EXCLUDED.precio_unitario ELSE detalle_pedido.precio_unitario END`,
+      [idPedido, p.id_producto, dinero(g.litros / p.pres), fijarPrecio ? dinero(g.precio * p.pres) : null, fijarPrecio],
     )
   }
 }
@@ -258,7 +261,12 @@ const pedidos: Adaptador<PedidoWire> = {
     const entregado = estado === 'entregado'
     // Sólo el administrador marca un pedido como urgente; una copia vieja del teléfono no lo quita. Cerrado, ya no lo es.
     const urgente = estado === 'pendiente' && (esAdmin(u) ? (w.urgente ?? ex?.wire.urgente ?? false) : (ex?.wire.urgente ?? false))
-    if (ex?.final) await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`) // corrección de administrador
+    if (ex?.final) {
+      // Un pedido cerrado sólo lo corrige el administrador. Al vendedor se le acepta reenviarlo igual (autorizarEscritura),
+      // p. ej. una entrega que el teléfono repite, pero no cambia nada: ni fecha, ni cobro, ni precios.
+      if (!esAdmin(u)) return
+      await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`)
+    }
 
     if (!ex) {
       await c.query(
@@ -267,7 +275,7 @@ const pedidos: Adaptador<PedidoWire> = {
         [w.id, w.clienteId, dueno, w.fecha, u.id, w.creado],
       )
     }
-    await escribirDetalle(c, w.id, w.items)
+    await escribirDetalle(c, w.id, w.items, esAdmin(u))
     await c.query(
       `UPDATE pedidos
           SET id_cliente = $2, id_vendedor = $3, fecha = $4, estado = $5::estado_pedido,

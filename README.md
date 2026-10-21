@@ -41,6 +41,10 @@ En la pantalla **Ruta**, si no hay pedidos, el botón **Cargar datos de ejemplo*
 - Pronóstico en `src/lib/pronostico.ts`.
 - Base de datos del backend en `db/`: versión PostgreSQL (ver `db/README.md`) y versión MySQL 8 lista para migrar a la nube (ver `db/mysql/README.md`).
 
+## Producción
+
+La base va en **Railway** (PostgreSQL) y la app con su API en **Vercel**. Los pasos, de cero a funcionando, están en [`docs/produccion-railway.md`](docs/produccion-railway.md): crear la base, copiar su dirección pública a `DATABASE_URL`, `npm run db:probar`, `npm run db:migrar`, `npm run db:admin` y publicar.
+
 ## Servidor
 
 La API (`api/`, ver [su README](api/README.md)) da login por rol (administrador / vendedor), sincronización de lo hecho sin conexión y resolución de conflictos. La app usa el servidor por omisión: llama a `/api`, o a `VITE_API_URL` si la API vive en otro dominio (variables en [`.env.example`](.env.example)). Con `VITE_OFFLINE_SOLO=true` es sólo local y sin cuentas. El administrador trabaja en el panel `/admin`. El vendedor ve su ruta y sus clientes, sin costos ni márgenes.
@@ -96,5 +100,3 @@ Los avisos de stock y de ventas se generan **en el teléfono**, así que funcion
 
 ## Pendiente (siguientes pasos)
 
-- Cierre de sesión que no dependa de la señal.
-- Sincronizar con la app cerrada (RF-052): hoy el service worker despierta a la app al volver la señal y es la app la que envía la cola; con la app cerrada, se envía al abrirla.

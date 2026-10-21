@@ -147,13 +147,13 @@ describe('entregas y pedidos cerrados', () => {
     const [fresa, natural] = await sabores(v)
     const c = cliente()
     const p = pedido(c.id, fresa.id, { estado: 'ENTREGADO', metodo_pago: 'TRANSFERENCIA', fecha_entregado_real: Date.now(),
-      items: [{ productoId: fresa.id, litros: 2, precio_litro: 60 }, { productoId: natural.id, litros: 1.5, precio_litro: 55 }] })
+      items: [{ productoId: fresa.id, litros: 2, precio_litro: fresa.precio_litro }, { productoId: natural.id, litros: 1.5, precio_litro: natural.precio_litro }] })
     const r = await push(v, [op('clientes', c.id, c), op('pedidos', p.id, p)])
     assert.deepEqual(estados(r), ['aplicada', 'aplicada'])
     const g = r.body.resultados[1].registro
     assert.equal(g.estado, 'ENTREGADO')
     assert.equal(g.metodo_pago, 'TRANSFERENCIA')
-    assert.equal(g.total, 202.5)
+    assert.equal(g.total, Math.round((2 * fresa.precio_litro + 1.5 * natural.precio_litro) * 100) / 100)
     const { rows } = await db.query(`SELECT count(*)::int AS n FROM detalle_pedido WHERE id_pedido = $1 AND costo_unitario > 0`, [p.id])
     assert.equal(rows[0].n, 2) // el costo queda congelado para el margen
   })
@@ -174,6 +174,51 @@ describe('entregas y pedidos cerrados', () => {
     const corr = await push(admin, [op('pedidos', p.id, cambio, version)])
     assert.equal(corr.body.resultados[0].estado, 'aplicada')
     assert.equal(corr.body.resultados[0].registro.total, 600)
+  })
+
+  it('el vendedor no reescribe un pedido entregado aunque mande los mismos litros (fecha, cobro ni precio)', async () => {
+    const v = await sesion('vendedor')
+    const [fresa] = await sabores(v)
+    const c = cliente()
+    const p = pedido(c.id, fresa.id, { estado: 'ENTREGADO', metodo_pago: 'EFECTIVO', fecha_entregado_real: Date.now(),
+      items: [{ productoId: fresa.id, litros: 3, precio_litro: fresa.precio_litro }] })
+    const a = await push(v, [op('clientes', c.id, c), op('pedidos', p.id, p)])
+    const g = a.body.resultados[1].registro
+    const trampa = { ...p, fecha: '2026-01-01', metodo_pago: 'TRANSFERENCIA', items: [{ productoId: fresa.id, litros: 3, precio_litro: 0 }] }
+    const r = await push(v, [op('pedidos', p.id, trampa, g.version)])
+    const q = r.body.resultados[0].registro
+    assert.equal(q.fecha, g.fecha)
+    assert.equal(q.metodo_pago, 'EFECTIVO')
+    assert.equal(q.total, g.total)
+    assert.equal(q.version, g.version) // ni siquiera se tocó
+  })
+
+  it('el precio lo pone el catálogo, no el teléfono del vendedor; el administrador sí puede fijarlo', async () => {
+    const v = await sesion('vendedor')
+    const admin = await sesion('administrador')
+    const [fresa] = await sabores(v)
+    const c = cliente()
+    const p = pedido(c.id, fresa.id, { items: [{ productoId: fresa.id, litros: 2, precio_litro: 0.01 }] })
+    const r = await push(v, [op('clientes', c.id, c), op('pedidos', p.id, p)])
+    const g = r.body.resultados[1].registro
+    assert.equal(g.items[0].precio_litro, fresa.precio_litro)
+    assert.equal(g.total, Math.round(2 * fresa.precio_litro * 100) / 100)
+    // Al editar el pedido, la línea conserva su precio aunque el teléfono mande otro.
+    const e = await push(v, [op('pedidos', p.id, { ...p, items: [{ productoId: fresa.id, litros: 4, precio_litro: 1 }] }, g.version)])
+    assert.equal(e.body.resultados[0].registro.items[0].precio_litro, fresa.precio_litro)
+    // Un descuento lo decide el administrador.
+    const d = await push(admin, [op('pedidos', p.id, { ...p, items: [{ productoId: fresa.id, litros: 4, precio_litro: 50 }] }, e.body.resultados[0].registro.version)])
+    assert.equal(d.body.resultados[0].registro.total, 200)
+  })
+
+  it('la bitácora guarda sólo los campos conocidos, no lo que el teléfono invente', async () => {
+    const v = await sesion('vendedor')
+    const c = cliente()
+    const basura = { ...c, relleno: 'x'.repeat(200_000) }
+    await push(v, [op('clientes', c.id, basura)])
+    const { rows } = await db.query(`SELECT length(datos::text) AS n, datos ? 'relleno' AS trae FROM operaciones_sync WHERE id_registro = $1`, [c.id])
+    assert.equal(rows[0].trae, false)
+    assert.ok(rows[0].n < 5000)
   })
 })
 

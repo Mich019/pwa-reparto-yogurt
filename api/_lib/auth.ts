@@ -156,6 +156,8 @@ export async function rutasAuth(
       await hashPassword(config, nueva),
     ])
     await db.query(`UPDATE sesiones SET revocado_en = now() WHERE id_usuario = $1 AND id_sesion <> $2 AND revocado_en IS NULL`, [req.usuario.id, req.usuario.sid])
+    // Las otras sesiones ya no reciben avisos; este teléfono vuelve a suscribirse solo al abrir la app (src/lib/push.ts).
+    await db.query(`DELETE FROM suscripciones_push WHERE id_usuario = $1`, [req.usuario.id])
     return rep.code(204).send()
   })
 }

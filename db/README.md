@@ -58,7 +58,7 @@ Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor 
 
 ## Bases ya creadas
 
-`migraciones/` trae los cambios al esquema posteriores a la primera versión. Aplícalos en orden con `psql -U postgres -d reparto_yogurt -f migraciones/NNN_*.sql` (son repetibles). La API está en [`../server`](../server/README.md).
+`migraciones/` trae los cambios al esquema posteriores a la primera versión. `npm run db:migrar` (desde la raíz) los aplica en orden, cada uno en una transacción; también se pueden correr a mano con `psql -U postgres -d reparto_yogurt -f migraciones/NNN_*.sql` (son repetibles). `npm run db:probar` dice, sin cambiar nada, si a la base le falta alguno. La API está en [`../api`](../api/README.md); la base en la nube, en [`../docs/produccion-railway.md`](../docs/produccion-railway.md).
 
 ## Notas para la API
 

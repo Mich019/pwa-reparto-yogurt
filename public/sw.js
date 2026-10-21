@@ -25,16 +25,25 @@ async function recortar() {
   for (let i = 0; i < ks.length - MAX_MOSAICOS; i++) await c.delete(ks[i])
 }
 
-// RF-052: al volver la conexión el navegador despierta este evento y se lo pasa a la app para que sincronice.
-// La cola vive en IndexedDB y el token en la sesión de la app, así que la sincronización la hace la propia
-// app; si no hay ninguna ventana abierta, sincroniza al abrirse (o al recuperar el foco).
+// RF-052: al volver la conexión el navegador despierta este evento, también con la app cerrada (Chrome y Edge en
+// Android y escritorio; Safari no lo ofrece y ahí se envía al abrir la app). Si la app está a la vista, ella sincroniza;
+// si no, el service worker envía la cola con el mismo código de la app (sw-envio.js) y la sesión que ella le dejó.
+try {
+  importScripts('./sw-envio.js')
+} catch {
+  /* sin el envío en segundo plano la app sigue funcionando: envía al abrirse */
+}
+
 self.addEventListener('sync', (e) => {
   if (e.tag !== 'sync-cola') return
   e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ventanas) => {
-      if (!ventanas.length) throw new Error('Sin ventanas abiertas: reintentar luego')
+    (async () => {
+      const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       ventanas.forEach((v) => v.postMessage({ tipo: 'sincronizar' }))
-    }),
+      if (ventanas.some((v) => v.visibilityState === 'visible')) return
+      if (!self.envioYogurt) throw new Error('Sin envío en segundo plano: reintentar luego')
+      await self.envioYogurt.enviarEnSegundoPlano() // si falla (sin señal), el navegador lo reintenta más tarde
+    })(),
   )
 })
 

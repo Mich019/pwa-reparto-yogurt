@@ -50,6 +50,9 @@ export function endpointPermitido(valor: string): boolean {
   } catch {
     return false
   }
+  // Sólo la forma canónica (la que da el navegador): web-push usa otro analizador de direcciones y una forma rara como
+  // «https:/fcm.googleapis.com/x» la entendería como otro destino (p. ej. el propio servidor).
+  if (u.href !== valor) return false
   if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
   return SERVICIOS_PUSH.some((r) => r.test(u.hostname))
 }

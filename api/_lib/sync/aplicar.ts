@@ -85,6 +85,14 @@ function mensajeBD(e: any): string | null {
   }
 }
 
+// Sólo lo que el esquema reconoce (campos conocidos, con sus topes de tamaño): unos datos inventados o enormes no se
+// guardan tal cual en la bitácora. Si no pasan el esquema, queda sólo el motivo del rechazo.
+function datosParaGuardar(op: OperacionEntrante): unknown {
+  if (op.op === 'delete') return {}
+  const r = ADAPTADORES[op.tabla].esquema.safeParse(op.datos)
+  return r.success ? r.data : {}
+}
+
 export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrante, reloj: Reloj, efectos: Efectos = { hoy: '', avisos: [] }): Promise<Resultado> {
   const tsMs = Math.min(op.ts + reloj.skewMs, reloj.ahoraMs) // el desfase del reloj del teléfono no cuenta; nunca en el futuro
 
@@ -117,7 +125,7 @@ export async function procesarOperacion(db: Db, u: Usuario, op: OperacionEntrant
     await c.query(
       `INSERT INTO operaciones_sync (id_operacion, id_usuario, dispositivo, tabla, id_registro, operacion, version_cliente, datos, creado_en_cliente, estado, detalle_error)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, to_timestamp($9::float8 / 1000.0), $10::estado_sync, $11)`,
-      [op.id, u.id, reloj.dispositivo, op.tabla, op.registroId, op.op === 'delete' ? 'delete' : 'update', op.version ?? null, JSON.stringify(op.datos ?? {}), tsMs, estado, nota ?? null],
+      [op.id, u.id, reloj.dispositivo, op.tabla, op.registroId, op.op === 'delete' ? 'delete' : 'update', op.version ?? null, JSON.stringify(datosParaGuardar(op)), tsMs, estado, nota ?? null],
     )
     // Datos de rechazos de permisos no deben filtrar registros ajenos: estadoActual ya filtra por cartera.
     const actual = await estadoActual(c, u, op)

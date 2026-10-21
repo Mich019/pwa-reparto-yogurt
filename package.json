@@ -9,13 +9,14 @@
   "scripts": {
     "dev": "concurrently -k -n web,api -c blue,green \"vite --host\" \"npm:dev:api\"",
     "dev:web": "vite --host",
-    "dev:api": "tsx watch --env-file=.env api/_lib/servidor.ts",
+    "dev:api": "tsx watch --env-file-if-exists=.env api/_lib/servidor.ts",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck:api": "tsc --noEmit -p api",
     "test:api": "tsx --test api/_test/*.test.ts",
-    "db:migrar": "tsx --env-file=.env db/migrar.ts",
-    "db:admin": "tsx --env-file=.env db/crear-admin.ts",
+    "db:migrar": "tsx --env-file-if-exists=.env db/migrar.ts",
+    "db:admin": "tsx --env-file-if-exists=.env db/crear-admin.ts",
+    "db:probar": "tsx --env-file-if-exists=.env db/probar-conexion.ts",
     "push:claves": "tsx api/_lib/claves-push.ts"
   },
   "dependencies": {

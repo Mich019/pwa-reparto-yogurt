@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Db } from './db.js'
 import { endpointPermitido, SuscripcionCaducada, type Enviador } from './push.js'
+import { claveUsuario } from './seguridad.js'
 
 // M10 · Notificaciones (RF-054). Cada aviso se guarda en `notificaciones` (la app lo trae al sincronizar, así llega
 // aunque no haya push) y, si hay claves VAPID, también se manda por Web Push a los teléfonos del destinatario.
@@ -99,7 +100,6 @@ const bodySuscripcion = z.object({
 const bodyBaja = z.object({ endpoint: z.string().max(2000) })
 const bodyLeidas = z.object({ ids: z.array(z.uuid()).min(1).max(200) })
 
-const limite = (max: number) => ({ rateLimit: { max, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.headers.authorization ?? req.ip } })
 
 export async function rutasNotificaciones(
   app: FastifyInstance,
@@ -108,6 +108,7 @@ export async function rutasNotificaciones(
   despachador: Despachador,
   enviador: Enviador | null,
 ) {
+  const limite = (max: number) => ({ rateLimit: { max, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => claveUsuario(req, config) } })
   // Qué puede hacer el servidor y con qué clave suscribirse.
   app.get('/notificaciones/config', { preHandler: requiereSesion }, async () => ({ push: !!enviador, clavePublica: enviador ? config.vapidPublica : null }))
 

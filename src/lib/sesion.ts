@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { api, apiArchivo, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
+import { CLAVE_REVOCAR, CLAVE_SESION_SW, guardarRevocacion, revocarPendientes, type SesionSegundoPlano } from './envio'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
 // el acceso se renueva solo cuando hay conexión y se pierde sólo al cerrar sesión o si el servidor
@@ -40,7 +41,22 @@ function fijar(s: Sesion | null) {
     if (s) localStorage.setItem(CLAVE, JSON.stringify(s))
     else localStorage.removeItem(CLAVE)
   } catch { /* almacenamiento lleno o bloqueado: la sesión vale mientras la app siga abierta */ }
+  copiarParaSegundoPlano(s)
   oyentes.forEach((f) => f())
+}
+
+// RF-052: el service worker envía la cola con la app cerrada y no puede leer localStorage (ver envio.ts).
+function copiarParaSegundoPlano(s: Sesion | null) {
+  const copia: SesionSegundoPlano | null = s && {
+    accessToken: s.accessToken,
+    expiraEn: s.expiraEn,
+    refreshToken: s.refreshToken,
+    usuarioId: s.usuario.id,
+    dispositivo: dispositivoId(),
+    debeCambiarPassword: s.usuario.debeCambiarPassword,
+  }
+  const escritura: Promise<unknown> = copia ? db.meta.put({ clave: CLAVE_SESION_SW, valor: copia }) : db.meta.delete(CLAVE_SESION_SW)
+  escritura.catch(() => {})
 }
 
 export const sesionActual = () => actual
@@ -75,7 +91,9 @@ async function adoptarUsuario(u: UsuarioSesion) {
       throw new Error('Este teléfono tiene cambios sin enviar de otra cuenta. Entra con esa cuenta para sincronizarlos primero.')
     }
     await db.transaction('rw', [db.clientes, db.productos, db.pedidos, db.recordatorios, db.cola, db.meta, db.problemas, db.stock, db.avisos], async () => {
+      const porRevocar = await db.meta.get(CLAVE_REVOCAR) // las sesiones cerradas sin señal se siguen revocando
       await Promise.all([db.clientes.clear(), db.productos.clear(), db.pedidos.clear(), db.recordatorios.clear(), db.cola.clear(), db.meta.clear(), db.problemas.clear(), db.stock.clear(), db.avisos.clear()])
+      if (porRevocar) await db.meta.put(porRevocar)
     })
   }
   await db.meta.put({ clave: 'usuarioId', valor: u.id })
@@ -193,9 +211,25 @@ export async function cerrarSesion() {
   if (s) {
     // Mejor esfuerzo y con tope de tiempo: sin señal, cerrar sesión no debe quedarse esperando.
     await Promise.race([Promise.allSettled([...antesDeCerrar].map((t) => t())), new Promise((r) => setTimeout(r, 4000))])
-    await api('/auth/logout', { cuerpo: { refreshToken: s.refreshToken } }).catch(() => {})
+    await api('/auth/logout', { cuerpo: { refreshToken: s.refreshToken } }).catch(async (e) => {
+      if (!(e instanceof ErrorRed)) return
+      await guardarRevocacion(s.refreshToken).catch(() => {})
+      pedirEnvioEnSegundoPlano()
+    })
   }
   fijar(null)
+}
+
+// Con señal otra vez (o al abrir la app), se revocan las sesiones que se cerraron sin conexión.
+function revocarAlVolverLaSenal() {
+  revocarPendientes().catch(() => {})
+}
+
+// RF-052: el service worker se encarga cuando vuelva la señal, aunque la app esté cerrada (public/sw.js).
+export function pedirEnvioEnSegundoPlano() {
+  navigator.serviceWorker?.ready
+    .then((reg) => (reg as ServiceWorkerRegistration & { sync?: { register(tag: string): Promise<void> } }).sync?.register('sync-cola'))
+    .catch(() => {})
 }
 
 // RF-002: Solicita un código de 6 dígitos al correo registrado
@@ -212,3 +246,9 @@ export async function restablecerPassword(correo: string, codigo: string, nueva:
   })
 }
 
+// Sesiones abiertas antes de que existiera la copia para el service worker.
+if (actual) copiarParaSegundoPlano(actual)
+if (MODO_SERVIDOR && typeof window !== 'undefined') {
+  revocarAlVolverLaSenal()
+  window.addEventListener('online', revocarAlVolverLaSenal)
+}
