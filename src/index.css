@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
+@import "./views/admin/tema.css";
 
 /* Inter (SIL OFL), sólo el subconjunto latino y dentro de la app para que cargue sin internet. */
 @font-face {
@@ -8,6 +9,15 @@
   font-display: swap;
   font-weight: 100 900;
   src: url("./fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+/* Bricolage Grotesque (SIL OFL): sólo los títulos y las cifras grandes del panel de administración. */
+@font-face {
+  font-family: "Bricolage Grotesque Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("./fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2-variations");
 }
 
 /* Paleta estilo Uber: blanco, negro, grises suaves y un azul para la ruta. */
@@ -23,6 +33,14 @@
   --color-rojo: #e11900;
   --color-ambar: #ffc043;
   --color-marino: #0e1124;
+  /* Panel de administración: marca Danelle (verde #035d38, amarillo #f9dc07; ver views/admin/tema.css). */
+  --font-display: "Bricolage Grotesque Variable", "Inter Variable", system-ui, sans-serif;
+  --color-lienzo: #f8f6ec;
+  --color-marca: #035d38;
+  --color-marca-oscuro: #04492c;
+  --color-limon: #f9dc07;
+  --color-serie: #1b8d5a;
+  --color-oro: #d2a408;
   --shadow-tarjeta: 0 2px 12px rgba(0, 0, 0, 0.1);
   --shadow-hoja: 0 -4px 20px rgba(0, 0, 0, 0.1);
 }

@@ -8,7 +8,7 @@ export interface Barra {
 }
 
 // Número redondo sobre el máximo, para que el techo del gráfico no sea 1,237.5.
-function techo(max: number) {
+export function techo(max: number) {
   if (max <= 0) return 1
   const e = 10 ** Math.floor(Math.log10(max))
   const m = max / e

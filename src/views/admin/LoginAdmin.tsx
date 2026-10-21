@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { AlertCircle, ArrowLeft, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { cerrarSesion, iniciarSesion, mensajeErrorLogin, sesionActual } from '../../lib/sesion'
-import { Logo } from '../../components/Logo'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { Campo, claseInput } from '../../components/ui'
+import { AveDanelle, LogoDanelle } from './marca'
 
 type Modo = 'login' | 'recuperar'
 
@@ -58,17 +58,19 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col justify-center bg-niebla/50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="relative isolate flex min-h-dvh flex-col justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
+      {/* El ave de la marca, enorme y casi transparente, asomando por la esquina */}
+      <AveDanelle className="pointer-events-none absolute -bottom-20 -right-6 -z-10 hidden h-[36rem] opacity-[0.09] sm:block lg:right-[10%]" />
+
       <div className="mx-auto w-full max-w-md">
-        
-        {/* Cabecera limpia sin textos adicionales */}
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="h-16 w-16 shadow-sm" textoClassName="text-3xl font-black" />
+          <LogoDanelle className="h-24" />
+          <h1 className="mt-6 text-[2rem] font-semibold leading-tight">Panel de administración</h1>
         </div>
 
         {/* Tarjeta principal */}
-        <div className="rounded-3xl border border-linea bg-papel p-6 shadow-tarjeta sm:p-8">
-          
+        <div className="rounded-[28px] border border-linea bg-papel p-6 shadow-[0_16px_48px_rgba(0,32,20,0.08)] sm:p-8">
+
           {/* MODO 1: LOGIN */}
           {modo === 'login' && (
             <form onSubmit={manejarLogin} className="space-y-5">
@@ -102,7 +104,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                   <button
                     type="button"
                     onClick={() => setVerPassword(!verPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-apagado transition-colors hover:text-tinta"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-apagado transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-marca"
                     aria-label="Ver u ocultar contraseña"
                   >
                     {verPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -114,7 +116,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                 <button
                   type="button"
                   onClick={() => { setError(''); setModo('recuperar') }}
-                  className="text-azul hover:underline"
+                  className="rounded-md py-1 text-azul hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
@@ -136,7 +138,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
               <button
                 type="submit"
                 disabled={cargando}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white transition-all active:scale-[0.99] active:bg-neutral-800 disabled:opacity-40"
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-colors hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40"
               >
                 {cargando ? (
                   <>
@@ -159,10 +161,10 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
 
         {/* Enlace sutil para ir a la PWA */}
         {onIrAPwa && (
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             <button
               onClick={onIrAPwa}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-apagado transition-colors hover:text-tinta"
+              className="inline-flex items-center gap-1.5 rounded-md py-1 text-xs font-semibold text-apagado transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
             >
               <ArrowLeft size={14} />
               Ir a la App Móvil de Reparto

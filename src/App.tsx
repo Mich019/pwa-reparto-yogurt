@@ -41,27 +41,14 @@ export default function App() {
   // =========================================================================
   // Sin servidor no hay cuentas que validar: /admin abre la misma app, que ya trae producción y sabores.
   if (esAdmin && MODO_SERVIDOR) {
-    if (!sesion) {
-      return (
-        <>
-          <Avisos />
-          <LoginAdmin onIrAPwa={irAPwa} />
-        </>
-      )
-    }
-    if (sesion.usuario.debeCambiarPassword) {
-      return (
-        <>
-          <Avisos />
-          <CambioObligatorio />
-        </>
-      )
-    }
     return (
-      <>
+      // `.tema-admin` lleva los colores y la letra del panel; la app de reparto no la usa (views/admin/tema.css).
+      <div className="tema-admin">
         <Avisos />
-        <AdminLayout onIrAPwa={irAPwa} />
-      </>
+        {!sesion ? <LoginAdmin onIrAPwa={irAPwa} />
+          : sesion.usuario.debeCambiarPassword ? <CambioObligatorio />
+          : <AdminLayout onIrAPwa={irAPwa} />}
+      </div>
     )
   }
 

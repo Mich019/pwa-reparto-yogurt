@@ -12,8 +12,47 @@ const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce
 export function Ajustes() {
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
-  const cola = useLiveQuery(() => db.cola.count(), []) ?? 0
   const [editando, setEditando] = useState<Producto | 'nuevo' | null>(null)
+
+  return (
+    <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
+      <h1 className="mt-3 text-3xl font-bold tracking-tight">Sabores y datos</h1>
+
+      <div className="mt-4 space-y-2">
+        {productos.map((p) => (
+          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
+            <PuntoSabor color={p.color_hex} className="h-11 w-11" />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
+              {p.descripcion && <div className="truncate text-xs text-apagado">{p.descripcion}</div>}
+              <div className="text-xs text-apagado">
+                Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L{(p.presentacion ?? 1) !== 1 && ` · envase de ${p.presentacion} L`}
+              </div>
+            </div>
+            <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
+          </button>
+        ))}
+        <Boton variante="secundario" className="w-full" onClick={() => setEditando('nuevo')}><Plus size={18} /> Nuevo sabor</Boton>
+      </div>
+
+      <h2 className="mt-8 text-2xl font-semibold tracking-tight">Tus datos</h2>
+      <DatosYRespaldo />
+
+      {editando && (
+        <FormSabor
+          producto={editando === 'nuevo' ? undefined : editando}
+          tieneVentas={editando !== 'nuevo' && pedidos.some((p) => p.items.some((i) => i.productoId === editando.id))}
+          onCerrar={() => setEditando(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Respaldo, restauración y (sin servidor) borrado de datos. `equipo` es el aparato donde se guarda: el teléfono, o la
+// computadora en el panel de administración.
+export function DatosYRespaldo({ equipo = 'teléfono' }: { equipo?: string }) {
+  const cola = useLiveQuery(() => db.cola.count(), []) ?? 0
   const [confirmarBorrado, setConfirmarBorrado] = useState(false)
 
   async function exportar() {
@@ -49,29 +88,9 @@ export function Ajustes() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">Sabores y datos</h1>
-
-      <div className="mt-4 space-y-2">
-        {productos.map((p) => (
-          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
-            <PuntoSabor color={p.color_hex} className="h-11 w-11" />
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
-              {p.descripcion && <div className="truncate text-xs text-apagado">{p.descripcion}</div>}
-              <div className="text-xs text-apagado">
-                Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L{(p.presentacion ?? 1) !== 1 && ` · envase de ${p.presentacion} L`}
-              </div>
-            </div>
-            <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
-          </button>
-        ))}
-        <Boton variante="secundario" className="w-full" onClick={() => setEditando('nuevo')}><Plus size={18} /> Nuevo sabor</Boton>
-      </div>
-
-      <h2 className="mt-8 text-2xl font-semibold tracking-tight">Tus datos</h2>
+    <>
       <p className="mt-1 text-sm text-apagado">
-        Todo se guarda en este teléfono y funciona sin internet.
+        Todo se guarda en este {equipo} y funciona sin internet.
         {MODO_SERVIDOR
           ? cola > 0 ? <> Hay {cola} cambios por enviar al servidor; salen solos cuando haya señal.</> : <> Se sincroniza solo con el servidor.</>
           : <> Mientras no haya servidor, descarga un respaldo seguido.{cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}</>}
@@ -87,25 +106,17 @@ export function Ajustes() {
       {!MODO_SERVIDOR && (
         <Boton variante="peligro" className="mt-2 w-full" onClick={() => setConfirmarBorrado(true)}><Trash2 size={18} /> Borrar clientes y pedidos</Boton>
       )}
-
-      {editando && (
-        <FormSabor
-          producto={editando === 'nuevo' ? undefined : editando}
-          tieneVentas={editando !== 'nuevo' && pedidos.some((p) => p.items.some((i) => i.productoId === editando.id))}
-          onCerrar={() => setEditando(null)}
-        />
-      )}
       <Hoja abierta={confirmarBorrado} onCerrar={() => setConfirmarBorrado(false)} titulo="¿Borrar todo?">
         <div className="space-y-3 pb-3">
-          <p className="text-apagado">Se borran clientes, pedidos y recordatorios de este teléfono. Los sabores se quedan. No se puede deshacer.</p>
+          <p className="text-apagado">Se borran clientes, pedidos y recordatorios de este {equipo}. Los sabores se quedan. No se puede deshacer.</p>
           <Boton variante="peligro" className="w-full" onClick={async () => { await borrarTodo(); localStorage.removeItem('ruta-del-dia'); setConfirmarBorrado(false); aviso('Datos borrados') }}>Sí, borrar</Boton>
         </div>
       </Hoja>
-    </div>
+    </>
   )
 }
 
-function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; tieneVentas: boolean; onCerrar: () => void }) {
+export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Producto; tieneVentas: boolean; onCerrar: () => void }) {
   const [sabor, setSabor] = useState(producto?.sabor ?? '')
   const [descripcion, setDescripcion] = useState(producto?.descripcion ?? '')
   const [presentacion, setPresentacion] = useState(String(producto?.presentacion ?? 1))
