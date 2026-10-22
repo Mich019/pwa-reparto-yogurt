@@ -1,6 +1,6 @@
 // Códigos de cliente: el QR impreso (RF-015 a 018), la tarjeta NFC (RF-019, 020) y cómo se leen (RF-022).
 import { db, guardar, uid, type Cliente } from './db'
-import { Documento, ajustarTexto, type Bytes } from './pdf'
+import { Documento, ajustarTexto, descargarArchivo, type Bytes } from './pdf'
 
 // Lo que lleva el QR. El prefijo sirve para reconocer de un vistazo un código de esta app y descartar
 // cualquier otro QR que pase por la cámara. También se acepta el UUID solo, por si se imprimió así.
@@ -117,24 +117,21 @@ export async function pdfEtiquetas(clientes: Cliente[]): Promise<Bytes> {
   return pdf.bytes()
 }
 
-// Abre la hoja de compartir del teléfono (ahí está "Imprimir"); donde no existe, descarga el archivo.
-export async function entregarPdf(bytes: Bytes, nombre: string): Promise<'compartido' | 'descargado' | 'cancelado'> {
-  const archivo = new File([bytes], nombre, { type: 'application/pdf' })
-  if (navigator.canShare?.({ files: [archivo] })) {
-    try {
-      await navigator.share({ files: [archivo], title: nombre })
-      return 'compartido'
-    } catch (e) {
-      if ((e as DOMException).name === 'AbortError') return 'cancelado'
-    }
+// Compartir el PDF (WhatsApp, correo, "Imprimir" del teléfono) sólo en pantallas táctiles: en Chrome de Windows
+// también existe, pero abre el panel de Windows en lugar de guardar el archivo. Descargar siempre está disponible.
+export const puedeCompartirPdf = () =>
+  matchMedia('(pointer: coarse)').matches && !!navigator.canShare?.({ files: [new File([], 'x.pdf', { type: 'application/pdf' })] })
+
+// Abre la hoja de compartir del teléfono; si falla (p. ej. el navegador ya no la deja abrir), descarga el archivo.
+export async function compartirPdf(bytes: Bytes, nombre: string): Promise<'compartido' | 'descargado' | 'cancelado'> {
+  try {
+    await navigator.share({ files: [new File([bytes], nombre, { type: 'application/pdf' })], title: nombre })
+    return 'compartido'
+  } catch (e) {
+    if ((e as DOMException).name === 'AbortError') return 'cancelado'
+    descargarArchivo(bytes, nombre)
+    return 'descargado'
   }
-  const url = URL.createObjectURL(archivo)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nombre
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
-  return 'descargado'
 }
 
 export const nombreArchivo = (texto: string) =>

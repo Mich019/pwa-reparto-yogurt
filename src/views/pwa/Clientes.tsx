@@ -1,13 +1,14 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { ChevronRight, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
+import { BookUser, ChevronRight, Download, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { DIAS_CORTOS, DIAS_LARGOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
+import { exportarLibreta, type Formato } from '../../lib/reportes'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { CambiarVendedor } from './Equipo'
@@ -34,6 +35,8 @@ export function Clientes() {
   const [perfilId, setPerfilId] = useState<string | null>(null)
   const [escaner, setEscaner] = useState(false)
   const [imprimir, setImprimir] = useState(false)
+  const [libreta, setLibreta] = useState(false)
+  const rol = useRol()
 
   const prod = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
   const stats = useMemo(() => {
@@ -73,9 +76,15 @@ export function Clientes() {
             <button onClick={() => setEscaner(true)} aria-label="Escanear QR o tarjeta" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
               <ScanLine size={20} />
             </button>
-            <button onClick={() => setImprimir(true)} aria-label="Imprimir QR" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
+            <button onClick={() => setImprimir(true)} aria-label="Imprimir QR" title="Imprimir QR" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
               <Printer size={20} />
             </button>
+            {/* La libreta junta la cartera de todos los vendedores en el servidor: sólo el administrador. */}
+            {MODO_SERVIDOR && rol === 'administrador' && (
+              <button onClick={() => setLibreta(true)} aria-label="Libreta de clientes" title="Libreta de clientes" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
+                <BookUser size={20} />
+              </button>
+            )}
             <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-full bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
               {verInactivos ? 'Activos' : 'Archivados'}
             </button>
@@ -119,6 +128,7 @@ export function Clientes() {
       </button>
 
       {imprimir && <ImpresionMasiva clientes={clientes} onCerrar={() => setImprimir(false)} />}
+      <HojaLibreta abierta={libreta} onCerrar={() => setLibreta(false)} />
       {escaner && (
         <Suspense fallback={null}>
           <Escaner onCliente={(c) => { setEscaner(false); setPerfilId(c.id) }} onCerrar={() => setEscaner(false)} />
@@ -399,4 +409,49 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
   }, [punto])
 
   return <div ref={div} className="h-48 overflow-hidden rounded-2xl bg-niebla" />
+}
+
+const FORMATOS_LIBRETA: Record<Formato, string> = {
+  pdf: 'Un directorio listo para imprimir, en hoja horizontal: resumen por vendedor y los clientes de cada uno con teléfono, dirección, días de visita, última compra y lo que han comprado.',
+  xlsx: 'Un libro de Excel con todos los clientes activos en una tabla con filtros: contacto, dirección, referencias, días y horario de visita, compras acumuladas y ubicación.',
+  csv: 'La misma tabla que el Excel, en un archivo CSV para importarla en otro sistema.',
+}
+
+function HojaLibreta({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => void }) {
+  const [formato, setFormato] = useState<Formato>('pdf')
+  const [bajando, setBajando] = useState(false)
+
+  async function descargar() {
+    setBajando(true)
+    try {
+      aviso(`Se descargó ${await exportarLibreta(formato)}`)
+      onCerrar()
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo descargar')
+    } finally {
+      setBajando(false)
+    }
+  }
+
+  return (
+    <Hoja
+      abierta={abierta}
+      onCerrar={onCerrar}
+      titulo="Libreta de clientes"
+      pie={<Boton onClick={descargar} disabled={bajando} className="w-full"><Download size={18} /> {bajando ? 'Preparando…' : 'Descargar'}</Boton>}
+    >
+      <p className="text-sm text-apagado">Todos los clientes activos de todos los vendedores, con sus datos al día de hoy.</p>
+      <Segmentado
+        valor={formato}
+        onChange={setFormato}
+        className="mt-3"
+        opciones={[
+          { valor: 'pdf', texto: <><FileDown size={16} /> PDF</> },
+          { valor: 'xlsx', texto: <><FileSpreadsheet size={16} /> Excel</> },
+          { valor: 'csv', texto: <><FileText size={16} /> CSV</> },
+        ]}
+      />
+      <p className="mt-3 pb-4 text-sm text-apagado">{FORMATOS_LIBRETA[formato]}</p>
+    </Hoja>
+  )
 }

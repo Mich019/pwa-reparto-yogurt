@@ -10,6 +10,7 @@ export interface Tabla {
   nombre: string // nombre de la hoja (máx. 31 caracteres)
   columnas: { titulo: string; tipo: Tipo; ancho?: number }[]
   filas: Valor[][]
+  total?: Valor[] // renglón de totales al pie (sólo en Excel; el CSV lleva únicamente los datos)
 }
 
 const desenvolver = (x: Valor, base: Tipo): { v: string | number | null; t: Tipo } =>
@@ -37,24 +38,35 @@ export function aCsv(t: Tabla): Buffer {
 
 // ------------------------------------------------------------------ XLSX
 
-// Estilos (índice en cellXfs): 0 normal · 1 encabezado · 2 fecha · 3 entero · 4 litros · 5 dinero · 6 porcentaje
-const ESTILO: Record<Tipo | 'encabezado', number> = { texto: 0, encabezado: 1, fecha: 2, entero: 3, litros: 4, dinero: 5, porcentaje: 6 }
+// Cada hoja: título (fila 1), periodo y fecha de generación (fila 2), encabezados (fila 4), datos con renglones
+// alternados y, si la tabla lo trae, un renglón de totales. Colores de la marca (--color-marca en src/index.css).
+const FILA_ENCABEZADO = 4
+
+// Estilos (índice en cellXfs): 0 vacío · 1 título · 2 subtítulo · 3 encabezado · desde 4, uno por tipo y variante
+// (renglón normal, renglón alterno, totales).
+const TIPOS: Tipo[] = ['texto', 'fecha', 'entero', 'litros', 'dinero', 'porcentaje']
+const FORMATO: Record<Tipo, number> = { texto: 0, fecha: 164, entero: 3, litros: 167, dinero: 165, porcentaje: 166 }
+const VARIANTES = [
+  { fontId: 0, fillId: 0, borderId: 1 }, // renglón
+  { fontId: 0, fillId: 3, borderId: 1 }, // renglón alterno
+  { fontId: 4, fillId: 4, borderId: 2 }, // totales
+] as const
+type Variante = 0 | 1 | 2
+const estilo = (t: Tipo, v: Variante) => 4 + v * TIPOS.length + TIPOS.indexOf(t)
 
 const ESTILOS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/><numFmt numFmtId="165" formatCode="&quot;$&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="0.0&quot;%&quot;"/></numFmts>
-<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill></fills>
-<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<numFmts count="4"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="&quot;$&quot;#,##0.00;[Red]\\-&quot;$&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="0.0&quot;%&quot;;[Red]\\-0.0&quot;%&quot;"/><numFmt numFmtId="167" formatCode="#,##0.0&quot; L&quot;"/></numFmts>
+<fonts count="5"><font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF035D38"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FF6B6B6B"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/></font></fonts>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF035D38"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F7F4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE1EEE6"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFDDE5E0"/></bottom><diagonal/></border><border><left/><right/><top style="medium"><color rgb="FF035D38"/></top><bottom style="thin"><color rgb="FF035D38"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="7">
+<cellXfs count="${4 + VARIANTES.length * TIPOS.length}">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
-<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
-<xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
-<xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
-<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
-<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+${VARIANTES.flatMap((v) => TIPOS.map((t) => `<xf numFmtId="${FORMATO[t]}" fontId="${v.fontId}" fillId="${v.fillId}" borderId="${v.borderId}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${t === 'texto' ? 'left' : 'right'}" vertical="center" indent="1"/></xf>`)).join('\n')}
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`
@@ -79,30 +91,59 @@ function serie(fecha: string) {
   return Date.UTC(y, m - 1, d) / 86_400_000 + 25_569
 }
 
-function celdaXlsx(ref: string, x: Valor, base: Tipo): string {
+// Texto "en línea": Excel nunca lo toma por una fórmula, aunque empiece con "=".
+const textoXlsx = (ref: string, s: number, texto: string) => `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${escapar(texto)}</t></is></c>`
+
+function celdaXlsx(ref: string, x: Valor, base: Tipo, variante: Variante): string {
   const { v, t } = desenvolver(x, base)
-  if (v === null || v === undefined || v === '') return ''
-  if (typeof v === 'number') return Number.isFinite(v) ? `<c r="${ref}" s="${ESTILO[t]}"><v>${v}</v></c>` : ''
-  if (t === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return `<c r="${ref}" s="${ESTILO.fecha}"><v>${serie(v)}</v></c>`
-  // Texto "en línea": Excel nunca lo toma por una fórmula, aunque empiece con "=".
-  return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapar(v)}</t></is></c>`
+  // Las celdas vacías también llevan estilo, para que el renglón alterno y los totales se vean completos.
+  if (v === null || v === undefined || v === '' || (typeof v === 'number' && !Number.isFinite(v))) return `<c r="${ref}" s="${estilo(t, variante)}"/>`
+  if (typeof v === 'number') return `<c r="${ref}" s="${estilo(t, variante)}"><v>${v}</v></c>`
+  if (t === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return `<c r="${ref}" s="${estilo('fecha', variante)}"><v>${serie(v)}</v></c>`
+  return textoXlsx(ref, estilo('texto', variante), v)
 }
 
-function hojaXml(t: Tabla): string {
+// Lo que ocupa un valor ya con formato ("$1,234.00", "12.5 L"), para el ancho de la columna.
+function largo(x: Valor, base: Tipo) {
+  const { v, t } = desenvolver(x, base)
+  if (typeof v !== 'number') return t === 'fecha' ? 10 : String(v ?? '').length
+  const entero = Math.round(Math.abs(v)).toLocaleString('en-US').length
+  return entero + (t === 'dinero' ? 5 : t === 'litros' ? 4 : t === 'porcentaje' ? 3 : 0)
+}
+
+export interface Encabezado {
+  titulo: string // "Reporte de ventas"
+  subtitulo: string // periodo y fecha de generación
+}
+
+function hojaXml(t: Tabla, e: Encabezado): string {
+  const n = t.columnas.length
   const ancho = t.columnas.map((c, i) => {
-    const largo = Math.max(c.titulo.length, ...t.filas.slice(0, 200).map((f) => String(desenvolver(f[i], c.tipo).v ?? '').length))
-    return `<col min="${i + 1}" max="${i + 1}" width="${c.ancho ?? Math.min(48, Math.max(10, largo + 2))}" customWidth="1"/>`
+    const mayor = Math.max(...c.titulo.split(' ').map((p) => p.length), ...[...t.filas.slice(0, 200), ...(t.total ? [t.total] : [])].map((f) => largo(f[i], c.tipo)))
+    return `<col min="${i + 1}" max="${i + 1}" width="${c.ancho ?? Math.min(48, Math.max(11, mayor + 5))}" customWidth="1"/>`
   })
+  const primera = FILA_ENCABEZADO + 1
   const filas = [
-    `<row r="1">${t.columnas.map((c, i) => `<c r="${letra(i)}1" s="${ESTILO.encabezado}" t="inlineStr"><is><t>${escapar(c.titulo)}</t></is></c>`).join('')}</row>`,
-    ...t.filas.map((f, r) => `<row r="${r + 2}">${f.map((x, i) => celdaXlsx(`${letra(i)}${r + 2}`, x, t.columnas[i].tipo)).join('')}</row>`),
+    `<row r="1" ht="26" customHeight="1">${textoXlsx('A1', 1, `${e.titulo} · ${t.nombre}`)}</row>`,
+    `<row r="2">${textoXlsx('A2', 2, e.subtitulo)}</row>`,
+    `<row r="${FILA_ENCABEZADO}" ht="30" customHeight="1">${t.columnas.map((c, i) => textoXlsx(`${letra(i)}${FILA_ENCABEZADO}`, 3, c.titulo)).join('')}</row>`,
+    ...t.filas.map((f, r) => `<row r="${primera + r}" ht="18" customHeight="1">${f.map((x, i) => celdaXlsx(`${letra(i)}${primera + r}`, x, t.columnas[i].tipo, (r % 2) as Variante)).join('')}</row>`),
   ]
-  const ultima = `${letra(t.columnas.length - 1)}${t.filas.length + 1}`
+  const fin = primera + t.filas.length - 1
+  if (t.total && t.filas.length) {
+    const total = t.total
+    filas.push(`<row r="${fin + 1}" ht="20" customHeight="1">${t.columnas.map((c, i) => celdaXlsx(`${letra(i)}${fin + 1}`, total[i] ?? null, c.tipo, 2)).join('')}</row>`)
+  }
   return (
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-    `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>` +
+    `<sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="${FILA_ENCABEZADO}" topLeftCell="A${primera}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
     `<cols>${ancho.join('')}</cols><sheetData>${filas.join('')}</sheetData>` +
-    (t.filas.length ? `<autoFilter ref="A1:${ultima}"/>` : '') +
+    (t.filas.length ? `<autoFilter ref="A${FILA_ENCABEZADO}:${letra(n - 1)}${fin}"/>` : '') +
+    // Al imprimir: horizontal, todas las columnas en el ancho de la hoja y el encabezado repetido en cada página.
+    `<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/>` +
+    `<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>` +
+    `<headerFooter><oddFooter>&amp;L${escapar(e.titulo)}&amp;RPágina &amp;P de &amp;N</oddFooter></headerFooter>` +
     `</worksheet>`
   )
 }
@@ -160,8 +201,8 @@ function zip(archivos: { nombre: string; datos: Buffer }[]): Buffer {
 
 const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
 
-export function aXlsx(tablas: Tabla[]): Buffer {
-  const hojas = tablas.map((t, i) => ({ id: i + 1, ...t }))
+export function aXlsx(tablas: Tabla[], encabezado: Encabezado): Buffer {
+  const hojas = tablas.map((t, i) => ({ id: i + 1, ...t, nombre: t.nombre.replace(/[\[\]:*?/\\]/g, ' ').slice(0, 31) }))
   const archivos = [
     {
       nombre: '[Content_Types].xml',
@@ -182,8 +223,10 @@ export function aXlsx(tablas: Tabla[]): Buffer {
       datos:
         XML +
         `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>` +
-        hojas.map((h) => `<sheet name="${escapar(h.nombre.replace(/[\[\]:*?/\\]/g, ' ').slice(0, 31))}" sheetId="${h.id}" r:id="rId${h.id}"/>`).join('') +
-        `</sheets></workbook>`,
+        hojas.map((h) => `<sheet name="${escapar(h.nombre)}" sheetId="${h.id}" r:id="rId${h.id}"/>`).join('') +
+        `</sheets><definedNames>` +
+        hojas.map((h, i) => `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">'${escapar(h.nombre.replace(/'/g, "''"))}'!$${FILA_ENCABEZADO}:$${FILA_ENCABEZADO}</definedName>`).join('') +
+        `</definedNames></workbook>`,
     },
     {
       nombre: 'xl/_rels/workbook.xml.rels',
@@ -194,7 +237,7 @@ export function aXlsx(tablas: Tabla[]): Buffer {
         `<Relationship Id="rId${hojas.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     },
     { nombre: 'xl/styles.xml', datos: ESTILOS_XML },
-    ...hojas.map((h) => ({ nombre: `xl/worksheets/sheet${h.id}.xml`, datos: hojaXml(h) })),
+    ...hojas.map((h) => ({ nombre: `xl/worksheets/sheet${h.id}.xml`, datos: hojaXml(h, encabezado) })),
   ].map((a) => ({ nombre: a.nombre, datos: Buffer.from(a.datos, 'utf8') }))
   return zip(archivos)
 }

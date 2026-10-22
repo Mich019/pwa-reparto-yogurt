@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
 import { dinero, hoy, sumarDias } from '../../lib/fechas'
 import {
   agrupacionesPosibles, agrupacionSugerida, cambio, diasDelRango, exportarReporte, mover, rangoDe, TABLAS_CSV, textoPeriodo, textoRango, useReporte,
@@ -108,7 +108,7 @@ export function Reportes() {
         )}
       </div>
 
-      <HojaExportar abierta={exportando} onCerrar={() => setExportando(false)} rango={rango} agrupar={agrupar} />
+      {reporte && <HojaExportar abierta={exportando} onCerrar={() => setExportando(false)} reporte={reporte} />}
     </div>
   )
 }
@@ -326,7 +326,7 @@ function Cambio({ valor }: { valor: number }): ReactNode {
   )
 }
 
-function HojaExportar({ abierta, onCerrar, rango, agrupar }: { abierta: boolean; onCerrar: () => void; rango: Rango; agrupar: Agrupar }) {
+function HojaExportar({ abierta, onCerrar, reporte }: { abierta: boolean; onCerrar: () => void; reporte: Reporte }) {
   const [formato, setFormato] = useState<Formato>('xlsx')
   const [tabla, setTabla] = useState<TablaCsv>('ventas')
   const [bajando, setBajando] = useState(false)
@@ -334,7 +334,7 @@ function HojaExportar({ abierta, onCerrar, rango, agrupar }: { abierta: boolean;
   async function descargar() {
     setBajando(true)
     try {
-      const nombre = await exportarReporte(rango, agrupar, formato, tabla)
+      const nombre = await exportarReporte(reporte, formato, tabla)
       aviso(`Se descargó ${nombre}`)
       onCerrar()
     } catch (e) {
@@ -351,18 +351,21 @@ function HojaExportar({ abierta, onCerrar, rango, agrupar }: { abierta: boolean;
       titulo="Exportar reporte"
       pie={<Boton onClick={descargar} disabled={bajando} className="w-full"><Download size={18} /> {bajando ? 'Preparando…' : 'Descargar'}</Boton>}
     >
-      <p className="text-sm text-apagado">Del {rango.desde} al {rango.hasta}.</p>
+      <p className="text-sm text-apagado">Del {reporte.desde.split('-').reverse().join('/')} al {reporte.hasta.split('-').reverse().join('/')}.</p>
       <Segmentado
         valor={formato}
         onChange={setFormato}
         className="mt-3"
         opciones={[
+          { valor: 'pdf', texto: <><FileDown size={16} /> PDF</> },
           { valor: 'xlsx', texto: <><FileSpreadsheet size={16} /> Excel</> },
           { valor: 'csv', texto: <><FileText size={16} /> CSV</> },
         ]}
       />
-      {formato === 'xlsx' ? (
-        <p className="mt-3 pb-4 text-sm text-apagado">Un libro de Excel (.xlsx) con cinco hojas: resumen, por periodo, por sabor, por vendedor y el historial de ventas.</p>
+      {formato === 'pdf' ? (
+        <p className="mt-3 pb-4 text-sm text-apagado">Un documento listo para leer o imprimir: cifras clave, gráfica de ingresos y tablas por sabor, por vendedor y por {AGRUPAR[reporte.agrupar].toLowerCase()}.</p>
+      ) : formato === 'xlsx' ? (
+        <p className="mt-3 pb-4 text-sm text-apagado">Un libro de Excel (.xlsx) con cinco hojas: resumen, por periodo, por sabor, por vendedor y el historial de ventas, con totales y listo para imprimir.</p>
       ) : (
         <div className="mt-3 pb-4">
           <p className="mb-2 text-sm text-apagado">Un archivo CSV tiene una sola tabla. Elige cuál.</p>

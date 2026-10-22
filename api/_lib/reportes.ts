@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Db } from './db.js'
-import { aCsv, aXlsx, type Tabla, type Valor } from './exportar.js'
+import { aCsv, aXlsx, type Tabla, type Tipo, type Valor } from './exportar.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
@@ -276,6 +276,7 @@ async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
     [q.desde, q.hasta],
   )
   if (rows.length > MAX_RENGLONES_HISTORIAL) return null
+  const suma = (k: string) => r2(rows.reduce((s, f) => s + Number(f[k]), 0))
   return {
     nombre: 'Ventas',
     columnas: [
@@ -290,6 +291,7 @@ async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
       { titulo: 'Pago', tipo: 'texto' },
     ],
     filas: rows.map((f) => [f.fecha, f.vendedor, f.cliente, f.sabor, num(f.litros), num(f.importe), num(f.costo), num(f.utilidad), f.metodo_pago]),
+    total: ['Total', null, null, null, suma('litros'), suma('importe'), suma('costo'), suma('utilidad'), null],
   }
 }
 
@@ -306,6 +308,7 @@ const tablaPeriodos = (r: Reporte): Tabla => ({
     { titulo: 'Margen (%)', tipo: 'porcentaje' },
   ],
   filas: r.periodos.map((p) => [p.inicio, p.fin, p.pedidos, p.litros, p.ingreso, p.costo, p.utilidad, pct(p.utilidad, p.ingreso)]),
+  total: ['Total', null, r.resumen.pedidos, r.resumen.litros, r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct],
 })
 
 const tablaSabores = (r: Reporte): Tabla => ({
@@ -324,6 +327,7 @@ const tablaSabores = (r: Reporte): Tabla => ({
     i + 1, s.sabor, s.litros, s.ingreso, s.costo, s.utilidad, s.margenPct,
     s.id === r.ranking.estrella ? 'Sabor estrella' : s.id === r.ranking.menorRotacion ? 'Menor rotación' : s.sinCosto ? 'Sin costo capturado' : null,
   ]),
+  total: [null, 'Total', r.resumen.litros, r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct, null],
 })
 
 const tablaVendedores = (r: Reporte): Tabla => ({
@@ -339,30 +343,49 @@ const tablaVendedores = (r: Reporte): Tabla => ({
     { titulo: 'Visitas sin venta', tipo: 'entero' },
   ],
   filas: r.vendedores.map((v) => [v.nombre + (v.activo || v.id === null ? '' : ' (baja)'), v.pedidos, v.clientes, v.litros, v.ingreso, v.utilidad, v.ticketPromedio, v.omitidos]),
+  // Clientes del total: los distintos de todo el periodo (un cliente que pasó de un vendedor a otro cuenta una vez).
+  total: ['Total', r.resumen.pedidos, r.resumen.clientes, r.resumen.litros, r.resumen.ingreso, r.resumen.utilidad, r.resumen.ticketPromedio, r.vendedores.reduce((s, v) => s + v.omitidos, 0)],
 })
 
+const fechaMx = (s: string) => s.split('-').reverse().join('/')
+
+// Cada cifra del periodo junto a la del periodo anterior y cuánto cambió (si hay con qué comparar).
 const tablaResumen = (r: Reporte): Tabla => {
   const x = r.resumen
-  const fila = (concepto: string, v: Valor): Valor[] => [concepto, v]
+  const a = r.anterior?.resumen
+  const conceptos: [string, keyof Resumen, Tipo][] = [
+    ['Ingresos', 'ingreso', 'dinero'],
+    ['Costos de producción', 'costo', 'dinero'],
+    ['Utilidad neta', 'utilidad', 'dinero'],
+    ['Margen', 'margenPct', 'porcentaje'],
+    ['Litros entregados', 'litros', 'litros'],
+    ['Pedidos entregados', 'pedidos', 'entero'],
+    ['Clientes atendidos', 'clientes', 'entero'],
+    ['Ticket promedio', 'ticketPromedio', 'dinero'],
+    ['Cobrado en efectivo', 'efectivo', 'dinero'],
+    ['Cobrado por transferencia', 'transferencia', 'dinero'],
+  ]
+  // El margen ya es un %: su cambio va en puntos ("+2.5 pts"), no en % del %.
+  const cambio = (k: keyof Resumen, ahora: number | null, antes: number | null | undefined): Valor => {
+    if (ahora === null || antes === null || antes === undefined) return null
+    if (k === 'margenPct') return `${ahora >= antes ? '+' : '-'}${Math.abs(r2(ahora - antes)).toFixed(1)} pts`
+    return { v: antes ? Math.round(((ahora - antes) / Math.abs(antes)) * 1000) / 10 : null, t: 'porcentaje' }
+  }
   return {
     nombre: 'Resumen',
     columnas: [
       { titulo: 'Concepto', tipo: 'texto', ancho: 28 },
-      { titulo: 'Valor', tipo: 'texto', ancho: 24 },
+      { titulo: `${fechaMx(r.desde)} a ${fechaMx(r.hasta)}`, tipo: 'texto', ancho: 26 },
+      ...(r.anterior ? [
+        { titulo: `Anterior: ${fechaMx(r.anterior.desde)} a ${fechaMx(r.anterior.hasta)}`, tipo: 'texto' as const, ancho: 26 },
+        { titulo: 'Cambio', tipo: 'texto' as const, ancho: 14 },
+      ] : []),
     ],
-    filas: [
-      fila('Periodo', `${r.desde} a ${r.hasta}`),
-      fila('Ingresos', { v: x.ingreso, t: 'dinero' }),
-      fila('Costos de producción', { v: x.costo, t: 'dinero' }),
-      fila('Utilidad neta', { v: x.utilidad, t: 'dinero' }),
-      fila('Margen (%)', { v: x.margenPct, t: 'porcentaje' }),
-      fila('Litros entregados', { v: x.litros, t: 'litros' }),
-      fila('Pedidos entregados', { v: x.pedidos, t: 'entero' }),
-      fila('Clientes atendidos', { v: x.clientes, t: 'entero' }),
-      fila('Ticket promedio', { v: x.ticketPromedio, t: 'dinero' }),
-      fila('Cobrado en efectivo', { v: x.efectivo, t: 'dinero' }),
-      fila('Cobrado por transferencia', { v: x.transferencia, t: 'dinero' }),
-    ],
+    filas: conceptos.map(([concepto, k, t]) => [
+      concepto,
+      { v: x[k], t },
+      ...(a ? [{ v: a[k], t }, cambio(k, x[k], a[k])] : []),
+    ]),
   }
 }
 
@@ -370,7 +393,7 @@ const tablaResumen = (r: Reporte): Tabla => {
 
 const MIME = { xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', csv: 'text/csv; charset=utf-8' } as const
 
-export async function rutasReportes(app: FastifyInstance, { db }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
+export async function rutasReportes(app: FastifyInstance, { db, config }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
   // Valida el rango; responde 400 si no se puede usar.
   function rango<T extends Consulta>(raw: unknown, schema: z.ZodType<T>, rep: FastifyReply): T | undefined {
     const q = schema.safeParse(raw)
@@ -401,7 +424,9 @@ export async function rutasReportes(app: FastifyInstance, { db }: Contexto, { re
     if (ventas === null) return rep.code(413).send({ error: 'Son demasiadas ventas para un solo archivo. Elige un periodo más corto.' })
 
     let datos: Buffer
-    if (formato === 'xlsx') datos = aXlsx([tablaResumen(r), tablaPeriodos(r), tablaSabores(r), tablaVendedores(r), ventas!])
+    const generado = new Date().toLocaleString('es-MX', { timeZone: config.zonaHoraria, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const encabezado = { titulo: 'Reporte de ventas', subtitulo: `Del ${fechaMx(q.desde)} al ${fechaMx(q.hasta)} · Generado el ${generado}` }
+    if (formato === 'xlsx') datos = aXlsx([tablaResumen(r), tablaPeriodos(r), tablaSabores(r), tablaVendedores(r), ventas!], encabezado)
     else datos = aCsv({ ventas: ventas!, periodos: tablaPeriodos(r), sabores: tablaSabores(r), vendedores: tablaVendedores(r) }[tabla]!)
 
     const nombre = `reporte-${formato === 'xlsx' ? 'ventas' : tabla}-${q.desde}_${q.hasta}.${formato}`

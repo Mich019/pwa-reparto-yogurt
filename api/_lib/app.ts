@@ -9,6 +9,7 @@ import { rutasCartera } from './cartera.js'
 import { crearDespachador, rutasNotificaciones } from './notificaciones.js'
 import { crearEnviador, type Enviador } from './push.js'
 import { rutasReportes } from './reportes.js'
+import { rutasLibreta } from './libreta.js'
 import { rutasStock } from './stock.js'
 import { rutasUsuarios } from './usuarios.js'
 import { rutasAdmin } from './admin.js'
@@ -114,6 +115,7 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
   await rutasCartera(app, ctx, { requiereAdmin }, despachador)
   await rutasAdmin(app, ctx, { requiereAdmin })
   await rutasReportes(app, ctx, { requiereAdmin })
+  await rutasLibreta(app, ctx, { requiereAdmin })
   await rutasStock(app, ctx, { requiereAdmin }, despachador)
   await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
 

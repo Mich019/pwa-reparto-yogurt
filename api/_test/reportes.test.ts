@@ -337,15 +337,22 @@ describe('exportar reportes a Excel y CSV (RF-048)', () => {
       ])
       assert.deepEqual([...z['xl/workbook.xml'].matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ['Resumen', 'Por periodo', 'Por sabor', 'Por vendedor', 'Ventas'])
 
+      // Título (fila 1), periodo (fila 2), encabezados (fila 4) y datos desde la fila 5.
+      // Estilos: 4 + variante × 6 + tipo (texto, fecha, entero, litros, dinero, porcentaje); variante 0 normal, 1 alterna, 2 totales.
       const resumen = z['xl/worksheets/sheet1.xml']
-      assert.match(resumen, /<c r="B3" s="5"><v>1000<\/v><\/c>/) // ingresos, con formato de dinero
-      assert.match(resumen, /<c r="B7" s="4"><v>17<\/v><\/c>/) // litros
-      assert.match(resumen, /<c r="B6" s="6"><v>66.5<\/v><\/c>/) // margen
+      assert.ok(resumen.includes('<t xml:space="preserve">Reporte de ventas · Resumen</t>'))
+      assert.ok(resumen.includes('Del 01/10/2026 al 15/10/2026'))
+      assert.match(resumen, /<c r="B5" s="8"><v>1000<\/v><\/c>/) // ingresos, con formato de dinero
+      assert.match(resumen, /<c r="B8" s="15"><v>66.5<\/v><\/c>/) // margen, en renglón alterno
+      assert.match(resumen, /<c r="B9" s="7"><v>17<\/v><\/c>/) // litros
 
       const ventas = z['xl/worksheets/sheet5.xml']
-      assert.equal((ventas.match(/<row /g) ?? []).length, 1 + 6)
-      assert.match(ventas, /<c r="A2" s="2"><v>46300<\/v><\/c>/) // 2026-10-05 como fecha de Excel
-      assert.match(ventas, /<autoFilter ref="A1:I7"\/>/)
+      assert.equal((ventas.match(/<row /g) ?? []).length, 3 + 6 + 1) // título, periodo, encabezados, 6 renglones y totales
+      assert.match(ventas, /<c r="A5" s="5"><v>46300<\/v><\/c>/) // 2026-10-05 como fecha de Excel
+      assert.match(ventas, /<autoFilter ref="A4:I10"\/>/) // el filtro no incluye los totales
+      assert.match(ventas, /<c r="A11" s="16" t="inlineStr"><is><t xml:space="preserve">Total<\/t><\/is><\/c>/)
+      assert.match(ventas, /<c r="F11" s="20"><v>1000<\/v><\/c>/) // suma de importes = ingresos del periodo
+      assert.ok(z['xl/workbook.xml'].includes(`<definedName name="_xlnm.Print_Titles" localSheetId="4">'Ventas'!$4:$4</definedName>`))
       // El nombre con forma de fórmula queda como texto, nunca como <f>
       assert.ok(ventas.includes('=HYPERLINK(&quot;http://malo.example&quot;,&quot;clic&quot;)'))
       assert.ok(!ventas.includes('<f>'))
@@ -357,8 +364,66 @@ describe('exportar reportes a Excel y CSV (RF-048)', () => {
       const r = await pedir(srv, admin, '/reportes/exportar?desde=2026-08-01&hasta=2026-08-03&formato=xlsx')
       assert.equal(r.statusCode, 200)
       const z = leerZip(r.rawPayload)
-      assert.equal((z['xl/worksheets/sheet5.xml'].match(/<row /g) ?? []).length, 1)
+      assert.equal((z['xl/worksheets/sheet5.xml'].match(/<row /g) ?? []).length, 3) // título, periodo y encabezados; sin totales
       assert.ok(!z['xl/worksheets/sheet5.xml'].includes('autoFilter'))
+    })
+  })
+})
+
+describe('libreta de clientes', () => {
+  it('sólo el administrador la descarga', async () => {
+    await escenario(async ({ srv, ana }) => {
+      assert.equal((await json(srv, ana, '/reportes/clientes')).status, 403)
+      assert.equal((await json(srv, null, '/reportes/clientes')).status, 401)
+      assert.equal((await json(srv, ana, '/reportes/clientes?formato=xlsx')).status, 403)
+    })
+  })
+
+  it('lista la cartera activa con contacto, días de visita y lo que ha comprado cada cliente', async () => {
+    await escenario(async ({ srv, pool, admin, ana, c2, c3 }) => {
+      await pool.query(`UPDATE clientes SET dias_semana = '{5,1}', ventana_horario = 'tarde', id_vendedor = $2 WHERE id_cliente = $1`, [c2, ana.id])
+      await pool.query(`UPDATE clientes SET frecuencia_tipo = 'intervalo', cada_dias = 7 WHERE id_cliente = $1`, [c3])
+      await pool.query(`INSERT INTO clientes (nombre, direccion, activo) VALUES ('Archivado', 'Calle 2', false)`)
+      const { status, body } = await json(srv, admin, '/reportes/clientes')
+      assert.equal(status, 200)
+      assert.deepEqual(body.clientes.map((c: any) => c.nombre).sort(), ['=HYPERLINK("http://malo.example","clic")', 'Doña Lupita', 'Tienda "El Sol", Centro'])
+      assert.equal(body.clientes[0].vendedor, 'Ana') // primero los que tienen vendedor; «Sin vendedor» al final
+
+      const lupita = body.clientes.find((c: any) => c.nombre === 'Doña Lupita')
+      assert.equal(lupita.vendedor, 'Sin vendedor')
+      assert.equal(lupita.visita, 'Sin días fijos')
+      assert.equal(lupita.horario, 'Mañana')
+      // Cuentan sólo los pedidos entregados, de cualquier fecha
+      assert.equal(lupita.pedidos, 4)
+      assert.equal(lupita.litros, 21)
+      assert.equal(lupita.comprado, 1225)
+      assert.equal(lupita.ultimaCompra, '2026-10-16')
+      assert.equal(lupita.proximaEntrega, '2026-10-06') // el pedido pendiente
+      assert.equal(lupita.saborFavorito, 'Fresa')
+
+      const sol = body.clientes.find((c: any) => c.nombre.startsWith('Tienda'))
+      assert.equal(sol.visita, 'Lun, Vie') // la semana empieza en lunes
+      assert.equal(sol.horario, 'Tarde')
+      assert.equal(body.clientes.find((c: any) => c.nombre.startsWith('=')).visita, 'Cada 7 días')
+    })
+  })
+
+  it('se exporta a Excel con una hoja y totales, y a CSV sin fórmulas', async () => {
+    await escenario(async ({ srv, admin }) => {
+      const x = await pedir(srv, admin, '/reportes/clientes?formato=xlsx')
+      assert.equal(x.statusCode, 200)
+      assert.match(x.headers['content-disposition'] as string, /^attachment; filename="libreta-clientes-\d{4}-\d{2}-\d{2}\.xlsx"$/)
+      const z = leerZip(x.rawPayload)
+      assert.deepEqual([...z['xl/workbook.xml'].matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ['Directorio'])
+      const hoja = z['xl/worksheets/sheet1.xml']
+      assert.ok(hoja.includes('Libreta de clientes · Directorio'))
+      assert.match(hoja, /<c r="A8" s="16" t="inlineStr"><is><t xml:space="preserve">3 clientes<\/t><\/is><\/c>/) // 3 clientes en filas 5 a 7 y el total
+      assert.ok(!hoja.includes('<f>'))
+
+      const csv = (await pedir(srv, admin, '/reportes/clientes?formato=csv')).rawPayload.toString('utf8')
+      assert.ok(csv.startsWith('﻿Vendedor,Cliente,Teléfono,Dirección'))
+      assert.ok(csv.includes(`"'=HYPERLINK(""http://malo.example"",""clic"")"`))
+      assert.equal((await json(srv, admin, '/reportes/clientes?formato=pdf')).status, 400) // el PDF lo arma la app
     })
   })
 })

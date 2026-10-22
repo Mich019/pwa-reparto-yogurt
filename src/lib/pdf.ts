@@ -26,6 +26,21 @@ const SIGNOS: Record<string, number> = { '¿': 611, '¡': 333, 'º': 365, 'ª': 
 
 export type Bytes = Uint8Array<ArrayBuffer>
 
+// Guarda un archivo en Descargas (computadora o teléfono). El enlace va dentro de la página: Firefox no descarga
+// desde un enlace suelto. La dirección temporal se suelta después, cuando el navegador ya empezó a leerla.
+export function descargarArchivo(datos: Blob | Bytes, nombre: string, tipo = 'application/pdf') {
+  const url = URL.createObjectURL(datos instanceof Blob ? datos : new Blob([datos], { type: tipo }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombre
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  return nombre
+}
+
 export type Fuente = 'normal' | 'negrita' | 'mono'
 const NOMBRE_FUENTE: Record<Fuente, string> = { normal: 'F1', negrita: 'F2', mono: 'F3' }
 const BASE_FUENTE: Record<Fuente, string> = { normal: 'Helvetica', negrita: 'Helvetica-Bold', mono: 'Courier' }
@@ -101,6 +116,11 @@ export class Documento {
   pagina(anchoMm: number, altoMm: number) {
     this.actual = { ancho: anchoMm, alto: altoMm, ops: [] }
     this.paginas.push(this.actual)
+  }
+
+  // Vuelve a dibujar sobre cada página ya hecha: el pie «Página 1 de 3» necesita saber cuántas son.
+  enCadaPagina(dibujar: (n: number, total: number) => void) {
+    this.paginas.forEach((p, i) => { this.actual = p; dibujar(i + 1, this.paginas.length) })
   }
 
   private y(mm: number) { return num((this.actual.alto - mm) * PT) }

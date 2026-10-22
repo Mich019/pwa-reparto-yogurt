@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ErrorRed } from './api'
 import { descargarAutenticado, llamarAutenticado } from './sesion'
 import { desdeIso, hoy, iso, sumarDias } from './fechas'
+import { descargarArchivo } from './pdf'
+import type { ClienteLibreta } from './reportePdf'
 
 // Reportes de ventas para el administrador (RF-043 a RF-048). Los arma el servidor con todo el historial y los
 // costos de cuando se vendió; por eso necesitan conexión y sólo los ve el administrador (RF-005).
@@ -155,7 +157,7 @@ export function useReporte(rango: Rango, agrupar: Agrupar, comparar?: Rango) {
 
 // ------------------------------------------------------------------ exportar (RF-048)
 
-export type Formato = 'xlsx' | 'csv'
+export type Formato = 'xlsx' | 'csv' | 'pdf'
 export type TablaCsv = 'ventas' | 'periodos' | 'sabores' | 'vendedores'
 export const TABLAS_CSV: { valor: TablaCsv; texto: string; ayuda: string }[] = [
   { valor: 'ventas', texto: 'Historial de ventas', ayuda: 'Una fila por sabor entregado a cada cliente' },
@@ -164,16 +166,19 @@ export const TABLAS_CSV: { valor: TablaCsv; texto: string; ayuda: string }[] = [
   { valor: 'vendedores', texto: 'Por vendedor', ayuda: 'Ventas e ingresos de cada vendedor' },
 ]
 
-export async function exportarReporte(r: Rango, agrupar: Agrupar, formato: Formato, tabla: TablaCsv) {
-  const blob = await descargarAutenticado(`/reportes/exportar?desde=${r.desde}&hasta=${r.hasta}&agrupar=${agrupar}&formato=${formato}&tabla=${tabla}`)
-  const nombre = `reporte-${formato === 'xlsx' ? 'ventas' : tabla}-${r.desde}_${r.hasta}.${formato}`
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nombre
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
-  return nombre
+// Excel y CSV los arma el servidor (traen el historial completo de ventas); el PDF, el teléfono con el reporte en pantalla.
+export async function exportarReporte(reporte: Reporte, formato: Formato, tabla: TablaCsv) {
+  const { desde, hasta, agrupar } = reporte
+  const blob = formato === 'pdf'
+    ? new Blob([(await import('./reportePdf')).reportePdf(reporte)], { type: 'application/pdf' })
+    : await descargarAutenticado(`/reportes/exportar?desde=${desde}&hasta=${hasta}&agrupar=${agrupar}&formato=${formato}&tabla=${tabla}`)
+  return descargarArchivo(blob, `reporte-${formato === 'csv' ? tabla : 'ventas'}-${desde}_${hasta}.${formato}`)
+}
+
+// Libreta de clientes: la cartera activa de todos los vendedores. El servidor da los datos (y arma Excel y CSV).
+export async function exportarLibreta(formato: Formato) {
+  const blob = formato === 'pdf'
+    ? new Blob([(await import('./reportePdf')).libretaPdf((await llamarAutenticado<{ clientes: ClienteLibreta[] }>('/reportes/clientes')).clientes)], { type: 'application/pdf' })
+    : await descargarAutenticado(`/reportes/clientes?formato=${formato}`)
+  return descargarArchivo(blob, `libreta-clientes-${hoy()}.${formato}`)
 }
