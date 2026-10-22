@@ -4,6 +4,7 @@ import { cerrarSesion, iniciarSesion, mensajeErrorLogin } from '../../lib/sesion
 import { ErrorApi } from '../../lib/api'
 import { Logo } from '../../components/Logo'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
+import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
 import { FormPassword } from './Cuenta'
 
@@ -15,6 +16,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
   const [esBloqueo, setEsBloqueo] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [recuperando, setRecuperando] = useState(false)
+  const [pideCodigo, setPideCodigo] = useState(false)
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
@@ -29,7 +31,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
     setEsBloqueo(false)
 
     try {
-      await iniciarSesion(c, p)
+      if ((await iniciarSesion(c, p)) === 'codigo') setPideCodigo(true)
     } catch (e: unknown) {
       setEsBloqueo(e instanceof ErrorApi && e.codigo === 'BLOQUEADA')
       setError(mensajeErrorLogin(e))
@@ -46,7 +48,9 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
           <Logo className="h-16 w-16 shadow-sm" textoClassName="text-3xl font-black" />
         </div>
 
-        {recuperando ? (
+        {pideCodigo ? (
+          <PasoCodigo onVolver={() => { setPideCodigo(false); setPassword('') }} />
+        ) : recuperando ? (
           <RecuperarPassword correoInicial={correo} onVolver={(c) => { setCorreo(c); setError(''); setRecuperando(false) }} />
         ) : (
           <form className="space-y-4" onSubmit={entrar}>

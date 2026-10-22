@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
-import { api, apiArchivo, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
+import { api, apiArchivo, COOKIES_POSIBLES, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
-import { CLAVE_REVOCAR, CLAVE_SESION_SW, guardarRevocacion, revocarPendientes, type SesionSegundoPlano } from './envio'
+import { CLAVE_REVOCAR, CLAVE_SESION_SW, REVOCAR_COOKIE, guardarRevocacion, olvidarRevocacionCookie, revocarPendientes, type SesionSegundoPlano } from './envio'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
 // el acceso se renueva solo cuando hay conexión y se pierde sólo al cerrar sesión o si el servidor
@@ -15,10 +15,13 @@ export interface UsuarioSesion {
   rol: Rol
   debeCambiarPassword: boolean
 }
+// Con `cookie`, los tokens no están aquí: viven en cookies HttpOnly que el navegador manda solo (panel web, ver
+// api/_lib/cookies.ts). Lo que se guarda en el teléfono es sólo quién es y cuándo vence el acceso.
 interface Sesion {
-  accessToken: string
+  accessToken?: string
   expiraEn: number
-  refreshToken: string
+  refreshToken?: string
+  cookie?: boolean
   usuario: UsuarioSesion
 }
 
@@ -28,7 +31,7 @@ const oyentes = new Set<() => void>()
 function leer(): Sesion | null {
   try {
     const s = JSON.parse(localStorage.getItem(CLAVE) ?? 'null')
-    return s?.refreshToken && s?.usuario ? s : null
+    return (s?.refreshToken || s?.cookie) && s?.usuario ? s : null
   } catch {
     return null
   }
@@ -51,6 +54,7 @@ function copiarParaSegundoPlano(s: Sesion | null) {
     accessToken: s.accessToken,
     expiraEn: s.expiraEn,
     refreshToken: s.refreshToken,
+    cookie: s.cookie,
     usuarioId: s.usuario.id,
     dispositivo: dispositivoId(),
     debeCambiarPassword: s.usuario.debeCambiarPassword,
@@ -105,18 +109,48 @@ let ultimoPasswordSesion: string | null = null
 export const obtenerUltimoPassword = () => ultimoPasswordSesion
 export const limpiarUltimoPassword = () => { ultimoPasswordSesion = null }
 
-export async function iniciarSesion(correo: string, password: string) {
-  const c = correo.trim()
+// Con verificación en dos pasos, la contraseña sola devuelve un desafío y falta el código (confirmarCodigo).
+let desafio: { token: string; password: string; modo: Modo } | null = null
+type Modo = 'token' | 'cookie'
+
+// `cookie`: el panel web pide la sesión en cookies HttpOnly (si la API está en el mismo dominio). La app de reparto
+// usa tokens: trabaja sin conexión y su service worker los necesita para enviar con la app cerrada.
+export async function iniciarSesion(correo: string, password: string, opciones: { cookie?: boolean } = {}): Promise<'listo' | 'codigo'> {
   const p = password.trim()
-  const r = await api<Sesion>('/auth/login', { cuerpo: { correo: c, password: p, dispositivo: dispositivoId() } })
+  const modo: Modo = opciones.cookie && COOKIES_POSIBLES ? 'cookie' : 'token'
+  const r = await api<Sesion | { dosPasos: true; desafio: string }>('/auth/login', { cuerpo: { correo: correo.trim(), password: p, dispositivo: dispositivoId(), modo } })
+  if ('dosPasos' in r) {
+    desafio = { token: r.desafio, password: p, modo }
+    return 'codigo'
+  }
+  await abrir(r, p)
+  return 'listo'
+}
+
+export async function confirmarCodigo(codigo: string) {
+  if (!desafio) throw new Error('Vuelve a escribir tu contraseña')
+  const { token, password, modo } = desafio
+  try {
+    const r = await api<Sesion>('/auth/login/codigo', { cuerpo: { desafio: token, codigo: codigo.trim(), dispositivo: dispositivoId(), modo } })
+    desafio = null
+    await abrir(r, password)
+  } catch (e) {
+    if (e instanceof ErrorApi && e.codigo === 'DESAFIO_VENCIDO') desafio = null
+    throw e
+  }
+}
+export const cancelarCodigo = () => { desafio = null }
+
+async function abrir(r: Sesion, p: string) {
   try {
     await adoptarUsuario(r.usuario)
   } catch (e) {
-    await api('/auth/logout', { cuerpo: { refreshToken: r.refreshToken } }).catch(() => {})
+    await api('/auth/logout', { cuerpo: r.cookie ? {} : { refreshToken: r.refreshToken } }).catch(() => {})
     throw e
   }
+  if (r.cookie) await olvidarRevocacionCookie().catch(() => {})
   ultimoPasswordSesion = r.usuario.debeCambiarPassword ? p : null
-  fijar({ accessToken: r.accessToken, expiraEn: r.expiraEn, refreshToken: r.refreshToken, usuario: r.usuario })
+  fijar({ accessToken: r.accessToken, expiraEn: r.expiraEn, refreshToken: r.refreshToken, cookie: r.cookie, usuario: r.usuario })
 }
 
 // Mensaje para quien intenta entrar. Los del servidor ya están pensados para mostrarse (cuenta bloqueada o dada de baja);
@@ -131,15 +165,16 @@ export function mensajeErrorLogin(e: unknown): string {
 let renovando: Promise<string | null> | null = null
 
 // Token de acceso vigente, renovándolo si hace falta. null = no se pudo (sin conexión o sesión revocada).
+// '' = sesión en cookie: no hay token que poner, el navegador manda la cookie.
 export async function tokenValido(): Promise<string | null> {
   const s = actual
   if (!s) return null
-  if (s.expiraEn - Date.now() > 60_000) return s.accessToken
+  if (s.expiraEn - Date.now() > 60_000) return s.accessToken ?? ''
   renovando ??= (async () => {
     try {
-      const r = await api<Sesion>('/auth/refresh', { cuerpo: { refreshToken: s.refreshToken } })
-      fijar({ ...r, usuario: r.usuario })
-      return r.accessToken
+      const r = await api<Sesion>('/auth/refresh', { cuerpo: s.cookie ? {} : { refreshToken: s.refreshToken } })
+      fijar({ ...s, ...r, usuario: r.usuario })
+      return r.accessToken ?? ''
     } catch (e) {
       if (e instanceof ErrorApi && e.status === 401) fijar(null) // el servidor revocó la sesión: hay que entrar de nuevo
       if (e instanceof ErrorRed || e instanceof ErrorApi) return null
@@ -164,7 +199,7 @@ export const sesionRevocada = () => fijar(null)
 async function conSesion<T>(llamada: (token: string) => Promise<T>): Promise<T> {
   for (let intento = 0; ; intento++) {
     const token = await tokenValido()
-    if (!token) throw new ErrorRed(actual ? 'Sin conexión' : 'Sin sesión')
+    if (token === null) throw new ErrorRed(actual ? 'Sin conexión' : 'Sin sesión')
     try {
       return await llamada(token)
     } catch (e) {
@@ -191,7 +226,7 @@ export function marcarPasswordPendiente(pendiente: boolean) {
 
 export async function cambiarPassword(actualPassword: string, nueva: string) {
   const token = await tokenValido()
-  if (!token) throw new ErrorRed('Necesitas conexión para cambiar la contraseña')
+  if (token === null) throw new ErrorRed('Necesitas conexión para cambiar la contraseña')
   await api('/auth/cambiar-password', { token, cuerpo: { actual: actualPassword.trim(), nueva: nueva.trim() } })
   limpiarUltimoPassword()
   marcarPasswordPendiente(false)
@@ -211,9 +246,9 @@ export async function cerrarSesion() {
   if (s) {
     // Mejor esfuerzo y con tope de tiempo: sin señal, cerrar sesión no debe quedarse esperando.
     await Promise.race([Promise.allSettled([...antesDeCerrar].map((t) => t())), new Promise((r) => setTimeout(r, 4000))])
-    await api('/auth/logout', { cuerpo: { refreshToken: s.refreshToken } }).catch(async (e) => {
+    await api('/auth/logout', { cuerpo: s.cookie ? {} : { refreshToken: s.refreshToken } }).catch(async (e) => {
       if (!(e instanceof ErrorRed)) return
-      await guardarRevocacion(s.refreshToken).catch(() => {})
+      await guardarRevocacion(s.cookie ? REVOCAR_COOKIE : s.refreshToken!).catch(() => {})
       pedirEnvioEnSegundoPlano()
     })
   }

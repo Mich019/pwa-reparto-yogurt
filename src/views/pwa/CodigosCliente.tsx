@@ -10,7 +10,7 @@ import { descargarArchivo } from '../../lib/pdf'
 import { Boton, Hoja, aviso, claseInput } from '../../components/ui'
 
 // El QR del cliente en pantalla, como vector.
-export function ImagenQR({ texto, className = '' }: { texto: string; className?: string }) {
+export function ImagenQR({ texto, className = '', etiqueta = 'Código QR del cliente' }: { texto: string; className?: string; etiqueta?: string }) {
   const [m, setM] = useState<MatrizQR | null>(null)
   useEffect(() => {
     let vigente = true
@@ -32,7 +32,7 @@ export function ImagenQR({ texto, className = '' }: { texto: string; className?:
   }, [m])
   if (!m) return <div className={`aspect-square animate-pulse rounded-2xl bg-niebla ${className}`} />
   return (
-    <svg viewBox={`0 0 ${m.n + 8} ${m.n + 8}`} shapeRendering="crispEdges" role="img" aria-label="Código QR del cliente" className={`aspect-square rounded-2xl bg-white ring-1 ring-linea ${className}`}>
+    <svg viewBox={`0 0 ${m.n + 8} ${m.n + 8}`} shapeRendering="crispEdges" role="img" aria-label={etiqueta} className={`aspect-square rounded-2xl bg-white ring-1 ring-linea ${className}`}>
       <path d={ruta} fill="#000" />
     </svg>
   )

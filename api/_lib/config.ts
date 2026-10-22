@@ -110,6 +110,29 @@ function leerProxy(): number | false {
   return v === 'true' || process.env.VERCEL ? 1 : false
 }
 
+// Orígenes a los que el navegador deja llamar a la API desde otro dominio. En producción sólo direcciones https
+// exactas: nunca «*» ni localhost (cualquier página abierta en la computadora de alguien podría usar su sesión).
+// Sin CORS_ORIGINS en producción no se acepta ningún otro dominio: la app servida junto a la API (Vercel) no lo necesita.
+function leerCors(produccion: boolean): string[] {
+  const valor = process.env.CORS_ORIGINS?.trim()
+  if (!valor) return produccion ? [] : ['http://localhost:5173']
+  const origenes = valor.split(',').map((s) => s.trim()).filter(Boolean)
+  for (const o of origenes) {
+    if (o === '*' || o.includes('*')) throw new Error('CORS_ORIGINS no admite comodines (*): pon la dirección exacta de la app')
+    let u: URL
+    try {
+      u = new URL(o)
+    } catch {
+      throw new Error(`CORS_ORIGINS tiene una dirección no válida: ${o} (ejemplo: https://reparto-yogurt.vercel.app)`)
+    }
+    if (u.origin !== o) throw new Error(`CORS_ORIGINS debe tener sólo el origen, sin ruta ni «/» al final: ${u.origin}`)
+    if (produccion && (u.protocol !== 'https:' || /^(localhost|127\.|\[::1\])/.test(u.hostname))) {
+      throw new Error(`En producción CORS_ORIGINS sólo admite direcciones https públicas, no ${o}`)
+    }
+  }
+  return origenes
+}
+
 export function leerConfig() {
   const jwtSecret = requerido('JWT_SECRET')
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET debe tener al menos 32 caracteres')
@@ -121,7 +144,7 @@ export function leerConfig() {
     conexion: leerConexion(),
     jwtSecret,
     ...leerPimienta(jwtSecret),
-    corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',').map((s) => s.trim()).filter(Boolean),
+    corsOrigins: leerCors(produccion),
     trustProxy: leerProxy(),
     enVercel: !!process.env.VERCEL,
     sinLimiteDePeticiones: prueba, // las pruebas inician sesión decenas de veces desde la misma IP (los límites de la base sí aplican)

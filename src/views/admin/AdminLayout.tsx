@@ -10,6 +10,8 @@ import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
 import { Reportes } from '../pwa/Reportes'
+import { DosPasos } from '../pwa/DosPasos'
+import { Hoja } from '../../components/ui'
 
 export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes'
 
@@ -63,6 +65,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const sesion = useSesion()
   const [seccion, setSeccionEstado] = useState<SeccionAdmin>(seccionGuardada)
   const [cerrando, setCerrando] = useState(false)
+  const [cuenta, setCuenta] = useState(false)
   const esAdmin = sesion?.usuario.rol === 'administrador'
 
   // Clientes, sabores y producción se leen de la copia local: sin esto el panel abierto directo en /admin se queda
@@ -162,13 +165,15 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
               <span className="hidden xl:inline">App de reparto</span>
             </button>
           )}
-          <span
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-semibold text-white"
-            title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : undefined}
-            aria-hidden="true"
+          <button
+            type="button"
+            onClick={() => setCuenta(true)}
+            aria-label="Mi cuenta y seguridad"
+            title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : 'Mi cuenta'}
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro ${anillo}`}
           >
             {sesion?.usuario.nombre.charAt(0).toUpperCase() ?? 'A'}
-          </span>
+          </button>
           <button
             type="button"
             onClick={manejarCerrarSesion}
@@ -198,6 +203,10 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           )}
         </div>
       </main>
+
+      <Hoja abierta={cuenta} onCerrar={() => setCuenta(false)} titulo={<div>Mi cuenta y seguridad<div className="text-base font-medium text-apagado">{sesion?.usuario.correo}</div></div>}>
+        <div className="pb-4"><DosPasos /></div>
+      </Hoja>
 
       {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono */}
       <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">

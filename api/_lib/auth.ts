@@ -4,14 +4,28 @@ import type { Contexto } from './app.js'
 import type { Config } from './config.js'
 import { hashPassword, PASSWORD_MAX, revisarPassword, verificarPassword, verificarRelleno } from './contrasenas.js'
 import { tx, type Db } from './db.js'
+import { tieneDosPasos, usarCodigo } from './dosPasos.js'
+import { borrarCookiesSesion, fijarCookiesSesion, leerCookie } from './cookies.js'
 import { ipCliente, sha256, tokenAleatorio } from './seguridad.js'
 
+// modo 'cookie': el panel web recibe la sesión en cookies HttpOnly en lugar de en la respuesta (ver cookies.ts).
+const modo = z.enum(['token', 'cookie']).default('token')
 const bodyLogin = z.object({
   correo: z.string().trim().min(3).max(150),
   password: z.string().min(1).max(PASSWORD_MAX),
   dispositivo: z.string().max(200).optional(),
+  modo,
 })
-const bodyRefresh = z.object({ refreshToken: z.string().min(20).max(200) })
+// Sin refreshToken, la sesión es la de la cookie.
+const bodyRefresh = z.object({ refreshToken: z.string().min(20).max(200).optional() })
+const bodyCodigoLogin = z.object({
+  desafio: z.string().min(20).max(2000),
+  codigo: z.string().trim().min(6).max(20),
+  dispositivo: z.string().max(200).optional(),
+  modo,
+})
+// Marca del token que entrega el login cuando falta el segundo paso: no sirve como sesión (ver autenticar en app.ts).
+export const DESAFIO = 'dos-pasos'
 const bodyCambio = z.object({ actual: z.string().min(1).max(PASSWORD_MAX), nueva: z.string().max(1000) })
 
 const MENSAJE_CREDENCIALES = 'Correo o contraseña incorrectos'
@@ -56,21 +70,28 @@ export async function rutasAuth(
   { db, config }: Contexto,
   { requiereSesionAunConPasswordPendiente }: { requiereSesionAunConPasswordPendiente: (req: FastifyRequest, rep: FastifyReply) => Promise<unknown> },
 ) {
-  function respuestaSesion(u: { id_usuario: string; nombre: string; correo: string; rol: string; debe_cambiar_password: boolean }, sid: string, refreshToken: string) {
+  // Con cookie, los tokens viajan sólo en Set-Cookie (HttpOnly): la respuesta no los trae y la página no los ve.
+  // `refreshToken` sólo al abrir la sesión: al renovar, la cookie de la sesión ya está puesta.
+  function respuestaSesion(
+    rep: FastifyReply,
+    u: { id_usuario: string; nombre: string; correo: string; rol: string; debe_cambiar_password: boolean },
+    sid: string,
+    refreshToken: string,
+    cookie: { nueva: boolean } | null,
+  ) {
     const accessToken = app.jwt.sign({ sub: u.id_usuario, sid })
-    return {
-      accessToken,
-      expiraEn: Date.now() + config.accesoMinutos * 60_000,
-      refreshToken,
-      usuario: { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password },
-    }
+    const expiraEn = Date.now() + config.accesoMinutos * 60_000
+    const usuario = { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password }
+    if (!cookie) return { accessToken, expiraEn, refreshToken, usuario }
+    fijarCookiesSesion(rep, config, { acceso: accessToken, sesion: cookie.nueva ? refreshToken : undefined })
+    return { cookie: true, expiraEn, usuario }
   }
 
   // RF-001 / RF-003 / RF-004
   app.post('/auth/login', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, rep) => {
     const body = bodyLogin.safeParse(req.body)
     if (!body.success) return rep.code(400).send({ error: 'Faltan el correo o la contraseña' })
-    const { correo, password, dispositivo } = body.data
+    const { correo, password, dispositivo, modo } = body.data
     const ip = ipCliente(req, config)
 
     const { rows } = await db.query(
@@ -93,41 +114,84 @@ export async function rutasAuth(
 
     await intento.bueno()
     // Un hash del pepper anterior o con otros parámetros se rehace ahora que se tiene la contraseña.
-    await db.query(`UPDATE usuarios SET ultimo_acceso = now(), password_hash = COALESCE($2, password_hash) WHERE id_usuario = $1`, [
-      u.id_usuario,
-      rehacer ? await hashPassword(config, password) : null,
-    ])
+    if (rehacer) await db.query(`UPDATE usuarios SET password_hash = $2 WHERE id_usuario = $1`, [u.id_usuario, await hashPassword(config, password)])
+    // Con verificación en dos pasos la contraseña sola no abre sesión: se entrega un desafío de 5 minutos que sólo
+    // sirve para /auth/login/codigo, junto con el código del autenticador.
+    if (await tieneDosPasos(db, u.id_usuario)) {
+      const desafio = app.jwt.sign({ sub: u.id_usuario, tipo: DESAFIO }, { expiresIn: '5m' })
+      return { dosPasos: true, desafio }
+    }
+    return abrirSesion(rep, u, dispositivo, ip, modo)
+  })
+
+  async function abrirSesion(rep: FastifyReply, u: Parameters<typeof respuestaSesion>[1], dispositivo: string | undefined, ip: string, modo: 'token' | 'cookie') {
+    await db.query(`UPDATE usuarios SET ultimo_acceso = now() WHERE id_usuario = $1`, [u.id_usuario])
     const refresh = tokenAleatorio()
     const { rows: s } = await db.query(
       `INSERT INTO sesiones (id_usuario, refresh_token_hash, dispositivo, ip, expira_en)
        VALUES ($1, $2, $3, $4, now() + make_interval(days => $5)) RETURNING id_sesion`,
       [u.id_usuario, sha256(refresh), dispositivo ?? null, ip, config.sesionDias],
     )
-    return respuestaSesion(u, s[0].id_sesion, refresh)
+    return respuestaSesion(rep, u, s[0].id_sesion, refresh, modo === 'cookie' ? { nueva: true } : null)
+  }
+
+  // Segundo paso del login: el código del autenticador o uno de respaldo. Un código equivocado cuenta como intento
+  // fallido (RF-003), con los mismos límites que la contraseña: no se pueden probar los millones de combinaciones.
+  app.post('/auth/login/codigo', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, rep) => {
+    const body = bodyCodigoLogin.safeParse(req.body)
+    if (!body.success) return rep.code(400).send({ error: 'Escribe el código de verificación' })
+    let sub: string
+    try {
+      const p = app.jwt.verify<{ sub: string; tipo?: string }>(body.data.desafio)
+      if (p.tipo !== DESAFIO) throw new Error('no es un desafío')
+      sub = p.sub
+    } catch {
+      return rep.code(401).send({ error: 'Pasaron más de 5 minutos. Vuelve a escribir tu contraseña.', codigo: 'DESAFIO_VENCIDO' })
+    }
+    const ip = ipCliente(req, config)
+    const { rows: [u] } = await db.query(
+      `SELECT id_usuario, nombre, correo, rol, activo, debe_cambiar_password, password_cambiado_en FROM usuarios WHERE id_usuario = $1`,
+      [sub],
+    )
+    if (!u?.activo) return rep.code(401).send({ error: 'Vuelve a escribir tu contraseña.', codigo: 'DESAFIO_VENCIDO' })
+    const intento = await registrarIntento(db, config, { correo: u.correo, ip, idUsuario: u.id_usuario, passwordCambiadoEn: u.password_cambiado_en })
+    if (!intento) return bloqueado(rep, config)
+    if (!(await usarCodigo(db, config, u.id_usuario, body.data.codigo))) {
+      return rep.code(401).send({ error: 'El código no es correcto o ya se usó. Escribe el que se ve ahora en tu app.' })
+    }
+    await intento.bueno()
+    return abrirSesion(rep, u, body.data.dispositivo, ip, body.data.modo)
   })
 
   // Renueva el token de acceso. El refresh token no rota: en zonas sin señal una respuesta perdida
   // dejaría al repartidor fuera; se revoca al cerrar sesión o al cambiar la contraseña.
   app.post('/auth/refresh', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, rep) => {
-    const body = bodyRefresh.safeParse(req.body)
+    const body = bodyRefresh.safeParse(req.body ?? {})
     if (!body.success) return rep.code(400).send({ error: 'Falta el token de sesión' })
-    const refresh = body.data.refreshToken
+    const deCookie = body.data.refreshToken ? undefined : leerCookie(req, config, 'sesion')
+    const refresh = body.data.refreshToken ?? deCookie
+    if (!refresh) return rep.code(401).send({ error: 'Sesión vencida, inicia sesión de nuevo', codigo: 'SESION_INVALIDA' })
     const { rows } = await db.query(
       `SELECT s.id_sesion, u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password
          FROM sesiones s JOIN usuarios u USING (id_usuario)
         WHERE s.refresh_token_hash = $1 AND s.revocado_en IS NULL AND s.expira_en > now() AND u.activo`,
       [sha256(refresh)],
     )
-    if (!rows[0]) return rep.code(401).send({ error: 'Sesión vencida, inicia sesión de nuevo', codigo: 'SESION_INVALIDA' })
-    return respuestaSesion(rows[0], rows[0].id_sesion, refresh)
+    if (!rows[0]) {
+      if (deCookie) borrarCookiesSesion(rep, config)
+      return rep.code(401).send({ error: 'Sesión vencida, inicia sesión de nuevo', codigo: 'SESION_INVALIDA' })
+    }
+    return respuestaSesion(rep, rows[0], rows[0].id_sesion, refresh, deCookie ? { nueva: false } : null)
   })
 
-  // RF-006: revoca la sesión de este dispositivo. Siempre 204, para poder reintentar.
+  // RF-006: revoca la sesión de este dispositivo (la del cuerpo o la de la cookie). Siempre 204, para poder reintentar.
   app.post('/auth/logout', async (req, rep) => {
-    const body = bodyRefresh.safeParse(req.body)
-    if (body.success) {
-      await db.query(`UPDATE sesiones SET revocado_en = now() WHERE refresh_token_hash = $1 AND revocado_en IS NULL`, [sha256(body.data.refreshToken)])
+    const body = bodyRefresh.safeParse(req.body ?? {})
+    const refresh = (body.success && body.data.refreshToken) || leerCookie(req, config, 'sesion')
+    if (refresh) {
+      await db.query(`UPDATE sesiones SET revocado_en = now() WHERE refresh_token_hash = $1 AND revocado_en IS NULL`, [sha256(refresh)])
     }
+    if (!(body.success && body.data.refreshToken)) borrarCookiesSesion(rep, config)
     return rep.code(204).send()
   })
 

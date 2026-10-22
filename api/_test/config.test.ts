@@ -90,3 +90,40 @@ describe('direcciones de notificaciones push', async () => {
     assert.equal(endpointPermitido('https://127.0.0.1/x'), false)
   })
 })
+
+describe('CORS_ORIGINS', () => {
+  const previos = { NODE_ENV: process.env.NODE_ENV, CORS_ORIGINS: process.env.CORS_ORIGINS, VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL }
+  afterEach(() => {
+    for (const [v, valor] of Object.entries(previos)) {
+      if (valor === undefined) delete process.env[v]
+      else process.env[v] = valor
+    }
+  })
+  function origenes(env: { NODE_ENV?: string; CORS_ORIGINS?: string }) {
+    delete process.env.VERCEL
+    delete process.env.CORS_ORIGINS
+    Object.assign(process.env, BASE, { DATABASE_URL: 'postgresql://u:c@localhost:5432/b', NODE_ENV: 'development' }, env)
+    return leerConfig().corsOrigins
+  }
+
+  it('en desarrollo, sin la variable, deja pasar a Vite en localhost', () => {
+    assert.deepEqual(origenes({}), ['http://localhost:5173'])
+  })
+
+  it('en producción, sin la variable, no deja pasar a ningún otro dominio (app y API juntas)', () => {
+    assert.deepEqual(origenes({ NODE_ENV: 'production' }), [])
+  })
+
+  it('en producción acepta direcciones https exactas, separadas por comas', () => {
+    assert.deepEqual(origenes({ NODE_ENV: 'production', CORS_ORIGINS: 'https://reparto.vercel.app, https://mich019.github.io' }), ['https://reparto.vercel.app', 'https://mich019.github.io'])
+  })
+
+  it('no arranca con comodines, localhost o http en producción, ni con rutas', () => {
+    assert.throws(() => origenes({ NODE_ENV: 'production', CORS_ORIGINS: '*' }), /comodines/)
+    assert.throws(() => origenes({ CORS_ORIGINS: 'https://*.vercel.app' }), /comodines/)
+    assert.throws(() => origenes({ NODE_ENV: 'production', CORS_ORIGINS: 'http://localhost:5173' }), /https públicas/)
+    assert.throws(() => origenes({ NODE_ENV: 'production', CORS_ORIGINS: 'http://reparto.example.com' }), /https públicas/)
+    assert.throws(() => origenes({ CORS_ORIGINS: 'https://reparto.vercel.app/' }), /sin ruta/)
+    assert.throws(() => origenes({ CORS_ORIGINS: 'reparto.vercel.app' }), /no válida/)
+  })
+})
