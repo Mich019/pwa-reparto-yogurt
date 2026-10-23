@@ -27,6 +27,20 @@
   --color-neutral-800: #033a24;
   --color-amber-600: #945a00;
 
+  /* Etiquetas de estado de los pedidos (piezas.tsx, PanelSabor.tsx). */
+  --chip-ok-fondo: #cfe9d9;
+  --chip-ok-texto: #0a4d2c;
+  --chip-pendiente-fondo: #f6e9a6;
+  --chip-pendiente-texto: #5c4600;
+  --chip-neutro-fondo: #e4e2cf;
+
+  /* Lo que va sobre el amarillo de la marca siempre es oscuro, también en el modo oscuro. */
+  --color-sobre-limon: #002014;
+
+  /* Globo de las gráficas al pasar el cursor: contrasta con la página (oscuro en claro, claro en oscuro). */
+  --globo-fondo: #002014;
+  --globo-texto: #ffffff;
+
   background-color: var(--color-lienzo);
   color: var(--color-tinta);
   accent-color: var(--color-marca);
@@ -34,16 +48,60 @@
   scrollbar-color: #c3c1a8 transparent;
 }
 
-/* Detrás del panel, el mismo crema al rebotar la pantalla o dejar espacio sin contenido. */
+/* Modo oscuro (Configuración → Apariencia, src/lib/tema.ts): verde casi negro con tarjetas un tono más claro, texto
+ * crema y el verde de la marca un poco más vivo para que el texto blanco de los botones tenga contraste (≥ 4.5:1).
+ * Los acentos que van como texto (verde, rojo, ámbar) se aclaran para leerse sobre fondo oscuro. */
+.tema-admin.oscuro {
+  --color-lienzo: #0e1611;
+  --color-papel: #172119;
+  --color-niebla: #212c24;
+  --color-linea: #313f35;
+  --color-tinta: #ecefe4;
+  --color-apagado: #a3ae9f;
+
+  --color-azul: #6bcf9a;
+  --color-verde: #6bcf9a;
+  --color-rojo: #f28b80;
+  --color-ambar: #f2b33d;
+
+  --color-marca: #0f7a47;
+  --color-marca-oscuro: #0b6139;
+  --color-serie: #34a96f;
+  --color-oro: #e0b422;
+  --color-neutral-700: #0b6139;
+  --color-neutral-800: #094f2f;
+  --color-amber-600: #f2b33d;
+  --color-amber-700: #f2b33d;
+
+  --chip-ok-fondo: #173f2a;
+  --chip-ok-texto: #a3e2bf;
+  --chip-pendiente-fondo: #43380c;
+  --chip-pendiente-texto: #f4df86;
+  --chip-neutro-fondo: #29352c;
+
+  --globo-fondo: #ecefe4;
+  --globo-texto: #0e1611;
+
+  color-scheme: dark;
+  scrollbar-color: #3a4a3f transparent;
+}
+
+/* Detrás del panel, el mismo fondo al rebotar la pantalla o dejar espacio sin contenido. */
 html:has(.tema-admin),
 html:has(.tema-admin) body,
 html:has(.tema-admin) #root {
   background-color: #f8f6ec;
 }
+html:has(.tema-admin.oscuro),
+html:has(.tema-admin.oscuro) body,
+html:has(.tema-admin.oscuro) #root {
+  background-color: #0e1611;
+  color-scheme: dark;
+}
 
 .tema-admin ::selection {
   background-color: var(--color-limon);
-  color: var(--color-tinta);
+  color: var(--color-sobre-limon);
 }
 
 /* Lo de abajo va en las capas de Tailwind (base, componentes, utilidades) y no suelto: una regla sin capa le gana a toda
@@ -79,6 +137,23 @@ html:has(.tema-admin) #root {
   :where(.tema-admin) .border-tinta,
   :where(.tema-admin) .focus\:border-tinta:focus {
     border-color: var(--color-marca);
+  }
+  /* Sobre el amarillo, texto oscuro aunque la tinta del modo oscuro sea clara. */
+  :where(.tema-admin) .bg-limon {
+    color: var(--color-sobre-limon);
+  }
+  /* Las tarjetas y botones blancos de las pantallas compartidas toman el color de tarjeta del modo oscuro. */
+  :where(.tema-admin.oscuro) .bg-white {
+    background-color: var(--color-papel);
+  }
+  :where(.tema-admin.oscuro) .border-white\/70 {
+    border-color: var(--color-linea);
+  }
+  /* El logo es verde y negro sobre transparente: en oscuro va sobre una placa crema para que se lea. */
+  :where(.tema-admin.oscuro) .logo-danelle {
+    background-color: #f8f6ec;
+    border-radius: 14px;
+    padding: 0.3rem 0.6rem;
   }
 }
 

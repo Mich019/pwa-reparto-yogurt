@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
 import { dinero, hoy, sumarDias } from '../../lib/fechas'
 import {
   agrupacionesPosibles, agrupacionSugerida, cambio, diasDelRango, exportarReporte, mover, rangoDe, TABLAS_CSV, textoPeriodo, textoRango, useReporte,
@@ -335,7 +335,7 @@ function HojaExportar({ abierta, onCerrar, reporte }: { abierta: boolean; onCerr
     setBajando(true)
     try {
       const nombre = await exportarReporte(reporte, formato, tabla)
-      aviso(`Se descargó ${nombre}`)
+      if (nombre) aviso(`Se descargó ${nombre}`)
       onCerrar()
     } catch (e) {
       aviso(e instanceof Error ? e.message : 'No se pudo descargar')
@@ -349,7 +349,7 @@ function HojaExportar({ abierta, onCerrar, reporte }: { abierta: boolean; onCerr
       abierta={abierta}
       onCerrar={onCerrar}
       titulo="Exportar reporte"
-      pie={<Boton onClick={descargar} disabled={bajando} className="w-full"><Download size={18} /> {bajando ? 'Preparando…' : 'Descargar'}</Boton>}
+      pie={<Boton onClick={descargar} disabled={bajando} className="w-full">{formato === 'pdf' ? <Eye size={18} /> : <Download size={18} />} {bajando ? 'Preparando…' : formato === 'pdf' ? 'Ver vista previa' : 'Descargar'}</Boton>}
     >
       <p className="text-sm text-apagado">Del {reporte.desde.split('-').reverse().join('/')} al {reporte.hasta.split('-').reverse().join('/')}.</p>
       <Segmentado

@@ -4,8 +4,10 @@ import { AdminLayout } from './views/admin/AdminLayout'
 import { Login, CambioObligatorio } from './views/pwa/Login'
 import { PwaLayout } from './views/pwa/PwaLayout'
 import { Avisos } from './components/ui'
+import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
+import { useTemaOscuro } from './lib/tema'
 
 function esRutaAdmin() {
   if (typeof window === 'undefined') return false
@@ -14,6 +16,7 @@ function esRutaAdmin() {
 
 export default function App() {
   const sesion = useSesion()
+  const oscuro = useTemaOscuro()
   const [esAdmin, setEsAdmin] = useState(esRutaAdmin)
 
   useEffect(() => {
@@ -43,8 +46,10 @@ export default function App() {
   if (esAdmin && MODO_SERVIDOR) {
     return (
       // `.tema-admin` lleva los colores y la letra del panel; la app de reparto no la usa (views/admin/tema.css).
-      <div className="tema-admin">
+      // `.oscuro`: el modo oscuro que se elige en Configuración (src/lib/tema.ts).
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
         <Avisos />
+        <VisorPdf />
         {!sesion ? <LoginAdmin onIrAPwa={irAPwa} />
           : sesion.usuario.debeCambiarPassword ? <CambioObligatorio />
           : <AdminLayout onIrAPwa={irAPwa} />}
@@ -75,6 +80,7 @@ export default function App() {
   return (
     <>
       <Avisos />
+      <VisorPdf />
       <PwaLayout onIrAAdmin={irAAdmin} />
     </>
   )

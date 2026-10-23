@@ -1,4 +1,4 @@
-import { ajustarTexto, anchoTexto, Documento, type Bytes, type Color, type Fuente } from './pdf'
+import { ajustarTexto, anchoTexto, Documento, type Color, type Fuente, type PdfListo } from './pdf'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
 // Informes en PDF para leer o imprimir (RF-048): el reporte de ventas y la libreta de clientes. Estilo sobrio de
@@ -175,19 +175,19 @@ class Informe {
     this.y += 4
   }
 
-  bytes(): Bytes {
+  listo(): PdfListo {
     this.pdf.enCadaPagina((n, total) => {
       this.pdf.linea(M, this.alto - 13, this.ancho - M, this.alto - 13, { color: REGLA, grosor: 0.2 })
       this.pdf.texto('Reparto Yogurt · Documento interno y confidencial', M, this.alto - 8.5, { tam: 7, color: TENUE })
       this.pdf.texto(`Página ${n} de ${total}`, this.ancho - M, this.alto - 8.5, { tam: 7, color: TENUE, alinear: 'der' })
     })
-    return this.pdf.bytes()
+    return this.pdf.listo()
   }
 }
 
 // ---------------------------------------------------------------------------------------------- reporte de ventas
 
-export function reportePdf(r: Reporte, ahora = new Date()): Bytes {
+export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   const periodo = `${fechaMx(r.desde)} al ${fechaMx(r.hasta)}`
   const inf = new Informe('Reporte de ventas', periodo)
   const { pdf } = inf
@@ -304,7 +304,7 @@ export function reportePdf(r: Reporte, ahora = new Date()): Bytes {
 
   inf.nota('Notas: se consideran los pedidos entregados, por su fecha de entrega, con el precio y el costo vigentes al momento de la venta. '
     + '"Sin venta" son visitas registradas en las que el cliente no compró.')
-  return inf.bytes()
+  return inf.listo()
 }
 
 // ---------------------------------------------------------------------------------------------- libreta de clientes
@@ -329,7 +329,7 @@ export interface ClienteLibreta {
 }
 
 // Directorio de la cartera activa, una sección por vendedor (vienen ordenados por vendedor y nombre).
-export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): Bytes {
+export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): PdfListo {
   const hoy = `${dos(ahora.getDate())}/${dos(ahora.getMonth() + 1)}/${ahora.getFullYear()}`
   const inf = new Informe('Libreta de clientes', `al ${hoy}`, true)
   const grupos = new Map<string, ClienteLibreta[]>()
@@ -368,5 +368,5 @@ export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): Byte
     ], cs, ['Subtotal', '', '', '', '', ent(suma(cs, 'pedidos')), lit(suma(cs, 'litros')), din(suma(cs, 'comprado')), ''])
   }
   if (!clientes.length) inf.nota('No hay clientes activos.')
-  return inf.bytes()
+  return inf.listo()
 }

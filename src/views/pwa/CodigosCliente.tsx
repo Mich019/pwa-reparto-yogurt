@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, CreditCard, Download, Nfc, RotateCcw, Search, Share2, Unlink } from 'lucide-react'
+import { Check, CreditCard, Eye, Nfc, RotateCcw, Search, Unlink } from 'lucide-react'
 import type { Cliente } from '../../lib/db'
 import {
-  ETIQUETAS_POR_HOJA, codigoCorto, compartirPdf, contenidoQR, duenoDeTarjeta, matrizQR, nombreArchivo, normalizarUid, puedeCompartirPdf,
+  ETIQUETAS_POR_HOJA, codigoCorto, contenidoQR, duenoDeTarjeta, matrizQR, nombreArchivo, normalizarUid,
   pdfEtiqueta, pdfEtiquetas, quitarTarjeta, reponerQR, vincularTarjeta, type MatrizQR,
 } from '../../lib/codigos'
 import { iniciarNfc, nfcDisponible } from '../../lib/escaneo'
-import { descargarArchivo } from '../../lib/pdf'
+import { mostrarPdf } from '../../components/VisorPdf'
 import { Boton, Hoja, aviso, claseInput } from '../../components/ui'
 
 // El QR del cliente en pantalla, como vector.
@@ -54,15 +54,11 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
   const actual = useRef(cliente)
   actual.current = cliente
   const hayNfc = nfcDisponible()
-  const compartible = puedeCompartirPdf()
-
-  async function exportar(compartir: boolean) {
+  // La etiqueta se abre en la vista previa; desde ahí se descarga, se imprime (a tamaño real) o se comparte.
+  async function verPdf() {
     setOcupado(true)
     try {
-      const nombre = `qr-${nombreArchivo(cliente.nombre)}.pdf`
-      const pdf = await pdfEtiqueta(cliente)
-      const r = compartir ? await compartirPdf(pdf, nombre) : (descargarArchivo(pdf, nombre), 'descargado')
-      if (r === 'descargado') aviso(`Se descargó ${nombre}. Imprímelo a tamaño real (100 %).`)
+      mostrarPdf(await pdfEtiqueta(cliente), `qr-${nombreArchivo(cliente.nombre)}.pdf`)
     } catch {
       aviso('No se pudo generar el PDF del QR')
     } finally { setOcupado(false) }
@@ -128,9 +124,8 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            <Boton onClick={() => exportar(false)} disabled={ocupado}><Download size={20} /> Descargar PDF</Boton>
+            <Boton onClick={() => void verPdf()} disabled={ocupado}><Eye size={20} /> {ocupado ? 'Generando…' : 'Ver PDF'}</Boton>
             <Boton variante="secundario" onClick={() => setModo({ t: 'reponer' })}><RotateCcw size={20} /> Reponer QR</Boton>
-            {compartible && <Boton variante="fantasma" className="col-span-2" onClick={() => exportar(true)} disabled={ocupado}><Share2 size={20} /> Compartir o imprimir</Boton>}
           </div>
         )}
 
@@ -215,15 +210,10 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
   const total = activos.filter((c) => elegidos.has(c.id)).length
   const hojas = Math.ceil(total / ETIQUETAS_POR_HOJA)
 
-  const compartible = puedeCompartirPdf()
-
-  async function generar(compartir: boolean) {
+  async function generar() {
     setGenerando(true)
     try {
-      const nombre = `qr-clientes-${total}.pdf`
-      const pdf = await pdfEtiquetas(activos.filter((c) => elegidos.has(c.id)))
-      const r = compartir ? await compartirPdf(pdf, nombre) : (descargarArchivo(pdf, nombre), 'descargado')
-      if (r === 'descargado') aviso(`Se descargó ${nombre}. Imprímelo a tamaño real (100 %).`)
+      mostrarPdf(await pdfEtiquetas(activos.filter((c) => elegidos.has(c.id))), `qr-clientes-${total}.pdf`)
     } catch {
       aviso('No se pudo generar el PDF de los QR')
     } finally { setGenerando(false) }
@@ -236,14 +226,9 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
       alto
       titulo={<div>Imprimir QR<div className="text-base font-medium text-apagado">{ETIQUETAS_POR_HOJA} etiquetas por hoja Carta</div></div>}
       pie={
-        <div className="flex gap-2">
-          <Boton className="flex-1 text-lg" disabled={!total || generando} onClick={() => generar(false)}>
-            <Download size={20} /> {generando ? 'Generando…' : total ? `Descargar PDF · ${total} ${total === 1 ? 'etiqueta' : 'etiquetas'} (${hojas} ${hojas === 1 ? 'hoja' : 'hojas'})` : 'Elige clientes'}
-          </Boton>
-          {compartible && (
-            <Boton variante="secundario" disabled={!total || generando} onClick={() => generar(true)}><Share2 size={20} /><span className="sr-only">Compartir o imprimir</span></Boton>
-          )}
-        </div>
+        <Boton className="w-full text-lg" disabled={!total || generando} onClick={() => void generar()}>
+          <Eye size={20} /> {generando ? 'Generando…' : total ? `Ver PDF · ${total} ${total === 1 ? 'etiqueta' : 'etiquetas'} (${hojas} ${hojas === 1 ? 'hoja' : 'hojas'})` : 'Elige clientes'}
+        </Boton>
       }
     >
       <div className="relative mb-2">

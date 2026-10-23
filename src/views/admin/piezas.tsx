@@ -31,10 +31,10 @@ export function Vacio({ children }: { children: ReactNode }) {
 }
 
 const ESTADOS: Record<EstadoPedido, { texto: string; clase: string }> = {
-  ENTREGADO: { texto: 'Entregado', clase: 'bg-[#cfe9d9] text-[#0a4d2c]' },
-  PENDIENTE: { texto: 'Pendiente', clase: 'bg-[#f6e9a6] text-[#5c4600]' },
-  RECORDAR_MAS_TARDE: { texto: 'Para después', clase: 'bg-[#e4e2cf] text-tinta' },
-  OMITIDO: { texto: 'Sin venta', clase: 'bg-[#e4e2cf] text-apagado' },
+  ENTREGADO: { texto: 'Entregado', clase: 'bg-(--chip-ok-fondo) text-(--chip-ok-texto)' },
+  PENDIENTE: { texto: 'Pendiente', clase: 'bg-(--chip-pendiente-fondo) text-(--chip-pendiente-texto)' },
+  RECORDAR_MAS_TARDE: { texto: 'Para después', clase: 'bg-(--chip-neutro-fondo) text-tinta' },
+  OMITIDO: { texto: 'Sin venta', clase: 'bg-(--chip-neutro-fondo) text-apagado' },
 }
 
 export function ChipEstado({ estado }: { estado: EstadoPedido }) {

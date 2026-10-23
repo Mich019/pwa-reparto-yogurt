@@ -86,9 +86,9 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
                         </span>
                       )}
                       {activa === d.clave && (
-                        <span aria-hidden="true" className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-lg bg-tinta/95 px-2.5 py-1.5 text-left text-xs leading-tight text-white shadow-lg ${lado}`} style={{ bottom: `calc(${pct}% + 8px)` }}>
+                        <span aria-hidden="true" className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-lg bg-(--globo-fondo) px-2.5 py-1.5 text-left text-xs leading-tight text-(--globo-texto) shadow-lg ${lado}`} style={{ bottom: `calc(${pct}% + 8px)` }}>
                           <span className="block text-sm font-semibold tabular-nums">{formato(d.valor)}</span>
-                          <span className="block text-white/75 first-letter:uppercase">{d.nombre}{d.actual && ' · en curso'}</span>
+                          <span className="block opacity-75 first-letter:uppercase">{d.nombre}{d.actual && ' · en curso'}</span>
                         </span>
                       )}
                     </button>

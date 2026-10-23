@@ -116,7 +116,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
             <Frasco color={p.color_hex} apagado={!p.disponible} className="h-48" />
           </div>
 
-          <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${primero ? 'bg-limon text-tinta' : p.disponible ? 'bg-[#cfe9d9] text-[#0a4d2c]' : 'bg-niebla text-apagado'}`}>
+          <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${primero ? 'bg-limon text-tinta' : p.disponible ? 'bg-(--chip-ok-fondo) text-(--chip-ok-texto)' : 'bg-niebla text-apagado'}`}>
             {primero && <Trophy size={13} aria-hidden="true" />}
             {primero ? 'El que más se vendió' : p.disponible ? 'A la venta' : 'Sin stock'}
           </span>

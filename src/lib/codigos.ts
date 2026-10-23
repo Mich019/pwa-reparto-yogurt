@@ -1,6 +1,6 @@
 // Códigos de cliente: el QR impreso (RF-015 a 018), la tarjeta NFC (RF-019, 020) y cómo se leen (RF-022).
 import { db, guardar, uid, type Cliente } from './db'
-import { Documento, ajustarTexto, descargarArchivo, type Bytes } from './pdf'
+import { Documento, ajustarTexto, type PdfListo } from './pdf'
 
 // Lo que lleva el QR. El prefijo sirve para reconocer de un vistazo un código de esta app y descartar
 // cualquier otro QR que pase por la cámara. También se acepta el UUID solo, por si se imprimió así.
@@ -96,15 +96,15 @@ async function dibujarEtiqueta(pdf: Documento, c: Cliente, x: number, y: number,
 }
 
 // RF-016: una sola etiqueta, en una página del tamaño exacto del imán.
-export async function pdfEtiqueta(c: Cliente): Promise<Bytes> {
+export async function pdfEtiqueta(c: Cliente): Promise<PdfListo> {
   const pdf = new Documento(`QR ${c.nombre}`)
   pdf.pagina(ETIQUETA.ancho, ETIQUETA.alto)
   await dibujarEtiqueta(pdf, c, 0, 0, false)
-  return pdf.bytes()
+  return pdf.listo()
 }
 
 // RF-017: varias etiquetas por hoja Carta, con guías de corte punteadas.
-export async function pdfEtiquetas(clientes: Cliente[]): Promise<Bytes> {
+export async function pdfEtiquetas(clientes: Cliente[]): Promise<PdfListo> {
   const { ancho, alto, columnas, filas } = ETIQUETA
   const x0 = (CARTA.ancho - ancho * columnas) / 2
   const y0 = (CARTA.alto - alto * filas) / 2
@@ -114,24 +114,7 @@ export async function pdfEtiquetas(clientes: Cliente[]): Promise<Bytes> {
     if (k === 0) pdf.pagina(CARTA.ancho, CARTA.alto)
     await dibujarEtiqueta(pdf, clientes[i], x0 + (k % columnas) * ancho, y0 + Math.floor(k / columnas) * alto, true)
   }
-  return pdf.bytes()
-}
-
-// Compartir el PDF (WhatsApp, correo, "Imprimir" del teléfono) sólo en pantallas táctiles: en Chrome de Windows
-// también existe, pero abre el panel de Windows en lugar de guardar el archivo. Descargar siempre está disponible.
-export const puedeCompartirPdf = () =>
-  matchMedia('(pointer: coarse)').matches && !!navigator.canShare?.({ files: [new File([], 'x.pdf', { type: 'application/pdf' })] })
-
-// Abre la hoja de compartir del teléfono; si falla (p. ej. el navegador ya no la deja abrir), descarga el archivo.
-export async function compartirPdf(bytes: Bytes, nombre: string): Promise<'compartido' | 'descargado' | 'cancelado'> {
-  try {
-    await navigator.share({ files: [new File([bytes], nombre, { type: 'application/pdf' })], title: nombre })
-    return 'compartido'
-  } catch (e) {
-    if ((e as DOMException).name === 'AbortError') return 'cancelado'
-    descargarArchivo(bytes, nombre)
-    return 'descargado'
-  }
+  return pdf.listo()
 }
 
 export const nombreArchivo = (texto: string) =>
