@@ -60,28 +60,19 @@ export default function App() {
   // =========================================================================
   // VISTA PWA MÓVIL DE REPARTO (/)
   // =========================================================================
-  if (MODO_SERVIDOR && !sesion) {
-    return (
-      <>
-        <Avisos />
-        <Login onIrAAdmin={irAAdmin} />
-      </>
-    )
-  }
-  if (MODO_SERVIDOR && sesion?.usuario.debeCambiarPassword) {
-    return (
-      <>
-        <Avisos />
-        <CambioObligatorio />
-      </>
-    )
-  }
-
+  // Con la imagen del panel (`.tema-admin`, siempre en claro); `.tema-campo` deja la hoja de «Nuevo pedido» con su
+  // diseño de antes (views/pwa/tema-campo.css).
   return (
-    <>
+    <div className="tema-admin tema-campo">
       <Avisos />
-      <VisorPdf />
-      <PwaLayout onIrAAdmin={irAAdmin} />
-    </>
+      {MODO_SERVIDOR && !sesion ? <Login onIrAAdmin={irAAdmin} />
+        : MODO_SERVIDOR && sesion?.usuario.debeCambiarPassword ? <CambioObligatorio />
+        : (
+          <>
+            <VisorPdf />
+            <PwaLayout onIrAAdmin={irAAdmin} />
+          </>
+        )}
+    </div>
   )
 }

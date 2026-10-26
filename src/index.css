@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "./views/admin/tema.css";
+@import "./views/pwa/tema-campo.css";
 
 /* Inter (SIL OFL), sólo el subconjunto latino y dentro de la app para que cargue sin internet. */
 @font-face {

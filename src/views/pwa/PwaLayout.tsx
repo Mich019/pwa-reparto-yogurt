@@ -78,7 +78,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   }, [sinVer])
 
   return (
-    <div className="flex h-dvh flex-col bg-papel text-tinta">
+    <div className="flex h-dvh flex-col bg-lienzo text-tinta">
       <Avisos />
 
       {/* Botón flotante para administradores que están usando la PWA */}
@@ -102,29 +102,32 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
         {actual === 'cuenta' && <Cuenta irA={irA} />}
       </main>
 
-      {/* Barra inferior. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin servidor: Ruta, Clientes, Producción y Sabores. */}
-      <nav aria-label="Secciones" className="z-30 grid border-t border-linea bg-papel pb-safe" style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}>
-        {visibles.map(({ id, texto, icono: Icono }) => {
-          const activa = actual === id
-          return (
-            <button
-              key={id}
-              onClick={() => setPestana(id)}
-              aria-current={activa ? 'page' : undefined}
-              className={`flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] ${
-                activa ? 'font-semibold text-tinta' : 'font-medium text-apagado'
-              }`}
-            >
-              <span className={`relative grid h-8 w-14 place-items-center rounded-full transition-colors ${activa ? 'bg-niebla' : ''}`}>
-                <Icono size={21} strokeWidth={activa ? 2.3 : 1.8} />
-                {id === 'cuenta' && sinVer + avisosSinLeer > 0 && (
-                  <span className="absolute top-0.5 right-3 h-2.5 w-2.5 rounded-full bg-rojo ring-2 ring-papel" />
-                )}
-              </span>
-              {texto}
-            </button>
-          )
-        })}
+      {/* Barra inferior, como la del panel en el teléfono: una píldora donde la pestaña elegida se abre en verde con su
+          nombre y las demás quedan en icono. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin
+          servidor: Ruta, Clientes, Producción y Sabores. */}
+      <nav aria-label="Secciones" className="z-30 flex justify-center bg-lienzo px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <ul className="flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.12)]">
+          {visibles.map(({ id, texto, icono: Icono }) => {
+            const activa = actual === id
+            const punto = id === 'cuenta' && sinVer + avisosSinLeer > 0
+            return (
+              <li key={id} className={activa ? 'min-w-0 flex-1' : 'shrink-0'}>
+                <button
+                  onClick={() => setPestana(id)}
+                  aria-label={texto}
+                  aria-current={activa ? 'page' : undefined}
+                  className={`relative flex h-12 items-center justify-center gap-2 rounded-full transition-colors ${
+                    activa ? 'w-full bg-tinta px-3 text-white' : 'w-14 text-apagado active:bg-niebla'
+                  }`}
+                >
+                  <Icono size={21} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
+                  {activa && <span className="truncate text-sm font-semibold">{texto}</span>}
+                  {punto && <span className="absolute top-2 right-2.5 h-2.5 w-2.5 rounded-full bg-rojo ring-2 ring-papel" />}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       </nav>
     </div>
   )

@@ -70,7 +70,7 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
       m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 9 } })
       m.addLayer({
         id: 'ruta', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-width': 5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#1f48d8', 1, '#7fb0ff'] },
+        paint: { 'line-width': 5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#035d38', 1, '#34a96f'] },
       })
       listo.current = true
     })

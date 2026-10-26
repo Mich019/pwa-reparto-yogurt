@@ -399,7 +399,7 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
     const m = mapa.current
     if (!m || !punto) return
     if (!marca.current) {
-      marca.current = new Marker({ color: '#000000', draggable: true }).setLngLat(punto).addTo(m)
+      marca.current = new Marker({ color: '#035d38', draggable: true }).setLngLat(punto).addTo(m)
       marca.current.on('dragend', () => {
         const ll = marca.current!.getLngLat()
         cb.current([ll.lng, ll.lat])

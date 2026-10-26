@@ -58,6 +58,7 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaIn
       abierta={abierto}
       onCerrar={onCerrar}
       alto
+      className="diseno-original" // en la app de reparto conserva el diseño en blanco y negro (views/pwa/tema-campo.css)
       pie={
         <Boton onClick={guardarPedido} className="w-full text-lg">
           {pedido ? 'Guardar cambios' : esUrgente ? 'Agendar como urgente' : `Agendar para ${textoFecha(fecha).toLowerCase()}`}
