@@ -3,6 +3,7 @@ import { ErrorRed } from './api'
 import { descargarAutenticado, llamarAutenticado } from './sesion'
 import { desdeIso, hoy, iso, sumarDias } from './fechas'
 import { descargarArchivo } from './pdf'
+import { mostrarPdf } from '../components/VisorPdf'
 import type { ClienteLibreta } from './reportePdf'
 
 // Reportes de ventas para el administrador (RF-043 a RF-048). Los arma el servidor con todo el historial y los
@@ -166,19 +167,26 @@ export const TABLAS_CSV: { valor: TablaCsv; texto: string; ayuda: string }[] = [
   { valor: 'vendedores', texto: 'Por vendedor', ayuda: 'Ventas e ingresos de cada vendedor' },
 ]
 
-// Excel y CSV los arma el servidor (traen el historial completo de ventas); el PDF, el teléfono con el reporte en pantalla.
-export async function exportarReporte(reporte: Reporte, formato: Formato, tabla: TablaCsv) {
+// Excel y CSV los arma el servidor (traen el historial completo de ventas) y se descargan. El PDF lo arma el teléfono
+// con el reporte en pantalla y se abre en la vista previa (components/VisorPdf.tsx), desde donde se descarga o imprime.
+// Devuelve el nombre del archivo descargado, o null si se abrió la vista previa.
+export async function exportarReporte(reporte: Reporte, formato: Formato, tabla: TablaCsv): Promise<string | null> {
   const { desde, hasta, agrupar } = reporte
-  const blob = formato === 'pdf'
-    ? new Blob([(await import('./reportePdf')).reportePdf(reporte)], { type: 'application/pdf' })
-    : await descargarAutenticado(`/reportes/exportar?desde=${desde}&hasta=${hasta}&agrupar=${agrupar}&formato=${formato}&tabla=${tabla}`)
-  return descargarArchivo(blob, `reporte-${formato === 'csv' ? tabla : 'ventas'}-${desde}_${hasta}.${formato}`)
+  const nombre = `reporte-${formato === 'csv' ? tabla : 'ventas'}-${desde}_${hasta}.${formato}`
+  if (formato === 'pdf') {
+    mostrarPdf((await import('./reportePdf')).reportePdf(reporte), nombre)
+    return null
+  }
+  return descargarArchivo(await descargarAutenticado(`/reportes/exportar?desde=${desde}&hasta=${hasta}&agrupar=${agrupar}&formato=${formato}&tabla=${tabla}`), nombre)
 }
 
 // Libreta de clientes: la cartera activa de todos los vendedores. El servidor da los datos (y arma Excel y CSV).
-export async function exportarLibreta(formato: Formato) {
-  const blob = formato === 'pdf'
-    ? new Blob([(await import('./reportePdf')).libretaPdf((await llamarAutenticado<{ clientes: ClienteLibreta[] }>('/reportes/clientes')).clientes)], { type: 'application/pdf' })
-    : await descargarAutenticado(`/reportes/clientes?formato=${formato}`)
-  return descargarArchivo(blob, `libreta-clientes-${hoy()}.${formato}`)
+export async function exportarLibreta(formato: Formato): Promise<string | null> {
+  const nombre = `libreta-clientes-${hoy()}.${formato}`
+  if (formato === 'pdf') {
+    const { clientes } = await llamarAutenticado<{ clientes: ClienteLibreta[] }>('/reportes/clientes')
+    mostrarPdf((await import('./reportePdf')).libretaPdf(clientes), nombre)
+    return null
+  }
+  return descargarArchivo(await descargarAutenticado(`/reportes/clientes?formato=${formato}`), nombre)
 }

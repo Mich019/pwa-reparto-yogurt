@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto'
 import { isIP } from 'node:net'
 import type { FastifyRequest } from 'fastify'
+import { leerCookie } from './cookies.js'
 
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex')
 export const tokenAleatorio = () => randomBytes(32).toString('base64url')
@@ -29,8 +30,9 @@ export function ipCliente(req: FastifyRequest, config: { enVercel: boolean }): s
 // Clave de los límites de peticiones para rutas con sesión: el usuario del token. Se lee sin verificar porque el límite
 // corre antes que la autenticación; un token inventado sólo reparte sus intentos entre usuarios falsos y luego recibe
 // 401, mientras que una cuenta real no puede saltarse su límite pidiendo tokens nuevos (todos llevan su id).
-export function claveUsuario(req: FastifyRequest, config: { enVercel: boolean }): string {
-  const token = /^Bearer ([\w-]+)\.([\w-]+)\.[\w-]+$/.exec(req.headers.authorization ?? '')
+export function claveUsuario(req: FastifyRequest, config: { enVercel: boolean; produccion: boolean }): string {
+  const jwt = req.headers.authorization ?? `Bearer ${leerCookie(req, config, 'acceso') ?? ''}` // el panel web la trae en cookie
+  const token = /^Bearer ([\w-]+)\.([\w-]+)\.[\w-]+$/.exec(jwt)
   if (token) {
     try {
       const sub = JSON.parse(Buffer.from(token[2], 'base64url').toString('utf8'))?.sub

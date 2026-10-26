@@ -10,6 +10,8 @@ import { crearDespachador, rutasNotificaciones } from './notificaciones.js'
 import { crearEnviador, type Enviador } from './push.js'
 import { rutasReportes } from './reportes.js'
 import { rutasLibreta } from './libreta.js'
+import { rutasDosPasos } from './dosPasos.js'
+import { CABECERA_APP, leerCookie } from './cookies.js'
 import { rutasStock } from './stock.js'
 import { rutasUsuarios } from './usuarios.js'
 import { rutasAdmin } from './admin.js'
@@ -77,10 +79,18 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
   // desactivó o cambió de rol, la base lo dice en cada petición.
   async function autenticar(req: FastifyRequest, rep: FastifyReply, permitirPasswordPendiente = false) {
     let payload: { sub: string; sid: string }
+    // El token va en Authorization (app de reparto) o en la cookie HttpOnly del panel web (cookies.ts).
+    const deCookie = req.headers.authorization ? undefined : leerCookie(req, ctx.config, 'acceso')
     try {
-      payload = await req.jwtVerify()
+      payload = deCookie ? app.jwt.verify(deCookie) : await req.jwtVerify()
+      // Sólo un token de sesión: el desafío del segundo paso del login (sin sesión) no abre nada más.
+      if (typeof payload.sid !== 'string' || typeof payload.sub !== 'string') throw new Error('no es un token de sesión')
     } catch {
       return rep.code(401).send({ error: 'Sesión inválida o vencida', codigo: 'SESION_INVALIDA' })
+    }
+    // Con cookie el navegador pone la sesión solo: un cambio debe traer además la cabecera de la app (CSRF).
+    if (deCookie && req.method !== 'GET' && req.method !== 'HEAD' && req.headers[CABECERA_APP] !== 'app') {
+      return rep.code(403).send({ error: 'Solicitud no permitida', codigo: 'SIN_CABECERA' })
     }
     const { rows } = await ctx.db.query(
       `SELECT u.id_usuario, u.rol, u.debe_cambiar_password
@@ -109,6 +119,7 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
   const despachador = crearDespachador(ctx.db, enviador, app.log)
 
   await rutasAuth(app, ctx, { requiereSesionAunConPasswordPendiente })
+  await rutasDosPasos(app, ctx, { requiereSesion })
   await rutasRecuperacion(app, ctx)
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })

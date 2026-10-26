@@ -2,13 +2,14 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 // Hoja modal que sube desde abajo, cómoda para usar con una mano.
-export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie }: {
+export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie, className = '' }: {
   abierta: boolean
   onCerrar: () => void
   titulo?: ReactNode
   children: ReactNode
   alto?: boolean
   pie?: ReactNode // botón fijo abajo, fuera del área que se desplaza
+  className?: string
 }) {
   const [montada, setMontada] = useState(abierta)
   const [visible, setVisible] = useState(false)
@@ -30,7 +31,7 @@ export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie }:
         onClick={onCerrar}
       />
       <div
-        className={`relative mx-auto flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-[28px] bg-papel text-tinta shadow-hoja transition-transform duration-250 ease-out ${alto ? 'h-[92dvh]' : ''} ${visible ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`relative mx-auto flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-[28px] bg-papel text-tinta shadow-hoja transition-transform duration-250 ease-out ${alto ? 'h-[92dvh]' : ''} ${visible ? 'translate-y-0' : 'translate-y-full'} ${className}`}
       >
         <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-linea" />
         <div className="flex items-center gap-3 px-5 pt-7 pb-3">

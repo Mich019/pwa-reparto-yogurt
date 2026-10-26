@@ -93,7 +93,8 @@ export async function enBaseAislada(prueba: (x: { srv: FastifyInstance; pool: pg
   await cx.connect()
   await cx.query(`CREATE SCHEMA ${esquema}`)
   await cx.query(`SET search_path TO ${esquema}`)
-  await cx.query(readFileSync(new URL('../../db/01_esquema.sql', import.meta.url), 'utf8'))
+  // Tablas y vistas, como la base real (la libreta de clientes usa v_resumen_cliente).
+  for (const f of ['01_esquema.sql', '02_vistas.sql']) await cx.query(readFileSync(new URL(`../../db/${f}`, import.meta.url), 'utf8'))
   const pool = new pg.Pool({ ...config.conexion, options: `-c search_path=${esquema}`, max: 4 })
   const srv = await construirApp({ db: pool, config })
   const hash = await hashPassword(config, PASSWORD)

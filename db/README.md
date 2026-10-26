@@ -43,7 +43,7 @@ El diseño base era correcto en lo esencial: cuatro entidades (Clientes, Product
 
 | Tabla | Para qué | Requisitos |
 |---|---|---|
-| `usuarios`, `sesiones`, `recuperaciones_password`, `intentos_login` | Login por rol, Argon2id, bloqueo tras intentos, cierre de sesión | RF-001 a RF-006, RF-038 a RF-040 |
+| `usuarios`, `sesiones`, `recuperaciones_password`, `intentos_login`, `dos_pasos` | Login por rol, Argon2id, bloqueo tras intentos, cierre de sesión, verificación en dos pasos | RF-001 a RF-006, RF-038 a RF-040 |
 | `clientes` | Cartera con GPS, frecuencia, horario, QR y NFC | RF-007 a RF-022, RF-041 |
 | `productos`, `stock_diario`, `produccion_diaria` | Sabores, precios, costos, litros producidos por día y litros asignados y devueltos a cada vendedor | RF-032 a RF-037 |
 | `pedidos`, `detalle_pedido` | Ventas en ruta, pedidos agendados, visitas sin venta, orden de ruta y marca de pedido urgente (`pedidos.urgente`) | RF-023 a RF-031, RF-054 |

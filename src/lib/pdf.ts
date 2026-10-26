@@ -41,6 +41,23 @@ export function descargarArchivo(datos: Blob | Bytes, nombre: string, tipo = 'ap
   return nombre
 }
 
+// Compartir el PDF (WhatsApp, correo, "Imprimir" del teléfono) sólo en pantallas táctiles: en Chrome de Windows
+// también existe, pero abre el panel de Windows en lugar de guardar el archivo. Descargar siempre está disponible.
+export const puedeCompartirPdf = () =>
+  matchMedia('(pointer: coarse)').matches && !!navigator.canShare?.({ files: [new File([], 'x.pdf', { type: 'application/pdf' })] })
+
+// Abre la hoja de compartir del teléfono; si falla (p. ej. el navegador ya no la deja abrir), descarga el archivo.
+export async function compartirPdf(bytes: Bytes, nombre: string): Promise<'compartido' | 'descargado' | 'cancelado'> {
+  try {
+    await navigator.share({ files: [new File([bytes], nombre, { type: 'application/pdf' })], title: nombre })
+    return 'compartido'
+  } catch (e) {
+    if ((e as DOMException).name === 'AbortError') return 'cancelado'
+    descargarArchivo(bytes, nombre)
+    return 'descargado'
+  }
+}
+
 export type Fuente = 'normal' | 'negrita' | 'mono'
 const NOMBRE_FUENTE: Record<Fuente, string> = { normal: 'F1', negrita: 'F2', mono: 'F3' }
 const BASE_FUENTE: Record<Fuente, string> = { normal: 'Helvetica', negrita: 'Helvetica-Bold', mono: 'Courier' }
@@ -105,7 +122,26 @@ function color(c: Color, trazo: boolean): string {
 
 const escapar = (s: string) => s.replace(/[\\()]/g, '\\$&')
 
-interface Pagina { ancho: number; alto: number; ops: string[] }
+// Vista previa: cada página también se dibuja como SVG (en mm, origen arriba a la izquierda, como aquí), para mostrarla
+// en la app sin depender del visor de PDF del navegador, que en Android no se ve dentro de la página.
+const mm = (x: number) => String(Math.round(x * 1000) / 1000)
+const rgb = (c: Color) => {
+  const v = (Array.isArray(c) ? c : [c, c, c]).map((x) => Math.round(Math.min(1, Math.max(0, x)) * 255))
+  return `rgb(${v.join(',')})`
+}
+const xml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const FAMILIA: Record<Fuente, string> = { normal: 'Helvetica, Arial, sans-serif', negrita: 'Helvetica, Arial, sans-serif', mono: "'Courier New', Courier, monospace" }
+const trazoSvg = (color: Color, grosor = 0.25, guion?: [number, number]) =>
+  ` stroke="${rgb(color)}" stroke-width="${mm(grosor)}"${guion ? ` stroke-dasharray="${mm(guion[0])} ${mm(guion[1])}"` : ''}`
+
+interface Pagina { ancho: number; alto: number; ops: string[]; svg: string[] }
+
+// Un PDF terminado: los bytes del archivo y cada página como SVG para la vista previa.
+export interface PdfListo {
+  titulo: string
+  bytes: Bytes
+  paginas: { ancho: number; alto: number; svg: string }[]
+}
 
 export class Documento {
   private paginas: Pagina[] = []
@@ -114,7 +150,7 @@ export class Documento {
   constructor(private titulo = '') {}
 
   pagina(anchoMm: number, altoMm: number) {
-    this.actual = { ancho: anchoMm, alto: altoMm, ops: [] }
+    this.actual = { ancho: anchoMm, alto: altoMm, ops: [], svg: [] }
     this.paginas.push(this.actual)
   }
 
@@ -136,6 +172,10 @@ export class Documento {
     }
     ops.push(`${this.x(x)} ${this.y(y + alto)} ${num(ancho * PT)} ${num(alto * PT)} re`)
     ops.push(o.relleno !== undefined && o.borde !== undefined ? 'B' : o.relleno !== undefined ? 'f' : 'S', 'Q')
+    this.actual.svg.push(
+      `<rect x="${mm(x)}" y="${mm(y)}" width="${mm(ancho)}" height="${mm(alto)}" fill="${o.relleno !== undefined ? rgb(o.relleno) : 'none'}"` +
+      `${o.borde !== undefined ? trazoSvg(o.borde, o.grosor, o.guion) : ''}/>`,
+    )
   }
 
   linea(x1: number, y1: number, x2: number, y2: number, o: { color?: Color; grosor?: number; guion?: [number, number] } = {}) {
@@ -143,6 +183,7 @@ export class Documento {
     ops.push('q', color(o.color ?? 0, true), `${num((o.grosor ?? 0.25) * PT)} w`)
     if (o.guion) ops.push(`[${num(o.guion[0] * PT)} ${num(o.guion[1] * PT)}] 0 d`)
     ops.push(`${this.x(x1)} ${this.y(y1)} m ${this.x(x2)} ${this.y(y2)} l S`, 'Q')
+    this.actual.svg.push(`<line x1="${mm(x1)}" y1="${mm(y1)}" x2="${mm(x2)}" y2="${mm(y2)}"${trazoSvg(o.color ?? 0, o.grosor, o.guion)}/>`)
   }
 
   // `y` es la línea base del texto. `alinear` decide qué punto del texto cae en `x`.
@@ -156,6 +197,11 @@ export class Documento {
       `BT /${NOMBRE_FUENTE[fuente]} ${num(tam)} Tf ${this.x(x0)} ${this.y(y)} Td (${escapar(paraPdf(texto))}) Tj ET`,
       'Q',
     )
+    // Mismo punto de inicio que en el PDF (x0 ya alineado con las medidas de Helvetica): sin text-anchor.
+    this.actual.svg.push(
+      `<text x="${mm(x0)}" y="${mm(y)}" font-family="${FAMILIA[fuente]}" font-size="${mm(tam / PT)}"${fuente === 'negrita' ? ' font-weight="bold"' : ''}` +
+      ` fill="${rgb(o.color ?? 0)}" xml:space="preserve">${xml(paraPdf(texto))}</text>`,
+    )
   }
 
   // Dibuja una matriz de módulos (QR) dentro de un cuadrado de `lado` mm. Une los módulos contiguos de cada fila
@@ -163,6 +209,7 @@ export class Documento {
   modulos(x: number, y: number, lado: number, n: number, oscuro: (fila: number, col: number) => boolean) {
     const m = lado / n
     const ops = this.actual.ops
+    let d = ''
     ops.push('q', '0 g')
     for (let f = 0; f < n; f++) {
       let c = 0
@@ -171,9 +218,25 @@ export class Documento {
         const ini = c
         while (c < n && oscuro(f, c)) c++
         ops.push(`${this.x(x + ini * m)} ${this.y(y + (f + 1) * m)} ${num((c - ini) * m * PT)} ${num(m * PT)} re`)
+        d += `M${mm(x + ini * m)} ${mm(y + f * m)}h${mm((c - ini) * m)}v${mm(m)}h-${mm((c - ini) * m)}z`
       }
     }
     ops.push('f', 'Q')
+    this.actual.svg.push(`<path d="${d}" fill="#000" shape-rendering="crispEdges"/>`)
+  }
+
+  // El archivo y su vista previa: cada página como SVG sobre fondo blanco, del tamaño real en mm.
+  listo(): PdfListo {
+    return {
+      titulo: this.titulo,
+      bytes: this.bytes(),
+      paginas: this.paginas.map((p) => ({
+        ancho: p.ancho,
+        alto: p.alto,
+        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${mm(p.ancho)} ${mm(p.alto)}" width="${mm(p.ancho)}mm" height="${mm(p.alto)}mm">` +
+          `<rect width="100%" height="100%" fill="#fff"/>${p.svg.join('')}</svg>`,
+      })),
+    }
   }
 
   bytes(): Bytes {

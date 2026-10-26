@@ -3,10 +3,11 @@ import { AlertCircle, ArrowLeft, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from
 import { ErrorApi } from '../../lib/api'
 import { cerrarSesion, iniciarSesion, mensajeErrorLogin, sesionActual } from '../../lib/sesion'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
+import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
 import { AveDanelle, LogoDanelle } from './marca'
 
-type Modo = 'login' | 'recuperar'
+type Modo = 'login' | 'recuperar' | 'codigo'
 
 export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
   onLoginExitoso?: () => void
@@ -38,23 +39,27 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
     setEsBloqueo(false)
 
     try {
-      await iniciarSesion(c, p)
-      const sesion = sesionActual()
-
-      // Restricción de rol: Solo Administrador puede ingresar al panel de admin
-      if (sesion && sesion.usuario.rol !== 'administrador') {
-        await cerrarSesion()
-        setError('Acceso no autorizado: esta cuenta es de vendedor')
-        return
-      }
-
-      onLoginExitoso?.()
+      // El panel guarda la sesión en cookies HttpOnly (fuera del alcance de cualquier script de la página).
+      if ((await iniciarSesion(c, p, { cookie: true })) === 'codigo') return setModo('codigo')
+      await despuesDeEntrar()
     } catch (err: unknown) {
       setEsBloqueo(err instanceof ErrorApi && err.codigo === 'BLOQUEADA')
       setError(mensajeErrorLogin(err))
     } finally {
       setCargando(false)
     }
+  }
+
+  // Restricción de rol: sólo el administrador entra al panel.
+  async function despuesDeEntrar() {
+    const sesion = sesionActual()
+    if (sesion && sesion.usuario.rol !== 'administrador') {
+      await cerrarSesion()
+      setModo('login')
+      setError('Acceso no autorizado: esta cuenta es de vendedor')
+      return
+    }
+    onLoginExitoso?.()
   }
 
   return (
@@ -150,6 +155,11 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
                 )}
               </button>
             </form>
+          )}
+
+          {/* MODO 3: SEGUNDO PASO (verificación en dos pasos) */}
+          {modo === 'codigo' && (
+            <PasoCodigo onListo={() => void despuesDeEntrar()} onVolver={() => { setPassword(''); setModo('login') }} />
           )}
 
           {/* MODO 2: RECUPERAR CONTRASEÑA (RF-002) */}

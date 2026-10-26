@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, ChartLine, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, ShieldAlert, Smartphone, Users } from 'lucide-react'
+import { BarChart3, ChartLine, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
 import { hace } from '../../lib/fechas'
 import { cerrarSesion, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
@@ -10,8 +10,9 @@ import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
 import { Reportes } from '../pwa/Reportes'
+import { Configuracion } from './Configuracion'
 
-export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes'
+export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes' | 'configuracion'
 
 const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
   { id: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
@@ -20,6 +21,7 @@ const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
   { id: 'produccion', texto: 'Producción', icono: BarChart3 },
   { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl },
   { id: 'reportes', texto: 'Reportes', icono: ChartLine },
+  { id: 'configuracion', texto: 'Configuración', icono: Settings },
 ]
 
 // La sección abierta sobrevive a recargar la página (sólo en esta pestaña del navegador).
@@ -162,13 +164,15 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
               <span className="hidden xl:inline">App de reparto</span>
             </button>
           )}
-          <span
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-semibold text-white"
-            title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : undefined}
-            aria-hidden="true"
+          <button
+            type="button"
+            onClick={() => setSeccion('configuracion')}
+            aria-label="Configuración de tu cuenta"
+            title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : 'Mi cuenta'}
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro ${anillo}`}
           >
             {sesion?.usuario.nombre.charAt(0).toUpperCase() ?? 'A'}
-          </span>
+          </button>
           <button
             type="button"
             onClick={manejarCerrarSesion}
@@ -187,6 +191,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
         <div className="pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-12">
           {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
           {seccion === 'sabores' && <AdminSabores />}
+          {seccion === 'configuracion' && <Configuracion />}
           {(seccion === 'equipo' || seccion === 'clientes' || seccion === 'produccion' || seccion === 'reportes') && (
             // Estas cuatro son las pantallas de la app de reparto, que traen su propio margen interior de 16 px.
             <div className="mx-auto max-w-[1100px] px-0 pt-2 sm:px-4">
@@ -199,10 +204,11 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
         </div>
       </main>
 
-      {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono */}
+      {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono.
+          Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}
       <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
         <ul className="pointer-events-auto flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel/90 p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.16)] backdrop-blur-xl">
-          {PESTANAS.map(({ id, texto, icono: Icono }) => {
+          {PESTANAS.filter((p) => p.id !== 'configuracion').map(({ id, texto, icono: Icono }) => {
             const activa = seccion === id
             return (
               <li key={id} className={activa ? 'min-w-0 flex-1' : 'shrink-0'}>

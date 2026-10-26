@@ -36,7 +36,7 @@ Las mismas en tu `.env` local (para crear la base) y en Vercel (**Settings → E
 | `AUTH_PEPPER_SECRET` | Otra, también con `openssl rand -hex 32`. **Guárdala aparte**: si se pierde, todas las contraseñas se tienen que restablecer |
 | `ZONA_HORARIA` | `America/Mexico_City` (la de los teléfonos de reparto) |
 | `DB_SSL_CA` | Recomendado: el certificado de la base, ver el paso 1 |
-| `CORS_ORIGINS` | La dirección de la app, p. ej. `https://reparto-yogurt.vercel.app` |
+| `CORS_ORIGINS` | Sólo si la app está en otro dominio que la API (p. ej. GitHub Pages): sus direcciones `https://` exactas, separadas por comas. Si app y API están juntas en Vercel, déjala vacía. No admite `*` ni `localhost`: con eso la API no arranca |
 | `RESEND_API_KEY`, `MAIL_FROM` | Para «¿Olvidaste tu contraseña?». Sin ellas, en producción no se puede enviar el código |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Opcional, para notificaciones push: `npm run push:claves` |
 
@@ -84,3 +84,4 @@ Conviene que la función de Vercel y la base estén en la misma región (Railway
 | `/api/health` responde pero el login da 500 | La base no tiene el esquema: corre `npm run db:migrar` |
 | El panel muestra números de «mañana» | `ZONA_HORARIA` no es la del negocio |
 | Las llamadas fallan con error de CORS | `CORS_ORIGINS` no tiene exactamente la dirección de la app (con `https://`, sin `/` al final) |
+| La API no arranca: «CORS_ORIGINS …» | Tiene `*`, `localhost`, `http://` o una ruta: deja sólo orígenes `https://` exactos |

@@ -9,6 +9,7 @@ import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, reno
 import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
+import { DosPasos } from './DosPasos'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
 
@@ -293,6 +294,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
         <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => void sincronizar()} disabled={sync.sincronizando}>Sincronizar ahora</Boton>
       </div>
 
+      <DosPasos />
       <Avisos irA={irA} />
       <Notificaciones />
 

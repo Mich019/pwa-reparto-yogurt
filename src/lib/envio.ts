@@ -100,9 +100,10 @@ export function enviarCola(llamar: Llamar, dispositivo: string): Promise<void> {
 // Lo que el service worker necesita para enviar con la app cerrada: la sesión vive en localStorage, que él no puede
 // leer, así que la app deja una copia en la base local (mismo origen, mismo nivel de protección) y la borra al salir.
 export interface SesionSegundoPlano {
-  accessToken: string
+  accessToken?: string // sin tokens: la sesión del panel web va en cookies HttpOnly, que el navegador pone solo
   expiraEn: number
-  refreshToken: string
+  refreshToken?: string
+  cookie?: boolean
   usuarioId: string
   dispositivo: string
   debeCambiarPassword: boolean
@@ -112,6 +113,8 @@ export const CLAVE_SESION_SW = 'sesion-segundo-plano'
 // Cierre de sesión sin señal (RF-006): el teléfono ya olvidó la sesión, pero el servidor la daría por buena hasta que
 // venza. Su token queda aquí y se revoca en cuanto haya conexión (la app al volver la señal, o el service worker).
 export const CLAVE_REVOCAR = 'revocar-pendientes'
+// En la lista, la sesión de la cookie (su token no se ve desde la página): se revoca mandando la cookie.
+export const REVOCAR_COOKIE = 'cookie'
 
 export async function guardarRevocacion(refreshToken: string) {
   await db.transaction('rw', db.meta, async () => {
@@ -124,10 +127,18 @@ export async function guardarRevocacion(refreshToken: string) {
 export async function revocarPendientes(): Promise<void> {
   const lista = ((await db.meta.get(CLAVE_REVOCAR))?.valor as string[] | undefined) ?? []
   for (const refreshToken of lista) {
-    await api('/auth/logout', { cuerpo: { refreshToken } }) // siempre 204, aunque ya estuviera revocada
+    await api('/auth/logout', { cuerpo: refreshToken === REVOCAR_COOKIE ? {} : { refreshToken } }) // siempre 204, aunque ya estuviera revocada
     await db.transaction('rw', db.meta, async () => {
       const ahora = ((await db.meta.get(CLAVE_REVOCAR))?.valor as string[] | undefined) ?? []
       await db.meta.put({ clave: CLAVE_REVOCAR, valor: ahora.filter((t) => t !== refreshToken) })
     })
   }
+}
+
+// Al entrar de nuevo con cookie, la cookie pendiente ya es la de la sesión nueva: no hay que revocarla.
+export async function olvidarRevocacionCookie() {
+  await db.transaction('rw', db.meta, async () => {
+    const lista = ((await db.meta.get(CLAVE_REVOCAR))?.valor as string[] | undefined) ?? []
+    if (lista.includes(REVOCAR_COOKIE)) await db.meta.put({ clave: CLAVE_REVOCAR, valor: lista.filter((t) => t !== REVOCAR_COOKIE) })
+  })
 }

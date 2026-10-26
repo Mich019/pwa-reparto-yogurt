@@ -161,6 +161,8 @@ export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contex
       )
       if (!rowCount) return falla(404, 'Esa cuenta no existe')
       await cerrarSesiones(c, p.data.id)
+      // Quien perdió el teléfono y los códigos de respaldo vuelve a entrar sólo con contraseña y la configura de nuevo.
+      await c.query(`DELETE FROM dos_pasos WHERE id_usuario = $1`, [p.data.id])
       return { ok: true }
     })
     if (esFalla(r)) return rep.code(r.status).send({ error: r.error })

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { BookUser, ChevronRight, Download, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
+import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
@@ -399,7 +399,7 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
     const m = mapa.current
     if (!m || !punto) return
     if (!marca.current) {
-      marca.current = new Marker({ color: '#000000', draggable: true }).setLngLat(punto).addTo(m)
+      marca.current = new Marker({ color: '#035d38', draggable: true }).setLngLat(punto).addTo(m)
       marca.current.on('dragend', () => {
         const ll = marca.current!.getLngLat()
         cb.current([ll.lng, ll.lat])
@@ -424,7 +424,8 @@ function HojaLibreta({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => 
   async function descargar() {
     setBajando(true)
     try {
-      aviso(`Se descargó ${await exportarLibreta(formato)}`)
+      const nombre = await exportarLibreta(formato)
+      if (nombre) aviso(`Se descargó ${nombre}`)
       onCerrar()
     } catch (e) {
       aviso(e instanceof Error ? e.message : 'No se pudo descargar')
@@ -438,7 +439,7 @@ function HojaLibreta({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => 
       abierta={abierta}
       onCerrar={onCerrar}
       titulo="Libreta de clientes"
-      pie={<Boton onClick={descargar} disabled={bajando} className="w-full"><Download size={18} /> {bajando ? 'Preparando…' : 'Descargar'}</Boton>}
+      pie={<Boton onClick={descargar} disabled={bajando} className="w-full">{formato === 'pdf' ? <Eye size={18} /> : <Download size={18} />} {bajando ? 'Preparando…' : formato === 'pdf' ? 'Ver vista previa' : 'Descargar'}</Boton>}
     >
       <p className="text-sm text-apagado">Todos los clientes activos de todos los vendedores, con sus datos al día de hoy.</p>
       <Segmentado

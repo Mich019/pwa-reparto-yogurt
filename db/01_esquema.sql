@@ -97,6 +97,17 @@ CREATE TABLE intentos_login (
 CREATE INDEX intentos_login_correo ON intentos_login (lower(correo), creado_en DESC);
 CREATE INDEX intentos_login_ip ON intentos_login (ip, creado_en DESC);
 
+-- Verificación en dos pasos (TOTP). Aparte de usuarios: su bitácora copia la fila entera y guardaría el secreto.
+-- El secreto va cifrado con una clave derivada de AUTH_PEPPER_SECRET (api/_lib/dosPasos.ts).
+CREATE TABLE dos_pasos (
+  id_usuario   uuid PRIMARY KEY REFERENCES usuarios (id_usuario) ON DELETE CASCADE,
+  secreto      text NOT NULL,                 -- cifrado con AES-256-GCM
+  activado_en  timestamptz,                   -- null = se está configurando: todavía no se pide al entrar
+  ultimo_paso  bigint NOT NULL DEFAULT 0,     -- ventana de 30 s del último código aceptado: no se acepta dos veces
+  respaldo     text[] NOT NULL DEFAULT '{}',  -- HMAC de los códigos de respaldo que quedan sin usar
+  creado_en    timestamptz NOT NULL DEFAULT now()
+);
+
 -- =============================================================================
 -- M02 / M03 · Clientes, frecuencia, QR y NFC
 -- =============================================================================

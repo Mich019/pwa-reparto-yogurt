@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { AlertCircle, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
 import { cerrarSesion, iniciarSesion, mensajeErrorLogin } from '../../lib/sesion'
 import { ErrorApi } from '../../lib/api'
-import { Logo } from '../../components/Logo'
+import { LogoDanelle } from '../admin/marca'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
+import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
 import { FormPassword } from './Cuenta'
 
@@ -15,6 +16,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
   const [esBloqueo, setEsBloqueo] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [recuperando, setRecuperando] = useState(false)
+  const [pideCodigo, setPideCodigo] = useState(false)
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
@@ -29,7 +31,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
     setEsBloqueo(false)
 
     try {
-      await iniciarSesion(c, p)
+      if ((await iniciarSesion(c, p)) === 'codigo') setPideCodigo(true)
     } catch (e: unknown) {
       setEsBloqueo(e instanceof ErrorApi && e.codigo === 'BLOQUEADA')
       setError(mensajeErrorLogin(e))
@@ -39,14 +41,16 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
   }
 
   return (
-    <div className="flex h-dvh flex-col justify-center bg-papel px-6 pt-safe pb-safe">
+    <div className="flex h-dvh flex-col justify-center bg-lienzo px-6 pt-safe pb-safe">
       <div className="mx-auto w-full max-w-sm">
         {/* Cabecera limpia */}
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="h-16 w-16 shadow-sm" textoClassName="text-3xl font-black" />
+          <LogoDanelle className="h-24" />
         </div>
 
-        {recuperando ? (
+        {pideCodigo ? (
+          <PasoCodigo onVolver={() => { setPideCodigo(false); setPassword('') }} />
+        ) : recuperando ? (
           <RecuperarPassword correoInicial={correo} onVolver={(c) => { setCorreo(c); setError(''); setRecuperando(false) }} />
         ) : (
           <form className="space-y-4" onSubmit={entrar}>
@@ -144,7 +148,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
 // Primera vez con una cuenta creada por el administrador: debe elegir su propia contraseña.
 export function CambioObligatorio() {
   return (
-    <div className="flex h-dvh flex-col justify-center bg-papel px-6 pt-safe pb-safe">
+    <div className="flex h-dvh flex-col justify-center bg-lienzo px-6 pt-safe pb-safe">
       <div className="mx-auto w-full max-w-sm">
         <h1 className="text-3xl font-bold tracking-tight">Elige tu contraseña</h1>
         <p className="mt-1 mb-6 text-apagado">Tu cuenta tiene una contraseña temporal. Cámbiala para continuar.</p>

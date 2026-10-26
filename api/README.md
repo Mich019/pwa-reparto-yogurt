@@ -29,9 +29,13 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 
 | Ruta | Quién | Para qué |
 |---|---|---|
-| `POST /auth/login` | todos | Correo y contraseña → token de acceso (15 min) + token de renovación (30 días). Límite de intentos fallidos (RF-003, ver [Seguridad](#seguridad)). |
-| `POST /auth/refresh` | todos | Token de acceso nuevo con el de renovación. |
-| `POST /auth/logout` | todos | Revoca la sesión de ese teléfono (RF-006). |
+| `POST /auth/login` | todos | Correo y contraseña → token de acceso (15 min) + token de renovación (30 días). Con `modo: "cookie"` (panel web) los tokens van en cookies HttpOnly. Con verificación en dos pasos devuelve `{ dosPasos, desafio }` en lugar de la sesión. Límite de intentos fallidos (RF-003, ver [Seguridad](#seguridad)). |
+| `POST /auth/login/codigo` | todos | Segundo paso: `desafio` (5 min) + código del autenticador o de respaldo → sesión. Un código equivocado cuenta como intento fallido. |
+| `POST /auth/refresh` | todos | Token de acceso nuevo con el de renovación (o con la cookie de sesión). |
+| `POST /auth/logout` | todos | Revoca la sesión de ese teléfono (RF-006) y borra las cookies del panel. |
+| `GET /auth/dos-pasos` | sesión | Si la verificación en dos pasos está activa y cuántos códigos de respaldo quedan. |
+| `POST /auth/dos-pasos/iniciar`, `/activar` | sesión | Secreto nuevo (QR `otpauth://`) y activación con el primer código; devuelve 10 códigos de respaldo una sola vez. |
+| `POST /auth/dos-pasos/desactivar`, `/respaldo` | sesión | Quitarla (contraseña + código) o generar códigos de respaldo nuevos (código). |
 | `POST /auth/cambiar-password` | sesión | Contraseña nueva; cierra las demás sesiones. Obligatorio si `debe_cambiar_password`. Una contraseña actual equivocada cuenta como intento fallido. |
 | `POST /auth/recuperar` | todos | Manda por correo un código de 6 dígitos que vale 15 min (RF-002). Responde lo mismo y tarda lo mismo exista o no la cuenta; hasta 3 códigos por cuenta y 10 por conexión cada hora. Necesita `RESEND_API_KEY`; sin ella, fuera de producción el código sale en la consola. |
 | `POST /auth/restablecer` | todos | Correo, código y contraseña nueva: la cambia, quita el bloqueo y cierra todas las sesiones. El código se anula tras 5 intentos. |
@@ -57,7 +61,12 @@ En GitHub Pages, define la variable de repositorio `API_URL` (Settings → Secre
 | `POST /notificaciones/leidas` | sesión | Marca avisos como leídos. |
 | `POST /notificaciones/prueba` | sesión | Manda un aviso de prueba a los teléfonos de esa cuenta. |
 
-Contraseñas con Argon2id y pepper (RF-004, ver [Seguridad](#seguridad)). El token de acceso lleva la sesión: si se cierra la sesión, se desactiva al usuario o cambia su rol, el servidor lo nota en la siguiente petición (RF-005, RF-006).
+Contraseñas con Argon2id y pepper (RF-004, ver [Seguridad](#seguridad)).
+
+**Verificación en dos pasos** (`_lib/dosPasos.ts`): TOTP de 6 dígitos cada 30 s (RFC 6238), opcional por cuenta y recomendada para administradores. El secreto se guarda cifrado (AES-256-GCM, clave derivada de `AUTH_PEPPER_SECRET`) en la tabla `dos_pasos`, aparte de `usuarios` para que su bitácora no lo copie; un código aceptado no vuelve a servir y los 10 de respaldo se guardan como HMAC. Si alguien pierde el teléfono y los códigos, un administrador le restablece la contraseña y eso la quita. Base existente: `db/migraciones/006_dos_pasos.sql`.
+
+**Sesión del panel web en cookies** (`_lib/cookies.ts`): con la app y la API en el mismo dominio, `/admin` entra con `modo: "cookie"` y los tokens viajan sólo en cookies `HttpOnly; SameSite=Strict` (en producción `Secure` y prefijo `__Host-`): un script colado en la página no puede leerlas. Los cambios hechos con la cookie exigen además la cabecera `X-Solicitud: app` (CSRF). La app de reparto sigue con tokens: trabaja sin conexión y su service worker los necesita. Si viene `Authorization`, manda sobre la cookie.
+ El token de acceso lleva la sesión: si se cierra la sesión, se desactiva al usuario o cambia su rol, el servidor lo nota en la siguiente petición (RF-005, RF-006).
 
 ## Roles
 

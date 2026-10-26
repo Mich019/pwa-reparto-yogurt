@@ -5,7 +5,7 @@ import ave from '../../assets/danelle-ave.png'
 // Logo y ave de Danelle. Los SVG originales eran un mapa de bits dentro de un SVG de 380 KB; aquí van recortados y
 // reducidos a los tres colores de la marca (verde #035d38, amarillo #f9dc07, negro) con la transparencia como suavizado.
 export function LogoDanelle({ className = 'h-12' }: { className?: string }) {
-  return <img src={logo} alt="Danelle, yogurt 100% natural" className={`w-auto select-none ${className}`} draggable={false} />
+  return <img src={logo} alt="Danelle, yogurt 100% natural" className={`logo-danelle w-auto select-none ${className}`} draggable={false} />
 }
 
 export function AveDanelle({ className = 'h-10' }: { className?: string }) {
