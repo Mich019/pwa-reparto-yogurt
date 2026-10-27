@@ -126,6 +126,7 @@ export interface Registro {
   negocio: string
   nombre: string
   correo: string
+  verificado: string // el correo que ya se confirmó con el código; si se cambia el correo, hay que confirmarlo otra vez
   terminos: boolean
   giros: string[]
   tipos: TipoEnvase[] // envases elegidos, en orden
@@ -141,7 +142,7 @@ const nuevoId = () => crypto.randomUUID()
 
 export function registroVacio(): Registro {
   return {
-    negocio: '', nombre: '', correo: '', terminos: false,
+    negocio: '', nombre: '', correo: '', verificado: '', terminos: false,
     giros: [], tipos: [], envases: [], controlRetornables: false, productos: [],
     marca: { color: COLORES_MARCA[0], logo: null },
     zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Mexico_City',

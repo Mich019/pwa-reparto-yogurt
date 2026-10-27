@@ -272,6 +272,20 @@ function armarPantallas(
       ),
     },
 
+    {
+      clave: 'verificar', fase: 'cuenta',
+      pregunta: 'Revisa tu correo',
+      ayuda: <>Te mandamos un código de 6 dígitos a <span className="font-semibold text-tinta">{r.correo.trim()}</span>.</>,
+      falta: r.verificado !== r.correo.trim().toLowerCase() ? 'Escribe el código de 6 dígitos que te mandamos' : null,
+      contenido: (
+        <PasoVerificar
+          correo={r.correo.trim().toLowerCase()}
+          verificado={r.verificado}
+          onVerificado={(c) => { cambiar((x) => ({ ...x, verificado: c })); avanzar() }}
+        />
+      ),
+    },
+
     // --- Tu catálogo ---
     {
       clave: 'bienvenida', fase: 'catalogo',
@@ -584,6 +598,73 @@ function PasoPassword({ password, setPassword, correo }: { password: string; set
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+const ESPERA_REENVIO = 60 // segundos
+
+// Confirmación del correo con un código de 6 dígitos; al completarlo avanza solo.
+function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; verificado: string; onVerificado: (correo: string) => void }) {
+  const [codigo, setCodigo] = useState('')
+  const [espera, setEspera] = useState(ESPERA_REENVIO)
+  const [reenviado, setReenviado] = useState(false)
+  const listo = verificado === correo
+
+  useEffect(() => {
+    if (listo || espera <= 0) return
+    const t = setTimeout(() => setEspera((s) => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [espera, listo])
+
+  // Prototipo: todavía no hay servidor que mande el correo, así que cualquier código de 6 dígitos confirma.
+  // Con la Fase 2 (registro por cuenta propia) aquí se valida el código en el servidor.
+  function escribir(v: string) {
+    const limpio = v.replace(/\D/g, '').slice(0, 6)
+    setCodigo(limpio)
+    if (limpio.length === 6) onVerificado(correo)
+  }
+
+  if (listo) {
+    return (
+      <div className="flex items-center gap-4 rounded-[22px] bg-marca/10 p-5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-verde text-white"><Check size={22} strokeWidth={3} /></span>
+        <div>
+          <div className="text-lg font-semibold">Correo confirmado</div>
+          <div className="text-sm text-apagado">{correo}</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <input
+        data-enfocar
+        value={codigo}
+        onChange={(e) => escribir(e.target.value)}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        placeholder="000000"
+        aria-label="Código de 6 dígitos"
+        className={`${claseInput} py-5 text-center text-3xl font-semibold tracking-[0.5em] tabular-nums`}
+      />
+      <div className="text-[15px]">
+        {espera > 0 ? (
+          <span className="text-apagado">
+            {reenviado ? 'Te mandamos otro código. ' : '¿No te llegó? Revisa en spam. '}
+            Puedes pedir otro en <span className="tabular-nums">{espera}</span> s.
+          </span>
+        ) : (
+          <button type="button" onClick={() => { setCodigo(''); setReenviado(true); setEspera(ESPERA_REENVIO) }} className="font-semibold text-azul hover:underline">
+            Mandar otro código
+          </button>
+        )}
+      </div>
+      <p className="rounded-2xl bg-niebla px-4 py-3 text-sm text-apagado">
+        Versión de prueba: todavía no se manda el correo, cualquier código de 6 dígitos sirve.
+      </p>
     </div>
   )
 }
@@ -971,7 +1052,7 @@ function Listo({ r, onIrAlPanel }: { r: Registro; onIrAlPanel: () => void }) {
         <Check size={40} strokeWidth={3} />
       </div>
       <h1 className="mt-6 text-[2rem] font-semibold leading-tight">¡{r.negocio} ya está lista!</h1>
-      <p className="mt-2 max-w-sm text-apagado">Confirma tu correo con el código que te enviamos y entra al panel.</p>
+      <p className="mt-2 max-w-sm text-apagado">Entra al panel con tu correo y tu contraseña para empezar a levantar pedidos.</p>
       <button type="button" onClick={onIrAlPanel} className="mt-8 rounded-full bg-tinta px-8 py-4 font-semibold text-white hover:bg-marca-oscuro">
         Ir al panel
       </button>
