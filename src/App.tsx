@@ -3,24 +3,31 @@ import { LoginAdmin } from './views/admin/LoginAdmin'
 import { AdminLayout } from './views/admin/AdminLayout'
 import { Login, CambioObligatorio } from './views/pwa/Login'
 import { PwaLayout } from './views/pwa/PwaLayout'
+import { RegistroEmpresa } from './views/registro/RegistroEmpresa'
 import { Avisos } from './components/ui'
 import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
 import { useTemaOscuro } from './lib/tema'
 
-function esRutaAdmin() {
+function esRuta(ruta: string) {
   if (typeof window === 'undefined') return false
-  return window.location.pathname.startsWith('/admin') || window.location.hash.startsWith('#/admin')
+  return window.location.pathname.startsWith(ruta) || window.location.hash.startsWith(`#${ruta}`)
 }
+const esRutaAdmin = () => esRuta('/admin')
+const esRutaRegistro = () => esRuta('/registro')
 
 export default function App() {
   const sesion = useSesion()
   const oscuro = useTemaOscuro()
   const [esAdmin, setEsAdmin] = useState(esRutaAdmin)
+  const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
 
   useEffect(() => {
-    const alCambiar = () => setEsAdmin(esRutaAdmin())
+    const alCambiar = () => {
+      setEsAdmin(esRutaAdmin())
+      setEsRegistro(esRutaRegistro())
+    }
     window.addEventListener('popstate', alCambiar)
     window.addEventListener('hashchange', alCambiar)
     return () => {
@@ -39,6 +46,29 @@ export default function App() {
     setEsAdmin(false)
   }
 
+  function irARegistro() {
+    window.history.pushState({}, '', '/registro')
+    setEsRegistro(true)
+  }
+
+  function irAlPanelDesdeRegistro() {
+    window.history.pushState({}, '', '/admin')
+    setEsRegistro(false)
+    setEsAdmin(true)
+  }
+
+  // =========================================================================
+  // ALTA DE EMPRESA (/registro): formulario progresivo, sin sesión
+  // =========================================================================
+  if (esRegistro && MODO_SERVIDOR) {
+    return (
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
+        <Avisos />
+        <RegistroEmpresa onIrAlPanel={irAlPanelDesdeRegistro} />
+      </div>
+    )
+  }
+
   // =========================================================================
   // VISTA PANEL ADMINISTRADOR (/admin)
   // =========================================================================
@@ -50,7 +80,7 @@ export default function App() {
       <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
         <Avisos />
         <VisorPdf />
-        {!sesion ? <LoginAdmin onIrAPwa={irAPwa} />
+        {!sesion ? <LoginAdmin onIrAPwa={irAPwa} onIrARegistro={irARegistro} />
           : sesion.usuario.debeCambiarPassword ? <CambioObligatorio />
           : <AdminLayout onIrAPwa={irAPwa} />}
       </div>

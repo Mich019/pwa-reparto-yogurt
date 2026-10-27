@@ -67,3 +67,6 @@ body {
 @keyframes pulso { 0% { box-shadow: 0 0 0 0 rgba(39,110,241,.55); } 70% { box-shadow: 0 0 0 18px rgba(39,110,241,0); } 100% { box-shadow: 0 0 0 0 rgba(39,110,241,0); } }
 .yo { width: 18px; height: 18px; border-radius: 9999px; background: #1a2cff; border: 3px solid #fff; box-shadow: 0 0 0 10px rgba(39,110,241,.22); }
 .maplibregl-ctrl-attrib { font-size: 10px; }
+
+/* Cada paso del registro (views/registro) y lo que se revela dentro entra deslizándose un poco. */
+@keyframes paso-entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
