@@ -1,95 +1,105 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import {
-  AlertCircle, ArrowLeft, ArrowRight, Check, Eye, EyeOff, ImagePlus, Minus, Package, Pencil, Plus, RotateCcw, Trash2, X,
-} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AlertCircle, ArrowLeft, ArrowRight, Check, Eye, EyeOff, ImagePlus, Mail, Minus, Plus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, ErrorApi, ErrorRed } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import {
-  aplicarSugerencias, borrarBorrador, COLORES_MARCA, cuerpoRegistro, envaseDeTipo, faltaEnCuenta, faltaEnEnvases,
-  faltaEnNegocio, faltaEnProductos, formatoCantidad, GIROS, guardarBorrador, leerBorrador, nombreEnvase, numero,
-  presentaciones, productoNuevo, registroVacio, reglasPassword, TIPOS_ENVASE, UNIDADES, ZONAS_HORARIAS,
-  type Envase, type Giro, type Producto, type Registro,
+  alternarTamano, alternarTipo, aplicarGiros, borrarBorrador, COLORES_MARCA, colorPara, correoValido, cuerpoRegistro,
+  GIROS, guardarBorrador, leerBorrador, leerTamano, nombreEnvase, numero, presentaciones, productoNuevo, registroVacio,
+  reglasPassword, sugerenciasProductos, textoTamano, tieneTamano, tipoEnvase, TIPOS_ENVASE,
+  type Producto, type Registro,
 } from '../../lib/registro'
-import { Campo, claseInput } from '../../components/ui'
+import { claseInput } from '../../components/ui'
+import { DibujoEnvase, type TipoEnvase } from './dibujos'
 
-// Formulario progresivo para dar de alta una empresa (/registro). Una pregunta a la vez: cada paso pide sólo lo
-// suyo, lo siguiente aparece cuando lo anterior está listo, y el avance se guarda en el equipo para seguir después.
+// Registro de una empresa nueva y su asistente de configuración, una pregunta por pantalla. Las pantallas se arman
+// según lo que se va contestando: una por cada envase elegido (sus tamaños) y dos por cada producto (variantes y
+// precios). El avance se guarda en el equipo, sin la contraseña, para seguir después.
 
-const PASOS = [
-  { clave: 'negocio', titulo: 'Tu negocio', pregunta: '¿Cómo se llama tu negocio y qué vende?' },
-  { clave: 'cuenta', titulo: 'Tu cuenta', pregunta: 'Crea tu cuenta de administrador' },
-  { clave: 'envases', titulo: 'Envases', pregunta: '¿En qué envases entregas?' },
-  { clave: 'productos', titulo: 'Productos', pregunta: 'Tus productos y sus precios' },
-  { clave: 'marca', titulo: 'Tu marca', pregunta: '¿Cómo se ve tu marca?' },
-  { clave: 'resumen', titulo: 'Resumen', pregunta: 'Revisa y crea tu empresa' },
-] as const
+type Fase = 'cuenta' | 'catalogo' | 'marca' | 'equipo'
+const FASES: { clave: Fase; texto: string }[] = [
+  { clave: 'cuenta', texto: 'Tu cuenta' },
+  { clave: 'catalogo', texto: 'Tu catálogo' },
+  { clave: 'marca', texto: 'Tu marca' },
+  { clave: 'equipo', texto: 'Tu equipo' },
+]
+
+interface Pantalla {
+  clave: string
+  fase: Fase
+  pregunta: ReactNode
+  ayuda?: ReactNode
+  falta?: string | null
+  opcional?: boolean // muestra «Omitir»
+  contenido: ReactNode
+}
 
 type Envio = { estado: 'nada' } | { estado: 'enviando' } | { estado: 'listo' } | { estado: 'error'; mensaje: string; pendiente?: boolean }
 
 export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
   const [inicial] = useState(leerBorrador)
-  const [registro, setRegistro] = useState<Registro>(() => inicial?.registro ?? registroVacio())
-  const [paso, setPaso] = useState(() => inicial?.paso ?? 0)
-  const [retomado, setRetomado] = useState(!!inicial) // se abrió con un borrador de otra vez
+  const [r, setR] = useState<Registro>(() => inicial?.registro ?? registroVacio())
+  const [clave, setClave] = useState(() => inicial?.paso ?? 'negocio')
+  const [retomado, setRetomado] = useState(!!inicial)
   // La contraseña sólo vive en memoria: al volver a esta página hay que escribirla de nuevo.
   const [password, setPassword] = useState('')
-  const [confirmacion, setConfirmacion] = useState('')
-  const [intento, setIntento] = useState(false) // se mostró el porqué de no poder continuar
+  const [intento, setIntento] = useState(false)
   const [envio, setEnvio] = useState<Envio>({ estado: 'nada' })
   const titulo = useRef<HTMLHeadingElement>(null)
 
-  useEffect(() => {
-    if (envio.estado !== 'listo') guardarBorrador(registro, paso)
-  }, [registro, paso, envio.estado])
+  const cambiar = (f: (x: Registro) => Registro) => setR(f)
+  const pantallas = useMemo(() => armarPantallas(r, cambiar, password, setPassword, () => continuar()), [r, password])
+  const i = Math.max(0, pantallas.findIndex((p) => p.clave === clave))
+  const actual = pantallas[i]
 
-  // Al cambiar de paso, el lector de pantalla y el teclado empiezan por la pregunta.
   useEffect(() => {
-    titulo.current?.focus({ preventScroll: true })
+    if (envio.estado !== 'listo') guardarBorrador(r, actual.clave)
+  }, [r, actual.clave, envio.estado])
+
+  // Al cambiar de pantalla, el teclado y el lector de pantalla empiezan por la pregunta; el campo, si hay, se enfoca.
+  useEffect(() => {
     window.scrollTo({ top: 0 })
-  }, [paso])
-
-  const falta = [
-    faltaEnNegocio(registro),
-    faltaEnCuenta(registro, password, confirmacion),
-    faltaEnEnvases(registro),
-    faltaEnProductos(registro),
-    null,
-    null,
-  ]
-
-  function cambiar(f: (r: Registro) => Registro) {
-    setRegistro(f)
-  }
+    const campo = document.querySelector<HTMLElement>('[data-enfocar]')
+    ;(campo ?? titulo.current)?.focus({ preventScroll: true })
+  }, [actual.clave])
 
   function irA(n: number) {
     setIntento(false)
-    setPaso(n)
+    setClave(pantallas[Math.max(0, Math.min(pantallas.length - 1, n))].clave)
   }
 
   function continuar() {
-    if (falta[paso]) return setIntento(true)
-    if (paso < PASOS.length - 1) irA(paso + 1)
+    // Se recalcula con el estado más reciente: hay pantallas que avanzan solas al elegir.
+    setIntento(false)
+    setClave((c) => {
+      const lista = armarPantallas(r, cambiar, password, setPassword, () => {})
+      const n = lista.findIndex((p) => p.clave === c)
+      return lista[Math.min(lista.length - 1, n + 1)].clave
+    })
+  }
+
+  function alContinuar() {
+    if (actual.falta) return setIntento(true)
+    if (i < pantallas.length - 1) irA(i + 1)
     else void crear()
   }
 
   async function crear() {
-    // Al volver de otro día la contraseña no está: se regresa a ese paso en vez de mandar algo incompleto.
-    const primero = falta.findIndex(Boolean)
-    if (primero >= 0) {
-      irA(primero)
+    const primera = pantallas.findIndex((p) => p.falta)
+    if (primera >= 0) {
+      irA(primera)
       setIntento(true)
       return
     }
     setEnvio({ estado: 'enviando' })
     try {
-      await api('/registro/empresa', { cuerpo: cuerpoRegistro(registro, password) })
+      await api('/registro/empresa', { cuerpo: cuerpoRegistro(r, password) })
       borrarBorrador()
       setEnvio({ estado: 'listo' })
     } catch (e) {
       if (e instanceof ErrorApi && e.status === 404) {
-        setEnvio({ estado: 'error', pendiente: true, mensaje: 'El servidor todavía no recibe altas de empresas: llega con la fase multiempresa. Tus datos quedaron guardados en este equipo y se podrán enviar entonces.' })
+        setEnvio({ estado: 'error', pendiente: true, mensaje: 'El servidor todavía no recibe altas de empresas: llega con la fase multiempresa. Tus datos quedaron guardados en este equipo.' })
       } else if (e instanceof ErrorRed) {
-        setEnvio({ estado: 'error', mensaje: 'Sin conexión con el servidor. Tus datos quedaron guardados; inténtalo de nuevo en un momento.' })
+        setEnvio({ estado: 'error', mensaje: 'Sin conexión con el servidor. Tus datos quedaron guardados; inténtalo en un momento.' })
       } else {
         setEnvio({ estado: 'error', mensaje: e instanceof Error ? e.message : 'No se pudo crear la empresa' })
       }
@@ -99,135 +109,101 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
   function empezarDeNuevo() {
     borrarBorrador()
     setRetomado(false)
-    setRegistro(registroVacio())
+    setR(registroVacio())
     setPassword('')
-    setConfirmacion('')
     setEnvio({ estado: 'nada' })
-    irA(0)
+    setIntento(false)
+    setClave('negocio')
   }
 
-  if (envio.estado === 'listo') return <Listo nombre={registro.negocio.nombre} onIrAlPanel={onIrAlPanel} />
+  if (envio.estado === 'listo') return <Listo r={r} onIrAlPanel={onIrAlPanel} />
 
-  const actual = PASOS[paso]
-  const avance = ((paso + 1) / PASOS.length) * 100
+  const ultima = i === pantallas.length - 1
+  const faseActual = FASES.findIndex((f) => f.clave === actual.fase)
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Encabezado fijo: de dónde viene, cuánto falta */}
-      <header className="sticky top-0 z-20 border-b border-linea bg-lienzo/95 backdrop-blur pt-safe">
+      <header className="sticky top-0 z-20 bg-lienzo/95 backdrop-blur pt-safe">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 py-2">
           <button
-            onClick={() => (paso ? irA(paso - 1) : onIrAlPanel())}
+            type="button"
+            onClick={() => (i ? irA(i - 1) : onIrAlPanel())}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-niebla text-tinta active:bg-linea focus-visible:outline-2 focus-visible:outline-marca"
-            aria-label={paso ? 'Paso anterior' : 'Volver al inicio de sesión'}
+            aria-label={i ? 'Pregunta anterior' : 'Volver al inicio de sesión'}
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline justify-between gap-2 text-xs font-semibold text-apagado">
-              <span className="truncate">{actual.titulo}</span>
-              <span className="tabular-nums">Paso {paso + 1} de {PASOS.length}</span>
+          {/* Cuatro tramos, uno por fase; el de la fase actual se llena pregunta a pregunta. */}
+          <div className="min-w-0 flex-1" role="progressbar" aria-valuemin={1} aria-valuemax={pantallas.length} aria-valuenow={i + 1} aria-label="Avance del registro">
+            <div className="flex gap-1">
+              {FASES.map((f, n) => {
+                const deFase = pantallas.filter((p) => p.fase === f.clave)
+                const hechas = n < faseActual ? deFase.length : n > faseActual ? 0 : deFase.findIndex((p) => p.clave === actual.clave) + 1
+                return (
+                  <div key={f.clave} className="h-1.5 flex-1 overflow-hidden rounded-full bg-niebla">
+                    <div className="h-full rounded-full bg-marca transition-[width] duration-500" style={{ width: `${deFase.length ? (hechas / deFase.length) * 100 : 0}%` }} />
+                  </div>
+                )
+              })}
             </div>
-            <div
-              className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-niebla"
-              role="progressbar"
-              aria-valuemin={1}
-              aria-valuemax={PASOS.length}
-              aria-valuenow={paso + 1}
-              aria-label="Avance del registro"
-            >
-              <div className="h-full rounded-full bg-marca transition-[width] duration-300" style={{ width: `${avance}%` }} />
+            <div className="mt-1 flex justify-between text-xs font-semibold text-apagado">
+              <span>{FASES[faseActual].texto}</span>
+              <span className="tabular-nums">{i + 1} de {pantallas.length}</span>
             </div>
           </div>
         </div>
-        {/* Los pasos ya hechos se pueden abrir directo */}
-        <nav className="mx-auto hidden w-full max-w-xl flex-wrap gap-1 px-4 pb-2 sm:flex" aria-label="Pasos">
-          {PASOS.map((p, i) => {
-            const hecho = i < paso
-            const abrible = i <= paso || falta.slice(0, i).every((f) => !f)
-            return (
-              <button
-                key={p.clave}
-                disabled={!abrible}
-                onClick={() => irA(i)}
-                aria-current={i === paso ? 'step' : undefined}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
-                  i === paso ? 'bg-tinta text-white' : 'bg-niebla text-tinta enabled:hover:bg-linea'
-                }`}
-              >
-                {hecho ? <Check size={13} strokeWidth={3} /> : <span className="tabular-nums">{i + 1}</span>}
-                {p.titulo}
-              </button>
-            )
-          })}
-        </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-6 pb-36">
-        {retomado && paso === inicial?.paso && (
-          <div className="mb-5 flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3 text-sm">
+      <form
+        id="pantalla"
+        onSubmit={(e) => { e.preventDefault(); alContinuar() }}
+        className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-6 pb-40"
+        noValidate
+      >
+        {retomado && actual.clave === inicial?.paso && (
+          <div className="mb-6 flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3 text-sm">
             <span className="flex-1">Seguimos donde te quedaste.</span>
-            <button onClick={empezarDeNuevo} className="flex items-center gap-1 font-semibold text-azul hover:underline">
+            <button type="button" onClick={empezarDeNuevo} className="flex items-center gap-1 font-semibold text-azul hover:underline">
               <RotateCcw size={14} /> Empezar de nuevo
             </button>
           </div>
         )}
 
-        <div key={paso} className="animate-[paso-entrar_.28s_ease-out]">
-          <h1 ref={titulo} tabIndex={-1} className="text-[1.75rem] font-semibold leading-tight outline-none">
-            {actual.pregunta}
-          </h1>
-
-          <div className="mt-6">
-            {paso === 0 && <PasoNegocio registro={registro} cambiar={cambiar} />}
-            {paso === 1 && (
-              <PasoCuenta
-                registro={registro}
-                cambiar={cambiar}
-                password={password}
-                setPassword={setPassword}
-                confirmacion={confirmacion}
-                setConfirmacion={setConfirmacion}
-              />
-            )}
-            {paso === 2 && <PasoEnvases registro={registro} cambiar={cambiar} />}
-            {paso === 3 && <PasoProductos registro={registro} cambiar={cambiar} />}
-            {paso === 4 && <PasoMarca registro={registro} cambiar={cambiar} />}
-            {paso === 5 && <PasoResumen registro={registro} irA={irA} />}
-          </div>
+        <div key={actual.clave} className="animate-[paso-entrar_.35s_ease-out]">
+          {/* Sin campo que enfocar, la pregunta tiene el foco: Enter también avanza desde ahí. */}
+          <h1 ref={titulo} tabIndex={-1} onKeyDown={(e) => e.key === 'Enter' && alContinuar()} className="text-[1.9rem] font-semibold leading-[1.15] outline-none">{actual.pregunta}</h1>
+          {actual.ayuda && <p className="mt-2 text-[15px] text-apagado">{actual.ayuda}</p>}
+          <div className="mt-7">{actual.contenido}</div>
         </div>
-      </main>
+      </form>
 
-      {/* Pie fijo con la acción principal, a la mano del pulgar */}
       <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-linea bg-lienzo/95 backdrop-blur">
         <div className="mx-auto w-full max-w-xl px-4 pt-3 pb-safe">
-          {intento && falta[paso] && (
+          {intento && actual.falta && (
             <p role="alert" className="mb-2 flex items-center gap-2 text-sm font-medium text-rojo">
-              <AlertCircle size={16} className="shrink-0" /> {falta[paso]}
+              <AlertCircle size={16} className="shrink-0" /> {actual.falta}
             </p>
           )}
-          {envio.estado === 'error' && paso === PASOS.length - 1 && (
+          {envio.estado === 'error' && ultima && (
             <div role="alert" className={`mb-2 flex items-start gap-2 rounded-2xl p-3 text-sm font-medium ${envio.pendiente ? 'bg-niebla text-tinta' : 'bg-rojo/10 text-rojo'}`}>
               <AlertCircle size={16} className="mt-0.5 shrink-0" /> <span>{envio.mensaje}</span>
             </div>
           )}
           <div className="flex gap-2">
-            {paso === 4 && (
-              <button
-                onClick={() => irA(5)}
-                className="rounded-full bg-niebla px-5 py-4 text-base font-semibold text-tinta transition-colors hover:bg-linea"
-              >
-                Después
+            {actual.opcional && (
+              <button type="button" onClick={() => irA(i + 1)} className="rounded-full bg-niebla px-6 py-4 text-base font-semibold text-tinta transition-colors hover:bg-linea">
+                Omitir
               </button>
             )}
             <button
-              onClick={continuar}
+              type="submit"
+              form="pantalla"
               disabled={envio.estado === 'enviando'}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-colors hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40 ${falta[paso] ? 'opacity-60' : ''}`}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-[colors,opacity] hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40 ${actual.falta ? 'opacity-50' : ''}`}
             >
               {envio.estado === 'enviando' ? (
                 <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Creando…</>
-              ) : paso === PASOS.length - 1 ? (
+              ) : ultima ? (
                 <>Crear mi empresa <Check size={18} /></>
               ) : (
                 <>Continuar <ArrowRight size={18} /></>
@@ -240,640 +216,763 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
   )
 }
 
-type PropsPaso = { registro: Registro; cambiar: (f: (r: Registro) => Registro) => void }
-
-// Un bloque que aparece cuando lo anterior está listo (lo que hace progresivo cada paso).
-function Revelar({ visible, children }: { visible: boolean; children: ReactNode }) {
-  if (!visible) return null
-  return <div className="animate-[paso-entrar_.28s_ease-out]">{children}</div>
-}
-
-function Ayuda({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-sm text-apagado">{children}</p>
-}
-
 // ---------------------------------------------------------------------------------------------------------------
-// Paso 1: el negocio
+// Las pantallas, en orden. Cada una: su pregunta, qué le falta para continuar y su contenido.
 // ---------------------------------------------------------------------------------------------------------------
-function PasoNegocio({ registro, cambiar }: PropsPaso) {
-  const n = registro.negocio
-  const poner = (c: Partial<Registro['negocio']>) => cambiar((r) => ({ ...r, negocio: { ...r.negocio, ...c } }))
-  const zonas = ZONAS_HORARIAS.includes(n.zonaHoraria) ? ZONAS_HORARIAS : [n.zonaHoraria, ...ZONAS_HORARIAS]
-
-  function elegirGiro(g: Giro) {
-    cambiar((r) => aplicarSugerencias({ ...r, negocio: { ...r.negocio, giro: g } }, g))
-  }
-
-  return (
-    <div className="space-y-7">
-      <Campo etiqueta="Nombre del negocio">
-        <input
-          autoFocus
-          value={n.nombre}
-          onChange={(e) => poner({ nombre: e.target.value })}
-          placeholder="Ej. Lácteos La Esperanza"
-          autoComplete="organization"
-          className={claseInput}
-        />
-      </Campo>
-
-      <Revelar visible={n.nombre.trim().length >= 2}>
-        <fieldset>
-          <legend className="mb-1.5 text-sm font-semibold text-apagado">¿Qué vende?</legend>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {GIROS.map((g) => (
-              <button
-                key={g.valor}
-                type="button"
-                onClick={() => elegirGiro(g.valor)}
-                aria-pressed={n.giro === g.valor}
-                className={`rounded-2xl border-2 p-3 text-left transition-colors ${
-                  n.giro === g.valor ? 'border-marca bg-marca/15' : 'border-transparent bg-niebla hover:border-linea'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2 text-base font-semibold">
-                  {g.texto}
-                  {n.giro === g.valor && <Check size={18} strokeWidth={3} className="shrink-0 text-verde" />}
-                </div>
-                <div className="mt-0.5 text-xs text-apagado">{g.detalle}</div>
-              </button>
-            ))}
-          </div>
-          {n.giro === 'otro' && (
-            <input
-              autoFocus
-              value={n.giroOtro}
-              onChange={(e) => poner({ giroOtro: e.target.value })}
-              placeholder="Ej. Tortillas, carne, flores…"
-              className={`${claseInput} mt-3`}
-            />
-          )}
-          {n.giro && n.giro !== 'otro' && n.giro !== 'abarrotes' && (
-            <Ayuda>Te dejamos listos unos envases y productos de ejemplo; en los siguientes pasos los cambias.</Ayuda>
-          )}
-        </fieldset>
-      </Revelar>
-
-      <Revelar visible={!!n.giro}>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Campo etiqueta="Ciudad (opcional)">
-            <input value={n.ciudad} onChange={(e) => poner({ ciudad: e.target.value })} placeholder="Ej. Puebla" autoComplete="address-level2" className={claseInput} />
-          </Campo>
-          <Campo etiqueta="Zona horaria">
-            <select value={n.zonaHoraria} onChange={(e) => poner({ zonaHoraria: e.target.value })} className={claseInput}>
-              {zonas.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ').replace('America/', '')}</option>)}
-            </select>
-          </Campo>
-        </div>
-        <Ayuda>La zona horaria decide cuándo empieza «hoy» para tus pedidos y reportes.</Ayuda>
-      </Revelar>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// Paso 2: la cuenta del primer administrador
-// ---------------------------------------------------------------------------------------------------------------
-function PasoCuenta({ registro, cambiar, password, setPassword, confirmacion, setConfirmacion }: PropsPaso & {
-  password: string
-  setPassword: (s: string) => void
-  confirmacion: string
-  setConfirmacion: (s: string) => void
-}) {
-  const c = registro.cuenta
-  const poner = (x: Partial<Registro['cuenta']>) => cambiar((r) => ({ ...r, cuenta: { ...r.cuenta, ...x } }))
-  const [ver, setVer] = useState(false)
-  const reglas = reglasPassword(password, c.correo)
-  const correoOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.correo.trim())
-
-  return (
-    <div className="space-y-6">
-      <p className="-mt-3 text-apagado">Con esta cuenta entras al panel. Después agregas a tus repartidores desde Equipo.</p>
-      <Campo etiqueta="Tu nombre">
-        <input autoFocus value={c.nombre} onChange={(e) => poner({ nombre: e.target.value })} autoComplete="name" placeholder="Nombre y apellido" className={claseInput} />
-      </Campo>
-
-      <Revelar visible={c.nombre.trim().length >= 2}>
-        <div className="space-y-6">
-          <Campo etiqueta="Correo">
-            <input type="email" value={c.correo} onChange={(e) => poner({ correo: e.target.value })} autoComplete="email" placeholder="correo@ejemplo.com" className={claseInput} />
-          </Campo>
-          <Campo etiqueta="Teléfono (opcional)">
-            <input type="tel" value={c.telefono} onChange={(e) => poner({ telefono: e.target.value })} autoComplete="tel" placeholder="10 dígitos" className={claseInput} />
-          </Campo>
-        </div>
-        <Ayuda>Cada correo pertenece a una sola empresa.</Ayuda>
-      </Revelar>
-
-      <Revelar visible={correoOk}>
-        <div className="space-y-4">
-          <Campo etiqueta="Contraseña">
-            <div className="relative">
-              <input
-                type={ver ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                className={`${claseInput} pr-12`}
-              />
-              <button
-                type="button"
-                onClick={() => setVer(!ver)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-apagado hover:text-tinta"
-                aria-label={ver ? 'Ocultar contraseña' : 'Ver contraseña'}
-              >
-                {ver ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </Campo>
-          <ul className="space-y-1 text-sm" aria-label="Reglas de la contraseña">
-            {reglas.map((r) => (
-              <li key={r.texto} className={`flex items-center gap-2 ${r.ok ? 'text-verde' : 'text-apagado'}`}>
-                <span className={`grid h-4 w-4 place-items-center rounded-full ${r.ok ? 'bg-verde text-white' : 'border border-linea'}`}>
-                  {r.ok && <Check size={11} strokeWidth={3.5} />}
-                </span>
-                {r.texto}
-              </li>
-            ))}
-          </ul>
-          <Revelar visible={reglas.every((r) => r.ok)}>
-            <Campo etiqueta="Repite la contraseña">
-              <input
-                type={ver ? 'text' : 'password'}
-                value={confirmacion}
-                onChange={(e) => setConfirmacion(e.target.value)}
-                autoComplete="new-password"
-                className={claseInput}
-              />
-            </Campo>
-            {confirmacion && confirmacion !== password && <Ayuda>Todavía no coinciden.</Ayuda>}
-          </Revelar>
-        </div>
-      </Revelar>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// Paso 3: envases
-// ---------------------------------------------------------------------------------------------------------------
-function PasoEnvases({ registro, cambiar }: PropsPaso) {
-  const [abierto, setAbierto] = useState<string | null>(null)
-  const ponerEnvase = (id: string, x: Partial<Envase>) =>
-    cambiar((r) => ({ ...r, envases: r.envases.map((e) => (e.id === id ? { ...e, ...x } : e)) }))
-
-  function agregar(tipo: string) {
-    const e = envaseDeTipo(tipo)
-    cambiar((r) => ({ ...r, envases: [...r.envases, e] }))
-    setAbierto(e.id)
-  }
-
-  function quitar(id: string) {
-    cambiar((r) => ({
-      ...r,
-      envases: r.envases.filter((e) => e.id !== id),
-      productos: r.productos.map((p) => {
-        const { [id]: _, ...resto } = p.precios
-        return { ...p, precios: resto }
-      }),
-    }))
-  }
-
-  const hayRetornables = registro.envases.some((e) => e.retornable)
-
-  return (
-    <div className="space-y-6">
-      <p className="-mt-3 text-apagado">Elige los que usas. Puedes tener el mismo envase en varios tamaños.</p>
-
-      <div className="flex flex-wrap gap-2">
-        {TIPOS_ENVASE.map((t) => (
-          <button
-            key={t.tipo}
-            type="button"
-            onClick={() => agregar(t.tipo)}
-            className="flex items-center gap-1.5 rounded-full bg-niebla px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-linea"
-          >
-            <Plus size={15} /> {t.nombre}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => agregar('propio')}
-          className="flex items-center gap-1.5 rounded-full border-2 border-dashed border-linea px-4 py-2 text-sm font-semibold transition-colors hover:border-marca"
-        >
-          <Plus size={15} /> Uno propio
-        </button>
-      </div>
-
-      {registro.envases.length > 0 && (
-        <ul className="space-y-2">
-          {registro.envases.map((e) => (
-            <li key={e.id} className="rounded-2xl border border-linea bg-papel">
-              <div className="flex items-center gap-3 px-4 py-3">
-                <Package size={20} className="shrink-0 text-marca" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{nombreEnvase(e)}</div>
-                  {e.retornable && <div className="text-xs text-apagado">Retornable</div>}
-                </div>
-                <button
-                  onClick={() => setAbierto(abierto === e.id ? null : e.id)}
-                  className="grid h-9 w-9 place-items-center rounded-full text-apagado hover:bg-niebla hover:text-tinta"
-                  aria-label={`Editar ${nombreEnvase(e)}`}
-                  aria-expanded={abierto === e.id}
-                >
-                  <Pencil size={16} />
-                </button>
-                <button onClick={() => quitar(e.id)} className="grid h-9 w-9 place-items-center rounded-full text-apagado hover:bg-rojo/10 hover:text-rojo" aria-label={`Quitar ${nombreEnvase(e)}`}>
-                  <Trash2 size={16} />
-                </button>
-              </div>
-              {abierto === e.id && (
-                <div className="grid grid-cols-2 gap-3 border-t border-linea px-4 py-4">
-                  <div className="col-span-2">
-                    <Campo etiqueta="Nombre">
-                      <input autoFocus={e.tipo === 'propio'} value={e.nombre} onChange={(x) => ponerEnvase(e.id, { nombre: x.target.value })} placeholder="Ej. Cubeta" className={claseInput} />
-                    </Campo>
-                  </div>
-                  <Campo etiqueta="Contenido">
-                    <EntradaNumero valor={e.contenido} onChange={(n) => ponerEnvase(e.id, { contenido: n })} />
-                  </Campo>
-                  <Campo etiqueta="Unidad">
-                    <input list="unidades" value={e.unidad} onChange={(x) => ponerEnvase(e.id, { unidad: x.target.value })} className={claseInput} />
-                  </Campo>
-                  <label className="col-span-2 flex items-center gap-3 text-sm font-semibold">
-                    <input type="checkbox" checked={e.retornable} onChange={(x) => ponerEnvase(e.id, { retornable: x.target.checked })} className="h-5 w-5" />
-                    Es retornable (el cliente lo devuelve)
-                  </label>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      <datalist id="unidades">{UNIDADES.map((u) => <option key={u} value={u} />)}</datalist>
-
-      <Revelar visible={hayRetornables}>
-        <label className="flex items-start gap-3 rounded-2xl bg-niebla p-4">
-          <input
-            type="checkbox"
-            checked={registro.controlRetornables}
-            onChange={(e) => cambiar((r) => ({ ...r, controlRetornables: e.target.checked }))}
-            className="mt-0.5 h-5 w-5"
-          />
-          <span>
-            <span className="block font-semibold">Llevar la cuenta de envases prestados</span>
-            <span className="text-sm text-apagado">El repartidor anota cuántos deja y cuántos recoge en cada cliente.</span>
+function armarPantallas(
+  r: Registro,
+  cambiar: (f: (x: Registro) => Registro) => void,
+  password: string,
+  setPassword: (s: string) => void,
+  avanzar: () => void,
+): Pantalla[] {
+  const nombreCorto = r.nombre.trim().split(/\s+/)[0]
+  const lista: Pantalla[] = [
+    // --- Tu cuenta ---
+    {
+      clave: 'negocio', fase: 'cuenta',
+      pregunta: '¿Cómo se llama tu negocio?',
+      ayuda: 'Así lo verán tus repartidores y tus clientes. Puedes cambiarlo después.',
+      falta: r.negocio.trim().length < 2 ? 'Escribe el nombre de tu negocio' : null,
+      contenido: <Texto valor={r.negocio} onChange={(v) => cambiar((x) => ({ ...x, negocio: v }))} placeholder="Ej. Lácteos La Esperanza" autoComplete="organization" />,
+    },
+    {
+      clave: 'nombre', fase: 'cuenta',
+      pregunta: '¿Y tú cómo te llamas?',
+      ayuda: `Serás quien administre ${r.negocio.trim() || 'tu negocio'}.`,
+      falta: r.nombre.trim().length < 2 ? 'Escribe tu nombre' : null,
+      contenido: <Texto valor={r.nombre} onChange={(v) => cambiar((x) => ({ ...x, nombre: v }))} placeholder="Nombre y apellido" autoComplete="name" />,
+    },
+    {
+      clave: 'correo', fase: 'cuenta',
+      pregunta: nombreCorto ? `Mucho gusto, ${nombreCorto}. ¿Cuál es tu correo?` : '¿Cuál es tu correo?',
+      ayuda: 'Te mandaremos un código para confirmarlo. Cada correo es de una sola empresa.',
+      falta: !correoValido(r.correo) ? 'Escribe un correo válido' : null,
+      contenido: <Texto tipo="email" valor={r.correo} onChange={(v) => cambiar((x) => ({ ...x, correo: v }))} placeholder="correo@ejemplo.com" autoComplete="email" icono={<Mail size={20} />} />,
+    },
+    {
+      clave: 'password', fase: 'cuenta',
+      pregunta: 'Crea una contraseña',
+      ayuda: 'Por seguridad no la guardamos en este equipo mientras llenas el registro.',
+      falta: !password ? 'Escribe tu contraseña' : !reglasPassword(password, r.correo).every((x) => x.ok) ? 'La contraseña aún no cumple las reglas' : null,
+      contenido: <PasoPassword password={password} setPassword={setPassword} correo={r.correo} />,
+    },
+    {
+      clave: 'terminos', fase: 'cuenta',
+      pregunta: 'Un último detalle legal',
+      ayuda: 'Vas a guardar datos de tus clientes (nombre, teléfono, dirección). La ley de protección de datos personales (LFPDPPP) pide que lo hagas con su aviso de privacidad.',
+      falta: !r.terminos ? 'Acepta los términos para continuar' : null,
+      contenido: (
+        <label className={`flex cursor-pointer items-start gap-4 rounded-[22px] border-2 p-5 transition-colors ${r.terminos ? 'border-marca bg-marca/10' : 'border-linea bg-papel'}`}>
+          <input type="checkbox" checked={r.terminos} onChange={(e) => cambiar((x) => ({ ...x, terminos: e.target.checked }))} className="mt-1 h-6 w-6 shrink-0" data-enfocar />
+          <span className="text-base">
+            Acepto los <span className="font-semibold">términos del servicio</span> y el <span className="font-semibold">aviso de privacidad</span>, y me comprometo a usar los datos de mis clientes sólo para sus pedidos.
           </span>
         </label>
-      </Revelar>
+      ),
+    },
+
+    // --- Tu catálogo ---
+    {
+      clave: 'bienvenida', fase: 'catalogo',
+      pregunta: <>Listo, {nombreCorto || 'ya tienes cuenta'}. Ahora armemos tu catálogo</>,
+      ayuda: 'Son unas preguntas rápidas sobre lo que vendes. Te proponemos todo según tu giro y tú sólo ajustas.',
+      contenido: (
+        <div className="flex items-end justify-center gap-1 rounded-[28px] bg-niebla px-4 pt-8 pb-5">
+          <DibujoEnvase tipo="botella" color="#f28c28" className="h-28" />
+          <DibujoEnvase tipo="costal" color="#b07a52" className="h-32" />
+          <DibujoEnvase tipo="frasco" color="#e5484d" className="h-24" />
+          <DibujoEnvase tipo="garrafon" color="#3aa0e0" className="h-32" />
+        </div>
+      ),
+    },
+    {
+      clave: 'giros', fase: 'catalogo',
+      pregunta: '¿Qué vende tu negocio?',
+      ayuda: 'Elige uno o varios.',
+      falta: !r.giros.length ? 'Elige al menos una opción' : null,
+      contenido: (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {GIROS.map((g) => {
+            const si = r.giros.includes(g.valor)
+            return (
+              <Tarjeta key={g.valor} elegida={si} onClick={() => cambiar((x) => aplicarGiros(x, si ? x.giros.filter((v) => v !== g.valor) : [...x.giros, g.valor]))}>
+                <DibujoEnvase tipo={g.dibujo} color={g.color} className="mx-auto h-20" />
+                <div className="mt-2 font-semibold leading-tight">{g.texto}</div>
+                <div className="mt-0.5 text-xs text-apagado">{g.detalle}</div>
+              </Tarjeta>
+            )
+          })}
+        </div>
+      ),
+    },
+    {
+      clave: 'tipos', fase: 'catalogo',
+      pregunta: '¿En qué envases lo entregas?',
+      ayuda: 'Ya marcamos los más comunes para tu giro. Quita o agrega los que uses.',
+      falta: !r.tipos.length ? 'Elige al menos un envase' : null,
+      contenido: (
+        <div className="grid grid-cols-3 gap-2.5">
+          {TIPOS_ENVASE.map((t) => {
+            const si = r.tipos.includes(t.tipo)
+            return (
+              <Tarjeta key={t.tipo} elegida={si} onClick={() => cambiar((x) => alternarTipo(x, t.tipo))} compacta>
+                <DibujoEnvase tipo={t.tipo} color={colorDeGiro(r)} className="mx-auto h-16" apagado={!si} />
+                <div className="mt-1.5 text-sm font-semibold leading-tight">{t.nombre}</div>
+                <div className="mt-0.5 hidden text-[11px] leading-tight text-apagado sm:block">{t.detalle}</div>
+              </Tarjeta>
+            )
+          })}
+        </div>
+      ),
+    },
+    // Una pantalla por envase elegido: sus tamaños.
+    ...r.tipos.map((tipo): Pantalla => {
+      const t = tipoEnvase(tipo)!
+      const elegidos = r.envases.filter((e) => e.tipo === tipo)
+      return {
+        clave: `tam:${tipo}`, fase: 'catalogo',
+        pregunta: tipo === 'granel' ? '¿Cómo vendes a granel?' : tipo === 'pieza' ? 'Por pieza, entendido' : `¿Qué tamaños de ${t.nombre.toLowerCase()} manejas?`,
+        ayuda: tipo === 'granel' ? 'Elige la unidad con la que pesas o mides.' : tipo === 'pieza' ? 'Cada unidad se cuenta por separado. Continúa.' : 'Puedes elegir varios; cada tamaño tendrá su propio precio.',
+        falta: !elegidos.length ? 'Elige al menos un tamaño' : null,
+        contenido: <PasoTamanos r={r} tipo={tipo} cambiar={cambiar} />,
+      }
+    }),
+  ]
+
+  if (r.envases.length) {
+    lista.push({
+      clave: 'retornables', fase: 'catalogo',
+      pregunta: '¿Cuáles te devuelven tus clientes?',
+      ayuda: 'Los envases retornables se prestan y se recogen en la siguiente visita. Si ninguno, continúa.',
+      contenido: (
+        <div className="space-y-2">
+          {r.envases.map((e) => (
+            <label key={e.id} className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 px-3 py-2 transition-colors ${e.retornable ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla'}`}>
+              <DibujoEnvase tipo={e.tipo} color={colorDeGiro(r)} className="h-12" />
+              <span className="flex-1 font-semibold">{nombreEnvase(e)}</span>
+              <input
+                type="checkbox"
+                checked={e.retornable}
+                onChange={(x) => cambiar((y) => ({ ...y, envases: y.envases.map((z) => (z.id === e.id ? { ...z, retornable: x.target.checked } : z)) }))}
+                className="h-6 w-6"
+              />
+            </label>
+          ))}
+        </div>
+      ),
+    })
+  }
+
+  if (r.envases.some((e) => e.retornable)) {
+    lista.push({
+      clave: 'prestamos', fase: 'catalogo',
+      pregunta: '¿Quieres llevar la cuenta de los envases prestados?',
+      ayuda: 'El repartidor anota cuántos deja y cuántos recoge, y sabrás quién te debe envases.',
+      contenido: (
+        <div className="grid gap-3">
+          <Opcion elegida={r.controlRetornables} onClick={() => { cambiar((x) => ({ ...x, controlRetornables: true })); avanzar() }} titulo="Sí, llevar la cuenta" detalle="Cada cliente tendrá su saldo de envases." />
+          <Opcion elegida={!r.controlRetornables} onClick={() => { cambiar((x) => ({ ...x, controlRetornables: false })); avanzar() }} titulo="No por ahora" detalle="Lo puedes activar después en Configuración." />
+        </div>
+      ),
+    })
+  }
+
+  lista.push({
+    clave: 'productos', fase: 'catalogo',
+    pregunta: '¿Qué productos vendes?',
+    ayuda: 'Sólo el nombre por ahora. Si vienen en sabores o tipos, eso va en la siguiente pregunta.',
+    falta: !r.productos.length ? 'Agrega al menos un producto' : null,
+    contenido: <PasoProductos r={r} cambiar={cambiar} />,
+  })
+
+  // Dos pantallas por producto: sus variantes y sus precios.
+  r.productos.forEach((p, n) => {
+    lista.push({
+      clave: `var:${p.id}`, fase: 'catalogo',
+      pregunta: <>¿<span className="text-marca">{p.nombre}</span> viene en sabores, tipos o colores?</>,
+      ayuda: 'Cada variante se distingue por su color en la app. Todas comparten el precio.',
+      contenido: <PasoVariantes producto={p} indice={n} cambiar={cambiar} />,
+    })
+    const activos = r.envases.filter((e) => p.precios[e.id]?.activo)
+    const sinPrecio = activos.find((e) => !(numero(p.precios[e.id].precio) > 0))
+    lista.push({
+      clave: `precio:${p.id}`, fase: 'catalogo',
+      pregunta: <>¿En qué envases vendes <span className="text-marca">{p.nombre}</span> y a qué precio?</>,
+      ayuda: 'El costo es opcional y sólo lo ven los administradores, nunca los repartidores.',
+      falta: !activos.length ? `Elige al menos un envase para ${p.nombre}` : sinPrecio ? `Falta el precio en ${nombreEnvase(sinPrecio)}` : null,
+      contenido: <PasoPrecios r={r} producto={p} cambiar={cambiar} />,
+    })
+  })
+
+  lista.push(
+    // --- Tu marca ---
+    {
+      clave: 'logo', fase: 'marca',
+      pregunta: '¿Tienes un logo?',
+      ayuda: 'Sale en la app de tus repartidores, el panel y los PDF.',
+      opcional: !r.marca.logo,
+      contenido: <PasoLogo r={r} cambiar={cambiar} />,
+    },
+    {
+      clave: 'color', fase: 'marca',
+      pregunta: 'Elige el color de tu marca',
+      ayuda: 'Lo usaremos en botones y encabezados.',
+      contenido: <PasoColor r={r} cambiar={cambiar} />,
+    },
+    // --- Tu equipo ---
+    {
+      clave: 'vendedores', fase: 'equipo',
+      pregunta: '¿Quién reparte contigo?',
+      ayuda: 'Les mandamos una invitación por correo para que creen su propia contraseña.',
+      opcional: !r.invitaciones.length,
+      contenido: <PasoVendedores r={r} cambiar={cambiar} />,
+    },
+    {
+      clave: 'resumen', fase: 'equipo',
+      pregunta: 'Así queda tu negocio',
+      ayuda: 'Prueba cómo levanta un pedido tu repartidor. Si algo no te gusta, regresa y cámbialo.',
+      contenido: <PasoResumen r={r} />,
+    },
+  )
+  return lista
+}
+
+const colorDeGiro = (r: Registro) => GIROS.find((g) => r.giros.includes(g.valor))?.color ?? r.marca.color
+
+// ---------------------------------------------------------------------------------------------------------------
+// Piezas
+// ---------------------------------------------------------------------------------------------------------------
+function Texto({ valor, onChange, placeholder, tipo = 'text', autoComplete, icono }: {
+  valor: string
+  onChange: (v: string) => void
+  placeholder?: string
+  tipo?: string
+  autoComplete?: string
+  icono?: ReactNode
+}) {
+  return (
+    <div className="relative">
+      <input
+        data-enfocar
+        type={tipo}
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        enterKeyHint="next"
+        className={`${claseInput} py-5 text-xl ${icono ? 'pl-13' : ''}`}
+      />
+      {icono && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado">{icono}</span>}
     </div>
   )
 }
 
-// Guarda el texto tal cual se escribe («0.» o «1,5» a medias) y sólo entrega el número.
-function EntradaNumero({ valor, onChange }: { valor: number; onChange: (n: number) => void }) {
-  const [texto, setTexto] = useState(Number.isFinite(valor) ? String(valor) : '')
+function Tarjeta({ elegida, onClick, children, compacta = false }: { elegida: boolean; onClick: () => void; children: ReactNode; compacta?: boolean }) {
   return (
-    <input
-      inputMode="decimal"
-      value={texto}
-      onChange={(x) => {
-        setTexto(x.target.value)
-        onChange(numero(x.target.value))
-      }}
-      className={claseInput}
-    />
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={elegida}
+      className={`relative rounded-[22px] border-2 text-center transition-[colors,transform] active:scale-[0.98] ${compacta ? 'p-2.5' : 'p-3'} ${
+        elegida ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla hover:border-linea'
+      }`}
+    >
+      {elegida && (
+        <span className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-marca text-white">
+          <Check size={14} strokeWidth={3.5} />
+        </span>
+      )}
+      {children}
+    </button>
   )
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Paso 4: productos, con precio y costo por envase
-// ---------------------------------------------------------------------------------------------------------------
-function PasoProductos({ registro, cambiar }: PropsPaso) {
-  const poner = (id: string, f: (p: Producto) => Producto) =>
-    cambiar((r) => ({ ...r, productos: r.productos.map((p) => (p.id === id ? f(p) : p)) }))
-
+function Opcion({ elegida, onClick, titulo, detalle }: { elegida: boolean; onClick: () => void; titulo: string; detalle: string }) {
   return (
-    <div className="space-y-4">
-      <p className="-mt-3 text-apagado">
-        Si un producto viene en sabores, colores o tipos, agrégalos como variantes: comparten el precio.
-      </p>
-      {registro.productos.map((p, i) => (
-        <TarjetaProducto
-          key={p.id}
-          producto={p}
-          envases={registro.envases}
-          enfocar={i === registro.productos.length - 1 && !p.nombre}
-          onCambiar={(f) => poner(p.id, f)}
-          onQuitar={() => cambiar((r) => ({ ...r, productos: r.productos.filter((x) => x.id !== p.id) }))}
-        />
-      ))}
-      <button
-        type="button"
-        onClick={() => cambiar((r) => ({ ...r, productos: [...r.productos, productoNuevo()] }))}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-linea py-4 font-semibold transition-colors hover:border-marca"
-      >
-        <Plus size={18} /> Agregar producto
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={elegida}
+      className={`flex items-center gap-4 rounded-[22px] border-2 p-5 text-left transition-colors ${elegida ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla hover:border-linea'}`}
+    >
+      <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 ${elegida ? 'border-marca bg-marca text-white' : 'border-linea'}`}>
+        {elegida && <Check size={14} strokeWidth={3.5} />}
+      </span>
+      <span>
+        <span className="block text-lg font-semibold">{titulo}</span>
+        <span className="text-sm text-apagado">{detalle}</span>
+      </span>
+    </button>
+  )
+}
+
+function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      className={`flex items-center gap-1.5 rounded-full px-5 py-3 text-base font-semibold transition-colors ${activo ? 'bg-tinta text-white' : 'bg-niebla text-tinta hover:bg-linea'}`}
+    >
+      {activo && <Check size={16} strokeWidth={3} />}
+      {children}
+    </button>
+  )
+}
+
+// Un campo con su botón «+» que agrega al presionar Enter, sin mandar el formulario.
+function Agregar({ placeholder, onAgregar, tipo = 'text', enfocar = false }: { placeholder: string; onAgregar: (v: string) => boolean | void; tipo?: string; enfocar?: boolean }) {
+  const [v, setV] = useState('')
+  function agregar() {
+    if (!v.trim()) return
+    if (onAgregar(v.trim()) !== false) setV('')
+  }
+  return (
+    <div className="flex gap-2">
+      <input
+        {...(enfocar ? { 'data-enfocar': true } : {})}
+        type={tipo}
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && v.trim()) {
+            e.preventDefault()
+            agregar()
+          }
+        }}
+        placeholder={placeholder}
+        className={`${claseInput} flex-1`}
+      />
+      <button type="button" onClick={agregar} disabled={!v.trim()} className="grid w-14 shrink-0 place-items-center rounded-xl bg-tinta text-white disabled:opacity-30" aria-label="Agregar">
+        <Plus size={22} />
       </button>
     </div>
   )
 }
 
-function TarjetaProducto({ producto: p, envases, enfocar, onCambiar, onQuitar }: {
-  producto: Producto
-  envases: Envase[]
-  enfocar: boolean
-  onCambiar: (f: (p: Producto) => Producto) => void
-  onQuitar: () => void
-}) {
-  const [variante, setVariante] = useState('')
-
-  function agregarVariante() {
-    const v = variante.trim()
-    if (v && !p.variantes.some((x) => x.toLowerCase() === v.toLowerCase())) onCambiar((x) => ({ ...x, variantes: [...x.variantes, v] }))
-    setVariante('')
-  }
-
-  const precio = (id: string) => p.precios[id] ?? { precio: '', costo: '', activo: false }
-  const ponerPrecio = (id: string, c: Partial<Producto['precios'][string]>) =>
-    onCambiar((x) => ({ ...x, precios: { ...x.precios, [id]: { ...precio(id), ...c } } }))
-
+function PasoPassword({ password, setPassword, correo }: { password: string; setPassword: (s: string) => void; correo: string }) {
+  const [ver, setVer] = useState(false)
+  const reglas = reglasPassword(password, correo)
   return (
-    <div className="rounded-[22px] border border-linea bg-papel p-4">
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <Campo etiqueta="Producto">
-            <input autoFocus={enfocar} value={p.nombre} onChange={(e) => onCambiar((x) => ({ ...x, nombre: e.target.value }))} placeholder="Ej. Yogurt" className={claseInput} />
-          </Campo>
-        </div>
-        <button onClick={onQuitar} className="mb-1 grid h-11 w-11 place-items-center rounded-full text-apagado hover:bg-rojo/10 hover:text-rojo" aria-label={`Quitar ${p.nombre || 'producto'}`}>
-          <Trash2 size={18} />
+    <div>
+      <div className="relative">
+        <input
+          data-enfocar
+          type={ver ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          className={`${claseInput} py-5 pr-14 text-xl`}
+        />
+        <button
+          type="button"
+          onClick={() => setVer(!ver)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-md p-1 text-apagado hover:text-tinta"
+          aria-label={ver ? 'Ocultar contraseña' : 'Ver contraseña'}
+        >
+          {ver ? <EyeOff size={20} /> : <Eye size={20} />}
         </button>
       </div>
-
-      <Revelar visible={!!p.nombre.trim()}>
-        <div className="mt-4">
-          <span className="mb-1.5 block text-sm font-semibold text-apagado">Variantes (opcional)</span>
-          <div className="flex flex-wrap items-center gap-2">
-            {p.variantes.map((v) => (
-              <span key={v} className="flex items-center gap-1 rounded-full bg-niebla py-1.5 pr-1.5 pl-3 text-sm font-semibold">
-                {v}
-                <button
-                  onClick={() => onCambiar((x) => ({ ...x, variantes: x.variantes.filter((y) => y !== v) }))}
-                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-linea"
-                  aria-label={`Quitar ${v}`}
-                >
-                  <X size={13} />
-                </button>
-              </span>
-            ))}
-            <input
-              value={variante}
-              onChange={(e) => setVariante(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault()
-                  agregarVariante()
-                }
-              }}
-              onBlur={agregarVariante}
-              placeholder={p.variantes.length ? 'Otra…' : 'Ej. Fresa y Enter'}
-              className="min-w-32 flex-1 rounded-full bg-niebla px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-marca"
-            />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <span className="mb-1.5 block text-sm font-semibold text-apagado">¿En qué envases lo vendes?</span>
-          <div className="space-y-2">
-            {envases.map((e) => {
-              const v = precio(e.id)
-              return (
-                <div key={e.id} className={`rounded-2xl p-3 transition-colors ${v.activo ? 'bg-niebla' : ''}`}>
-                  <label className="flex items-center gap-3 font-semibold">
-                    <input type="checkbox" checked={v.activo} onChange={(x) => ponerPrecio(e.id, { activo: x.target.checked })} className="h-5 w-5" />
-                    {nombreEnvase(e)}
-                  </label>
-                  {v.activo && (
-                    <div className="mt-3 grid grid-cols-2 gap-3 pl-8">
-                      <Campo etiqueta="Precio">
-                        <input inputMode="decimal" value={v.precio} onChange={(x) => ponerPrecio(e.id, { precio: x.target.value })} placeholder="$" className={`${claseInput} bg-papel`} />
-                      </Campo>
-                      <Campo etiqueta="Costo (opcional)">
-                        <input inputMode="decimal" value={v.costo} onChange={(x) => ponerPrecio(e.id, { costo: x.target.value })} placeholder="$" className={`${claseInput} bg-papel`} />
-                      </Campo>
-                      {numero(v.precio) > 0 && numero(v.costo) >= 0 && (
-                        <p className="col-span-2 -mt-1 text-xs text-apagado">
-                          Ganas {dinero(numero(v.precio) - numero(v.costo))} por {e.nombre.toLowerCase() || 'envase'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          <p className="mt-2 text-xs text-apagado">El costo sólo lo ven los administradores, nunca los repartidores.</p>
-        </div>
-      </Revelar>
+      <ul className="mt-4 space-y-2" aria-label="Reglas de la contraseña">
+        {reglas.map((x) => (
+          <li key={x.texto} className={`flex items-center gap-2.5 text-[15px] transition-colors ${x.ok ? 'text-verde' : 'text-apagado'}`}>
+            <span className={`grid h-5 w-5 place-items-center rounded-full transition-colors ${x.ok ? 'bg-verde text-white' : 'border-2 border-linea'}`}>
+              {x.ok && <Check size={12} strokeWidth={3.5} />}
+            </span>
+            {x.texto}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Paso 5: marca
-// ---------------------------------------------------------------------------------------------------------------
+function PasoTamanos({ r, tipo, cambiar }: { r: Registro; tipo: TipoEnvase; cambiar: (f: (x: Registro) => Registro) => void }) {
+  const t = tipoEnvase(tipo)!
+  const [error, setError] = useState('')
+  const propios = r.envases.filter((e) => e.tipo === tipo && !t.tamanos.some((s) => tieneTamano({ ...r, envases: [e] }, tipo, s)))
+  const base = (e: { contenido: number; unidad: string }) => e.contenido / (e.unidad === 'ml' || e.unidad === 'g' ? 1000 : 1)
+  const elegidos = r.envases.filter((e) => e.tipo === tipo).sort((a, b) => base(a) - base(b))
+  return (
+    <div>
+      <div className="mb-6 flex items-end justify-center gap-2 rounded-[28px] bg-niebla px-4 pt-6 pb-4">
+        {/* Los tamaños elegidos, del chico al grande, cada dibujo más alto que el anterior */}
+        {elegidos.length ? elegidos.slice(0, 5).map((e, n, todos) => (
+          <div key={e.id} className="flex flex-col items-center">
+            <div style={{ height: 64 + (todos.length > 1 ? (n / (todos.length - 1)) * 48 : 32) }}>
+              <DibujoEnvase tipo={tipo} color={colorDeGiro(r)} className="h-full" />
+            </div>
+            {tipo !== 'pieza' && <div className="mt-1 text-xs font-semibold text-apagado">{textoTamano(e)}</div>}
+          </div>
+        )) : <DibujoEnvase tipo={tipo} color={colorDeGiro(r)} className="h-24" apagado />}
+      </div>
+      {tipo !== 'pieza' && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {t.tamanos.map((s) => (
+              <Chip key={s} activo={tieneTamano(r, tipo, s)} onClick={() => cambiar((x) => alternarTamano(x, tipo, s))}>{s}</Chip>
+            ))}
+            {propios.map((e) => (
+              <Chip key={e.id} activo onClick={() => cambiar((x) => alternarTamano(x, tipo, textoTamano(e)))}>{textoTamano(e)}</Chip>
+            ))}
+          </div>
+          {tipo !== 'granel' && (
+            <div className="mt-5">
+              <span className="mb-1.5 block text-sm font-semibold text-apagado">¿Otro tamaño? Escríbelo con su unidad</span>
+              <Agregar
+                placeholder="Ej. 3 L, 750 ml, 20 kg, 6 pz"
+                onAgregar={(v) => {
+                  setError('')
+                  const x = leerTamano(v)
+                  if (!x) return setError('Escribe el número y la unidad, por ejemplo 3 L'), false
+                  if (tieneTamano(r, tipo, v)) return setError('Ese tamaño ya está'), false
+                  cambiar((y) => alternarTamano(y, tipo, v))
+                }}
+              />
+              {error && <p role="alert" className="mt-2 text-sm font-medium text-rojo">{error}</p>}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function PasoProductos({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => Registro) => void }) {
+  const sugeridos = sugerenciasProductos(r)
+  const agregar = (nombre: string, variantes: string[] = []) => {
+    if (r.productos.some((p) => p.nombre.toLowerCase() === nombre.toLowerCase())) return false
+    cambiar((x) => ({ ...x, productos: [...x.productos, productoNuevo(nombre, variantes, x.productos.length)] }))
+  }
+  return (
+    <div className="space-y-5">
+      <Agregar placeholder="Ej. Yogurt, Arroz, Agua…" onAgregar={(v) => agregar(v)} enfocar />
+      {r.productos.length > 0 && (
+        <ul className="space-y-2">
+          {r.productos.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-papel px-4 py-3 ring-1 ring-linea">
+              <span className="h-4 w-4 shrink-0 rounded-full ring-1 ring-black/15" style={{ background: p.color }} />
+              <span className="flex-1 text-lg font-semibold">{p.nombre}</span>
+              <button
+                type="button"
+                onClick={() => cambiar((x) => ({ ...x, productos: x.productos.filter((y) => y.id !== p.id) }))}
+                className="grid h-9 w-9 place-items-center rounded-full text-apagado hover:bg-rojo/10 hover:text-rojo"
+                aria-label={`Quitar ${p.nombre}`}
+              >
+                <X size={18} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {sugeridos.length > 0 && (
+        <div>
+          <span className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-apagado"><Sparkles size={14} /> Sugerencias</span>
+          <div className="flex flex-wrap gap-2">
+            {sugeridos.map((s) => (
+              <button key={s.nombre} type="button" onClick={() => agregar(s.nombre, s.variantes)} className="flex items-center gap-1.5 rounded-full border-2 border-dashed border-linea px-4 py-2 font-semibold hover:border-marca">
+                <Plus size={15} /> {s.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PasoVariantes({ producto: p, indice, cambiar }: { producto: Producto; indice: number; cambiar: (f: (x: Registro) => Registro) => void }) {
+  const poner = (f: (p: Producto) => Producto) => cambiar((x) => ({ ...x, productos: x.productos.map((y) => (y.id === p.id ? f(y) : y)) }))
+  const [con, setCon] = useState(p.variantes.length > 0)
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <Opcion elegida={!con} onClick={() => { setCon(false); poner((y) => ({ ...y, variantes: [] })) }} titulo="No" detalle="Es uno solo" />
+        <Opcion elegida={con} onClick={() => setCon(true)} titulo="Sí" detalle="Tiene variantes" />
+      </div>
+      {con && (
+        <div className="animate-[paso-entrar_.3s_ease-out] space-y-3">
+          <Agregar
+            placeholder="Ej. Fresa, Integral, Grande…"
+            enfocar
+            onAgregar={(v) => {
+              if (p.variantes.some((x) => x.nombre.toLowerCase() === v.toLowerCase())) return false
+              poner((y) => ({ ...y, variantes: [...y.variantes, { nombre: v, color: colorPara(v, indice + y.variantes.length) }] }))
+            }}
+          />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {p.variantes.map((v, n) => (
+              <div key={v.nombre} className="flex items-center gap-2 rounded-2xl bg-niebla py-2 pr-2 pl-2.5">
+                {/* El color se cambia tocando el círculo */}
+                <label className="relative grid h-8 w-8 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full ring-2 ring-white/70" style={{ background: v.color }} title="Cambiar color">
+                  <input
+                    type="color"
+                    value={v.color}
+                    onChange={(e) => poner((y) => ({ ...y, variantes: y.variantes.map((z, m) => (m === n ? { ...z, color: e.target.value } : z)) }))}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    aria-label={`Color de ${v.nombre}`}
+                  />
+                </label>
+                <span className="min-w-0 flex-1 truncate font-semibold">{v.nombre}</span>
+                <button
+                  type="button"
+                  onClick={() => poner((y) => ({ ...y, variantes: y.variantes.filter((_, m) => m !== n) }))}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-linea"
+                  aria-label={`Quitar ${v.nombre}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          {p.variantes.length > 0 && <p className="text-sm text-apagado">Toca el círculo para cambiar el color.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PasoPrecios({ r, producto: p, cambiar }: { r: Registro; producto: Producto; cambiar: (f: (x: Registro) => Registro) => void }) {
+  const precio = (id: string) => p.precios[id] ?? { precio: '', costo: '', activo: false }
+  const poner = (id: string, c: Partial<Producto['precios'][string]>) =>
+    cambiar((x) => ({ ...x, productos: x.productos.map((y) => (y.id === p.id ? { ...y, precios: { ...y.precios, [id]: { ...precio(id), ...c } } } : y)) }))
+  const color = p.variantes[0]?.color ?? p.color
+  // Primero los envases que ya se usan o se sugirieron para este producto; el orden no cambia al marcar o desmarcar.
+  const [primero] = useState(() => new Set(Object.keys(p.precios)))
+  const orden = [...r.envases].sort((a, b) => (primero.has(a.id) ? 0 : 1) - (primero.has(b.id) ? 0 : 1))
+  return (
+    <div className="space-y-3">
+      {orden.map((e) => {
+        const v = precio(e.id)
+        const ganancia = numero(v.precio) - numero(v.costo)
+        return (
+          <div key={e.id} className={`overflow-hidden rounded-[22px] border-2 transition-colors ${v.activo ? 'border-marca bg-papel' : 'border-transparent bg-niebla'}`}>
+            <button type="button" onClick={() => poner(e.id, { activo: !v.activo })} aria-pressed={v.activo} className="flex w-full items-center gap-3 p-3 text-left">
+              <DibujoEnvase tipo={e.tipo} color={color} etiqueta={p.nombre.slice(0, 1).toUpperCase()} className="h-16" apagado={!v.activo} />
+              <span className="flex-1">
+                <span className="block text-lg font-semibold">{nombreEnvase(e)}</span>
+                <span className="text-sm text-apagado">{v.activo ? 'Lo vendo así' : 'Tócalo si lo vendes así'}</span>
+              </span>
+              <span className={`grid h-7 w-7 place-items-center rounded-full border-2 ${v.activo ? 'border-marca bg-marca text-white' : 'border-linea'}`}>
+                {v.activo && <Check size={15} strokeWidth={3.5} />}
+              </span>
+            </button>
+            {v.activo && (
+              <div className="grid animate-[paso-entrar_.3s_ease-out] grid-cols-2 gap-3 px-3 pb-3">
+                <Dinero etiqueta="Precio de venta" valor={v.precio} onChange={(s) => poner(e.id, { precio: s })} enfocar />
+                <Dinero etiqueta="Te cuesta (opcional)" valor={v.costo} onChange={(s) => poner(e.id, { costo: s })} />
+                {Number.isFinite(ganancia) && numero(v.precio) > 0 && (
+                  <p className={`col-span-2 text-sm font-semibold ${ganancia >= 0 ? 'text-verde' : 'text-rojo'}`}>
+                    {ganancia >= 0 ? `Ganas ${dinero(ganancia)} por cada uno` : `Pierdes ${dinero(-ganancia)} por cada uno`}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function Dinero({ etiqueta, valor, onChange, enfocar = false }: { etiqueta: string; valor: string; onChange: (s: string) => void; enfocar?: boolean }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-semibold text-apagado">{etiqueta}</span>
+      <span className="relative block">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado">$</span>
+        <input autoFocus={enfocar && !valor} inputMode="decimal" value={valor} onChange={(e) => onChange(e.target.value)} className={`${claseInput} pl-8 text-lg font-semibold`} />
+      </span>
+    </label>
+  )
+}
+
 const LOGO_MAXIMO = 500 * 1024
 
-function PasoMarca({ registro, cambiar }: PropsPaso) {
-  const m = registro.marca
+function PasoLogo({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => Registro) => void }) {
   const [error, setError] = useState('')
-  const poner = (x: Partial<Registro['marca']>) => cambiar((r) => ({ ...r, marca: { ...r.marca, ...x } }))
-
-  function elegirLogo(f: File | undefined) {
+  function elegir(f: File | undefined) {
     setError('')
     if (!f) return
     if (!f.type.startsWith('image/')) return setError('Elige una imagen (PNG, JPG o SVG)')
     if (f.size > LOGO_MAXIMO) return setError('La imagen pesa más de 500 KB; prueba con una más chica')
     const lector = new FileReader()
-    lector.onload = () => poner({ logo: String(lector.result) })
+    lector.onload = () => cambiar((x) => ({ ...x, marca: { ...x.marca, logo: String(lector.result) } }))
     lector.readAsDataURL(f)
   }
+  return (
+    <div>
+      <label className="flex cursor-pointer flex-col items-center gap-3 rounded-[28px] border-2 border-dashed border-linea p-8 text-center transition-colors hover:border-marca">
+        <div className="grid h-32 w-32 place-items-center overflow-hidden rounded-3xl bg-niebla">
+          {r.marca.logo ? <img src={r.marca.logo} alt="Tu logo" className="h-full w-full object-contain p-2" /> : <ImagePlus size={36} className="text-apagado" />}
+        </div>
+        <div className="text-lg font-semibold">{r.marca.logo ? 'Cambiar logo' : 'Subir mi logo'}</div>
+        <div className="text-sm text-apagado">PNG, JPG o SVG, hasta 500 KB</div>
+        <input type="file" accept="image/*" className="sr-only" onChange={(e) => elegir(e.target.files?.[0])} />
+      </label>
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-rojo">{error}</p>}
+      {r.marca.logo && (
+        <button type="button" onClick={() => cambiar((x) => ({ ...x, marca: { ...x.marca, logo: null } }))} className="mt-3 text-sm font-semibold text-azul hover:underline">
+          Quitar logo
+        </button>
+      )}
+    </div>
+  )
+}
 
+function PasoColor({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => Registro) => void }) {
+  const poner = (c: string) => cambiar((x) => ({ ...x, marca: { ...x.marca, color: c } }))
   return (
     <div className="space-y-7">
-      <p className="-mt-3 text-apagado">Aparece en la app, el panel y los PDF. Puedes cambiarlo cuando quieras.</p>
-
-      <div>
-        <span className="mb-1.5 block text-sm font-semibold text-apagado">Logo</span>
-        <label className="flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed border-linea p-4 transition-colors hover:border-marca">
-          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-niebla">
-            {m.logo ? <img src={m.logo} alt="Tu logo" className="h-full w-full object-contain" /> : <ImagePlus size={24} className="text-apagado" />}
-          </div>
-          <div className="text-sm">
-            <div className="font-semibold">{m.logo ? 'Cambiar logo' : 'Subir logo'}</div>
-            <div className="text-apagado">PNG, JPG o SVG, hasta 500 KB</div>
-          </div>
-          <input type="file" accept="image/*" className="sr-only" onChange={(e) => elegirLogo(e.target.files?.[0])} />
+      <div className="flex flex-wrap items-center gap-3">
+        {COLORES_MARCA.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => poner(c)}
+            aria-pressed={r.marca.color === c}
+            aria-label={`Color ${c}`}
+            className={`grid h-14 w-14 place-items-center rounded-full ring-offset-2 ring-offset-lienzo transition-shadow ${r.marca.color === c ? 'ring-[3px] ring-tinta' : ''}`}
+            style={{ background: c }}
+          >
+            {r.marca.color === c && <Check size={22} strokeWidth={3} className="text-white" />}
+          </button>
+        ))}
+        <label className="flex h-14 items-center gap-2 rounded-full bg-niebla pr-5 pl-2 font-semibold">
+          <input type="color" value={r.marca.color} onChange={(e) => poner(e.target.value)} className="h-10 w-10 cursor-pointer rounded-full border-0 bg-transparent" />
+          Otro
         </label>
-        {error && <p role="alert" className="mt-2 text-sm font-medium text-rojo">{error}</p>}
-        {m.logo && (
-          <button onClick={() => poner({ logo: null })} className="mt-2 text-sm font-semibold text-azul hover:underline">Quitar logo</button>
-        )}
       </div>
-
-      <fieldset>
-        <legend className="mb-1.5 text-sm font-semibold text-apagado">Color principal</legend>
-        <div className="flex flex-wrap items-center gap-3">
-          {COLORES_MARCA.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => poner({ color: c })}
-              aria-pressed={m.color === c}
-              aria-label={`Color ${c}`}
-              className={`grid h-11 w-11 place-items-center rounded-full ring-offset-2 ring-offset-lienzo transition-shadow ${m.color === c ? 'ring-2 ring-tinta' : ''}`}
-              style={{ background: c }}
-            >
-              {m.color === c && <Check size={18} strokeWidth={3} className="text-white" />}
-            </button>
-          ))}
-          <label className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-4 pl-1.5 text-sm font-semibold">
-            <input type="color" value={m.color} onChange={(e) => poner({ color: e.target.value })} className="h-8 w-8 cursor-pointer rounded-full border-0 bg-transparent" />
-            Otro
-          </label>
+      <div className="overflow-hidden rounded-[22px] ring-1 ring-linea">
+        <div className="flex items-center gap-3 px-4 py-4 text-white" style={{ background: r.marca.color }}>
+          {r.marca.logo ? <img src={r.marca.logo} alt="" className="h-10 w-10 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/20 text-lg font-bold">{r.negocio.trim().slice(0, 1).toUpperCase()}</span>}
+          <span className="truncate text-lg font-semibold">{r.negocio || 'Tu negocio'}</span>
         </div>
-      </fieldset>
-
-      <div>
-        <span className="mb-1.5 block text-sm font-semibold text-apagado">Así se verá</span>
-        <div className="flex items-center gap-3 rounded-2xl px-4 py-3 text-white" style={{ background: m.color }}>
-          {m.logo ? <img src={m.logo} alt="" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5" /> : <Package size={24} />}
-          <span className="truncate text-lg font-semibold">{registro.negocio.nombre || 'Tu negocio'}</span>
+        <div className="space-y-3 bg-papel p-4">
+          <div className="h-3 w-2/3 rounded-full bg-niebla" />
+          <div className="h-3 w-1/2 rounded-full bg-niebla" />
+          <div className="rounded-full py-3 text-center font-semibold text-white" style={{ background: r.marca.color }}>Nuevo pedido</div>
         </div>
       </div>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Paso 6: resumen y vista del repartidor
-// ---------------------------------------------------------------------------------------------------------------
-function PasoResumen({ registro, irA }: { registro: Registro; irA: (n: number) => void }) {
-  const n = registro.negocio
-  const giro = n.giro === 'otro' ? n.giroOtro : GIROS.find((g) => g.valor === n.giro)?.texto
-
+function PasoVendedores({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => Registro) => void }) {
+  const [error, setError] = useState('')
   return (
     <div className="space-y-4">
-      <Seccion titulo="Negocio" onEditar={() => irA(0)}>
-        <div className="font-semibold">{n.nombre}</div>
-        <div className="text-sm text-apagado">{[giro, n.ciudad, n.zonaHoraria.replace(/_/g, ' ')].filter(Boolean).join(' · ')}</div>
-      </Seccion>
-      <Seccion titulo="Administrador" onEditar={() => irA(1)}>
-        <div className="font-semibold">{registro.cuenta.nombre}</div>
-        <div className="text-sm text-apagado">{registro.cuenta.correo}</div>
-      </Seccion>
-      <Seccion titulo="Envases" onEditar={() => irA(2)}>
-        <div className="flex flex-wrap gap-1.5">
-          {registro.envases.map((e) => (
-            <span key={e.id} className="rounded-full bg-niebla px-3 py-1 text-sm font-semibold">{nombreEnvase(e)}{e.retornable ? ' ↺' : ''}</span>
-          ))}
-        </div>
-        {registro.controlRetornables && <div className="mt-2 text-sm text-apagado">Con cuenta de envases prestados</div>}
-      </Seccion>
-      <Seccion titulo="Productos" onEditar={() => irA(3)}>
-        <ul className="space-y-2">
-          {registro.productos.map((p) => (
-            <li key={p.id}>
-              <div className="font-semibold">{p.nombre}{p.variantes.length > 0 && <span className="font-normal text-apagado"> · {p.variantes.join(', ')}</span>}</div>
-              <div className="text-sm text-apagado">
-                {registro.envases.filter((e) => p.precios[e.id]?.activo).map((e) => `${nombreEnvase(e)} ${dinero(numero(p.precios[e.id].precio))}`).join(' · ')}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Seccion>
-
-      <div className="pt-2">
-        <h2 className="text-xl font-semibold">Así lo verá tu repartidor</h2>
-        <p className="mt-1 text-sm text-apagado">Pruébalo: toca + y − como si levantaras un pedido.</p>
-        <VistaRepartidor registro={registro} />
-      </div>
+      <Agregar
+        tipo="email"
+        enfocar
+        placeholder="correo de tu repartidor"
+        onAgregar={(v) => {
+          setError('')
+          const c = v.toLowerCase()
+          if (!correoValido(c)) return setError('Ese correo no parece válido'), false
+          if (c === r.correo.trim().toLowerCase()) return setError('Ese es tu correo; tú ya eres administrador'), false
+          if (r.invitaciones.includes(c)) return setError('Ya está en la lista'), false
+          cambiar((x) => ({ ...x, invitaciones: [...x.invitaciones, c] }))
+        }}
+      />
+      {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
+      <ul className="space-y-2">
+        {r.invitaciones.map((c) => (
+          <li key={c} className="flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3">
+            <Mail size={18} className="shrink-0 text-apagado" />
+            <span className="min-w-0 flex-1 truncate font-semibold">{c}</span>
+            <button type="button" onClick={() => cambiar((x) => ({ ...x, invitaciones: x.invitaciones.filter((y) => y !== c) }))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-linea" aria-label={`Quitar ${c}`}>
+              <X size={16} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {!r.invitaciones.length && <p className="text-sm text-apagado">Si aún no los tienes, omite este paso: los invitas después desde Equipo.</p>}
     </div>
   )
 }
 
-function Seccion({ titulo, onEditar, children }: { titulo: string; onEditar: () => void; children: ReactNode }) {
+function PasoResumen({ r }: { r: Registro }) {
+  const lista = presentaciones(r)
   return (
-    <section className="rounded-[22px] border border-linea bg-papel p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-apagado">{titulo}</h2>
-        <button onClick={onEditar} className="flex items-center gap-1 text-sm font-semibold text-azul hover:underline">
-          <Pencil size={13} /> Cambiar
-        </button>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 rounded-[22px] px-4 py-4 text-white" style={{ background: r.marca.color }}>
+        {r.marca.logo ? <img src={r.marca.logo} alt="" className="h-12 w-12 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20 text-xl font-bold">{r.negocio.trim().slice(0, 1).toUpperCase()}</span>}
+        <div className="min-w-0">
+          <div className="truncate text-lg font-semibold">{r.negocio}</div>
+          <div className="truncate text-sm opacity-80">
+            {r.productos.length} {r.productos.length === 1 ? 'producto' : 'productos'} · {lista.length} presentaciones · {r.invitaciones.length} {r.invitaciones.length === 1 ? 'repartidor' : 'repartidores'}
+          </div>
+        </div>
       </div>
-      {children}
-    </section>
+      <VistaRepartidor r={r} />
+    </div>
   )
 }
 
-// Un teléfono de muestra con el selector por presentación: + / − por envase y el total por unidad.
-function VistaRepartidor({ registro }: { registro: Registro }) {
-  const lista = presentaciones(registro)
+// La hoja «Nuevo pedido» como la verá el repartidor: tarjetas por presentación al estilo de los sabores de yogurt,
+// con el dibujo del envase del color del producto, + y − grandes, y el total por unidad abajo.
+function VistaRepartidor({ r }: { r: Registro }) {
+  const lista = presentaciones(r)
   const [cant, setCant] = useState<Record<string, number>>({})
   const sumar = (k: string, d: number) => setCant((c) => ({ ...c, [k]: Math.max(0, (c[k] ?? 0) + d) }))
-
-  const total = lista.reduce((s, x) => s + (cant[x.clave] ?? 0) * x.precio, 0)
+  const total = lista.reduce((s, x) => s + (cant[x.clave] ?? 0) * (x.precio || 0), 0)
   const porUnidad = new Map<string, number>()
   for (const x of lista) {
     const c = cant[x.clave] ?? 0
     if (c) porUnidad.set(x.envase.unidad, (porUnidad.get(x.envase.unidad) ?? 0) + c * x.envase.contenido)
   }
-  const resumen = [...porUnidad].map(([u, v]) => `${formatoCantidad(v)} ${u === 'pieza' ? (v === 1 ? 'pieza' : 'piezas') : u}`).join(' + ')
+  const resumen = [...porUnidad].map(([u, v]) => `${v.toLocaleString('es-MX', { maximumFractionDigits: 3 })} ${u}`).join(' + ')
 
   return (
-    <div className="mx-auto mt-4 w-full max-w-sm overflow-hidden rounded-[32px] border-[6px] border-tinta/85 bg-papel shadow-tarjeta">
-      <div className="flex items-center gap-2 px-4 py-3 text-white" style={{ background: registro.marca.color }}>
-        {registro.marca.logo ? <img src={registro.marca.logo} alt="" className="h-7 w-7 rounded-md bg-white object-contain p-0.5" /> : <Package size={20} />}
+    <div className="mx-auto w-full max-w-sm overflow-hidden rounded-[36px] border-[7px] border-tinta/85 bg-papel shadow-tarjeta">
+      <div className="flex items-center gap-2 px-4 py-3 text-white" style={{ background: r.marca.color }}>
         <span className="truncate font-semibold">Nuevo pedido</span>
       </div>
-      <ul className="max-h-96 divide-y divide-linea overflow-y-auto">
+      <div className="grid max-h-[28rem] grid-cols-2 gap-2.5 overflow-y-auto p-2.5">
         {lista.map((x) => {
           const c = cant[x.clave] ?? 0
           return (
-            <li key={x.clave} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{x.nombre}</div>
-                <div className="text-xs text-apagado">{nombreEnvase(x.envase)} · {dinero(x.precio)}</div>
+            <div key={x.clave} className={`flex flex-col overflow-hidden rounded-2xl transition-shadow ${c ? 'ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
+              <div className="relative flex justify-center px-2 pt-3 pb-1" style={{ background: `color-mix(in oklab, ${x.color} 22%, var(--color-papel))` }}>
+                <DibujoEnvase tipo={x.envase.tipo} color={x.color} etiqueta={x.nombre.slice(0, 1).toUpperCase()} className="h-20" />
+                {c > 0 && <span className="absolute top-2 right-2 grid h-7 min-w-7 place-items-center rounded-full bg-tinta px-1.5 text-sm font-bold text-white tabular-nums">{c}</span>}
               </div>
-              <button onClick={() => sumar(x.clave, -1)} disabled={!c} className="grid h-9 w-9 place-items-center rounded-full bg-niebla disabled:opacity-40" aria-label={`Quitar ${x.nombre} ${nombreEnvase(x.envase)}`}>
-                <Minus size={16} strokeWidth={3} />
-              </button>
-              <span className="w-6 text-center text-lg font-bold tabular-nums">{c}</span>
-              <button onClick={() => sumar(x.clave, 1)} className="grid h-9 w-9 place-items-center rounded-full text-white" style={{ background: registro.marca.color }} aria-label={`Agregar ${x.nombre} ${nombreEnvase(x.envase)}`}>
-                <Plus size={16} strokeWidth={3} />
-              </button>
-            </li>
+              <div className="flex flex-1 flex-col bg-papel px-2.5 pt-2 pb-2.5">
+                <div className="truncate text-sm leading-5 font-bold">{x.nombre}</div>
+                <div className="truncate text-xs text-apagado">{nombreEnvase(x.envase)} · {dinero(x.precio || 0)}</div>
+                <div className="mt-2 flex items-center justify-between">
+                  <button type="button" onClick={() => sumar(x.clave, -1)} disabled={!c} className="grid h-9 w-9 place-items-center rounded-full bg-niebla disabled:opacity-30" aria-label={`Quitar ${x.nombre}`}>
+                    <Minus size={16} strokeWidth={3} />
+                  </button>
+                  <span className="text-lg font-extrabold tabular-nums">{c}</span>
+                  <button type="button" onClick={() => sumar(x.clave, 1)} className="grid h-9 w-9 place-items-center rounded-full text-white" style={{ background: r.marca.color }} aria-label={`Agregar ${x.nombre}`}>
+                    <Plus size={16} strokeWidth={3} />
+                  </button>
+                </div>
+              </div>
+            </div>
           )
         })}
-      </ul>
-      <div className="flex items-center justify-between bg-tinta px-4 py-3 text-white">
-        <span className="text-sm opacity-80">{resumen || 'Sin productos'}</span>
-        <span className="text-xl font-bold tabular-nums">{dinero(total)}</span>
+      </div>
+      <div className="flex items-center justify-between px-4 py-3.5 text-white" style={{ background: '#0e1124' }}>
+        <span className="text-sm text-white/70">{resumen || 'Toca + para agregar'}</span>
+        <span className="text-2xl font-extrabold tabular-nums">{dinero(total)}</span>
       </div>
     </div>
   )
 }
 
-function Listo({ nombre, onIrAlPanel }: { nombre: string; onIrAlPanel: () => void }) {
+function Listo({ r, onIrAlPanel }: { r: Registro; onIrAlPanel: () => void }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
       <div className="grid h-20 w-20 place-items-center rounded-full bg-marca text-white">
         <Check size={40} strokeWidth={3} />
       </div>
-      <h1 className="mt-6 text-[2rem] font-semibold leading-tight">¡{nombre} ya está lista!</h1>
-      <p className="mt-2 max-w-sm text-apagado">Te mandamos un correo para confirmar tu cuenta. Después entra al panel y agrega a tus repartidores.</p>
-      <button onClick={onIrAlPanel} className="mt-8 rounded-full bg-tinta px-8 py-4 font-semibold text-white hover:bg-marca-oscuro">
+      <h1 className="mt-6 text-[2rem] font-semibold leading-tight">¡{r.negocio} ya está lista!</h1>
+      <p className="mt-2 max-w-sm text-apagado">Confirma tu correo con el código que te enviamos y entra al panel.</p>
+      <button type="button" onClick={onIrAlPanel} className="mt-8 rounded-full bg-tinta px-8 py-4 font-semibold text-white hover:bg-marca-oscuro">
         Ir al panel
       </button>
     </div>
