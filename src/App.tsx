@@ -1,24 +1,21 @@
 import { useEffect, useState } from 'react'
 import { LoginAdmin } from './views/admin/LoginAdmin'
 import { AdminLayout } from './views/admin/AdminLayout'
-import { Registro } from './views/registro/Registro'
 import { Login, CambioObligatorio } from './views/pwa/Login'
 import { PwaLayout } from './views/pwa/PwaLayout'
+import { RegistroEmpresa } from './views/registro/RegistroEmpresa'
 import { Avisos } from './components/ui'
 import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
 import { useTemaOscuro } from './lib/tema'
 
-function esRutaRegistro() {
+function esRuta(ruta: string) {
   if (typeof window === 'undefined') return false
-  return window.location.pathname.startsWith('/registro') || window.location.hash.startsWith('#/registro')
+  return window.location.pathname.startsWith(ruta) || window.location.hash.startsWith(`#${ruta}`)
 }
-
-function esRutaAdmin() {
-  if (typeof window === 'undefined') return false
-  return window.location.pathname.startsWith('/admin') || window.location.hash.startsWith('#/admin')
-}
+const esRutaAdmin = () => esRuta('/admin')
+const esRutaRegistro = () => esRuta('/registro')
 
 export default function App() {
   const sesion = useSesion()
@@ -27,7 +24,10 @@ export default function App() {
   const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
 
   useEffect(() => {
-    const alCambiar = () => { setEsAdmin(esRutaAdmin()); setEsRegistro(esRutaRegistro()) }
+    const alCambiar = () => {
+      setEsAdmin(esRutaAdmin())
+      setEsRegistro(esRutaRegistro())
+    }
     window.addEventListener('popstate', alCambiar)
     window.addEventListener('hashchange', alCambiar)
     return () => {
@@ -41,21 +41,30 @@ export default function App() {
     setEsAdmin(true)
   }
 
-  function irARegistro() {
-    window.history.pushState({}, '', '/registro')
-    setEsRegistro(true)
-  }
-
   function irAPwa() {
     window.history.pushState({}, '', '/')
     setEsAdmin(false)
   }
 
-  // Registro de una empresa nueva (/registro): prototipo del formulario progresivo, todavía sin servidor.
+  function irARegistro() {
+    window.history.pushState({}, '', '/registro')
+    setEsRegistro(true)
+  }
+
+  function irAlPanelDesdeRegistro() {
+    window.history.pushState({}, '', '/admin')
+    setEsRegistro(false)
+    setEsAdmin(true)
+  }
+
+  // =========================================================================
+  // ALTA DE EMPRESA (/registro): formulario progresivo, sin sesión
+  // =========================================================================
   if (esRegistro && MODO_SERVIDOR) {
     return (
-      <div className="tema-admin">
-        <Registro onIrALogin={() => { window.history.pushState({}, '', '/admin'); setEsRegistro(false); setEsAdmin(true) }} />
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
+        <Avisos />
+        <RegistroEmpresa onIrAlPanel={irAlPanelDesdeRegistro} />
       </div>
     )
   }
