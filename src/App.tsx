@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LoginAdmin } from './views/admin/LoginAdmin'
 import { AdminLayout } from './views/admin/AdminLayout'
+import { Registro } from './views/registro/Registro'
 import { Login, CambioObligatorio } from './views/pwa/Login'
 import { PwaLayout } from './views/pwa/PwaLayout'
 import { Avisos } from './components/ui'
@@ -8,6 +9,11 @@ import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
 import { useTemaOscuro } from './lib/tema'
+
+function esRutaRegistro() {
+  if (typeof window === 'undefined') return false
+  return window.location.pathname.startsWith('/registro') || window.location.hash.startsWith('#/registro')
+}
 
 function esRutaAdmin() {
   if (typeof window === 'undefined') return false
@@ -18,9 +24,10 @@ export default function App() {
   const sesion = useSesion()
   const oscuro = useTemaOscuro()
   const [esAdmin, setEsAdmin] = useState(esRutaAdmin)
+  const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
 
   useEffect(() => {
-    const alCambiar = () => setEsAdmin(esRutaAdmin())
+    const alCambiar = () => { setEsAdmin(esRutaAdmin()); setEsRegistro(esRutaRegistro()) }
     window.addEventListener('popstate', alCambiar)
     window.addEventListener('hashchange', alCambiar)
     return () => {
@@ -34,9 +41,23 @@ export default function App() {
     setEsAdmin(true)
   }
 
+  function irARegistro() {
+    window.history.pushState({}, '', '/registro')
+    setEsRegistro(true)
+  }
+
   function irAPwa() {
     window.history.pushState({}, '', '/')
     setEsAdmin(false)
+  }
+
+  // Registro de una empresa nueva (/registro): prototipo del formulario progresivo, todavía sin servidor.
+  if (esRegistro && MODO_SERVIDOR) {
+    return (
+      <div className="tema-admin">
+        <Registro onIrALogin={() => { window.history.pushState({}, '', '/admin'); setEsRegistro(false); setEsAdmin(true) }} />
+      </div>
+    )
   }
 
   // =========================================================================
@@ -50,7 +71,7 @@ export default function App() {
       <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
         <Avisos />
         <VisorPdf />
-        {!sesion ? <LoginAdmin onIrAPwa={irAPwa} />
+        {!sesion ? <LoginAdmin onIrAPwa={irAPwa} onIrARegistro={irARegistro} />
           : sesion.usuario.debeCambiarPassword ? <CambioObligatorio />
           : <AdminLayout onIrAPwa={irAPwa} />}
       </div>
