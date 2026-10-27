@@ -9,9 +9,10 @@ import { AveDanelle, LogoDanelle } from './marca'
 
 type Modo = 'login' | 'recuperar' | 'codigo'
 
-export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
+export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
   onLoginExitoso?: () => void
   onIrAPwa?: () => void
+  onIrARegistro?: () => void
 }) {
   const [modo, setModo] = useState<Modo>('login')
 
@@ -168,6 +169,19 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa }: {
           )}
 
         </div>
+
+        {/* Alta de una empresa nueva (formulario progresivo de /registro) */}
+        {onIrARegistro && modo === 'login' && (
+          <p className="mt-5 text-center text-sm text-apagado">
+            ¿Tu negocio aún no tiene cuenta?{' '}
+            <button
+              onClick={onIrARegistro}
+              className="rounded-md font-semibold text-azul hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
+            >
+              Regístralo
+            </button>
+          </p>
+        )}
 
         {/* Enlace sutil para ir a la PWA */}
         {onIrAPwa && (
