@@ -17,7 +17,7 @@ npm run preview        # serve dist/ — needed to test the service worker, offl
 npm run typecheck:api  # tsc -p api (front tsconfig only includes src/)
 npm run test:api       # node:test via tsx, all api/_test/*.test.ts
 npm run db:migrar      # create/upgrade Postgres from db/ (-- --demo loads demo data, -- --reiniciar DROPS everything)
-npm run db:admin       # create an admin user
+npm run db:admin       # create an admin user (-- correo "Nombre" [--empresa "Empresa"]; creates the company if new)
 npm run db:probar      # read-only check: env vars, DB connection, SSL, schema/migrations state
 npm run push:claves    # generate VAPID keys
 ```
@@ -47,6 +47,11 @@ Demo accounts (with `04_datos_demo.sql` / `--demo`): `admin@yogurt.local`, `vend
 - `administrador` vs `vendedor`. Sellers only see their own portfolio and **never receive costs/margins** — the server omits them; reports, stock capture and team management are admin-only routes.
 - Every authenticated request re-checks `sesiones` + `usuarios.activo` in the DB (so logout/deactivation is immediate). `debe_cambiar_password` blocks everything except password change.
 - Inside transactions the API sets `SET LOCAL app.id_usuario` for DB-trigger auditing, and `SET LOCAL app.permitir_correccion = 'on'` to edit a closed order. Admin-count changes are serialized with `pg_advisory_xact_lock`.
+
+### Multi-company (tenancy)
+- One shared DB; every business table has `id_empresa` (table `empresas`), composite FKs `*_misma_empresa`, and RLS policy `por_empresa` for role `reparto_app` (PostgreSQL 15+). `api/_lib/db.ts`: an AsyncLocalStorage scope per request (`conAlcance` in `app.ts`), `fijarEmpresa` when the session is validated, then `porEmpresa(pool)` and `tx()` run each query/transaction as `SET LOCAL ROLE reparto_app` + `app.id_empresa`. Code before the company is known (login, refresh, password recovery) runs as the DB owner and sees everything — filter explicitly there.
+- `id_empresa` defaults to `current_setting('app.id_empresa')`, so INSERTs don't name it. Views are `security_invoker`; trigger functions take the company from the row. A suspended company (`empresas.activa = false`) gets 403 `EMPRESA_SUSPENDIDA` on login/refresh/every request.
+- Tests: `ayuda.ts` connects as owner with `app.id_empresa` = first company; `crearEmpresa()` / `sesion(rol, disp, empresa)` for a second one (`multiempresa.test.ts`).
 
 ### Database (`db/`)
 - PostgreSQL is authoritative: `01_esquema.sql` (types, tables, triggers that maintain `version`/`actualizado_en`, totals, audit), `02_vistas.sql` (report views, `fn_pronostico_produccion`). Schema changes for existing DBs go in `db/migraciones/NNN_*.sql` (must be re-runnable) **and** must be reflected in `01_esquema.sql`.

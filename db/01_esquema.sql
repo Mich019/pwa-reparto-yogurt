@@ -1,7 +1,12 @@
 -- =============================================================================
--- Reparto Yogurt · Base de datos PostgreSQL (13 o superior)
+-- Reparto Yogurt · Base de datos PostgreSQL (15 o superior)
 -- Parte del esquema base (Clientes, Productos, Pedidos, Detalle_Pedido) y lo
 -- completa para cubrir RF-001 a RF-055. Ver db/README.md para el análisis.
+--
+-- Multiempresa: varias empresas comparten la base. Cada tabla del negocio lleva
+-- id_empresa (por omisión, la empresa de la petición: app.id_empresa, que fija
+-- la API) y una regla por filas que sólo deja ver lo de esa empresa al rol de la
+-- API (reparto_app). Ver la sección «Multiempresa» al final.
 --
 -- Uso:  psql -U postgres -d reparto_yogurt -f 01_esquema.sql
 -- =============================================================================
@@ -35,10 +40,26 @@ BEGIN
 END $$;
 
 -- =============================================================================
+-- Multiempresa · Empresas
+-- =============================================================================
+CREATE TABLE empresas (
+  id_empresa     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre         varchar(120) NOT NULL,
+  zona_horaria   varchar(64) NOT NULL DEFAULT 'America/Mexico_City',
+  color_marca    char(7),
+  logo           text,
+  activa         boolean NOT NULL DEFAULT true,          -- false = suspendida: nadie de ella entra
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT empresas_color_hex CHECK (color_marca IS NULL OR color_marca ~ '^#[0-9A-Fa-f]{6}$')
+);
+
+-- =============================================================================
 -- M01 · Autenticación y seguridad
 -- =============================================================================
 CREATE TABLE usuarios (
   id_usuario            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa            uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   nombre                varchar(100) NOT NULL,
   correo                varchar(150) NOT NULL,
   telefono              varchar(20),
@@ -52,9 +73,12 @@ CREATE TABLE usuarios (
   actualizado_en        timestamptz NOT NULL DEFAULT now(),
   version               integer NOT NULL DEFAULT 1,
   CONSTRAINT usuarios_correo_formato CHECK (correo ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
-  CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%')
+  CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%'),
+  CONSTRAINT usuarios_empresa_id UNIQUE (id_empresa, id_usuario)
 );
+-- Único en todo el sistema: el correo dice a qué empresa se entra (cada cuenta es de una sola empresa).
 CREATE UNIQUE INDEX usuarios_correo_unico ON usuarios (lower(correo));
+CREATE INDEX usuarios_empresa ON usuarios (id_empresa);
 
 -- RF-006: sesiones con refresh token; cerrar sesión = revocar.
 CREATE TABLE sesiones (
@@ -113,6 +137,7 @@ CREATE TABLE dos_pasos (
 -- =============================================================================
 CREATE TABLE clientes (
   id_cliente       uuid PRIMARY KEY DEFAULT gen_random_uuid(),  -- UUID: se crean sin conexión en el teléfono
+  id_empresa       uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_vendedor      uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL, -- RF-041 cartera
   nombre           varchar(100) NOT NULL,
   direccion        text NOT NULL,
@@ -138,10 +163,13 @@ CREATE TABLE clientes (
   CONSTRAINT clientes_frecuencia_coherente CHECK (
     (frecuencia_tipo = 'intervalo'   AND cada_dias IS NOT NULL AND cada_dias BETWEEN 1 AND 90) OR
     (frecuencia_tipo = 'dias_semana' AND cada_dias IS NULL)
-  )
+  ),
+  CONSTRAINT clientes_empresa_id UNIQUE (id_empresa, id_cliente),
+  CONSTRAINT clientes_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
 );
 CREATE UNIQUE INDEX clientes_qr_unico  ON clientes (qr_uuid);
-CREATE UNIQUE INDEX clientes_nfc_unico ON clientes (nfc_uid) WHERE nfc_uid IS NOT NULL;
+CREATE UNIQUE INDEX clientes_nfc_unico ON clientes (id_empresa, nfc_uid) WHERE nfc_uid IS NOT NULL;
+CREATE INDEX clientes_empresa    ON clientes (id_empresa);
 CREATE INDEX clientes_vendedor   ON clientes (id_vendedor) WHERE activo;
 CREATE INDEX clientes_nombre     ON clientes (lower(nombre));
 CREATE INDEX clientes_telefono   ON clientes (telefono);
@@ -153,6 +181,7 @@ CREATE INDEX clientes_sync       ON clientes (actualizado_en);
 -- =============================================================================
 CREATE TABLE productos (
   id_producto         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa          uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   nombre              varchar(100) NOT NULL DEFAULT 'Yogurt',   -- producto base
   sabor               varchar(100) NOT NULL,
   descripcion         text,
@@ -167,13 +196,17 @@ CREATE TABLE productos (
   CONSTRAINT productos_precio_positivo CHECK (precio_unitario > 0),
   CONSTRAINT productos_costo_no_negativo CHECK (costo_produccion >= 0),
   CONSTRAINT productos_presentacion_positiva CHECK (presentacion_litros > 0),
-  CONSTRAINT productos_color_hex CHECK (color_hex ~ '^#[0-9A-Fa-f]{6}$')
+  CONSTRAINT productos_color_hex CHECK (color_hex ~ '^#[0-9A-Fa-f]{6}$'),
+  CONSTRAINT productos_empresa_id UNIQUE (id_empresa, id_producto)
 );
-CREATE UNIQUE INDEX productos_nombre_sabor_unico ON productos (lower(nombre), lower(sabor), presentacion_litros);
+-- Dos empresas pueden tener su propio «Fresa».
+CREATE UNIQUE INDEX productos_nombre_sabor_unico ON productos (id_empresa, lower(nombre), lower(sabor), presentacion_litros);
+CREATE INDEX productos_empresa ON productos (id_empresa);
 
 -- RF-037: litros producidos y asignados a cada vendedor al iniciar la jornada.
 CREATE TABLE stock_diario (
   id_stock          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa        uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   fecha             date NOT NULL DEFAULT current_date,
   id_producto       uuid NOT NULL REFERENCES productos (id_producto) ON DELETE RESTRICT,
   id_vendedor       uuid NOT NULL REFERENCES usuarios (id_usuario) ON DELETE RESTRICT,
@@ -183,25 +216,32 @@ CREATE TABLE stock_diario (
   actualizado_en    timestamptz NOT NULL DEFAULT now(),
   version           integer NOT NULL DEFAULT 1,
   CONSTRAINT stock_cantidades_validas CHECK (cantidad_asignada >= 0 AND cantidad_devuelta BETWEEN 0 AND cantidad_asignada),
-  CONSTRAINT stock_unico_por_dia UNIQUE (fecha, id_producto, id_vendedor)
+  CONSTRAINT stock_unico_por_dia UNIQUE (fecha, id_producto, id_vendedor),
+  CONSTRAINT stock_producto_misma_empresa FOREIGN KEY (id_empresa, id_producto) REFERENCES productos (id_empresa, id_producto),
+  CONSTRAINT stock_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
 );
 CREATE INDEX stock_sync ON stock_diario (actualizado_en);
+CREATE INDEX stock_diario_empresa ON stock_diario (id_empresa);
 
 -- RF-037: litros producidos de cada sabor en el día; lo que no se asigna a un vendedor queda en el almacén.
 CREATE TABLE produccion_diaria (
   fecha          date NOT NULL,
+  id_empresa     uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_producto    uuid NOT NULL REFERENCES productos (id_producto) ON DELETE CASCADE,
   litros         numeric(8, 2) NOT NULL,
   actualizado_en timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (fecha, id_producto),
-  CONSTRAINT produccion_litros_validos CHECK (litros >= 0)
+  CONSTRAINT produccion_litros_validos CHECK (litros >= 0),
+  CONSTRAINT produccion_producto_misma_empresa FOREIGN KEY (id_empresa, id_producto) REFERENCES productos (id_empresa, id_producto)
 );
+CREATE INDEX produccion_diaria_empresa ON produccion_diaria (id_empresa);
 
 -- =============================================================================
 -- M04 / M05 · Pedidos, detalle y ruta
 -- =============================================================================
 CREATE TABLE pedidos (
   id_pedido            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa           uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_cliente           uuid NOT NULL REFERENCES clientes (id_cliente) ON DELETE RESTRICT,
   id_vendedor          uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
   id_pedido_origen     uuid REFERENCES pedidos (id_pedido) ON DELETE SET NULL, -- "tomar como base el pedido anterior"
@@ -222,8 +262,12 @@ CREATE TABLE pedidos (
   CONSTRAINT pedidos_entregado_completo CHECK (
     estado <> 'entregado' OR (fecha_entregado_real IS NOT NULL AND metodo_pago IS NOT NULL)
   ),
-  CONSTRAINT pedidos_no_es_su_origen CHECK (id_pedido_origen IS DISTINCT FROM id_pedido)
+  CONSTRAINT pedidos_no_es_su_origen CHECK (id_pedido_origen IS DISTINCT FROM id_pedido),
+  CONSTRAINT pedidos_empresa_id UNIQUE (id_empresa, id_pedido),
+  CONSTRAINT pedidos_cliente_misma_empresa FOREIGN KEY (id_empresa, id_cliente) REFERENCES clientes (id_empresa, id_cliente),
+  CONSTRAINT pedidos_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
 );
+CREATE INDEX pedidos_empresa      ON pedidos (id_empresa);
 CREATE INDEX pedidos_ruta_del_dia ON pedidos (id_vendedor, fecha, estado);       -- RF-027
 CREATE INDEX pedidos_fecha_estado ON pedidos (fecha, estado);                     -- pronóstico y reportes
 CREATE INDEX pedidos_cliente      ON pedidos (id_cliente, fecha DESC);            -- RF-012 historial
@@ -231,6 +275,7 @@ CREATE INDEX pedidos_sync         ON pedidos (actualizado_en);
 
 CREATE TABLE detalle_pedido (
   id_detalle_pedido uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa        uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_pedido         uuid NOT NULL REFERENCES pedidos (id_pedido) ON DELETE CASCADE,
   id_producto       uuid NOT NULL REFERENCES productos (id_producto) ON DELETE RESTRICT, -- RF-036
   cantidad          numeric(8, 2) NOT NULL,              -- unidades de la presentación (1 L por defecto)
@@ -242,13 +287,17 @@ CREATE TABLE detalle_pedido (
   version           integer NOT NULL DEFAULT 1,
   CONSTRAINT detalle_cantidad_positiva CHECK (cantidad > 0),
   CONSTRAINT detalle_precio_no_negativo CHECK (precio_unitario >= 0 AND costo_unitario >= 0),
-  CONSTRAINT detalle_producto_unico UNIQUE (id_pedido, id_producto)
+  CONSTRAINT detalle_producto_unico UNIQUE (id_pedido, id_producto),
+  CONSTRAINT detalle_pedido_misma_empresa FOREIGN KEY (id_empresa, id_pedido) REFERENCES pedidos (id_empresa, id_pedido),
+  CONSTRAINT detalle_producto_misma_empresa FOREIGN KEY (id_empresa, id_producto) REFERENCES productos (id_empresa, id_producto)
 );
 CREATE INDEX detalle_producto ON detalle_pedido (id_producto);
+CREATE INDEX detalle_pedido_empresa ON detalle_pedido (id_empresa);
 
 -- "Recordar más tarde" del flujo post-entrega.
 CREATE TABLE recordatorios (
   id_recordatorio  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa       uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_cliente       uuid NOT NULL REFERENCES clientes (id_cliente) ON DELETE CASCADE,
   id_vendedor      uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
   id_pedido_origen uuid REFERENCES pedidos (id_pedido) ON DELETE SET NULL,
@@ -257,15 +306,18 @@ CREATE TABLE recordatorios (
   creado_en        timestamptz NOT NULL DEFAULT now(),
   atendido_en      timestamptz,
   actualizado_en   timestamptz NOT NULL DEFAULT now(),
-  version          integer NOT NULL DEFAULT 1
+  version          integer NOT NULL DEFAULT 1,
+  CONSTRAINT recordatorios_cliente_misma_empresa FOREIGN KEY (id_empresa, id_cliente) REFERENCES clientes (id_empresa, id_cliente)
 );
 CREATE INDEX recordatorios_pendientes ON recordatorios (id_vendedor) WHERE estado = 'pendiente';
+CREATE INDEX recordatorios_empresa ON recordatorios (id_empresa);
 
 -- =============================================================================
 -- M07 · Auditoría (RF-042)
 -- =============================================================================
 CREATE TABLE auditoria (
   id_auditoria  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id_empresa    uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_usuario    uuid,          -- quién (lo pasa la API con SET LOCAL app.id_usuario)
   accion        varchar(10) NOT NULL,
   tabla         varchar(50) NOT NULL,
@@ -276,6 +328,7 @@ CREATE TABLE auditoria (
 );
 CREATE INDEX auditoria_tabla_registro ON auditoria (tabla, id_registro);
 CREATE INDEX auditoria_fecha ON auditoria (creado_en DESC);
+CREATE INDEX auditoria_empresa ON auditoria (id_empresa);
 
 -- =============================================================================
 -- M09 · Sincronización offline (RF-051 a RF-053)
@@ -284,6 +337,7 @@ CREATE INDEX auditoria_fecha ON auditoria (creado_en DESC);
 -- reenvía, la llave primaria evita aplicarlo dos veces.
 CREATE TABLE operaciones_sync (
   id_operacion      uuid PRIMARY KEY,
+  id_empresa        uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   id_usuario        uuid NOT NULL REFERENCES usuarios (id_usuario) ON DELETE CASCADE,
   dispositivo       varchar(200),
   tabla             varchar(50) NOT NULL,
@@ -296,8 +350,10 @@ CREATE TABLE operaciones_sync (
   estado            estado_sync NOT NULL,
   detalle_error     text,
   CONSTRAINT sync_operacion_valida CHECK (operacion IN ('insert', 'update', 'delete')),
-  CONSTRAINT sync_tabla_valida CHECK (tabla IN ('clientes', 'pedidos', 'detalle_pedido', 'recordatorios', 'productos', 'stock_diario'))
+  CONSTRAINT sync_tabla_valida CHECK (tabla IN ('clientes', 'pedidos', 'detalle_pedido', 'recordatorios', 'productos', 'stock_diario')),
+  CONSTRAINT sync_usuario_misma_empresa FOREIGN KEY (id_empresa, id_usuario) REFERENCES usuarios (id_empresa, id_usuario)
 );
+CREATE INDEX operaciones_sync_empresa ON operaciones_sync (id_empresa);
 CREATE INDEX sync_usuario_fecha ON operaciones_sync (id_usuario, recibido_en DESC);
 CREATE INDEX sync_conflictos ON operaciones_sync (recibido_en) WHERE estado = 'conflicto';
 CREATE INDEX sync_registro ON operaciones_sync (tabla, id_registro, recibido_en DESC);  -- quién cambió por última vez un registro (RF-053)
@@ -307,9 +363,11 @@ CREATE TABLE eliminaciones (
   tabla       varchar(50) NOT NULL,
   id_registro uuid NOT NULL,
   eliminado_en timestamptz NOT NULL DEFAULT now(),
+  id_empresa  uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
   PRIMARY KEY (tabla, id_registro)
 );
 CREATE INDEX eliminaciones_fecha ON eliminaciones (eliminado_en);
+CREATE INDEX eliminaciones_empresa ON eliminaciones (id_empresa);
 
 -- Registros que salieron de la cartera de un vendedor (RF-041). No son borrados (el registro sigue existiendo para
 -- los demás): al sincronizar, el teléfono del vendedor anterior sólo quita su copia.
@@ -318,9 +376,12 @@ CREATE TABLE retiros_vendedor (
   tabla       varchar(50) NOT NULL,
   id_registro uuid NOT NULL,
   retirado_en timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (id_vendedor, tabla, id_registro)
+  id_empresa  uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  PRIMARY KEY (id_vendedor, tabla, id_registro),
+  CONSTRAINT retiros_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
 );
 CREATE INDEX retiros_vendedor_fecha ON retiros_vendedor (id_vendedor, retirado_en);
+CREATE INDEX retiros_vendedor_empresa ON retiros_vendedor (id_empresa);
 
 -- =============================================================================
 -- M10 · Notificaciones (RF-054, RF-055)
@@ -331,8 +392,11 @@ CREATE TABLE suscripciones_push (
   endpoint       text NOT NULL UNIQUE,
   clave_p256dh   text NOT NULL,
   clave_auth     text NOT NULL,
-  creado_en      timestamptz NOT NULL DEFAULT now()
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  id_empresa     uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  CONSTRAINT suscripciones_usuario_misma_empresa FOREIGN KEY (id_empresa, id_usuario) REFERENCES usuarios (id_empresa, id_usuario)
 );
+CREATE INDEX suscripciones_push_empresa ON suscripciones_push (id_empresa);
 
 CREATE TABLE notificaciones (
   id_notificacion uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -342,8 +406,11 @@ CREATE TABLE notificaciones (
   cuerpo          text,
   datos           jsonb,
   creado_en       timestamptz NOT NULL DEFAULT now(),
-  leida_en        timestamptz
+  leida_en        timestamptz,
+  id_empresa      uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  CONSTRAINT notificaciones_usuario_misma_empresa FOREIGN KEY (id_empresa, id_usuario) REFERENCES usuarios (id_empresa, id_usuario)
 );
+CREATE INDEX notificaciones_empresa ON notificaciones (id_empresa);
 CREATE INDEX notificaciones_no_leidas ON notificaciones (id_usuario, creado_en DESC) WHERE leida_en IS NULL;
 CREATE INDEX notificaciones_usuario ON notificaciones (id_usuario, creado_en DESC);
 
@@ -405,13 +472,13 @@ END $$;
 CREATE TRIGGER detalle_bloqueado BEFORE INSERT OR UPDATE OR DELETE ON detalle_pedido
   FOR EACH ROW EXECUTE FUNCTION fn_detalle_bloqueado();
 
--- Registro de borrados para la sincronización.
+-- Registro de borrados para la sincronización. La empresa sale de la fila borrada, no de la petición.
 CREATE FUNCTION fn_registrar_eliminacion() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-  id uuid := (to_jsonb(OLD) ->> TG_ARGV[0])::uuid;
+  fila jsonb := to_jsonb(OLD);
 BEGIN
-  INSERT INTO eliminaciones (tabla, id_registro) VALUES (TG_TABLE_NAME, id)
+  INSERT INTO eliminaciones (id_empresa, tabla, id_registro) VALUES ((fila ->> 'id_empresa')::uuid, TG_TABLE_NAME, (fila ->> TG_ARGV[0])::uuid)
   ON CONFLICT (tabla, id_registro) DO UPDATE SET eliminado_en = now();
   RETURN OLD;
 END $$;
@@ -421,7 +488,8 @@ CREATE TRIGGER pedidos_eliminacion       AFTER DELETE ON pedidos        FOR EACH
 CREATE TRIGGER detalle_eliminacion       AFTER DELETE ON detalle_pedido FOR EACH ROW EXECUTE FUNCTION fn_registrar_eliminacion('id_detalle_pedido');
 CREATE TRIGGER recordatorios_eliminacion AFTER DELETE ON recordatorios  FOR EACH ROW EXECUTE FUNCTION fn_registrar_eliminacion('id_recordatorio');
 
--- Auditoría de cambios críticos (precios, usuarios, cartera, borrados).
+-- Auditoría de cambios críticos (precios, usuarios, cartera, borrados). La empresa sale de la fila que cambió: a veces
+-- no hay sesión (p. ej. al recuperar la contraseña).
 CREATE FUNCTION fn_auditar() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -436,9 +504,9 @@ BEGIN
                         = despues - ARRAY['actualizado_en', 'version', 'ultimo_acceso'] THEN
     RETURN NULL;
   END IF;
-  INSERT INTO auditoria (id_usuario, accion, tabla, id_registro, datos_antes, datos_despues)
-  VALUES (nullif(current_setting('app.id_usuario', true), '')::uuid, TG_OP, TG_TABLE_NAME,
-          (coalesce(despues, antes) ->> TG_ARGV[0])::uuid, antes, despues);
+  INSERT INTO auditoria (id_empresa, id_usuario, accion, tabla, id_registro, datos_antes, datos_despues)
+  VALUES ((coalesce(despues, antes) ->> 'id_empresa')::uuid, nullif(current_setting('app.id_usuario', true), '')::uuid,
+          TG_OP, TG_TABLE_NAME, (coalesce(despues, antes) ->> TG_ARGV[0])::uuid, antes, despues);
   RETURN NULL;
 END $$;
 CREATE TRIGGER productos_auditoria AFTER INSERT OR UPDATE OR DELETE ON productos
@@ -449,5 +517,44 @@ CREATE TRIGGER clientes_auditoria AFTER UPDATE OF id_vendedor, activo OR DELETE 
   FOR EACH ROW EXECUTE FUNCTION fn_auditar('id_cliente');
 CREATE TRIGGER pedidos_auditoria AFTER DELETE ON pedidos
   FOR EACH ROW EXECUTE FUNCTION fn_auditar('id_pedido');
+
+-- =============================================================================
+-- Multiempresa · Rol de la API y reglas por filas (RLS)
+-- =============================================================================
+-- La API corre cada petición con sesión con el rol reparto_app (SET LOCAL ROLE) y app.id_empresa fijado
+-- (api/_lib/db.ts). Ese rol no se salta las reglas, así que sólo ve y escribe filas de su empresa. El dueño de la
+-- base (con quien corren los scripts y lo que pasa antes de saber la empresa, como iniciar sesión) no tiene reglas.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'reparto_app') THEN
+    CREATE ROLE reparto_app NOLOGIN NOBYPASSRLS;
+  END IF;
+  -- Quien corre la API debe poder cambiar a ese rol. Desde PostgreSQL 16, crear un rol no basta para «usarlo».
+  IF current_setting('server_version_num')::int >= 160000 THEN
+    EXECUTE format('GRANT reparto_app TO %I WITH SET TRUE', current_user);
+  ELSE
+    EXECUTE format('GRANT reparto_app TO %I', current_user);
+  END IF;
+  EXECUTE format('GRANT USAGE ON SCHEMA %I TO reparto_app', current_schema());
+  EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO reparto_app', current_schema());
+  EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO reparto_app', current_schema());
+  EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO reparto_app', current_schema());
+  -- Lo que creen 02_vistas.sql y las migraciones futuras también.
+  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO reparto_app', current_schema());
+  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT ON SEQUENCES TO reparto_app', current_schema());
+END $$;
+
+DO $$
+DECLARE
+  t text;
+  regla constant text := $r$id_empresa = nullif(current_setting('app.id_empresa', true), '')::uuid$r$;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['empresas', 'usuarios', 'clientes', 'productos', 'stock_diario', 'produccion_diaria', 'pedidos',
+                           'detalle_pedido', 'recordatorios', 'auditoria', 'operaciones_sync', 'eliminaciones',
+                           'retiros_vendedor', 'suscripciones_push', 'notificaciones'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('CREATE POLICY por_empresa ON %I TO reparto_app USING (%s) WITH CHECK (%s)', t, regla, regla);
+  END LOOP;
+END $$;
 
 COMMIT;

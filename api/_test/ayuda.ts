@@ -14,19 +14,39 @@ process.env.DATABASE_URL ??= 'postgres://postgres:test@localhost:5432/reparto_yo
 
 export const PASSWORD = 'Yogurt2026!'
 export const config = leerConfig()
-export const db = crearPool(config.conexion)
+
+// Multiempresa: las pruebas preparan sus datos directo en la base, como el dueño (sin reglas por filas). Esa conexión
+// trae por omisión la primera empresa (la crea 03_datos_iniciales.sql), así los INSERT de siempre tienen dueño. La API,
+// en cambio, corre cada petición dentro de la empresa del usuario que llama.
+const conOpciones = (extra: string) => ({ ...config.conexion, options: [config.conexion.options, extra].filter(Boolean).join(' ') })
+export const EMPRESA: string = await (async () => {
+  const cx = new pg.Client(config.conexion)
+  await cx.connect()
+  try {
+    await cx.query(`INSERT INTO empresas (nombre) SELECT 'Empresa principal' WHERE NOT EXISTS (SELECT 1 FROM empresas)`)
+    return (await cx.query(`SELECT id_empresa FROM empresas ORDER BY creado_en, id_empresa LIMIT 1`)).rows[0].id_empresa
+  } finally {
+    await cx.end()
+  }
+})()
+export const db = crearPool(conOpciones(`-c app.id_empresa=${EMPRESA}`))
 export const app: FastifyInstance = await construirApp({ db, config })
+
+// Otra empresa en la misma base, para probar que ninguna ve lo de la otra.
+export async function crearEmpresa(nombre = `Empresa ${randomUUID().slice(0, 6)}`) {
+  return (await db.query(`INSERT INTO empresas (nombre) VALUES ($1) RETURNING id_empresa`, [nombre])).rows[0].id_empresa as string
+}
 const HASH = await hashPassword(config, PASSWORD)
 
 // Cada inicio de sesión de prueba sale de una IP distinta: los límites de intentos (RF-003) cuentan por IP y en la
 // base de pruebas quedan los de corridas anteriores. Las pruebas de esos límites pasan una IP fija.
 export const ipAleatoria = () => `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`
 
-export async function crearUsuario(rol: 'administrador' | 'vendedor', extra: { debeCambiar?: boolean; activo?: boolean } = {}) {
+export async function crearUsuario(rol: 'administrador' | 'vendedor', extra: { debeCambiar?: boolean; activo?: boolean; empresa?: string } = {}) {
   const correo = `${rol}-${randomUUID().slice(0, 8)}@prueba.local`
   const { rows } = await db.query(
-    `INSERT INTO usuarios (nombre, correo, password_hash, rol, debe_cambiar_password, activo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_usuario`,
-    [`Prueba ${rol}`, correo, HASH, rol, extra.debeCambiar ?? false, extra.activo ?? true],
+    `INSERT INTO usuarios (id_empresa, nombre, correo, password_hash, rol, debe_cambiar_password, activo) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_usuario`,
+    [extra.empresa ?? EMPRESA, `Prueba ${rol}`, correo, HASH, rol, extra.debeCambiar ?? false, extra.activo ?? true],
   )
   return { id: rows[0].id_usuario as string, correo }
 }
@@ -36,8 +56,8 @@ export async function login(correo: string, password = PASSWORD, dispositivo = '
   return { status: r.statusCode, body: r.json() }
 }
 
-export async function sesion(rol: 'administrador' | 'vendedor', dispositivo = 'tel-1') {
-  const u = await crearUsuario(rol)
+export async function sesion(rol: 'administrador' | 'vendedor', dispositivo = 'tel-1', empresa?: string) {
+  const u = await crearUsuario(rol, { empresa })
   const { body } = await login(u.correo, PASSWORD, dispositivo)
   return { ...u, token: body.accessToken as string, refreshToken: body.refreshToken as string, dispositivo }
 }
@@ -95,7 +115,8 @@ export async function enBaseAislada(prueba: (x: { srv: FastifyInstance; pool: pg
   await cx.query(`SET search_path TO ${esquema}`)
   // Tablas y vistas, como la base real (la libreta de clientes usa v_resumen_cliente).
   for (const f of ['01_esquema.sql', '02_vistas.sql']) await cx.query(readFileSync(new URL(`../../db/${f}`, import.meta.url), 'utf8'))
-  const pool = new pg.Pool({ ...config.conexion, options: `-c search_path=${esquema}`, max: 4 })
+  const empresa = (await cx.query(`INSERT INTO empresas (nombre) VALUES ('Empresa aislada') RETURNING id_empresa`)).rows[0].id_empresa
+  const pool = new pg.Pool({ ...conOpciones(`-c search_path=${esquema} -c app.id_empresa=${empresa}`), max: 4 })
   const srv = await construirApp({ db: pool, config })
   const hash = await hashPassword(config, PASSWORD)
   const usuario = async (nombre: string, rol: 'administrador' | 'vendedor') => {

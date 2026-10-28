@@ -14,6 +14,8 @@ SET client_encoding = 'UTF8';
 
 BEGIN;
 SET LOCAL app.permitir_correccion = 'on';   -- permite cargar pedidos ya entregados con su detalle
+-- Multiempresa: todo lo de prueba es de la primera empresa (la que crea 03_datos_iniciales.sql).
+SELECT set_config('app.id_empresa', (SELECT id_empresa::text FROM empresas ORDER BY creado_en, id_empresa LIMIT 1), true);
 
 DO $$
 DECLARE

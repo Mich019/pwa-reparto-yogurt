@@ -35,7 +35,7 @@ try {
   console.log(`✓ Conectada a «${info.base}» (PostgreSQL ${info.version}), conexión ${info.cifrada ? 'cifrada (SSL)' : 'SIN cifrar'}`)
   const local = /^(localhost|127\.|::1|.*\.railway\.internal$)/.test(new URL(cx.host.includes(':') ? `http://[${cx.host}]` : `http://${cx.host}`).hostname)
   if (!info.cifrada && !local) console.warn('! La conexión viaja sin cifrar por internet: pon DB_SSL=true')
-  if (Number.parseInt(info.version, 10) < 13) console.warn('! Se necesita PostgreSQL 13 o más nuevo (gen_random_uuid)')
+  if (Number.parseInt(info.version, 10) < 15) console.warn('! Se necesita PostgreSQL 15 o más nuevo (vistas con security_invoker, multiempresa)')
 
   const esquema = (await cx.query(`SELECT 1 FROM pg_proc WHERE proname = 'fn_marcar_actualizacion'`)).rowCount === 1
   if (!esquema) {
@@ -49,7 +49,9 @@ try {
       `SELECT to_regclass('public.retiros_vendedor') IS NOT NULL AS m002,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recuperaciones_password' AND column_name = 'intentos') AS m003,
               to_regclass('public.produccion_diaria') IS NOT NULL AS m004,
-              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'password_cambiado_en') AS m005`,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'password_cambiado_en') AS m005,
+              to_regclass('public.dos_pasos') IS NOT NULL AS m006,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'id_empresa') AS m007`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

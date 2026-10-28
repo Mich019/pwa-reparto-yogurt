@@ -4,7 +4,7 @@ La versión MySQL 8, con los pasos para pasarla a la nube, está en [`mysql/`](m
 
 ## Cómo crearla
 
-Requiere PostgreSQL 13 o superior. Desde esta carpeta:
+Requiere PostgreSQL 15 o superior (las vistas usan `security_invoker`; con 16+ el rol de la API se concede `WITH SET`). Desde esta carpeta:
 
 ```bash
 psql -U postgres -f crear_bd.sql            # esquema + vistas + sabores + datos de prueba
@@ -61,6 +61,8 @@ Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor 
 `migraciones/` trae los cambios al esquema posteriores a la primera versión. `npm run db:migrar` (desde la raíz) los aplica en orden, cada uno en una transacción; también se pueden correr a mano con `psql -U postgres -d reparto_yogurt -f migraciones/NNN_*.sql` (son repetibles). `npm run db:probar` dice, sin cambiar nada, si a la base le falta alguno. La API está en [`../api`](../api/README.md); la base en la nube, en [`../docs/produccion-railway.md`](../docs/produccion-railway.md).
 
 ## Notas para la API
+
+- **Multiempresa** (migración `007_multiempresa.sql`): cada tabla de negocio tiene `id_empresa` (tabla `empresas`), con llaves compuestas `*_misma_empresa` para que un pedido no apunte al cliente de otra empresa. Las reglas por filas (RLS, política `por_empresa`) se aplican al rol `reparto_app`: la API entra a cada petición con `SET LOCAL ROLE reparto_app` y `set_config('app.id_empresa', …)`, así que sólo ve y escribe filas de esa empresa. El dueño de la base (migraciones, scripts, iniciar sesión) no tiene RLS. `id_empresa` toma por omisión `app.id_empresa`, por eso los `INSERT` no lo mencionan. Un correo pertenece a una sola empresa.
 
 - La contraseña se hashea con Argon2id en la API; la base sólo acepta hashes `$argon2id$…`.
 - Para que la auditoría registre quién hizo el cambio, la API ejecuta `SET LOCAL app.id_usuario = '<uuid>'` dentro de cada transacción.

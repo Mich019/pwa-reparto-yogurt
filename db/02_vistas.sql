@@ -7,8 +7,11 @@ SET client_encoding = 'UTF8';
 
 BEGIN;
 
+-- Multiempresa: las vistas corren con los permisos de quien consulta (security_invoker, PostgreSQL 15+), así respetan
+-- las reglas por filas de 01_esquema.sql y cada empresa sólo ve lo suyo.
+
 -- RF-027 / RF-029: entregas pendientes de hoy, con lo necesario para el ruteo.
-CREATE VIEW v_ruta_del_dia AS
+CREATE VIEW v_ruta_del_dia WITH (security_invoker = true) AS
 SELECT pe.id_pedido, pe.id_vendedor, pe.orden_ruta, pe.estado, pe.total,
        c.id_cliente, c.nombre, c.direccion, c.telefono, c.latitud, c.longitud, c.ventana_horario, c.referencias,
        (SELECT sum(d.cantidad * pr.presentacion_litros)
@@ -21,7 +24,7 @@ SELECT pe.id_pedido, pe.id_vendedor, pe.orden_ruta, pe.estado, pe.total,
    AND c.activo;
 
 -- RF-043, RF-044, RF-047: ventas por día y vendedor (agrupar por semana/mes desde la API).
-CREATE VIEW v_ventas_diarias AS
+CREATE VIEW v_ventas_diarias WITH (security_invoker = true) AS
 SELECT pe.fecha,
        pe.id_vendedor,
        u.nombre                                         AS vendedor,
@@ -39,7 +42,7 @@ SELECT pe.fecha,
  GROUP BY pe.fecha, pe.id_vendedor, u.nombre;
 
 -- RF-045, RF-046: ventas y margen por sabor y día.
-CREATE VIEW v_ventas_por_sabor AS
+CREATE VIEW v_ventas_por_sabor WITH (security_invoker = true) AS
 SELECT pe.fecha,
        pr.id_producto,
        pr.sabor,
@@ -55,7 +58,7 @@ SELECT pe.fecha,
  GROUP BY pe.fecha, pr.id_producto, pr.sabor, pr.color_hex;
 
 -- RF-012, RF-013: perfil del cliente (litros acumulados, última visita, sabor favorito).
-CREATE VIEW v_resumen_cliente AS
+CREATE VIEW v_resumen_cliente WITH (security_invoker = true) AS
 SELECT c.id_cliente,
        c.nombre,
        coalesce(h.litros, 0)::numeric(12, 2) AS litros_acumulados,

@@ -62,7 +62,6 @@ export async function rutasSync(
     const vendedor = u.rol === 'vendedor' ? u.id : undefined
     const desde = q.data.desde || undefined
     return tx(db, null, async (c) => {
-      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
       const { rows: [{ ahora }] } = await c.query(`SELECT (extract(epoch from clock_timestamp()) * 1000)::float8 AS ahora`)
       const datos: Record<string, unknown[]> = {}
       for (const t of TABLAS) {
@@ -107,7 +106,7 @@ export async function rutasSync(
       const avisos = filasAvisos.reverse().map((r) => ({ id: r.id_notificacion, tipo: r.tipo, titulo: r.titulo, cuerpo: r.cuerpo ?? '', datos: r.datos ?? {}, creado: r.creado_ms }))
 
       return { ahora, cursor: Math.max(0, Math.floor(ahora) - SOLAPE_MS), ...datos, stock, avisos, eliminados }
-    })
+    }, { fotoFija: true })
   })
 
   // El administrador revisa lo que no se aplicó.

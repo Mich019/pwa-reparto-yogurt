@@ -3,7 +3,7 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import type { Config } from './config.js'
-import type { Db } from './db.js'
+import { conAlcance, fijarEmpresa, porEmpresa, type Db } from './db.js'
 import { rutasAuth } from './auth.js'
 import { rutasCartera } from './cartera.js'
 import { crearDespachador, rutasNotificaciones } from './notificaciones.js'
@@ -25,6 +25,7 @@ export interface Usuario {
   rol: Rol
   sid: string
   debeCambiarPassword: boolean
+  empresa: string // id_empresa: la base sólo le deja ver y escribir lo de esa empresa
 }
 
 declare module 'fastify' {
@@ -39,7 +40,9 @@ export interface Contexto {
   enviador?: Enviador | null // cómo mandar un push; por defecto el de las claves VAPID de config (null = sin push). Las pruebas ponen uno falso.
 }
 
-export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
+export async function construirApp(entrada: Contexto): Promise<FastifyInstance> {
+  // Multiempresa: con sesión, cada consulta corre dentro de la empresa del usuario (db.ts, porEmpresa).
+  const ctx: Contexto = { ...entrada, db: porEmpresa(entrada.db) }
   const saltos = ctx.config.trustProxy
   const app = Fastify({
     logger: process.env.NODE_ENV !== 'test',
@@ -49,6 +52,10 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
     // En Vercel todo llega como /api/...; en local y en las pruebas, sin prefijo. Ambas formas valen.
     rewriteUrl: (req) => (req.url ?? '/').replace(/^\/api(?=\/|\?|$)/, '') || '/',
   })
+
+  // Cada petición tiene su alcance: empieza sin empresa y autenticar() le pone la del usuario. Va primero, para que todo
+  // lo que corre después (hooks, la ruta, los avisos que se mandan al terminar) quede dentro.
+  app.addHook('onRequest', (_req, _rep, listo) => conAlcance(listo))
 
   // Los detalles de un error interno van al registro del servidor, no a quien llamó.
   app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, req, rep) => {
@@ -92,14 +99,17 @@ export async function construirApp(ctx: Contexto): Promise<FastifyInstance> {
     if (deCookie && req.method !== 'GET' && req.method !== 'HEAD' && req.headers[CABECERA_APP] !== 'app') {
       return rep.code(403).send({ error: 'Solicitud no permitida', codigo: 'SIN_CABECERA' })
     }
+    // Todavía sin empresa en el alcance: esta consulta busca la sesión en todo el sistema.
     const { rows } = await ctx.db.query(
-      `SELECT u.id_usuario, u.rol, u.debe_cambiar_password
-         FROM sesiones s JOIN usuarios u USING (id_usuario)
+      `SELECT u.id_usuario, u.rol, u.debe_cambiar_password, u.id_empresa, e.activa AS empresa_activa
+         FROM sesiones s JOIN usuarios u USING (id_usuario) JOIN empresas e USING (id_empresa)
         WHERE s.id_sesion = $1 AND s.id_usuario = $2 AND s.revocado_en IS NULL AND s.expira_en > now() AND u.activo`,
       [payload.sid, payload.sub],
     )
     if (!rows[0]) return rep.code(401).send({ error: 'Sesión inválida o vencida', codigo: 'SESION_INVALIDA' })
-    req.usuario = { id: rows[0].id_usuario, rol: rows[0].rol, sid: payload.sid, debeCambiarPassword: rows[0].debe_cambiar_password }
+    if (!rows[0].empresa_activa) return rep.code(403).send({ error: 'La cuenta de tu empresa está suspendida.', codigo: 'EMPRESA_SUSPENDIDA' })
+    fijarEmpresa(rows[0].id_empresa) // desde aquí, todo lo de esta petición corre dentro de su empresa
+    req.usuario = { id: rows[0].id_usuario, rol: rows[0].rol, sid: payload.sid, debeCambiarPassword: rows[0].debe_cambiar_password, empresa: rows[0].id_empresa }
     if (rows[0].debe_cambiar_password && !permitirPasswordPendiente) {
       return rep.code(403).send({ error: 'Debes cambiar tu contraseña antes de continuar', codigo: 'CAMBIAR_PASSWORD' })
     }

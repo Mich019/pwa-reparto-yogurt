@@ -5,6 +5,12 @@
 
 SET client_encoding = 'UTF8';
 
+-- Multiempresa: la primera empresa de la base (se renombra después) y sus sabores de partida.
+INSERT INTO empresas (nombre) SELECT 'Empresa principal' WHERE NOT EXISTS (SELECT 1 FROM empresas);
+DO $$ BEGIN
+  PERFORM set_config('app.id_empresa', (SELECT id_empresa::text FROM empresas ORDER BY creado_en, id_empresa LIMIT 1), false);
+END $$;
+
 INSERT INTO productos (nombre, sabor, presentacion_litros, precio_unitario, costo_produccion, color_hex) VALUES
   ('Yogurt', 'Fresa',     1, 60, 28, '#f472b6'),
   ('Yogurt', 'Natural',   1, 55, 24, '#f5ecd7'),

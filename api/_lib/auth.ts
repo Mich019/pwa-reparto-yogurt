@@ -29,6 +29,8 @@ export const DESAFIO = 'dos-pasos'
 const bodyCambio = z.object({ actual: z.string().min(1).max(PASSWORD_MAX), nueva: z.string().max(1000) })
 
 const MENSAJE_CREDENCIALES = 'Correo o contraseña incorrectos'
+// Multiempresa: la empresa entera está suspendida (sólo se dice con la contraseña correcta, como la cuenta de baja).
+const EMPRESA_SUSPENDIDA = { error: 'La cuenta de tu empresa está suspendida. Habla con el administrador de tu negocio.', codigo: 'EMPRESA_SUSPENDIDA' }
 
 // RF-003: antes de probar una contraseña se revisa el límite de intentos y el intento queda registrado como fallido
 // (si resulta correcta, se marca como bueno). Contar y registrar va bajo un candado por IP: los intentos simultáneos
@@ -95,8 +97,9 @@ export async function rutasAuth(
     const ip = ipCliente(req, config)
 
     const { rows } = await db.query(
-      `SELECT id_usuario, nombre, correo, rol, password_hash, activo, debe_cambiar_password, password_cambiado_en
-         FROM usuarios WHERE lower(correo) = lower($1)`,
+      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.password_hash, u.activo, u.debe_cambiar_password, u.password_cambiado_en,
+              e.activa AS empresa_activa
+         FROM usuarios u JOIN empresas e USING (id_empresa) WHERE lower(u.correo) = lower($1)`,
       [correo],
     )
     const u = rows[0]
@@ -111,6 +114,7 @@ export async function rutasAuth(
     if (!ok) return rep.code(401).send({ error: MENSAJE_CREDENCIALES })
     // RF-040: sólo con la contraseña correcta se le dice por qué no entra.
     if (!u.activo) return rep.code(403).send({ error: 'Tu cuenta está dada de baja. Habla con el administrador.', codigo: 'CUENTA_SUSPENDIDA' })
+    if (!u.empresa_activa) return rep.code(403).send(EMPRESA_SUSPENDIDA)
 
     await intento.bueno()
     // Un hash del pepper anterior o con otros parámetros se rehace ahora que se tiene la contraseña.
@@ -150,10 +154,12 @@ export async function rutasAuth(
     }
     const ip = ipCliente(req, config)
     const { rows: [u] } = await db.query(
-      `SELECT id_usuario, nombre, correo, rol, activo, debe_cambiar_password, password_cambiado_en FROM usuarios WHERE id_usuario = $1`,
+      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.activo, u.debe_cambiar_password, u.password_cambiado_en, e.activa AS empresa_activa
+         FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [sub],
     )
     if (!u?.activo) return rep.code(401).send({ error: 'Vuelve a escribir tu contraseña.', codigo: 'DESAFIO_VENCIDO' })
+    if (!u.empresa_activa) return rep.code(403).send(EMPRESA_SUSPENDIDA)
     const intento = await registrarIntento(db, config, { correo: u.correo, ip, idUsuario: u.id_usuario, passwordCambiadoEn: u.password_cambiado_en })
     if (!intento) return bloqueado(rep, config)
     if (!(await usarCodigo(db, config, u.id_usuario, body.data.codigo))) {
@@ -172,8 +178,8 @@ export async function rutasAuth(
     const refresh = body.data.refreshToken ?? deCookie
     if (!refresh) return rep.code(401).send({ error: 'Sesión vencida, inicia sesión de nuevo', codigo: 'SESION_INVALIDA' })
     const { rows } = await db.query(
-      `SELECT s.id_sesion, u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password
-         FROM sesiones s JOIN usuarios u USING (id_usuario)
+      `SELECT s.id_sesion, u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password, e.activa AS empresa_activa
+         FROM sesiones s JOIN usuarios u USING (id_usuario) JOIN empresas e USING (id_empresa)
         WHERE s.refresh_token_hash = $1 AND s.revocado_en IS NULL AND s.expira_en > now() AND u.activo`,
       [sha256(refresh)],
     )
@@ -181,6 +187,8 @@ export async function rutasAuth(
       if (deCookie) borrarCookiesSesion(rep, config)
       return rep.code(401).send({ error: 'Sesión vencida, inicia sesión de nuevo', codigo: 'SESION_INVALIDA' })
     }
+    // 403 y no 401: la app no cierra la sesión, así lo que el repartidor no ha enviado se queda en el teléfono.
+    if (!rows[0].empresa_activa) return rep.code(403).send(EMPRESA_SUSPENDIDA)
     return respuestaSesion(rep, rows[0], rows[0].id_sesion, refresh, deCookie ? { nueva: false } : null)
   })
 
