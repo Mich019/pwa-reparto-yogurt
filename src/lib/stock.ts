@@ -26,7 +26,7 @@ export function useStockDeHoy(): SaborEnRuta[] | undefined {
 export interface LineaStock { productoId: string; asignada: number; devuelta: number; entregado: number }
 export interface DiaStock {
   fecha: string
-  productos: { id: string; sabor: string; color: string; disponible: boolean }[]
+  productos: { id: string; sabor: string; color: string; disponible: boolean; unidad?: string }[] // unidad: L si no viene
   produccion: { productoId: string; litros: number }[]
   vendedores: { id: string; nombre: string; activo: boolean; lineas: LineaStock[] }[]
 }

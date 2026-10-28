@@ -90,8 +90,9 @@ describe('reportes de ventas (RF-043 a RF-047)', () => {
       const r = await json(srv, admin, `/reportes/ventas?${OCTUBRE}`)
       assert.equal(r.status, 200)
       assert.deepEqual(r.body.resumen, {
-        ingreso: 1000, costo: 335, utilidad: 665, margenPct: 66.5, litros: 17, pedidos: 5, clientes: 3, ticketPromedio: 200, efectivo: 820, transferencia: 180,
+        ingreso: 1000, costo: 335, utilidad: 665, margenPct: 66.5, litros: 17, porUnidad: { L: 17 }, pedidos: 5, clientes: 3, ticketPromedio: 200, efectivo: 820, transferencia: 180,
       })
+      assert.deepEqual(r.body.unidades, ['L'])
       // El corte de un solo día
       const dia = await json(srv, admin, '/reportes/ventas?desde=2026-10-06&hasta=2026-10-06')
       assert.equal(dia.body.resumen.ingreso, 320)
@@ -424,6 +425,26 @@ describe('libreta de clientes', () => {
       assert.ok(csv.startsWith('﻿Vendedor,Cliente,Teléfono,Dirección'))
       assert.ok(csv.includes(`"'=HYPERLINK(""http://malo.example"",""clic"")"`))
       assert.equal((await json(srv, admin, '/reportes/clientes?formato=pdf')).status, 400) // el PDF lo arma la app
+    })
+  })
+
+  it('con productos en varias unidades no suma litros con kilos (catálogo flexible)', async () => {
+    await escenario(async ({ srv, pool, admin, ana, c1 }) => {
+      const { rows: [hielo] } = await pool.query(
+        `INSERT INTO productos (sabor, precio_unitario, costo_produccion, presentacion_litros, unidad, envase) VALUES ('Hielo', 35, 10, 5, 'kg', 'bolsa_nylon') RETURNING id_producto`,
+      )
+      await vender(pool, { vendedor: ana.id, cliente: c1, fecha: '2026-10-07', lineas: [{ producto: hielo.id_producto, litros: 2, precio: 35, costo: 10 }] }) // 2 bolsas de 5 kg
+      const r = await json(srv, admin, `/reportes/ventas?${OCTUBRE}`)
+      assert.deepEqual(r.body.unidades, ['L', 'kg'])
+      assert.deepEqual(r.body.resumen.porUnidad, { L: 17, kg: 10 })
+      assert.deepEqual(r.body.periodos.find((p: { periodo: string }) => p.periodo === '2026-10-07').porUnidad.kg, 10)
+      assert.deepEqual(r.body.vendedores.find((v: { id: string }) => v.id === ana.id).porUnidad.kg, 10)
+      assert.equal(r.body.sabores.find((s: { sabor: string }) => s.sabor === 'Hielo').unidad, 'kg')
+      // En el Excel/CSV, una columna por unidad.
+      const per = (await pedir(srv, admin, `/reportes/exportar?${OCTUBRE}&formato=csv&tabla=periodos`)).rawPayload.toString('utf8')
+      assert.match(per.split('\r\n')[0], /Litros.*Kilos/)
+      const lib = await json(srv, admin, '/reportes/clientes')
+      assert.equal(lib.body.clientes.find((c: { porUnidad: Record<string, number> }) => c.porUnidad.kg).porUnidad.kg, 10)
     })
   })
 })

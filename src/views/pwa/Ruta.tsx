@@ -14,6 +14,7 @@ import { AlertasRuta } from './AlertasRuta'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
+import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Hoja, PuntoSabor, Segmentado, aviso, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
@@ -238,8 +239,9 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
   const clientePost = postEntrega ? porId.get(postEntrega.clienteId) : undefined
   const baseAnterior = useMemo(() => (postEntrega ? aCantidades(postEntrega.items) : undefined), [postEntrega])
 
-  const litrosActivo = activo ? activo.items.reduce((s, i) => s + i.litros, 0) : 0
-  const litrosEntregados = entregados.reduce((s, p) => s + p.items.reduce((a, i) => a + i.litros, 0), 0)
+  // Por unidad (catálogo flexible): «60 L + 10 kg»; para el yogurt, los litros de siempre.
+  const litrosActivo = totalOCero(activo?.items ?? [], productos)
+  const litrosEntregados = totalOCero(entregados.flatMap((p) => p.items), productos)
   const avance = totalPedidos ? Math.round((entregados.length / totalPedidos) * 100) : 0
   const minutosRuta = ruta && orden.length ? Math.max(1, Math.round(ruta.duracion_s / 60)) : null
 
@@ -321,7 +323,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                   </div>
                   <div className="text-right">
                     <div className="text-2xl leading-8 font-semibold tracking-tight tabular-nums">{dinero(activo.total)}</div>
-                    <div className="mt-1 text-sm text-apagado">{litrosActivo} L · {pago === 'EFECTIVO' ? 'efectivo' : 'transfer'}</div>
+                    <div className="mt-1 text-sm text-apagado">{litrosActivo} · {pago === 'EFECTIVO' ? 'efectivo' : 'transfer'}</div>
                   </div>
                 </button>
 
@@ -331,7 +333,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                     return (
                       <span key={i.productoId} className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
                         <PuntoSabor color={p?.color_hex} />
-                        {i.litros} L {p?.sabor ?? '¿?'}
+                        {textoCantidad(i.litros, p)} {p?.sabor ?? '¿?'}
                       </span>
                     )
                   })}
@@ -405,7 +407,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               <Sparkles size={28} />
               <div className="mt-2 text-2xl leading-8 font-bold tracking-tight">¡Ruta terminada!</div>
               <div className="mt-1 text-apagado">
-                {entregados.length} entregas · {litrosEntregados} L · {dinero(totalDia)}
+                {entregados.length} entregas · {litrosEntregados} · {dinero(totalDia)}
               </div>
             </div>
           ) : (
@@ -441,7 +443,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3">
                 <Dato valor={`${entregados.length} de ${totalPedidos}`} etiqueta="entregas" />
-                <Dato valor={`${litrosEntregados} L`} etiqueta="repartidos" />
+                <Dato valor={litrosEntregados} etiqueta="repartidos" />
                 <Dato valor={minutosRuta ? `${minutosRuta} min` : '—'} etiqueta="de ruta" />
               </div>
             </div>
@@ -483,7 +485,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               destacada
               icono={<Copy size={26} />}
               titulo="Igual que el anterior"
-              sub={postEntrega!.items.map((i) => `${i.litros} L ${prodPorId.get(i.productoId)?.sabor ?? ''}`).join(' · ')}
+              sub={postEntrega!.items.map((i) => `${textoCantidad(i.litros, prodPorId.get(i.productoId))} ${prodPorId.get(i.productoId)?.sabor ?? ''}`).join(' · ')}
               onClick={() => { setEditor({ cliente: clientePost, base: baseAnterior }); setPostEntrega(null) }}
             />
             <OpcionGrande icono={<PlusCircle size={26} />} titulo="Desde cero" sub="Todos los sabores en 0" onClick={() => { setEditor({ cliente: clientePost, base: {} }); setPostEntrega(null) }} />

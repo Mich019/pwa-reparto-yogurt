@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
+import { ordenarUnidades } from './unidades.js'
 import { hoyEn } from './fechas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -23,7 +24,7 @@ export async function rutasAdmin(
 
     // 1. Usuarios / Vendedores
     const { rows: [u] } = await db.query(`
-      SELECT 
+      SELECT
         count(*)::int AS total,
         count(*) FILTER (WHERE activo)::int AS activos,
         count(*) FILTER (WHERE rol = 'vendedor' AND activo)::int AS vendedores_activos,
@@ -33,7 +34,7 @@ export async function rutasAdmin(
 
     // 2. Clientes
     const { rows: [c] } = await db.query(`
-      SELECT 
+      SELECT
         count(*)::int AS total,
         count(*) FILTER (WHERE activo)::int AS activos,
         count(*) FILTER (WHERE id_vendedor IS NULL AND activo)::int AS sin_vendedor
@@ -42,7 +43,7 @@ export async function rutasAdmin(
 
     // 3. Productos / Catálogo
     const { rows: [pr] } = await db.query(`
-      SELECT 
+      SELECT
         count(*)::int AS total,
         count(*) FILTER (WHERE disponible)::int AS disponibles
       FROM productos
@@ -50,7 +51,7 @@ export async function rutasAdmin(
 
     // 4. Pedidos del día de hoy
     const { rows: [p] } = await db.query(`
-      SELECT 
+      SELECT
         count(*)::int AS total,
         count(*) FILTER (WHERE estado = 'pendiente')::int AS pendientes,
         count(*) FILTER (WHERE estado = 'en_camino')::int AS en_camino,
@@ -63,27 +64,30 @@ export async function rutasAdmin(
       WHERE fecha = $1
     `, [fecha])
 
-    // 5. Litros programados / vendidos hoy
-    const { rows: [lit] } = await db.query(`
-      SELECT 
-        coalesce(sum(d.cantidad * prod.presentacion_litros), 0)::float8 AS litros_hoy
+    // 5. Litros programados / vendidos hoy; por unidad (catálogo flexible): { L: 40, kg: 10 }
+    const { rows: porUnidad } = await db.query(`
+      SELECT prod.unidad, sum(d.cantidad * prod.presentacion_litros)::float8 AS n
       FROM detalle_pedido d
       JOIN pedidos ped ON d.id_pedido = ped.id_pedido
       JOIN productos prod ON d.id_producto = prod.id_producto
       WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
+      GROUP BY prod.unidad
     `, [fecha])
+    const cantidadesHoy = Object.fromEntries(porUnidad.map((f) => [f.unidad as string, Math.round(Number(f.n) * 100) / 100]))
+    const { rows: catalogo } = await db.query(`SELECT DISTINCT unidad FROM productos WHERE disponible`)
 
     // 6. Sabores con más demanda hoy
     const { rows: saboresTop } = await db.query(`
-      SELECT 
+      SELECT
         prod.sabor,
         prod.color_hex AS color,
+        prod.unidad,
         coalesce(sum(d.cantidad * prod.presentacion_litros), 0)::float8 AS litros
       FROM detalle_pedido d
       JOIN pedidos ped ON d.id_pedido = ped.id_pedido
       JOIN productos prod ON d.id_producto = prod.id_producto
       WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
-      GROUP BY prod.sabor, prod.color_hex
+      GROUP BY prod.sabor, prod.color_hex, prod.unidad
       ORDER BY litros DESC
       LIMIT 4
     `, [fecha])
@@ -112,11 +116,14 @@ export async function rutasAdmin(
         cancelados: p?.cancelados ?? 0,
         totalCobrado: p?.total_cobrado ?? 0,
         totalEsperado: p?.total_esperado ?? 0,
-        litrosHoy: lit?.litros_hoy ?? 0,
+        litrosHoy: porUnidad.reduce((s, f) => s + Number(f.n), 0), // todas las unidades juntas: sólo sirve con una
+        cantidadesHoy,
+        unidades: ordenarUnidades([...catalogo.map((f) => f.unidad as string), ...Object.keys(cantidadesHoy)]),
       },
       saboresTop: (saboresTop ?? []).map((s) => ({
         sabor: s.sabor as string,
         color: s.color as string,
+        unidad: s.unidad as string,
         litros: Number(s.litros),
       })),
     }

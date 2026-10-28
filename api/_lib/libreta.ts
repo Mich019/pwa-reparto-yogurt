@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Db } from './db.js'
+import { ordenarUnidades, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla } from './exportar.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -21,7 +22,8 @@ export interface ClienteLibreta {
   alta: string // YYYY-MM-DD
   ubicacion: string | null // "19.43260000, -99.13320000"
   pedidos: number
-  litros: number
+  litros: number // todas las unidades juntas: sólo sirve si la empresa usa una
+  porUnidad: Record<string, number> // catálogo flexible: { L: 60, kg: 10 }
   comprado: number
   ultimaCompra: string | null
   proximaEntrega: string | null
@@ -37,8 +39,15 @@ function textoVisita(tipo: string, dias: number[], cada: number | null) {
 }
 
 export async function libreta(db: Db): Promise<ClienteLibreta[]> {
+  const { rows: pu } = await db.query(
+    `SELECT x.id_cliente, pr.unidad, sum(d.cantidad * pr.presentacion_litros)::float8 AS n
+       FROM pedidos x JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)
+      WHERE x.estado = 'entregado' GROUP BY 1, 2`,
+  )
+  const porCliente = new Map<string, Record<string, number>>()
+  for (const f of pu) porCliente.set(f.id_cliente, { ...porCliente.get(f.id_cliente), [f.unidad]: Math.round(f.n * 100) / 100 })
   const { rows } = await db.query(
-    `SELECT c.nombre, c.telefono, c.direccion, c.colonia, c.referencias, coalesce(u.nombre, 'Sin vendedor') AS vendedor,
+    `SELECT c.id_cliente, c.nombre, c.telefono, c.direccion, c.colonia, c.referencias, coalesce(u.nombre, 'Sin vendedor') AS vendedor,
             c.frecuencia_tipo, c.dias_semana, c.cada_dias, c.ventana_horario, c.creado_en::date AS alta, c.latitud, c.longitud,
             r.pedidos_entregados, r.litros_acumulados, r.ultima_visita, r.proxima_entrega, r.sabor_favorito,
             (SELECT coalesce(sum(d.subtotal), 0) FROM pedidos x JOIN detalle_pedido d USING (id_pedido)
@@ -62,6 +71,7 @@ export async function libreta(db: Db): Promise<ClienteLibreta[]> {
     ubicacion: f.latitud === null ? null : `${f.latitud}, ${f.longitud}`,
     pedidos: Number(f.pedidos_entregados),
     litros: Number(f.litros_acumulados),
+    porUnidad: porCliente.get(f.id_cliente) ?? {},
     comprado: Number(f.comprado),
     ultimaCompra: f.ultima_visita,
     proximaEntrega: f.proxima_entrega,
@@ -69,7 +79,12 @@ export async function libreta(db: Db): Promise<ClienteLibreta[]> {
   }))
 }
 
-const tablaLibreta = (cs: ClienteLibreta[]): Tabla => ({
+// Una columna por unidad que se haya vendido («Litros», «Kilos»…); con una sola, la de siempre.
+const tablaLibreta = (cs: ClienteLibreta[]): Tabla => {
+  const unidades = ordenarUnidades(cs.flatMap((c) => Object.keys(c.porUnidad)))
+  if (!unidades.length) unidades.push('L')
+  const de = (c: ClienteLibreta) => unidades.map((u) => c.porUnidad[u] ?? 0)
+  return {
   nombre: 'Directorio',
   columnas: [
     { titulo: 'Vendedor', tipo: 'texto' },
@@ -82,7 +97,7 @@ const tablaLibreta = (cs: ClienteLibreta[]): Tabla => ({
     { titulo: 'Horario', tipo: 'texto' },
     { titulo: 'Cliente desde', tipo: 'fecha' },
     { titulo: 'Pedidos', tipo: 'entero' },
-    { titulo: 'Litros', tipo: 'litros' },
+    ...unidades.map((u) => ({ titulo: tituloUnidad(u), tipo: 'litros' as const })),
     { titulo: 'Total comprado', tipo: 'dinero' },
     { titulo: 'Última compra', tipo: 'fecha' },
     { titulo: 'Próxima entrega', tipo: 'fecha' },
@@ -91,11 +106,13 @@ const tablaLibreta = (cs: ClienteLibreta[]): Tabla => ({
   ],
   filas: cs.map((c) => [
     c.vendedor, c.nombre, c.telefono, c.direccion, c.colonia, c.referencias, c.visita, c.horario, c.alta,
-    c.pedidos, c.litros, c.comprado, c.ultimaCompra, c.proximaEntrega, c.saborFavorito, c.ubicacion,
+    c.pedidos, ...de(c), c.comprado, c.ultimaCompra, c.proximaEntrega, c.saborFavorito, c.ubicacion,
   ]),
   total: [`${cs.length} clientes`, null, null, null, null, null, null, null, null,
-    cs.reduce((s, c) => s + c.pedidos, 0), cs.reduce((s, c) => s + c.litros, 0), Math.round(cs.reduce((s, c) => s + c.comprado, 0) * 100) / 100],
-})
+    cs.reduce((s, c) => s + c.pedidos, 0), ...unidades.map((u) => Math.round(cs.reduce((s, c) => s + (c.porUnidad[u] ?? 0), 0) * 100) / 100),
+    Math.round(cs.reduce((s, c) => s + c.comprado, 0) * 100) / 100],
+  }
+}
 
 const MIME = { xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', csv: 'text/csv; charset=utf-8' } as const
 const consulta = z.object({ formato: z.enum(['json', 'xlsx', 'csv']).default('json') })

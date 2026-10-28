@@ -6,6 +6,7 @@ import {
   type Agrupar, type Formato, type Rango, type Reporte, type TablaCsv, type Vista,
 } from '../../lib/reportes'
 import { aviso, Boton, claseInput, Hoja, PuntoSabor, Segmentado } from '../../components/ui'
+import { textoPorUnidad, tituloUnidad } from '../../lib/unidades'
 import { Columnas } from '../../components/graficas'
 
 // Reportes del administrador (RF-043 a RF-048): corte del día, comparativos por semana y mes, utilidad por sabor,
@@ -22,7 +23,7 @@ const MAX_DIAS = 1096
 const ANTERIOR: Record<Vista, string> = { dia: 'al día anterior', semana: 'a la semana anterior', mes: 'al mes anterior', rango: 'al periodo anterior de la misma duración' }
 
 const num = (n: number, dec = 1) => n.toLocaleString('es-MX', { maximumFractionDigits: dec })
-const litros = (n: number) => `${num(n)} L`
+const litros = (n: number, unidad = 'L') => `${num(n)} ${unidad}`
 const porcentaje = (n: number | null) => (n === null ? '—' : `${num(n)}%`)
 const dineroEje = (n: number) => `$${n >= 1000 ? `${num(n / 1000)}k` : num(n)}`
 const ejeLitros = (n: number) => (n >= 1000 ? `${num(n / 1000)}k` : num(n))
@@ -139,7 +140,14 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
   const comparar = !enCurso && anterior
   const sinVentas = r.pedidos === 0
   const variosAnios = reporte.desde.slice(0, 4) !== reporte.hasta.slice(0, 4)
-  const maxLitros = Math.max(1, ...reporte.sabores.map((s) => s.litros))
+  // Catálogo flexible: con una sola unidad todo se lee como antes; con varias, los totales van por unidad
+  // («60 L + 10 kg») y no hay gráfica de cantidad (no se suman litros con kilos).
+  const unidades = reporte.unidades?.length ? reporte.unidades : ['L']
+  const varias = unidades.length > 1
+  const u0 = unidades[0]
+  const cantidad = (pu: Record<string, number> | undefined, n: number) => (varias ? textoPorUnidad(pu, unidades, n) : litros(n, u0))
+  const maxPorUnidad = new Map<string, number>()
+  for (const s of reporte.sabores) maxPorUnidad.set(s.unidad || 'L', Math.max(maxPorUnidad.get(s.unidad || 'L') ?? 1, s.litros))
   const maxIngreso = Math.max(1, ...reporte.vendedores.map((v) => v.ingreso))
   const estrella = reporte.sabores.find((s) => s.id === reporte.ranking.estrella)
   const menor = reporte.sabores.find((s) => s.id === reporte.ranking.menorRotacion)
@@ -158,7 +166,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tarjeta etiqueta="Recaudado" valor={dinero(r.ingreso)} cambio={comparar ? cambio(r.ingreso, anterior.resumen.ingreso) : null} />
         <Tarjeta etiqueta="Utilidad neta" valor={dinero(r.utilidad)} acento pie={`Margen ${porcentaje(r.margenPct)}`} cambio={comparar ? cambio(r.utilidad, anterior.resumen.utilidad) : null} />
-        <Tarjeta etiqueta="Litros entregados" valor={litros(r.litros)} cambio={comparar ? cambio(r.litros, anterior.resumen.litros) : null} />
+        <Tarjeta etiqueta={varias ? 'Entregado' : `${tituloUnidad(u0)} entregados`} valor={cantidad(r.porUnidad, r.litros)} cambio={comparar && !varias ? cambio(r.litros, anterior.resumen.litros) : null} />
         <Tarjeta etiqueta="Clientes atendidos" valor={String(r.clientes)} pie={`${r.pedidos} ${r.pedidos === 1 ? 'pedido' : 'pedidos'}`} />
       </div>
       {comparar && <p className="mt-2 text-xs text-apagado">Los cambios son frente {ANTERIOR[vista]}.</p>}
@@ -185,19 +193,19 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
               </div>
               <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 <Columnas titulo="Ingresos" barras={barras((p) => p.ingreso)} color="bg-azul" formato={dinero} formatoEje={dineroEje} total={dinero(r.ingreso)} />
-                <Columnas titulo="Litros" barras={barras((p) => p.litros)} color="bg-tinta" formato={litros} formatoEje={ejeLitros} total={litros(r.litros)} />
+                {!varias && <Columnas titulo={tituloUnidad(u0)} barras={barras((p) => p.litros)} color="bg-tinta" formato={(n) => litros(n, u0)} formatoEje={ejeLitros} total={litros(r.litros, u0)} />}
               </div>
               <details className="mt-2 rounded-2xl bg-niebla px-4 py-3 text-sm">
                 <summary className="cursor-pointer font-semibold">Ver como tabla</summary>
                 <div className="mt-2 overflow-x-auto">
                   <table className="w-full min-w-[26rem] text-left tabular-nums">
                     <thead className="text-xs text-apagado">
-                      <tr><th className="py-1 font-medium">{AGRUPAR[agrupar]}</th><th className="font-medium">Pedidos</th><th className="font-medium">Litros</th><th className="font-medium">Ingresos</th><th className="font-medium">Utilidad</th></tr>
+                      <tr><th className="py-1 font-medium">{AGRUPAR[agrupar]}</th><th className="font-medium">Pedidos</th><th className="font-medium">{varias ? 'Entregado' : tituloUnidad(u0)}</th><th className="font-medium">Ingresos</th><th className="font-medium">Utilidad</th></tr>
                     </thead>
                     <tbody className="divide-y divide-linea">
                       {reporte.periodos.map((p) => (
                         <tr key={p.periodo}>
-                          <td className="py-1.5">{textoPeriodo(p, agrupar, true)}</td><td>{p.pedidos}</td><td>{num(p.litros)}</td><td>{dinero(p.ingreso)}</td><td>{dinero(p.utilidad)}</td>
+                          <td className="py-1.5">{textoPeriodo(p, agrupar, true)}</td><td>{p.pedidos}</td><td>{varias ? textoPorUnidad(p.porUnidad, unidades, p.litros) : num(p.litros)}</td><td>{dinero(p.ingreso)}</td><td>{dinero(p.utilidad)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -210,18 +218,18 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
           <div className="mt-7 grid gap-x-8 lg:grid-cols-2">
             <section>
               <h2 className="text-2xl font-bold tracking-tight">Sabores</h2>
-              <p className="text-xs text-apagado">Del que más litros vendió al que menos. La utilidad usa el costo de cuando se vendió.</p>
+              <p className="text-xs text-apagado">Del que más vendió al que menos. La utilidad usa el costo de cuando se vendió.</p>
               {estrella && menor && estrella.id !== menor.id && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-2xl bg-niebla p-3">
                     <div className="flex items-center gap-1 text-xs font-medium text-verde"><TrendingUp size={14} /> Sabor estrella</div>
                     <div className="mt-1 font-semibold">{estrella.sabor}</div>
-                    <div className="text-xs text-apagado tabular-nums">{litros(estrella.litros)}</div>
+                    <div className="text-xs text-apagado tabular-nums">{litros(estrella.litros, estrella.unidad)}</div>
                   </div>
                   <div className="rounded-2xl bg-niebla p-3">
                     <div className="flex items-center gap-1 text-xs font-medium text-rojo"><TrendingDown size={14} /> Menor rotación</div>
                     <div className="mt-1 font-semibold">{menor.sabor}</div>
-                    <div className="text-xs text-apagado tabular-nums">{litros(menor.litros)}</div>
+                    <div className="text-xs text-apagado tabular-nums">{litros(menor.litros, menor.unidad)}</div>
                   </div>
                 </div>
               )}
@@ -235,10 +243,10 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                           <span className="mr-1.5 text-xs font-medium text-apagado tabular-nums">{i + 1}.</span>{s.sabor}
                           {s.id === reporte.ranking.estrella && <Star size={13} className="ml-1.5 inline -translate-y-px fill-ambar text-ambar" aria-label="Sabor estrella" />}
                         </span>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums">{litros(s.litros)}</span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">{litros(s.litros, s.unidad)}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 rounded-full bg-niebla">
-                        <div className="h-full rounded-full bg-tinta" style={{ width: `${(s.litros / maxLitros) * 100}%` }} />
+                        <div className="h-full rounded-full bg-tinta" style={{ width: `${(s.litros / (maxPorUnidad.get(s.unidad || 'L') ?? 1)) * 100}%` }} />
                       </div>
                       {s.litros === 0 ? (
                         <div className="mt-1 text-[11px] text-apagado">Sin ventas en el periodo</div>
@@ -281,7 +289,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                       <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-apagado tabular-nums">
                         <span>{v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
                         <span>{v.clientes} {v.clientes === 1 ? 'cliente' : 'clientes'}</span>
-                        <span>{litros(v.litros)}</span>
+                        <span>{cantidad(v.porUnidad, v.litros)}</span>
                         {v.ticketPromedio !== null && <span>Ticket {dinero(v.ticketPromedio)}</span>}
                         <span className={v.utilidad >= 0 ? 'text-verde' : 'text-rojo'}>Utilidad {dinero(v.utilidad)}</span>
                         {v.omitidos > 0 && <span>{v.omitidos} {v.omitidos === 1 ? 'visita sin venta' : 'visitas sin venta'}</span>}

@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
 import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
-import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Ventana } from '../../lib/db'
+import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Producto, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { DIAS_CORTOS, DIAS_LARGOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
@@ -13,6 +13,7 @@ import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
+import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 
 const Escaner = lazy(() => import('./Escaner'))
@@ -138,7 +139,7 @@ export function Clientes() {
         <Perfil
           cliente={perfil}
           pedidos={pedidos.filter((p) => p.clienteId === perfil.id)}
-          litros={stats.get(perfil.id)?.litros ?? 0}
+          consumido={totalOCero([...(stats.get(perfil.id)?.sabores ?? [])].map(([productoId, litros]) => ({ productoId, litros })), productos)}
           favorito={favorito(perfil.id)}
           sabor={(id) => prod.get(id)}
           onCerrar={() => setPerfilId(null)}
@@ -151,12 +152,12 @@ export function Clientes() {
   )
 }
 
-function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar }: {
+function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEditar }: {
   cliente: Cliente
   pedidos: Pedido[]
-  litros: number
+  consumido: string // por unidad: «12 L», «60 L + 10 kg»
   favorito?: { sabor: string; color_hex: string }
-  sabor: (id: string) => { sabor: string; color_hex: string } | undefined
+  sabor: (id: string) => Producto | undefined
   onCerrar: () => void
   onEditar: () => void
 }) {
@@ -182,7 +183,7 @@ function Perfil({ cliente, pedidos, litros, favorito, sabor, onCerrar, onEditar 
       <div className="space-y-5 pb-4">
         <div className="text-sm text-apagado">{cliente.direccion} · {textoFrecuencia(cliente.frecuencia)} · {cliente.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <Dato valor={`${litros} L`} etiqueta="Consumidos" />
+          <Dato valor={consumido} etiqueta="Consumidos" />
           <Dato valor={favorito?.sabor ?? '—'} etiqueta="Favorito" icono={favorito ? <PuntoSabor color={favorito.color_hex} className="h-2.5 w-2.5 align-[-1px]" /> : <Star size={12} className="inline" />} />
           <Dato valor={ultima ? textoFecha(ultima.fecha) : '—'} etiqueta="Última visita" />
         </div>
@@ -251,7 +252,7 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
 
 const ETIQUETA_ESTADO = { PENDIENTE: 'Agendado', ENTREGADO: 'Entregado', OMITIDO: 'Omitido', RECORDAR_MAS_TARDE: 'Por confirmar' }
 
-function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => { sabor: string; color_hex: string } | undefined; onClick?: () => void }) {
+function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => Producto | undefined; onClick?: () => void }) {
   return (
     <button onClick={onClick} disabled={!onClick} className="flex w-full items-center gap-3 rounded-xl bg-niebla px-3 py-3 text-left">
       <div className="w-20 shrink-0 text-sm font-medium">{textoFecha(p.fecha)}</div>
@@ -259,7 +260,7 @@ function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => {
         {p.items.map((i) => (
           <span key={i.productoId} className="flex items-center gap-1 text-xs">
             <PuntoSabor color={sabor(i.productoId)?.color_hex} className="h-3 w-3" />
-            {i.litros}L {sabor(i.productoId)?.sabor}
+            {textoCantidad(i.litros, sabor(i.productoId))} {sabor(i.productoId)?.sabor}
           </span>
         ))}
       </div>

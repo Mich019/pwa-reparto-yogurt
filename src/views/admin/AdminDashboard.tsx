@@ -9,6 +9,7 @@ import { llamarAutenticado, useSesion } from '../../lib/sesion'
 import type { SeccionAdmin } from './AdminLayout'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { useFichaSabor } from './PanelSabor'
+import { textoPorUnidad } from '../../lib/unidades'
 import { ChipEstado, Delta, TarjetaSabor, Vacio } from './piezas'
 
 export interface DashboardStats {
@@ -36,6 +37,8 @@ export interface DashboardStats {
     totalCobrado: number
     totalEsperado: number
     litrosHoy: number
+    cantidadesHoy?: Record<string, number> // por unidad (catálogo flexible)
+    unidades?: string[] // las de la empresa, L primero
   }
   saboresTop: Array<{
     sabor: string
@@ -194,7 +197,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             pie={reporte && crecimiento !== null ? <><Delta valor={crecimiento} /> <span>vs. 30 días antes</span></> : undefined}
           />
           <Cifra etiqueta="Pedidos de hoy" valor={valor(String(porAtender))} />
-          <Cifra etiqueta="Litros de hoy" valor={valor(litrosTxt(p?.litrosHoy ?? 0))} />
+          <Cifra etiqueta={(p?.unidades ?? ['L']).some((u) => u !== 'L') ? 'Cantidad de hoy' : 'Litros de hoy'} valor={valor(p?.cantidadesHoy ? textoPorUnidad(p.cantidadesHoy, p.unidades) : litrosTxt(p?.litrosHoy ?? 0))} />
         </dl>
       </section>
 
@@ -226,7 +229,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
         <Tarjeta
           id="t-sabores"
           titulo="Sabores más vendidos"
-          subtitulo="Litros entregados en los últimos 30 días"
+          subtitulo={(p?.unidades ?? ['L']).some((u) => u !== 'L') ? 'Lo entregado en los últimos 30 días' : 'Litros entregados en los últimos 30 días'}
           className="flex flex-col xl:row-span-2"
           accion={paginas > 1 && (
             <div className="flex gap-2">

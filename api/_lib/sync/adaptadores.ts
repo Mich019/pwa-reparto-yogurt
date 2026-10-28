@@ -2,6 +2,7 @@ import type { z } from 'zod'
 import type { Cx } from '../db.js'
 import type { Usuario } from '../app.js'
 import type { AvisoPendiente } from '../notificaciones.js'
+import { totalPorUnidad } from '../unidades.js'
 import {
   clienteWire, pedidoWire, productoWire, recordatorioWire,
   type ClienteWire, type PedidoWire, type ProductoWire, type RecordatorioWire, type Tabla,
@@ -297,21 +298,24 @@ const pedidos: Adaptador<PedidoWire> = {
       [w.id],
     )
     if (!p?.id_vendedor || p.id_vendedor === u.id) return []
-    const litros = Math.round(w.items.reduce((s, i) => s + i.litros, 0) * 100) / 100
+    // Por unidad (catálogo flexible): «3 L», «60 L + 10 kg».
+    const { rows: unidades } = await c.query(`SELECT id_producto, unidad FROM productos WHERE id_producto = ANY($1::uuid[])`, [w.items.map((i) => i.productoId)])
+    const unidad = new Map(unidades.map((r) => [r.id_producto as string, r.unidad as string]))
+    const litros = totalPorUnidad(w.items.map((i) => ({ unidad: unidad.get(i.productoId), cantidad: i.litros })))
     const datos = { pestana: 'ruta' as const, pedidoId: w.id }
     const aviso = (tipo: AvisoPendiente['tipo'], titulo: string, cuerpo: string): AvisoPendiente[] => [{ para: p.id_vendedor, tipo, titulo, cuerpo, datos }]
 
-    if (p.urgente && !ex?.wire.urgente) return aviso('pedido_urgente', 'Pedido urgente', `${p.nombre}: ${litros} L, entrégalo cuanto antes`)
+    if (p.urgente && !ex?.wire.urgente) return aviso('pedido_urgente', 'Pedido urgente', `${p.nombre}: ${litros}, entrégalo cuanto antes`)
 
     const antes = ex?.wire
     const eraDeHoy = antes?.fecha === hoy
     const esDeHoy = w.fecha === hoy
     if (!eraDeHoy && !esDeHoy) return []
     const ruta = (cuerpo: string) => aviso('ruta_modificada', 'Tu ruta cambió', cuerpo)
-    if (!antes) return w.estado === 'PENDIENTE' ? ruta(`Nueva parada: ${p.nombre}, ${litros} L`) : []
+    if (!antes) return w.estado === 'PENDIENTE' ? ruta(`Nueva parada: ${p.nombre}, ${litros}`) : []
     if (antes.fecha !== w.fecha) return esDeHoy ? ruta(`Se agregó a tu ruta de hoy: ${p.nombre}`) : ruta(`${p.nombre} ya no se visita hoy`)
     if (antes.estado !== w.estado) return w.estado === 'PENDIENTE' ? ruta(`${p.nombre} volvió a tu ruta de hoy`) : ruta(`${p.nombre} se quitó de tu ruta de hoy`)
-    if (firmaItems(antes.items) !== firmaItems(w.items)) return ruta(`Cambió el pedido de ${p.nombre}: ahora ${litros} L`)
+    if (firmaItems(antes.items) !== firmaItems(w.items)) return ruta(`Cambió el pedido de ${p.nombre}: ahora ${litros}`)
     return []
   },
   async avisarBorrado(c, u, ex, hoy) {

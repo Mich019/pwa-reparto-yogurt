@@ -51,8 +51,9 @@ export function calcularStock(fecha: string, stock: StockMin[], pedidos: PedidoM
 export const PESO_NIVEL: Record<Nivel, number> = { agotado: 0, falta: 1, bajo: 2, ok: 3 }
 export const hayAvisoDeStock = (s: SaborEnRuta) => s.nivel !== 'ok'
 
-export function textoNivel(s: SaborEnRuta, sabor: string): { titulo: string; cuerpo: string } {
-  const l = (n: number) => `${n} L`
+// `unidad`: en qué se mide el sabor (catálogo flexible; L si no se dice).
+export function textoNivel(s: SaborEnRuta, sabor: string, unidad = 'L'): { titulo: string; cuerpo: string } {
+  const l = (n: number) => `${n} ${unidad}`
   if (s.nivel === 'agotado') return { titulo: `Se agotó ${sabor}`, cuerpo: s.pendiente > 0 ? `Te piden ${l(s.pendiente)} de ${sabor} hoy y ya no te queda.` : `Ya entregaste los ${l(s.asignada)} que llevabas.` }
   if (s.nivel === 'falta') return { titulo: `No te alcanza ${sabor}`, cuerpo: `Te quedan ${l(s.restante)} y tus pedidos de hoy piden ${l(s.pendiente)}.` }
   return { titulo: `Queda poco ${sabor}`, cuerpo: `Te quedan ${l(s.restante)} de los ${l(s.asignada)} que llevabas.` }
@@ -73,7 +74,7 @@ export interface EntradaAlertas {
   hora: number // 0 a 23, del teléfono
   horaCierre: number
   filas: SaborEnRuta[]
-  productos: { id: string; sabor: string }[]
+  productos: { id: string; sabor: string; unidad?: string }[]
   cola: CambioMin[]
 }
 
@@ -88,8 +89,8 @@ export function pendientesTexto(cola: CambioMin[]) {
 export function avisosQueToca({ fecha, hora, horaCierre, filas, productos, cola }: EntradaAlertas): AvisoNuevo[] {
   const lista: AvisoNuevo[] = []
   for (const f of filas.filter(hayAvisoDeStock)) {
-    const sabor = productos.find((p) => p.id === f.productoId)?.sabor ?? 'un sabor'
-    const { titulo, cuerpo } = textoNivel(f, sabor)
+    const p = productos.find((x) => x.id === f.productoId)
+    const { titulo, cuerpo } = textoNivel(f, p?.sabor ?? 'un sabor', p?.unidad || 'L')
     lista.push({ id: `stock:${fecha}:${f.productoId}:${f.nivel}`, tipo: 'stock_bajo', titulo, cuerpo, pestana: 'stock' })
   }
   if (cola.length > 0 && hora >= horaCierre) {

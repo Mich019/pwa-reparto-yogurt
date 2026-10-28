@@ -17,20 +17,24 @@ export interface Resumen {
   costo: number
   utilidad: number
   margenPct: number | null
-  litros: number
+  litros: number // todas las unidades juntas: sólo sirve con una (ver porUnidad)
+  porUnidad?: PorUnidad
   pedidos: number
   clientes: number
   ticketPromedio: number | null
   efectivo: number
   transferencia: number
 }
-export interface Periodo { periodo: string; inicio: string; fin: string; ingreso: number; costo: number; utilidad: number; litros: number; pedidos: number }
+// Catálogo flexible: lo entregado de cada unidad ({ L: 60, kg: 10 }); no se suman litros con kilos.
+export type PorUnidad = Record<string, number>
+export interface Periodo { periodo: string; inicio: string; fin: string; ingreso: number; costo: number; utilidad: number; litros: number; porUnidad?: PorUnidad; pedidos: number }
 export interface SaborVendido {
   id: string
   sabor: string
   color: string
   disponible: boolean
-  litros: number
+  unidad?: string // L si no viene
+  litros: number // en la unidad del sabor
   ingreso: number
   costo: number
   utilidad: number
@@ -44,6 +48,7 @@ export interface VendedorRendimiento {
   pedidos: number
   clientes: number
   litros: number
+  porUnidad?: PorUnidad
   ingreso: number
   utilidad: number
   ticketPromedio: number | null
@@ -53,6 +58,7 @@ export interface Reporte {
   desde: string
   hasta: string
   agrupar: Agrupar
+  unidades?: string[] // las del catálogo, L primero; con una sola, todo se lee como antes
   resumen: Resumen
   anterior: (Rango & { resumen: Resumen }) | null
   periodos: Periodo[]

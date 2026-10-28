@@ -74,7 +74,7 @@ export function TarjetaSabor({ producto, venta, posicion, conPrecio = false, fra
       <div className="mt-3 w-full min-w-0">
         <div className="truncate text-sm font-semibold">{producto.sabor}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-apagado">
-          <span className="tabular-nums">{vendido ? litrosTxt(venta.litros) : 'Sin ventas'}</span>
+          <span className="tabular-nums">{vendido ? litrosTxt(venta.litros, unidadDe(producto)) : 'Sin ventas'}</span>
           <Delta valor={cambio(venta.litros, venta.litrosAntes)} />
         </div>
         {conPrecio && <div className="mt-1 text-xs text-apagado tabular-nums">{dinero(producto.precio_litro)}/{unidadDe(producto)}{presentacionDe(producto) && ` · ${presentacionDe(producto)}`}</div>}

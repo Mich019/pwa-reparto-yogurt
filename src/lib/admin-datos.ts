@@ -5,7 +5,8 @@ import { desdeIso, hoy, iso, sumarDias } from './fechas'
 // Números del panel de administración que salen de la copia local (el administrador baja todo el historial al
 // sincronizar, ver sync.ts): ventas por sabor y últimos pedidos. Los de «hoy» y los reportes los da el servidor.
 
-export const litrosTxt = (n: number) => `${n.toLocaleString('es-MX', { maximumFractionDigits: 1 })} L`
+// En la unidad del sabor (catálogo flexible); L para el yogurt.
+export const litrosTxt = (n: number, unidad = 'L') => `${n.toLocaleString('es-MX', { maximumFractionDigits: 1 })} ${unidad}`
 
 // 1,200 → 1.2K, para los números del eje de los gráficos (el valor exacto va en el tooltip y en la tabla).
 export const compacto = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('es-MX', { maximumFractionDigits: 1 })}K` : String(Math.round(n)))

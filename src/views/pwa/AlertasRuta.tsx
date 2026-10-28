@@ -18,6 +18,7 @@ export function AlertasRuta({ irAStock }: { irAStock?: () => void }) {
 
   const aviso = (filas ?? []).filter((f) => f.nivel !== 'ok')
   const saborDe = (id: string) => productos.find((p) => p.id === id)?.sabor ?? 'Sabor'
+  const unidadDe = (id: string) => productos.find((p) => p.id === id)?.unidad || 'L'
   const tardeYSinEnviar = sinEnviar > 0 && new Date().getHours() >= horaCierre
   if (!aviso.length && !tardeYSinEnviar) return null
 
@@ -26,7 +27,7 @@ export function AlertasRuta({ irAStock }: { irAStock?: () => void }) {
       {aviso.length > 0 && (
         <button onClick={irAStock} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold shadow-tarjeta ${aviso.some((f) => f.nivel === 'agotado') ? 'bg-rojo text-white' : 'bg-ambar text-tinta'}`} data-alerta-stock={aviso[0].nivel}>
           <Package size={15} className="shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{aviso.length === 1 ? `${textoNivel(aviso[0], saborDe(aviso[0].productoId)).titulo}: ${aviso[0].nivel === 'agotado' ? 'sin litros' : `${aviso[0].restante} L`}` : `${aviso.length} sabores con poco stock`}</span>
+          <span className="min-w-0 flex-1 truncate">{aviso.length === 1 ? `${textoNivel(aviso[0], saborDe(aviso[0].productoId), unidadDe(aviso[0].productoId)).titulo}: ${aviso[0].nivel === 'agotado' ? 'se acabó' : `${aviso[0].restante} ${unidadDe(aviso[0].productoId)}`}` : `${aviso.length} sabores con poco stock`}</span>
         </button>
       )}
       {tardeYSinEnviar && (

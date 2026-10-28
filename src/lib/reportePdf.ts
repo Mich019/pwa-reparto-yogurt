@@ -1,5 +1,6 @@
 import { ajustarTexto, anchoTexto, Documento, type Color, type Fuente, type PdfListo } from './pdf'
 import { colorLegible, esDanelle, marcaActual } from './marca'
+import { textoPorUnidad, tituloUnidad } from './unidades'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
 // Informes en PDF para leer o imprimir (RF-048): el reporte de ventas y la libreta de clientes. Estilo sobrio de
@@ -34,7 +35,7 @@ const NEGATIVO: Color = [0.725, 0.11, 0.11] // #B91C1C
 const n2 = (n: number, dec: number) => n.toLocaleString('es-MX', { minimumFractionDigits: dec, maximumFractionDigits: dec })
 const din = (n: number | null) => (n === null ? '-' : `${n < 0 ? '-' : ''}$${n2(Math.abs(n), 2)}`)
 const dinCorto = (n: number) => `$${n >= 1000 ? `${n2(n / 1000, n >= 10_000 ? 0 : 1)}k` : n2(n, 0)}`
-const lit = (n: number) => `${n2(n, 1)} L`
+const lit = (n: number, unidad = 'L') => `${n2(n, 1)} ${unidad}`
 const pct = (n: number | null) => (n === null ? '-' : `${n2(n, 1)}%`)
 const ent = (n: number) => n.toLocaleString('es-MX')
 const fechaMx = (s: string | null) => (s ? s.split('-').reverse().join('/') : '-')
@@ -206,6 +207,10 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   const x = r.resumen
   const a = r.anterior?.resumen
   const UNIDAD = { dia: 'día', semana: 'semana', mes: 'mes' }[r.agrupar]
+  const unidades = r.unidades?.length ? r.unidades : ['L']
+  const varias = unidades.length > 1
+  const cant = (pu: Record<string, number> | undefined, n: number) => (varias ? textoPorUnidad(pu, unidades, n) : lit(n, unidades[0]))
+  const tituloCant = varias ? 'Cantidad' : tituloUnidad(unidades[0])
 
   inf.portada(`Resultados del ${periodo}`, [
     ['Periodo', periodo],
@@ -223,7 +228,7 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   const indicadores: { titulo: string; valor: string; pie: { texto: string; color: Color } }[] = [
     { titulo: 'Ingresos', valor: din(x.ingreso), pie: variacion(x.ingreso, a?.ingreso) },
     { titulo: 'Utilidad neta', valor: din(x.utilidad), pie: { texto: x.margenPct === null ? 'Sin ventas en el periodo' : `Margen ${pct(x.margenPct)}`, color: x.utilidad < 0 ? NEGATIVO : TENUE } },
-    { titulo: 'Litros entregados', valor: lit(x.litros), pie: variacion(x.litros, a?.litros) },
+    { titulo: varias ? 'Entregado' : `${tituloCant} entregados`, valor: cant(x.porUnidad, x.litros), pie: varias ? { texto: 'Por unidad', color: TENUE } : variacion(x.litros, a?.litros) },
     { titulo: 'Pedidos entregados', valor: ent(x.pedidos), pie: variacion(x.pedidos, a?.pedidos) },
     { titulo: 'Clientes atendidos', valor: ent(x.clientes), pie: variacion(x.clientes, a?.clientes) },
     { titulo: 'Ticket promedio', valor: din(x.ticketPromedio), pie: variacion(x.ticketPromedio, a?.ticketPromedio) },
@@ -281,38 +286,38 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   inf.tituloSeccion('Rentabilidad por sabor', 'Ordenado de mayor a menor volumen')
   inf.tabla<SaborVendido>([
     { titulo: 'Sabor', ancho: 0.18, valor: (s) => s.sabor, muestra: (s) => hex(s.color) },
-    { titulo: 'Litros', ancho: 0.1, der: true, valor: (s) => lit(s.litros) },
-    { titulo: 'Part.', ancho: 0.08, der: true, valor: (s) => (x.litros ? `${n2((s.litros / x.litros) * 100, 1)}%` : '-') },
+    { titulo: tituloCant, ancho: 0.1, der: true, valor: (s) => lit(s.litros, s.unidad) },
+    { titulo: 'Part.', ancho: 0.08, der: true, valor: (s) => (!varias && x.litros ? `${n2((s.litros / x.litros) * 100, 1)}%` : '-') },
     { titulo: 'Ingresos', ancho: 0.13, der: true, valor: (s) => din(s.ingreso) },
     { titulo: 'Costo', ancho: 0.13, der: true, valor: (s) => din(s.costo) },
     { titulo: 'Utilidad', ancho: 0.13, der: true, valor: (s) => din(s.utilidad), color: (s) => signo(s.utilidad) },
     { titulo: 'Margen', ancho: 0.09, der: true, valor: (s) => pct(s.margenPct) },
     { titulo: 'Observación', ancho: 0.16, valor: nota, color: (s) => (s.sinCosto ? NEGATIVO : TENUE) },
-  ], r.sabores, ['Total', lit(x.litros), x.litros ? '100.0%' : '-', din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct), ''])
+  ], r.sabores, ['Total', cant(x.porUnidad, x.litros), !varias && x.litros ? '100.0%' : '-', din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct), ''])
 
   inf.tituloSeccion('Desempeño por vendedor', 'Ordenado por ingresos')
   inf.tabla<VendedorRendimiento>([
     { titulo: 'Vendedor', ancho: 0.22, valor: (v) => v.nombre, detalle: (v) => (v.activo || v.id === null ? null : 'Cuenta dada de baja') },
     { titulo: 'Pedidos', ancho: 0.09, der: true, valor: (v) => ent(v.pedidos) },
     { titulo: 'Clientes', ancho: 0.09, der: true, valor: (v) => ent(v.clientes) },
-    { titulo: 'Litros', ancho: 0.1, der: true, valor: (v) => lit(v.litros) },
+    { titulo: tituloCant, ancho: 0.1, der: true, valor: (v) => cant(v.porUnidad, v.litros) },
     { titulo: 'Ingresos', ancho: 0.14, der: true, valor: (v) => din(v.ingreso) },
     { titulo: 'Utilidad', ancho: 0.13, der: true, valor: (v) => din(v.utilidad), color: (v) => signo(v.utilidad) },
     { titulo: 'Ticket prom.', ancho: 0.12, der: true, valor: (v) => din(v.ticketPromedio) },
     { titulo: 'Sin venta', ancho: 0.11, der: true, valor: (v) => ent(v.omitidos) },
-  ], r.vendedores, ['Total', ent(x.pedidos), ent(x.clientes), lit(x.litros), din(x.ingreso), din(x.utilidad), din(x.ticketPromedio), ent(r.vendedores.reduce((s, v) => s + v.omitidos, 0))])
+  ], r.vendedores, ['Total', ent(x.pedidos), ent(x.clientes), cant(x.porUnidad, x.litros), din(x.ingreso), din(x.utilidad), din(x.ticketPromedio), ent(r.vendedores.reduce((s, v) => s + v.omitidos, 0))])
 
   const nombrePeriodo = (p: Periodo) => (r.agrupar === 'semana' ? (p.inicio === p.fin ? fechaMx(p.inicio) : `${fechaMx(p.inicio)} al ${fechaMx(p.fin)}`) : textoPeriodo(p, r.agrupar, true))
   inf.tituloSeccion(`Detalle por ${UNIDAD}`)
   inf.tabla<Periodo>([
     { titulo: UNIDAD.charAt(0).toUpperCase() + UNIDAD.slice(1), ancho: 0.26, valor: nombrePeriodo },
     { titulo: 'Pedidos', ancho: 0.1, der: true, valor: (p) => ent(p.pedidos) },
-    { titulo: 'Litros', ancho: 0.11, der: true, valor: (p) => lit(p.litros) },
+    { titulo: tituloCant, ancho: 0.11, der: true, valor: (p) => cant(p.porUnidad, p.litros) },
     { titulo: 'Ingresos', ancho: 0.14, der: true, valor: (p) => din(p.ingreso) },
     { titulo: 'Costos', ancho: 0.14, der: true, valor: (p) => din(p.costo) },
     { titulo: 'Utilidad', ancho: 0.14, der: true, valor: (p) => din(p.utilidad), color: (p) => signo(p.utilidad) },
     { titulo: 'Margen', ancho: 0.11, der: true, valor: (p) => pct(p.ingreso > 0 ? Math.round((p.utilidad / p.ingreso) * 1000) / 10 : null) },
-  ], r.periodos, ['Total', ent(x.pedidos), lit(x.litros), din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct)])
+  ], r.periodos, ['Total', ent(x.pedidos), cant(x.porUnidad, x.litros), din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct)])
 
   inf.nota('Notas: se consideran los pedidos entregados, por su fecha de entrega, con el precio y el costo vigentes al momento de la venta. '
     + '"Sin venta" son visitas registradas en las que el cliente no compró.')
@@ -334,6 +339,7 @@ export interface ClienteLibreta {
   ubicacion: string | null
   pedidos: number
   litros: number
+  porUnidad?: Record<string, number> // catálogo flexible: { L: 60, kg: 10 }
   comprado: number
   ultimaCompra: string | null
   proximaEntrega: string | null
@@ -347,6 +353,16 @@ export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): PdfL
   const grupos = new Map<string, ClienteLibreta[]>()
   for (const c of clientes) grupos.set(c.vendedor, [...(grupos.get(c.vendedor) ?? []), c])
   const suma = (cs: ClienteLibreta[], k: 'pedidos' | 'litros' | 'comprado') => cs.reduce((s, c) => s + c[k], 0)
+  // Lo comprado por unidad («60 L + 10 kg»); sin desglose (servidor anterior), los litros de siempre.
+  const cant = (cs: ClienteLibreta[]) => {
+    if (cs.some((c) => !c.porUnidad)) return lit(suma(cs, 'litros'))
+    const pu: Record<string, number> = {}
+    for (const c of cs) for (const [u, n] of Object.entries(c.porUnidad!)) pu[u] = (pu[u] ?? 0) + n
+    return textoPorUnidad(pu, ['L'])
+  }
+  // Con una sola unidad la columna se llama como siempre («Litros»).
+  const unidades = [...new Set(clientes.flatMap((c) => Object.keys(c.porUnidad ?? {})))]
+  const tituloCant = unidades.length > 1 ? 'Cantidad' : tituloUnidad(unidades[0] ?? 'L')
 
   inf.portada('Directorio de la cartera activa', [
     ['Clientes activos', ent(clientes.length)],
@@ -360,9 +376,9 @@ export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): PdfL
     { titulo: 'Clientes', ancho: 0.13, der: true, valor: ([, cs]) => ent(cs.length) },
     { titulo: 'Mañana / tarde', ancho: 0.13, der: true, valor: ([, cs]) => `${ent(cs.filter((c) => c.horario === 'Mañana').length)} / ${ent(cs.filter((c) => c.horario === 'Tarde').length)}` },
     { titulo: 'Pedidos', ancho: 0.12, der: true, valor: ([, cs]) => ent(suma(cs, 'pedidos')) },
-    { titulo: 'Litros', ancho: 0.13, der: true, valor: ([, cs]) => lit(suma(cs, 'litros')) },
+    { titulo: tituloCant, ancho: 0.13, der: true, valor: ([, cs]) => cant(cs) },
     { titulo: 'Compras', ancho: 0.15, der: true, valor: ([, cs]) => din(suma(cs, 'comprado')) },
-  ], [...grupos], ['Total', ent(clientes.length), `${ent(clientes.filter((c) => c.horario === 'Mañana').length)} / ${ent(clientes.filter((c) => c.horario === 'Tarde').length)}`, ent(suma(clientes, 'pedidos')), lit(suma(clientes, 'litros')), din(suma(clientes, 'comprado'))])
+  ], [...grupos], ['Total', ent(clientes.length), `${ent(clientes.filter((c) => c.horario === 'Mañana').length)} / ${ent(clientes.filter((c) => c.horario === 'Tarde').length)}`, ent(suma(clientes, 'pedidos')), cant(clientes), din(suma(clientes, 'comprado'))])
 
   inf.tituloSeccion('Directorio de clientes', 'Historial: pedidos entregados desde el alta')
   for (const [vendedor, cs] of grupos) {
@@ -374,10 +390,10 @@ export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): PdfL
       { titulo: 'Visita', ancho: 0.11, valor: (c) => c.visita, detalle: (c) => c.horario },
       { titulo: 'Última compra', ancho: 0.11, der: true, valor: (c) => fechaMx(c.ultimaCompra), detalle: (c) => (c.proximaEntrega ? `Próx. ${fechaMx(c.proximaEntrega)}` : null) },
       { titulo: 'Pedidos', ancho: 0.06, der: true, valor: (c) => ent(c.pedidos) },
-      { titulo: 'Litros', ancho: 0.07, der: true, valor: (c) => lit(c.litros) },
+      { titulo: tituloCant, ancho: 0.07, der: true, valor: (c) => cant([c]) },
       { titulo: 'Compras', ancho: 0.09, der: true, valor: (c) => din(c.comprado) },
       { titulo: 'Favorito', ancho: 0.1, valor: (c) => c.saborFavorito ?? '-' },
-    ], cs, ['Subtotal', '', '', '', '', ent(suma(cs, 'pedidos')), lit(suma(cs, 'litros')), din(suma(cs, 'comprado')), ''])
+    ], cs, ['Subtotal', '', '', '', '', ent(suma(cs, 'pedidos')), cant(cs), din(suma(cs, 'comprado')), ''])
   }
   if (!clientes.length) inf.nota('No hay clientes activos.')
   return inf.listo()

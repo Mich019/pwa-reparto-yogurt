@@ -8,7 +8,7 @@ import { cambio } from '../../lib/reportes'
 import { FormSabor } from '../pwa/Ajustes'
 import { BarrasPeriodo } from './graficas'
 import { Frasco } from './marca'
-import { presentacionDe, unidadDe } from '../../lib/unidades'
+import { nombreUnidad, presentacionDe, unidadDe } from '../../lib/unidades'
 import { Delta } from './piezas'
 
 interface Foto { producto: Producto; venta: VentaSabor; posicion: number }
@@ -127,18 +127,19 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
           </p>
           {p.descripcion && <p className="mt-2 text-sm leading-relaxed text-tinta/80">{p.descripcion}</p>}
 
+          {/* En la unidad del sabor: «Litros, 30 días», «Kilos, 30 días». */}
           <dl className="mt-5 grid grid-cols-4 divide-x divide-linea rounded-2xl bg-papel/85 py-3 text-center">
-            <Dato valor={venta.litros ? litrosTxt(venta.litros) : '0 L'} etiqueta="Litros, 30 días" />
+            <Dato valor={litrosTxt(venta.litros, unidadDe(p))} etiqueta={`${mayuscula(nombreUnidad(unidadDe(p), 2))}, 30 días`} />
             <Dato valor={dinero(venta.ingreso)} etiqueta="Ingresos, 30 días" />
-            <Dato valor={margen === null ? '—' : `${margen}%`} etiqueta="Margen por litro" />
+            <Dato valor={margen === null ? '—' : `${margen}%`} etiqueta={`Margen por ${nombreUnidad(unidadDe(p), 1)}`} />
             <Dato valor={dif === null ? '—' : <Delta valor={dif} className="text-base" />} etiqueta="Contra los 30 días antes" />
           </dl>
 
-          <h3 className="mt-6 mb-3 text-sm font-semibold">Litros vendidos, últimos 12 meses</h3>
+          <h3 className="mt-6 mb-3 text-sm font-semibold">{mayuscula(nombreUnidad(unidadDe(p), 2))} vendidos, últimos 12 meses</h3>
           <BarrasPeriodo
             datos={meses}
-            formato={litrosTxt}
-            descripcion={`Litros de ${p.sabor} vendidos cada mes, últimos 12 meses`}
+            formato={(n) => litrosTxt(n, unidadDe(p))}
+            descripcion={`${mayuscula(nombreUnidad(unidadDe(p), 2))} de ${p.sabor} vendidos cada mes, últimos 12 meses`}
             leyenda={['Meses cerrados', 'Mes en curso']}
             alto={96}
           />
@@ -173,3 +174,5 @@ function Dato({ valor, etiqueta }: { valor: React.ReactNode; etiqueta: string })
     </div>
   )
 }
+
+const mayuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

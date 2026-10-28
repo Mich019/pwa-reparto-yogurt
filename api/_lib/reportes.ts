@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Db } from './db.js'
+import { ordenarUnidades, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla, type Tipo, type Valor } from './exportar.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -49,7 +50,8 @@ export interface Resumen {
   costo: number
   utilidad: number
   margenPct: number | null // utilidad sobre ingreso, en %
-  litros: number
+  litros: number // suma de todas las unidades: sólo sirve si la empresa usa una (ver porUnidad)
+  porUnidad: PorUnidad
   pedidos: number
   clientes: number
   ticketPromedio: number | null
@@ -57,7 +59,21 @@ export interface Resumen {
   transferencia: number
 }
 
-function resumenDe(f: Record<string, unknown>): Resumen {
+// Catálogo flexible: cuánto se entregó de cada unidad ({ L: 60, kg: 10 }); no se suman litros con kilos.
+export type PorUnidad = Record<string, number>
+
+// Filas {clave, unidad, n} → clave → { unidad: n }.
+function agruparUnidades(filas: Record<string, unknown>[], clave: string) {
+  const m = new Map<unknown, PorUnidad>()
+  for (const f of filas) {
+    const x = m.get(f[clave]) ?? {}
+    x[f.unidad as string] = num(f.n)
+    m.set(f[clave], x)
+  }
+  return m
+}
+
+function resumenDe(f: Record<string, unknown>, porUnidad: PorUnidad = {}): Resumen {
   const ingreso = num(f.ingreso)
   const costo = num(f.costo)
   const pedidos = Number(f.pedidos ?? 0)
@@ -67,6 +83,7 @@ function resumenDe(f: Record<string, unknown>): Resumen {
     utilidad: r2(ingreso - costo),
     margenPct: pct(ingreso - costo, ingreso),
     litros: num(f.litros),
+    porUnidad,
     pedidos,
     clientes: Number(f.clientes ?? 0),
     ticketPromedio: pedidos ? r2(ingreso / pedidos) : null,
@@ -83,6 +100,7 @@ export interface Periodo {
   costo: number
   utilidad: number
   litros: number
+  porUnidad: PorUnidad
   pedidos: number
 }
 export interface Sabor {
@@ -90,7 +108,8 @@ export interface Sabor {
   sabor: string
   color: string
   disponible: boolean
-  litros: number
+  unidad: string
+  litros: number // en la unidad del sabor
   ingreso: number
   costo: number
   utilidad: number
@@ -104,6 +123,7 @@ export interface Vendedor {
   pedidos: number
   clientes: number
   litros: number
+  porUnidad: PorUnidad
   ingreso: number
   utilidad: number
   ticketPromedio: number | null
@@ -113,6 +133,7 @@ export interface Reporte {
   desde: string
   hasta: string
   agrupar: Consulta['agrupar']
+  unidades: string[] // las del catálogo de la empresa, L primero: con una sola, todo se lee como antes
   resumen: Resumen
   anterior: { desde: string; hasta: string; resumen: Resumen } | null // mismo largo, justo antes
   periodos: Periodo[]
@@ -128,6 +149,7 @@ const VENDIDO = `pe.estado = 'entregado' AND pe.fecha BETWEEN $1::date AND $2::d
 const DE_VENTAS = `FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)`
 
 async function resumen(db: Db, desde: string, hasta: string): Promise<Resumen> {
+  const { rows: u } = await db.query(`SELECT pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY pr.unidad`, [desde, hasta])
   const { rows } = await db.query(
     `SELECT sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo, sum(${LITROS}) AS litros,
             count(DISTINCT pe.id_pedido) AS pedidos, count(DISTINCT pe.id_cliente) AS clientes,
@@ -136,11 +158,16 @@ async function resumen(db: Db, desde: string, hasta: string): Promise<Resumen> {
        ${DE_VENTAS} WHERE ${VENDIDO}`,
     [desde, hasta],
   )
-  return resumenDe(rows[0])
+  return resumenDe(rows[0], Object.fromEntries(u.map((f) => [f.unidad, num(f.n)])))
 }
 
 async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
   const u = UNIDAD[q.agrupar] // sale de una lista fija: es seguro ponerlo en el texto de la consulta
+  const { rows: pu } = await db.query(
+    `SELECT date_trunc('${u}', pe.fecha::timestamp)::date AS periodo, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`,
+    [q.desde, q.hasta],
+  )
+  const porPeriodo = agruparUnidades(pu, 'periodo')
   const { rows } = await db.query(
     `WITH cortes AS (
        SELECT g::date AS periodo FROM generate_series(date_trunc('${u}', $1::date::timestamp), $2::date::timestamp, interval '1 ${u}') g
@@ -165,6 +192,7 @@ async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
       costo,
       utilidad: r2(ingreso - costo),
       litros: num(f.litros),
+      porUnidad: porPeriodo.get(inicio) ?? {},
       pedidos: Number(f.pedidos ?? 0),
     }
   })
@@ -172,7 +200,7 @@ async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
 
 async function sabores(db: Db, q: Consulta): Promise<Sabor[]> {
   const { rows } = await db.query(
-    `SELECT pr.id_producto, pr.sabor, pr.color_hex, pr.disponible,
+    `SELECT pr.id_producto, pr.sabor, pr.color_hex, pr.disponible, pr.unidad,
             coalesce(v.litros, 0) AS litros, coalesce(v.ingreso, 0) AS ingreso, coalesce(v.costo, 0) AS costo, coalesce(v.sin_costo, false) AS sin_costo
        FROM productos pr
        LEFT JOIN (
@@ -192,6 +220,7 @@ async function sabores(db: Db, q: Consulta): Promise<Sabor[]> {
       sabor: f.sabor,
       color: f.color_hex,
       disponible: f.disponible,
+      unidad: f.unidad,
       litros: num(f.litros),
       ingreso,
       costo,
@@ -215,14 +244,16 @@ async function vendedores(db: Db, q: Consulta): Promise<Vendedor[]> {
        ) x GROUP BY id_vendedor`,
     [q.desde, q.hasta],
   )
+  const { rows: vu } = await db.query(`SELECT pe.id_vendedor, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`, [q.desde, q.hasta])
+  const porVendedor = agruparUnidades(vu, 'id_vendedor')
   // Todo el equipo activo aparece, aunque no haya vendido: un cero también es un dato.
   const { rows: gente } = await db.query(
     `SELECT id_usuario, nombre, activo FROM usuarios WHERE (rol = 'vendedor' AND activo) OR id_usuario = ANY($1::uuid[])`,
     [act.map((f) => f.id_vendedor).filter(Boolean)],
   )
   const porId = new Map(act.map((f) => [f.id_vendedor as string | null, f]))
-  const filas: Vendedor[] = gente.map((u) => ({ id: u.id_usuario, nombre: u.nombre, activo: u.activo, ...metricas(porId.get(u.id_usuario)) }))
-  if (porId.has(null)) filas.push({ id: null, nombre: 'Sin vendedor', activo: false, ...metricas(porId.get(null)) })
+  const filas: Vendedor[] = gente.map((u) => ({ id: u.id_usuario, nombre: u.nombre, activo: u.activo, ...metricas(porId.get(u.id_usuario)), porUnidad: porVendedor.get(u.id_usuario) ?? {} }))
+  if (porId.has(null)) filas.push({ id: null, nombre: 'Sin vendedor', activo: false, ...metricas(porId.get(null)), porUnidad: porVendedor.get(null) ?? {} })
   return filas.sort((a, b) => b.ingreso - a.ingreso || b.pedidos - a.pedidos || a.nombre.localeCompare(b.nombre, 'es'))
 }
 
@@ -243,11 +274,16 @@ function metricas(f?: Record<string, unknown>) {
 export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
   const dias = diasEntre(q.desde, q.hasta)
   const antes = q.compararDesde && q.compararHasta ? { desde: q.compararDesde, hasta: q.compararHasta } : { desde: sumarDias(q.desde, -dias), hasta: sumarDias(q.desde, -1) }
-  const [r, ant, per, sab, ven] = await Promise.all([resumen(db, q.desde, q.hasta), resumen(db, antes.desde, antes.hasta), periodos(db, q), sabores(db, q), vendedores(db, q)])
+  const [r, ant, per, sab, ven, uni] = await Promise.all([
+    resumen(db, q.desde, q.hasta), resumen(db, antes.desde, antes.hasta), periodos(db, q), sabores(db, q), vendedores(db, q),
+    db.query(`SELECT DISTINCT unidad FROM productos WHERE disponible`),
+  ])
+  const unidades = ordenarUnidades([...uni.rows.map((f) => f.unidad as string), ...Object.keys(r.porUnidad)])
   return {
     desde: q.desde,
     hasta: q.hasta,
     agrupar: q.agrupar,
+    unidades: unidades.length ? unidades : ['L'],
     resumen: r,
     anterior: ant.pedidos ? { ...antes, resumen: ant } : null,
     periodos: per,
@@ -262,9 +298,13 @@ export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
 
 // ------------------------------------------------------------------ exportar
 
+// Catálogo flexible: los totales llevan una columna por unidad («Litros», «Kilos»…); con una sola unidad, la de siempre.
+const columnasUnidad = (r: Reporte) => r.unidades.map((u) => ({ titulo: tituloUnidad(u), tipo: 'litros' as const }))
+const valoresUnidad = (r: Reporte, pu: PorUnidad) => r.unidades.map((u) => pu[u] ?? 0)
+
 async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
   const { rows } = await db.query(
-    `SELECT pe.fecha, coalesce(u.nombre, 'Sin vendedor') AS vendedor, c.nombre AS cliente, pr.sabor,
+    `SELECT pe.fecha, coalesce(u.nombre, 'Sin vendedor') AS vendedor, c.nombre AS cliente, pr.sabor, pr.unidad,
             ${LITROS} AS litros, d.subtotal AS importe, d.cantidad * d.costo_unitario AS costo,
             d.subtotal - d.cantidad * d.costo_unitario AS utilidad, pe.metodo_pago
        ${DE_VENTAS}
@@ -277,6 +317,9 @@ async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
   )
   if (rows.length > MAX_RENGLONES_HISTORIAL) return null
   const suma = (k: string) => r2(rows.reduce((s, f) => s + Number(f[k]), 0))
+  // Con varias unidades la cantidad lleva la suya al lado y no se suman litros con kilos.
+  const unidades = [...new Set(rows.map((f) => f.unidad as string))]
+  const varias = unidades.length > 1
   return {
     nombre: 'Ventas',
     columnas: [
@@ -284,14 +327,15 @@ async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
       { titulo: 'Vendedor', tipo: 'texto' },
       { titulo: 'Cliente', tipo: 'texto' },
       { titulo: 'Sabor', tipo: 'texto' },
-      { titulo: 'Litros', tipo: 'litros' },
+      { titulo: varias ? 'Cantidad' : tituloUnidad(unidades[0] ?? 'L'), tipo: 'litros' },
+      ...(varias ? [{ titulo: 'Unidad', tipo: 'texto' as const }] : []),
       { titulo: 'Importe', tipo: 'dinero' },
       { titulo: 'Costo', tipo: 'dinero' },
       { titulo: 'Utilidad', tipo: 'dinero' },
       { titulo: 'Pago', tipo: 'texto' },
     ],
-    filas: rows.map((f) => [f.fecha, f.vendedor, f.cliente, f.sabor, num(f.litros), num(f.importe), num(f.costo), num(f.utilidad), f.metodo_pago]),
-    total: ['Total', null, null, null, suma('litros'), suma('importe'), suma('costo'), suma('utilidad'), null],
+    filas: rows.map((f) => [f.fecha, f.vendedor, f.cliente, f.sabor, num(f.litros), ...(varias ? [f.unidad] : []), num(f.importe), num(f.costo), num(f.utilidad), f.metodo_pago]),
+    total: ['Total', null, null, null, varias ? null : suma('litros'), ...(varias ? [null] : []), suma('importe'), suma('costo'), suma('utilidad'), null],
   }
 }
 
@@ -301,22 +345,25 @@ const tablaPeriodos = (r: Reporte): Tabla => ({
     { titulo: 'Desde', tipo: 'fecha' },
     { titulo: 'Hasta', tipo: 'fecha' },
     { titulo: 'Pedidos', tipo: 'entero' },
-    { titulo: 'Litros', tipo: 'litros' },
+    ...columnasUnidad(r),
     { titulo: 'Ingresos', tipo: 'dinero' },
     { titulo: 'Costos', tipo: 'dinero' },
     { titulo: 'Utilidad', tipo: 'dinero' },
     { titulo: 'Margen (%)', tipo: 'porcentaje' },
   ],
-  filas: r.periodos.map((p) => [p.inicio, p.fin, p.pedidos, p.litros, p.ingreso, p.costo, p.utilidad, pct(p.utilidad, p.ingreso)]),
-  total: ['Total', null, r.resumen.pedidos, r.resumen.litros, r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct],
+  filas: r.periodos.map((p) => [p.inicio, p.fin, p.pedidos, ...valoresUnidad(r, p.porUnidad), p.ingreso, p.costo, p.utilidad, pct(p.utilidad, p.ingreso)]),
+  total: ['Total', null, r.resumen.pedidos, ...valoresUnidad(r, r.resumen.porUnidad), r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct],
 })
 
-const tablaSabores = (r: Reporte): Tabla => ({
+const tablaSabores = (r: Reporte): Tabla => {
+  const varias = r.unidades.length > 1
+  return {
   nombre: 'Por sabor',
   columnas: [
     { titulo: 'Lugar', tipo: 'entero' },
     { titulo: 'Sabor', tipo: 'texto' },
-    { titulo: 'Litros', tipo: 'litros' },
+    { titulo: varias ? 'Cantidad' : tituloUnidad(r.unidades[0]), tipo: 'litros' },
+    ...(varias ? [{ titulo: 'Unidad', tipo: 'texto' as const }] : []),
     { titulo: 'Ingresos', tipo: 'dinero' },
     { titulo: 'Costos', tipo: 'dinero' },
     { titulo: 'Utilidad', tipo: 'dinero' },
@@ -324,11 +371,12 @@ const tablaSabores = (r: Reporte): Tabla => ({
     { titulo: 'Nota', tipo: 'texto' },
   ],
   filas: r.sabores.map((s, i) => [
-    i + 1, s.sabor, s.litros, s.ingreso, s.costo, s.utilidad, s.margenPct,
+    i + 1, s.sabor, s.litros, ...(varias ? [s.unidad] : []), s.ingreso, s.costo, s.utilidad, s.margenPct,
     s.id === r.ranking.estrella ? 'Sabor estrella' : s.id === r.ranking.menorRotacion ? 'Menor rotación' : s.sinCosto ? 'Sin costo capturado' : null,
   ]),
-  total: [null, 'Total', r.resumen.litros, r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct, null],
-})
+  total: [null, 'Total', varias ? null : r.resumen.litros, ...(varias ? [null] : []), r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct, null],
+  }
+}
 
 const tablaVendedores = (r: Reporte): Tabla => ({
   nombre: 'Por vendedor',
@@ -336,15 +384,15 @@ const tablaVendedores = (r: Reporte): Tabla => ({
     { titulo: 'Vendedor', tipo: 'texto' },
     { titulo: 'Pedidos', tipo: 'entero' },
     { titulo: 'Clientes', tipo: 'entero' },
-    { titulo: 'Litros', tipo: 'litros' },
+    ...columnasUnidad(r),
     { titulo: 'Ingresos', tipo: 'dinero' },
     { titulo: 'Utilidad', tipo: 'dinero' },
     { titulo: 'Ticket promedio', tipo: 'dinero' },
     { titulo: 'Visitas sin venta', tipo: 'entero' },
   ],
-  filas: r.vendedores.map((v) => [v.nombre + (v.activo || v.id === null ? '' : ' (baja)'), v.pedidos, v.clientes, v.litros, v.ingreso, v.utilidad, v.ticketPromedio, v.omitidos]),
+  filas: r.vendedores.map((v) => [v.nombre + (v.activo || v.id === null ? '' : ' (baja)'), v.pedidos, v.clientes, ...valoresUnidad(r, v.porUnidad), v.ingreso, v.utilidad, v.ticketPromedio, v.omitidos]),
   // Clientes del total: los distintos de todo el periodo (un cliente que pasó de un vendedor a otro cuenta una vez).
-  total: ['Total', r.resumen.pedidos, r.resumen.clientes, r.resumen.litros, r.resumen.ingreso, r.resumen.utilidad, r.resumen.ticketPromedio, r.vendedores.reduce((s, v) => s + v.omitidos, 0)],
+  total: ['Total', r.resumen.pedidos, r.resumen.clientes, ...valoresUnidad(r, r.resumen.porUnidad), r.resumen.ingreso, r.resumen.utilidad, r.resumen.ticketPromedio, r.vendedores.reduce((s, v) => s + v.omitidos, 0)],
 })
 
 const fechaMx = (s: string) => s.split('-').reverse().join('/')
@@ -353,7 +401,8 @@ const fechaMx = (s: string) => s.split('-').reverse().join('/')
 const tablaResumen = (r: Reporte): Tabla => {
   const x = r.resumen
   const a = r.anterior?.resumen
-  const conceptos: [string, keyof Resumen, Tipo][] = [
+  type Numerico = Exclude<keyof Resumen, 'porUnidad'>
+  const conceptos: [string, Numerico, Tipo][] = [
     ['Ingresos', 'ingreso', 'dinero'],
     ['Costos de producción', 'costo', 'dinero'],
     ['Utilidad neta', 'utilidad', 'dinero'],
@@ -366,7 +415,7 @@ const tablaResumen = (r: Reporte): Tabla => {
     ['Cobrado por transferencia', 'transferencia', 'dinero'],
   ]
   // El margen ya es un %: su cambio va en puntos ("+2.5 pts"), no en % del %.
-  const cambio = (k: keyof Resumen, ahora: number | null, antes: number | null | undefined): Valor => {
+  const cambio = (k: Numerico, ahora: number | null, antes: number | null | undefined): Valor => {
     if (ahora === null || antes === null || antes === undefined) return null
     if (k === 'margenPct') return `${ahora >= antes ? '+' : '-'}${Math.abs(r2(ahora - antes)).toFixed(1)} pts`
     return { v: antes ? Math.round(((ahora - antes) / Math.abs(antes)) * 1000) / 10 : null, t: 'porcentaje' }
@@ -381,11 +430,16 @@ const tablaResumen = (r: Reporte): Tabla => {
         { titulo: 'Cambio', tipo: 'texto' as const, ancho: 14 },
       ] : []),
     ],
-    filas: conceptos.map(([concepto, k, t]) => [
-      concepto,
-      { v: x[k], t },
-      ...(a ? [{ v: a[k], t }, cambio(k, x[k], a[k])] : []),
-    ]),
+    filas: conceptos.flatMap(([concepto, k, t]): Valor[][] => {
+      // Lo entregado, una fila por unidad: «Litros entregados», «Kilos entregados».
+      if (k === 'litros') {
+        return r.unidades.map((u) => {
+          const ahora = x.porUnidad[u] ?? 0
+          return [`${tituloUnidad(u)} entregados`, { v: ahora, t }, ...(a ? [{ v: a.porUnidad[u] ?? 0, t }, cambio(k, ahora, a.porUnidad[u] ?? 0)] : [])]
+        })
+      }
+      return [[concepto, { v: x[k], t }, ...(a ? [{ v: a[k], t }, cambio(k, x[k], a[k])] : [])]]
+    }),
   }
 }
 

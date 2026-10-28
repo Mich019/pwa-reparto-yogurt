@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { tx, type Db } from './db.js'
 import { hoyEn } from './fechas.js'
+import { totalPorUnidad } from './unidades.js'
 import type { AvisoPendiente, Despachador } from './notificaciones.js'
 
 // RF-037 · Control de stock diario: los litros que se produjeron de cada sabor y los que se le entregan a cada
@@ -32,7 +33,7 @@ const bodyCopiar = z.object({ desde: fechaIso, hacia: fechaIso })
 export interface LineaStock { productoId: string; asignada: number; devuelta: number; entregado: number }
 export interface DiaStock {
   fecha: string
-  productos: { id: string; sabor: string; color: string; disponible: boolean }[] // para pintar la pantalla sin depender del catálogo del teléfono
+  productos: { id: string; sabor: string; color: string; disponible: boolean; unidad: string }[] // para pintar la pantalla sin depender del catálogo del teléfono
   produccion: { productoId: string; litros: number }[]
   vendedores: { id: string; nombre: string; activo: boolean; lineas: LineaStock[] }[]
 }
@@ -46,7 +47,7 @@ class Falla extends Error {
 // El día completo: lo producido, y por vendedor lo asignado, lo devuelto y lo que ya entregó según sus pedidos.
 export async function leerDia(q: Consulta, fecha: string): Promise<DiaStock> {
   const [{ rows: catalogo }, { rows: prod }, { rows: vend }, { rows: stock }, { rows: entregas }] = await Promise.all([
-    q.query(`SELECT id_producto, sabor, color_hex, disponible FROM productos ORDER BY lower(sabor), id_producto`),
+    q.query(`SELECT id_producto, sabor, color_hex, disponible, unidad FROM productos ORDER BY lower(sabor), id_producto`),
     q.query(`SELECT id_producto, litros::float8 AS litros FROM produccion_diaria WHERE fecha = $1 ORDER BY id_producto`, [fecha]),
     q.query(
       `SELECT u.id_usuario, u.nombre, u.activo FROM usuarios u
@@ -72,7 +73,7 @@ export async function leerDia(q: Consulta, fecha: string): Promise<DiaStock> {
   for (const e of entregas) linea(e.id_vendedor, e.id_producto).entregado = redondear(e.litros)
   return {
     fecha,
-    productos: catalogo.map((r) => ({ id: r.id_producto, sabor: r.sabor, color: r.color_hex, disponible: r.disponible })),
+    productos: catalogo.map((r) => ({ id: r.id_producto, sabor: r.sabor, color: r.color_hex, disponible: r.disponible, unidad: r.unidad })),
     produccion: prod.map((r) => ({ productoId: r.id_producto, litros: r.litros })),
     vendedores: vend.map((v) => ({
       id: v.id_usuario,
@@ -83,21 +84,21 @@ export async function leerDia(q: Consulta, fecha: string): Promise<DiaStock> {
   }
 }
 
-// «Tu carga de hoy: Fresa 5 L, Mango 7 L · 12 L en total»
+// «Tu carga de hoy: Fresa 5 L, Mango 7 L · 12 L en total» (por unidad si hay de varias: «… · 12 L + 10 kg en total»)
 async function avisoDeCarga(c: Consulta, idVendedor: string, fecha: string, hoy: string, teniaCarga: boolean): Promise<AvisoPendiente | null> {
   if (fecha < hoy) return null // corregir un día que ya pasó no le dice nada al vendedor
   const { rows } = await c.query(
-    `SELECT pr.sabor, s.cantidad_asignada::float8 AS litros FROM stock_diario s JOIN productos pr USING (id_producto)
+    `SELECT pr.sabor, pr.unidad, s.cantidad_asignada::float8 AS litros FROM stock_diario s JOIN productos pr USING (id_producto)
       WHERE s.fecha = $1 AND s.id_vendedor = $2 AND s.cantidad_asignada > 0 ORDER BY pr.sabor`,
     [fecha, idVendedor],
   )
-  const total = redondear(rows.reduce((s, r) => s + r.litros, 0))
+  const total = totalPorUnidad(rows.map((r) => ({ unidad: r.unidad, cantidad: r.litros })))
   const dia = fecha === hoy ? 'de hoy' : `del ${fecha.slice(8)}/${fecha.slice(5, 7)}`
   return {
     para: idVendedor,
     tipo: 'stock_asignado',
     titulo: teniaCarga ? `Cambió tu carga ${dia}` : `Tu carga ${dia}`,
-    cuerpo: rows.length ? `${rows.map((r) => `${r.sabor} ${redondear(r.litros)} L`).join(', ')} · ${total} L en total` : 'Hoy no tienes carga asignada',
+    cuerpo: rows.length ? `${rows.map((r) => `${r.sabor} ${redondear(r.litros)} ${r.unidad}`).join(', ')} · ${total} en total` : 'Hoy no tienes carga asignada',
     datos: { pestana: 'stock' },
   }
 }
