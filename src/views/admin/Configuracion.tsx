@@ -5,8 +5,10 @@ import { cambiarTema, usePreferenciaTema, type PreferenciaTema } from '../../lib
 import { Hoja } from '../../components/ui'
 import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
+import { useSuscripcion } from '../../lib/suscripcion'
+import { SeccionSuscripcion } from './Suscripcion'
 
-// Configuración del panel: apariencia (de este navegador), la cuenta y su seguridad, y cerrar sesión.
+// Configuración del panel: apariencia (de este navegador), la cuenta y su seguridad, la suscripción y cerrar sesión.
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
 
@@ -43,6 +45,7 @@ export function Configuracion() {
   const [cambiando, setCambiando] = useState(false)
   const [saliendo, setSaliendo] = useState(false)
   const u = sesion?.usuario
+  const suscripcion = useSuscripcion(u?.id)
 
   async function salir() {
     setSaliendo(true)
@@ -108,6 +111,12 @@ export function Configuracion() {
           {/* DosPasos trae su propia tarjeta; aquí sólo se le quita el margen de arriba. */}
           <div className="-mt-3"><DosPasos /></div>
         </Seccion>
+
+        {suscripcion && (
+          <Seccion id="suscripcion" titulo="Suscripción" descripcion="El plan de tu empresa. El pago y la tarjeta los maneja Mercado Pago.">
+            <SeccionSuscripcion s={suscripcion} />
+          </Seccion>
+        )}
 
         <Seccion id="sesion" titulo="Sesión" descripcion="Cierra la sesión en este navegador. Para volver a entrar se piden tu contraseña y, si la activaste, la verificación en dos pasos.">
           <button

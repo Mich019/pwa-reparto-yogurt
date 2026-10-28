@@ -133,6 +133,21 @@ function leerCors(produccion: boolean): string[] {
   return origenes
 }
 
+// MP_ACCESS_TOKEN: «Credenciales de producción» (o de prueba) de la aplicación en mercadopago.com.mx/developers.
+// MP_WEBHOOK_SECRET: la «clave secreta» de Webhooks de esa aplicación; con ella se revisa la firma de cada aviso.
+function leerMercadoPago() {
+  const accessToken = process.env.MP_ACCESS_TOKEN?.trim() ?? ''
+  const precio = Number(process.env.MP_PRECIO_MENSUAL ?? '')
+  if (process.env.MP_PRECIO_MENSUAL && !(precio > 0)) throw new Error('MP_PRECIO_MENSUAL debe ser un número mayor que 0 (pesos al mes)')
+  return {
+    accessToken,
+    webhookSecret: process.env.MP_WEBHOOK_SECRET?.trim() ?? '',
+    precioMensual: precio > 0 ? precio : 0,
+    moneda: process.env.MP_MONEDA?.trim() || 'MXN',
+    activo: !!accessToken && precio > 0,
+  }
+}
+
 export function leerConfig() {
   const jwtSecret = requerido('JWT_SECRET')
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET debe tener al menos 32 caracteres')
@@ -173,6 +188,10 @@ export function leerConfig() {
     verificacionHoras: 24,
     // Invitaciones a repartidores: el enlace va a la app (APP_URL; si no, el primer CORS_ORIGINS o el dominio de Vercel).
     invitacionDias: 7,
+    // Cobro (Fase 3): días de prueba gratis de cada empresa nueva y la suscripción mensual con Mercado Pago. Sin
+    // MP_ACCESS_TOKEN y MP_PRECIO_MENSUAL no se puede suscribir nadie, pero la app funciona igual (desarrollo).
+    pruebaDias: Number(process.env.PRUEBA_DIAS || 14),
+    mercadoPago: leerMercadoPago(),
     urlApp: (process.env.APP_URL?.trim() || corsOrigins[0]
       || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:5173')).replace(/\/+$/, ''),
     // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.

@@ -52,7 +52,8 @@ try {
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'password_cambiado_en') AS m005,
               to_regclass('public.dos_pasos') IS NOT NULL AS m006,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'id_empresa') AS m007,
-              to_regclass('public.invitaciones') IS NOT NULL AS m008`,
+              to_regclass('public.invitaciones') IS NOT NULL AS m008,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'empresas' AND column_name = 'prueba_hasta') AS m009`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

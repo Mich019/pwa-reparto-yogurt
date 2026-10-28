@@ -50,11 +50,18 @@ CREATE TABLE empresas (
   logo           text,
   giros          text[] NOT NULL DEFAULT '{}',           -- qué vende, según el registro (/registro)
   control_retornables boolean NOT NULL DEFAULT false,    -- lleva la cuenta de envases prestados
+  -- Cobro (api/_lib/suscripcion.ts): acceso si está exenta, en prueba o con la suscripción de Mercado Pago autorizada.
+  exenta         boolean NOT NULL DEFAULT false,         -- no paga (p. ej. la primera empresa de una instalación propia)
+  prueba_hasta   timestamptz NOT NULL DEFAULT now() + interval '14 days',
+  suscripcion_estado varchar(20),                        -- pending, authorized, paused, cancelled (Mercado Pago)
+  mp_preapproval_id  varchar(64),
+  suscripcion_actualizada timestamptz,
   activa         boolean NOT NULL DEFAULT true,          -- false = suspendida: nadie de ella entra
   creado_en      timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT empresas_color_hex CHECK (color_marca IS NULL OR color_marca ~ '^#[0-9A-Fa-f]{6}$')
 );
+CREATE UNIQUE INDEX empresas_mp_preapproval ON empresas (mp_preapproval_id) WHERE mp_preapproval_id IS NOT NULL;
 
 -- =============================================================================
 -- M01 · Autenticación y seguridad

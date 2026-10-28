@@ -11,6 +11,8 @@ import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
 import { Reportes } from '../pwa/Reportes'
 import { Configuracion } from './Configuracion'
+import { AvisoPrueba, PantallaCobro } from './Suscripcion'
+import { useSuscripcion } from '../../lib/suscripcion'
 
 export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes' | 'configuracion'
 
@@ -66,6 +68,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const [seccion, setSeccionEstado] = useState<SeccionAdmin>(seccionGuardada)
   const [cerrando, setCerrando] = useState(false)
   const esAdmin = sesion?.usuario.rol === 'administrador'
+  const suscripcion = useSuscripcion(esAdmin ? sesion?.usuario.id : undefined)
 
   // Clientes, sabores y producción se leen de la copia local: sin esto el panel abierto directo en /admin se queda
   // vacío y lo que se edita aquí no llega al servidor hasta abrir la app de reparto.
@@ -107,6 +110,9 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
       </div>
     )
   }
+
+  // Sin prueba ni suscripción, el panel sólo deja pagar (el servidor responde 402 a lo demás).
+  if (suscripcion?.estado === 'vencida') return <PantallaCobro s={suscripcion} />
 
   async function manejarCerrarSesion() {
     setCerrando(true)
@@ -185,6 +191,8 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           </button>
         </div>
       </header>
+
+      {suscripcion && <AvisoPrueba s={suscripcion} onVer={() => setSeccion('configuracion')} />}
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         {/* Abajo queda sitio para la barra flotante del teléfono */}

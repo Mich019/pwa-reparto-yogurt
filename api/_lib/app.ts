@@ -18,6 +18,8 @@ import { rutasAdmin } from './admin.js'
 import { rutasSync } from './sync/rutas.js'
 import { rutasRecuperacion } from './recuperacion.js'
 import { rutasRegistro } from './registro.js'
+import { crearClienteMp, type ClienteMp } from './mercadopago.js'
+import { CON_ACCESO, rutasSuscripcion, SUSCRIPCION_VENCIDA } from './suscripcion.js'
 import { ipCliente } from './seguridad.js'
 
 export type Rol = 'administrador' | 'vendedor'
@@ -39,6 +41,7 @@ export interface Contexto {
   db: Db
   config: Config
   enviador?: Enviador | null // cómo mandar un push; por defecto el de las claves VAPID de config (null = sin push). Las pruebas ponen uno falso.
+  mercadoPago?: ClienteMp | null // cobro; por defecto el de MP_ACCESS_TOKEN (null = sin cobro). Las pruebas ponen uno falso.
 }
 
 export async function construirApp(entrada: Contexto): Promise<FastifyInstance> {
@@ -84,8 +87,9 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   })
 
   // RF-005 / RF-006: el token trae la sesión; si se revocó (cerrar sesión) o el usuario se
-  // desactivó o cambió de rol, la base lo dice en cada petición.
-  async function autenticar(req: FastifyRequest, rep: FastifyReply, permitirPasswordPendiente = false) {
+  // desactivó o cambió de rol, la base lo dice en cada petición. También si su empresa sigue con acceso (prueba o
+  // suscripción, suscripcion.ts): sin él sólo quedan la sesión (`passwordPendiente`) y la pantalla de cobro (`sinCobro`).
+  async function autenticar(req: FastifyRequest, rep: FastifyReply, opciones: { passwordPendiente?: boolean; sinCobro?: boolean } = {}) {
     let payload: { sub: string; sid: string }
     // El token va en Authorization (app de reparto) o en la cookie HttpOnly del panel web (cookies.ts).
     const deCookie = req.headers.authorization ? undefined : leerCookie(req, ctx.config, 'acceso')
@@ -102,7 +106,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
     }
     // Todavía sin empresa en el alcance: esta consulta busca la sesión en todo el sistema.
     const { rows } = await ctx.db.query(
-      `SELECT u.id_usuario, u.rol, u.debe_cambiar_password, u.id_empresa, e.activa AS empresa_activa
+      `SELECT u.id_usuario, u.rol, u.debe_cambiar_password, u.id_empresa, e.activa AS empresa_activa, ${CON_ACCESO} AS con_acceso
          FROM sesiones s JOIN usuarios u USING (id_usuario) JOIN empresas e USING (id_empresa)
         WHERE s.id_sesion = $1 AND s.id_usuario = $2 AND s.revocado_en IS NULL AND s.expira_en > now() AND u.activo`,
       [payload.sid, payload.sub],
@@ -111,15 +115,21 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
     if (!rows[0].empresa_activa) return rep.code(403).send({ error: 'La cuenta de tu empresa está suspendida.', codigo: 'EMPRESA_SUSPENDIDA' })
     fijarEmpresa(rows[0].id_empresa) // desde aquí, todo lo de esta petición corre dentro de su empresa
     req.usuario = { id: rows[0].id_usuario, rol: rows[0].rol, sid: payload.sid, debeCambiarPassword: rows[0].debe_cambiar_password, empresa: rows[0].id_empresa }
-    if (rows[0].debe_cambiar_password && !permitirPasswordPendiente) {
+    if (rows[0].debe_cambiar_password && !opciones.passwordPendiente) {
       return rep.code(403).send({ error: 'Debes cambiar tu contraseña antes de continuar', codigo: 'CAMBIAR_PASSWORD' })
     }
+    if (!rows[0].con_acceso && !opciones.passwordPendiente && !opciones.sinCobro) return rep.code(402).send(SUSCRIPCION_VENCIDA)
   }
 
   const requiereSesion = (req: FastifyRequest, rep: FastifyReply) => autenticar(req, rep)
-  const requiereSesionAunConPasswordPendiente = (req: FastifyRequest, rep: FastifyReply) => autenticar(req, rep, true)
+  const requiereSesionAunConPasswordPendiente = (req: FastifyRequest, rep: FastifyReply) => autenticar(req, rep, { passwordPendiente: true })
   const requiereAdmin = async (req: FastifyRequest, rep: FastifyReply) => {
     await autenticar(req, rep)
+    if (!rep.sent && req.usuario.rol !== 'administrador') return rep.code(403).send({ error: 'Sólo el administrador puede hacer esto', codigo: 'SIN_PERMISO' })
+  }
+
+  const requiereAdminSinCobro = async (req: FastifyRequest, rep: FastifyReply) => {
+    await autenticar(req, rep, { sinCobro: true })
     if (!rep.sent && req.usuario.rol !== 'administrador') return rep.code(403).send({ error: 'Sólo el administrador puede hacer esto', codigo: 'SIN_PERMISO' })
   }
 
@@ -133,6 +143,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasDosPasos(app, ctx, { requiereSesion })
   await rutasRecuperacion(app, ctx)
   await rutasRegistro(app, ctx, { requiereAdmin })
+  await rutasSuscripcion(app, ctx, ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config), { requiereAdminSinCobro })
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })
   await rutasCartera(app, ctx, { requiereAdmin }, despachador)

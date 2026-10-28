@@ -63,6 +63,7 @@ Función: `fn_pronostico_produccion(desde, dias)` devuelve los litros por sabor 
 ## Notas para la API
 
 - **Multiempresa** (migración `007_multiempresa.sql`): cada tabla de negocio tiene `id_empresa` (tabla `empresas`), con llaves compuestas `*_misma_empresa` para que un pedido no apunte al cliente de otra empresa. Las reglas por filas (RLS, política `por_empresa`) se aplican al rol `reparto_app`: la API entra a cada petición con `SET LOCAL ROLE reparto_app` y `set_config('app.id_empresa', …)`, así que sólo ve y escribe filas de esa empresa. El dueño de la base (migraciones, scripts, iniciar sesión) no tiene RLS. `id_empresa` toma por omisión `app.id_empresa`, por eso los `INSERT` no lo mencionan. Un correo pertenece a una sola empresa.
+- **Cobro** (migración `009_suscripciones.sql`): `empresas.prueba_hasta`, `suscripcion_estado`, `mp_preapproval_id` y `exenta`. Las empresas que ya existían al aplicarla quedan exentas.
 - **Registro** (migración `008_registro.sql`): `verificaciones_correo` guarda el código que confirma el correo antes de que exista la empresa (sin RLS; el rol de la API no la ve), e `invitaciones` el HMAC del enlace con el que un repartidor crea su cuenta.
 
 - La contraseña se hashea con Argon2id en la API; la base sólo acepta hashes `$argon2id$…`.

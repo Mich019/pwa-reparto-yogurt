@@ -6,7 +6,8 @@
 SET client_encoding = 'UTF8';
 
 -- Multiempresa: la primera empresa de la base (se renombra después) y sus sabores de partida.
-INSERT INTO empresas (nombre) SELECT 'Empresa principal' WHERE NOT EXISTS (SELECT 1 FROM empresas);
+-- La primera empresa de una instalación no paga (exenta); las que se registren después tienen prueba y suscripción.
+INSERT INTO empresas (nombre, exenta) SELECT 'Empresa principal', true WHERE NOT EXISTS (SELECT 1 FROM empresas);
 DO $$ BEGIN
   PERFORM set_config('app.id_empresa', (SELECT id_empresa::text FROM empresas ORDER BY creado_en, id_empresa LIMIT 1), false);
 END $$;

@@ -222,8 +222,9 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
       // Como dueño de la base (la empresa todavía no existe); app.id_empresa da dueño a todo lo que sigue.
       const r = await tx(db, null, async (cx) => {
         const { rows: [emp] } = await cx.query(
-          `INSERT INTO empresas (nombre, zona_horaria, color_marca, logo, giros, control_retornables) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_empresa`,
-          [e.nombre, e.zonaHoraria, e.color, e.logo, e.giros, e.controlRetornables],
+          `INSERT INTO empresas (nombre, zona_horaria, color_marca, logo, giros, control_retornables, prueba_hasta)
+           VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(days => $7)) RETURNING id_empresa`,
+          [e.nombre, e.zonaHoraria, e.color, e.logo, e.giros, e.controlRetornables, config.pruebaDias],
         )
         await cx.query(`SELECT set_config('app.id_empresa', $1, true)`, [emp.id_empresa])
         const { rows: [u] } = await cx.query(
@@ -244,7 +245,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         return { idEmpresa: emp.id_empresa as string, enlaces }
       })
       await mandarInvitaciones(r.enlaces, e.nombre, a.nombre, req.log)
-      return rep.code(201).send({ empresa: { id: r.idEmpresa, nombre: e.nombre }, productos: productos.length, invitaciones: r.enlaces.length })
+      return rep.code(201).send({ empresa: { id: r.idEmpresa, nombre: e.nombre }, productos: productos.length, invitaciones: r.enlaces.length, diasPrueba: config.pruebaDias })
     } catch (err) {
       if (err instanceof CorreoRepetido) return rep.code(409).send(CORREO_REPETIDO)
       throw err
