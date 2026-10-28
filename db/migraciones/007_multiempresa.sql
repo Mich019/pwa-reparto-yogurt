@@ -41,10 +41,20 @@ BEGIN
 END $$;
 
 -- 3. Lo que era único en toda la base ahora es único dentro de cada empresa ------------------------------------------
-DROP INDEX IF EXISTS productos_nombre_sabor_unico;
-CREATE UNIQUE INDEX productos_nombre_sabor_unico ON productos (id_empresa, lower(nombre), lower(sabor), presentacion_litros);
-DROP INDEX IF EXISTS clientes_nfc_unico;
-CREATE UNIQUE INDEX clientes_nfc_unico ON clientes (id_empresa, nfc_uid) WHERE nfc_uid IS NOT NULL;
+-- Sólo se rehacen los índices de antes de multiempresa (sin id_empresa): esta migración se vuelve a correr en cada
+-- db:migrar, y una posterior (010_catalogo.sql) amplía el de productos.
+DO $$
+DECLARE
+  i text;
+BEGIN
+  FOREACH i IN ARRAY ARRAY['productos_nombre_sabor_unico', 'clientes_nfc_unico'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = i AND indexdef NOT LIKE '%id_empresa%') THEN
+      EXECUTE format('DROP INDEX %I', i);
+    END IF;
+  END LOOP;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS productos_nombre_sabor_unico ON productos (id_empresa, lower(nombre), lower(sabor), presentacion_litros);
+CREATE UNIQUE INDEX IF NOT EXISTS clientes_nfc_unico ON clientes (id_empresa, nfc_uid) WHERE nfc_uid IS NOT NULL;
 
 -- 4. Llaves compuestas: nada apunta a otra empresa -------------------------------------------------------------------
 DO $$

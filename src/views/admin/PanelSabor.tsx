@@ -8,6 +8,7 @@ import { cambio } from '../../lib/reportes'
 import { FormSabor } from '../pwa/Ajustes'
 import { BarrasPeriodo } from './graficas'
 import { Frasco } from './marca'
+import { presentacionDe, unidadDe } from '../../lib/unidades'
 import { Delta } from './piezas'
 
 interface Foto { producto: Producto; venta: VentaSabor; posicion: number }
@@ -122,7 +123,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
           </span>
           <h2 id={titulo} className="mt-3 text-[1.75rem] font-semibold leading-tight">{p.sabor}</h2>
           <p className="mt-1 text-sm text-apagado tabular-nums">
-            {dinero(p.precio_litro)}/L · costo {dinero(p.costo_litro)}/L · envase de {p.presentacion ?? 1} L
+            {dinero(p.precio_litro)}/{unidadDe(p)} · costo {dinero(p.costo_litro)}/{unidadDe(p)}{presentacionDe(p) && ` · ${presentacionDe(p)}`}
           </p>
           {p.descripcion && <p className="mt-2 text-sm leading-relaxed text-tinta/80">{p.descripcion}</p>}
 

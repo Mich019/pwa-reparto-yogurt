@@ -359,4 +359,21 @@ describe('catálogo de sabores (RF-032)', () => {
       await db.query(`DELETE FROM productos WHERE id_producto = $1`, [id])
     }
   })
+
+  it('un producto en su unidad y su envase (catálogo flexible); sin decirlo, L y sin envase', async () => {
+    const admin = await sesion('administrador')
+    const arroz = { id: randomUUID(), sabor: `Arroz ${randomUUID().slice(0, 6)}`, presentacion: 25, unidad: 'kg', envase: 'costal', precio_litro: 30, costo_litro: 20, color_hex: '#f1eee4', disponible: true }
+    const yogurt = { id: randomUUID(), sabor: `Coco ${randomUUID().slice(0, 6)}`, precio_litro: 60, costo_litro: 25, color_hex: '#f1ece2', disponible: true }
+    try {
+      const r = await push(admin, [op('productos', arroz.id, arroz), op('productos', yogurt.id, yogurt)])
+      assert.deepEqual(r.body.resultados.map((x: any) => [x.registro.unidad, x.registro.envase, x.registro.presentacion]), [['kg', 'costal', 25], ['L', undefined, 1]])
+      // El costal de 25 kg a $30 el kg se guarda a $750 el costal; la unidad y el envase no cambian después.
+      const { rows: [f] } = await db.query(`SELECT precio_unitario::float8 AS precio, unidad, envase FROM productos WHERE id_producto = $1`, [arroz.id])
+      assert.deepEqual(f, { precio: 750, unidad: 'kg', envase: 'costal' })
+      const e = await push(admin, [op('productos', arroz.id, { ...arroz, unidad: 'L', envase: 'bolsa' }, r.body.resultados[0].registro.version)])
+      assert.deepEqual([e.body.resultados[0].registro.unidad, e.body.resultados[0].registro.envase], ['kg', 'costal'])
+    } finally {
+      await db.query(`DELETE FROM productos WHERE id_producto = ANY($1::uuid[])`, [[arroz.id, yogurt.id]])
+    }
+  })
 })

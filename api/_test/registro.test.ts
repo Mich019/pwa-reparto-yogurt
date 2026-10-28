@@ -60,7 +60,10 @@ describe('registro de una empresa', () => {
     const l = await login(correo, CLAVE)
     assert.equal(l.status, 200)
     const { body } = await pull({ token: l.body.accessToken, dispositivo: 'panel' })
-    assert.deepEqual(body.productos.map((p: { sabor: string; presentacion: number }) => `${p.sabor} ${p.presentacion}`).sort(), ['Fresa 0.25', 'Fresa 1', 'Mango 0.25', 'Mango 1'])
+    assert.deepEqual(
+      body.productos.map((p: { sabor: string; presentacion: number; unidad: string; envase: string }) => `${p.sabor} ${p.presentacion} ${p.unidad} ${p.envase}`).sort(),
+      ['Yogurt Fresa 0.25 L vaso', 'Yogurt Fresa 1 L frasco', 'Yogurt Mango 0.25 L vaso', 'Yogurt Mango 1 L frasco'],
+    )
     const { rows: [e] } = await db.query(`SELECT e.color_marca, e.giros FROM empresas e JOIN usuarios u USING (id_empresa) WHERE u.correo = $1`, [correo])
     assert.deepEqual(e, { color_marca: '#1d4ed8', giros: ['lacteos'] })
   })
@@ -138,9 +141,14 @@ describe('catálogo del registro', () => {
         { id: 'b', nombre: 'Botella 1 L', tipo: 'botella', contenido: 1, unidad: 'L', retornable: false },
         { id: 'f', nombre: 'Frasco 1 L', tipo: 'frasco', contenido: 1, unidad: 'L', retornable: false },
         { id: 'g', nombre: 'Bolsa 500 g', tipo: 'bolsa', contenido: 500, unidad: 'g', retornable: false },
+        { id: 'k', nombre: 'A granel (kg)', tipo: 'granel', contenido: 1, unidad: 'kg', retornable: false },
       ],
-      productos: [{ nombre: 'Leche', color: '#ffffff', variantes: [], presentaciones: [{ envase: 'b', precio: 30, costo: null }, { envase: 'f', precio: 35, costo: 10 }, { envase: 'g', precio: 40, costo: null }] }],
+      productos: [{ nombre: 'Leche', color: '#ffffff', variantes: [], presentaciones: [
+        { envase: 'b', precio: 30, costo: null }, { envase: 'f', precio: 35, costo: 10 }, { envase: 'g', precio: 40, costo: null }, { envase: 'k', precio: 70, costo: null },
+      ] }],
     })
-    assert.deepEqual(filas.map((f) => [f.sabor, f.presentacion, f.precio, f.costo]), [['Leche', 1, 30, 0], ['Leche (Frasco 1 L)', 1, 35, 10], ['Leche', 0.5, 40, 0]])
+    assert.deepEqual(filas.map((f) => [f.sabor, f.presentacion, f.unidad, f.envase, f.precio, f.costo]), [
+      ['Leche', 1, 'L', 'botella', 30, 0], ['Leche', 1, 'L', 'frasco', 35, 10], ['Leche', 0.5, 'kg', 'bolsa', 40, 0], ['Leche', 1, 'kg', null, 70, 0],
+    ])
   })
 })

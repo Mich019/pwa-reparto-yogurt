@@ -84,29 +84,29 @@ const revisa = (e: z.ZodError) => e.issues[0]?.message ?? 'Datos incompletos'
 
 class CorreoRepetido extends Error {}
 
-// Lo que devuelve el registro como productos de hoy (un renglón por producto × variante × envase). El catálogo flexible
-// (Fase 5) guardará envases y unidades de verdad; mientras, el contenido va en presentacion_litros (ml y g pasan a L y
-// kg) y el envase en la descripción.
+// Lo que devuelve el registro como productos del catálogo: un renglón por producto × variante × envase, con su unidad
+// (ml y g pasan a L y kg para que todo lo de una unidad se sume junto) y su envase («pieza» y «granel» no son envase).
+// Con variantes, el sabor lleva el nombre del producto («Arroz Blanco»), que es lo que muestran las pantallas.
+const UNIDAD_BASE: Record<string, [string, number]> = { ml: ['L', 1000], l: ['L', 1], g: ['kg', 1000], kg: ['kg', 1], pz: ['pz', 1] }
+const SIN_ENVASE = ['pieza', 'granel']
+
 export function productosDelRegistro(b: Pick<z.infer<typeof bodyEmpresa>, 'envases' | 'productos'>) {
   const envases = new Map(b.envases.map((e) => [e.id, e]))
-  const filas: { nombre: string; sabor: string; descripcion: string; presentacion: number; precio: number; costo: number; color: string }[] = []
+  const filas: { nombre: string; sabor: string; presentacion: number; unidad: string; envase: string | null; precio: number; costo: number; color: string }[] = []
   const ya = new Set<string>()
   for (const p of b.productos) {
-    const variantes = p.variantes.length ? p.variantes : [{ nombre: p.nombre, color: p.color }]
+    const variantes = p.variantes.length ? p.variantes.map((v) => ({ ...v, nombre: `${p.nombre} ${v.nombre}`.slice(0, 100) })) : [{ nombre: p.nombre, color: p.color }]
     for (const pr of p.presentaciones) {
       const e = envases.get(pr.envase)
       if (!e) continue
-      const chico = ['ml', 'g'].includes(e.unidad.toLowerCase())
-      const presentacion = Math.min(999.99, Math.max(0.01, Math.round((chico ? e.contenido / 1000 : e.contenido) * 100) / 100))
-      const descripcion = e.nombre || `${e.contenido} ${e.unidad}`
+      const [unidad, divisor] = UNIDAD_BASE[e.unidad.toLowerCase()] ?? [e.unidad, 1]
+      const presentacion = Math.min(999.99, Math.max(0.01, Math.round((e.contenido / divisor) * 100) / 100))
+      const envase = SIN_ENVASE.includes(e.tipo) ? null : e.tipo
       for (const v of variantes) {
-        // Dos envases del mismo tamaño (botella y frasco de 1 L) serían el mismo sabor: se distinguen por el envase.
-        let sabor = v.nombre
-        if (ya.has(`${p.nombre}|${sabor}|${presentacion}`.toLowerCase())) sabor = `${v.nombre} (${descripcion})`.slice(0, 100)
-        const clave = `${p.nombre}|${sabor}|${presentacion}`.toLowerCase()
+        const clave = [p.nombre, v.nombre, presentacion, unidad, envase].join('|').toLowerCase()
         if (ya.has(clave)) continue
         ya.add(clave)
-        filas.push({ nombre: p.nombre, sabor, descripcion, presentacion, precio: pr.precio, costo: pr.costo ?? 0, color: v.color })
+        filas.push({ nombre: p.nombre, sabor: v.nombre, presentacion, unidad, envase, precio: pr.precio, costo: pr.costo ?? 0, color: v.color })
       }
     }
   }
@@ -236,8 +236,8 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         await cx.query(`SELECT set_config('app.id_usuario', $1, true)`, [u.id_usuario])
         for (const p of productos) {
           await cx.query(
-            `INSERT INTO productos (nombre, sabor, descripcion, presentacion_litros, precio_unitario, costo_produccion, color_hex) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [p.nombre, p.sabor, p.descripcion, p.presentacion, p.precio, p.costo, p.color],
+            `INSERT INTO productos (nombre, sabor, presentacion_litros, unidad, envase, precio_unitario, costo_produccion, color_hex) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [p.nombre, p.sabor, p.presentacion, p.unidad, p.envase, p.precio, p.costo, p.color],
           )
         }
         const enlaces = []

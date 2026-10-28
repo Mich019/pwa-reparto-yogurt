@@ -65,7 +65,8 @@ const productos: Adaptador<ProductoWire> = {
       const pres = num(r.presentacion_litros)
       return {
         wire: {
-          id: r.id_producto, sabor: r.sabor, descripcion: r.descripcion ?? undefined, presentacion: pres, precio_litro: dinero(num(r.precio_unitario) / pres),
+          id: r.id_producto, sabor: r.sabor, descripcion: r.descripcion ?? undefined, presentacion: pres, unidad: r.unidad, envase: r.envase ?? undefined,
+          precio_litro: dinero(num(r.precio_unitario) / pres),
           costo_litro: dinero(num(r.costo_produccion) / pres), color_hex: r.color_hex, disponible: r.disponible, version: r.version,
         },
         version: r.version, actualizadoMs: r.act_ms, actualizadoUs: r.act_us, final: false, dueno: null, extra: { presentacion: pres },
@@ -76,13 +77,14 @@ const productos: Adaptador<ProductoWire> = {
     return esAdmin(u) ? null : 'Sólo el administrador puede cambiar los sabores y precios'
   },
   async escribir(c, _u, w, ex) {
-    // La presentación se fija al crear el sabor: lo ya vendido está guardado en envases de ese tamaño.
+    // La presentación (contenido, unidad y envase) se fija al crear el sabor: lo ya vendido está guardado en envases de
+    // ese tamaño. Los precios van por unidad (precio_litro = por L, kg o pieza).
     const pres = ex ? (ex.extra?.presentacion as number) : dinero(w.presentacion ?? 1)
     if (!ex) {
       await c.query(
-        `INSERT INTO productos (id_producto, sabor, descripcion, presentacion_litros, precio_unitario, costo_produccion, color_hex, disponible)
-         VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8)`,
-        [w.id, w.sabor, w.descripcion ?? null, pres, dinero(w.precio_litro * pres), dinero(w.costo_litro * pres), w.color_hex, w.disponible],
+        `INSERT INTO productos (id_producto, sabor, descripcion, presentacion_litros, precio_unitario, costo_produccion, color_hex, disponible, unidad, envase)
+         VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, $9, NULLIF($10, ''))`,
+        [w.id, w.sabor, w.descripcion ?? null, pres, dinero(w.precio_litro * pres), dinero(w.costo_litro * pres), w.color_hex, w.disponible, w.unidad ?? 'L', w.envase ?? null],
       )
     } else {
       await c.query(

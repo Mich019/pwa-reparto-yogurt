@@ -32,7 +32,9 @@ export const productoWire = z.object({
   id: z.uuid(),
   sabor: texto(100).min(1),
   descripcion: texto(500).optional(), // '' la borra; si no viene, se conserva la del servidor
-  presentacion: z.number().min(0.01).max(999).optional(), // litros por envase (RF-032); sólo cuenta al crearlo
+  presentacion: z.number().min(0.01).max(999).optional(), // contenido de cada envase en `unidad` (RF-032); sólo cuenta al crearlo
+  unidad: texto(10).min(1).optional(), // L (por omisión), kg, pz…; sólo cuenta al crearlo
+  envase: texto(30).nullable().optional(), // frasco, garrafon, bolsa…; sólo cuenta al crearlo
   precio_litro: z.number().positive().max(99999999),
   costo_litro: z.number().min(0).max(99999999),
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),

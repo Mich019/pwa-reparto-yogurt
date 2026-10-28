@@ -223,7 +223,9 @@ CREATE TABLE productos (
   nombre              varchar(100) NOT NULL DEFAULT 'Yogurt',   -- producto base
   sabor               varchar(100) NOT NULL,
   descripcion         text,
-  presentacion_litros numeric(5, 2) NOT NULL DEFAULT 1,         -- RF-032
+  presentacion_litros numeric(5, 2) NOT NULL DEFAULT 1,         -- RF-032: contenido de cada envase, en `unidad`
+  unidad              varchar(10) NOT NULL DEFAULT 'L',         -- L, kg, pz… (catálogo flexible)
+  envase              varchar(30),                              -- frasco, garrafon, bolsa…; vacío = sin envase propio
   precio_unitario     numeric(10, 2) NOT NULL,                  -- RF-033 precio por presentación
   costo_produccion    numeric(10, 2) NOT NULL DEFAULT 0,        -- RF-034
   color_hex           char(7) NOT NULL DEFAULT '#f472b6',       -- color de la tarjeta en la app
@@ -235,10 +237,11 @@ CREATE TABLE productos (
   CONSTRAINT productos_costo_no_negativo CHECK (costo_produccion >= 0),
   CONSTRAINT productos_presentacion_positiva CHECK (presentacion_litros > 0),
   CONSTRAINT productos_color_hex CHECK (color_hex ~ '^#[0-9A-Fa-f]{6}$'),
+  CONSTRAINT productos_unidad_valida CHECK (btrim(unidad) <> ''),
   CONSTRAINT productos_empresa_id UNIQUE (id_empresa, id_producto)
 );
--- Dos empresas pueden tener su propio «Fresa».
-CREATE UNIQUE INDEX productos_nombre_sabor_unico ON productos (id_empresa, lower(nombre), lower(sabor), presentacion_litros);
+-- Dos empresas pueden tener su propio «Fresa», y el mismo sabor puede venir en botella y en frasco del mismo tamaño.
+CREATE UNIQUE INDEX productos_nombre_sabor_unico ON productos (id_empresa, lower(nombre), lower(sabor), presentacion_litros, unidad, coalesce(envase, ''));
 CREATE INDEX productos_empresa ON productos (id_empresa);
 
 -- RF-037: litros producidos y asignados a cada vendedor al iniciar la jornada.

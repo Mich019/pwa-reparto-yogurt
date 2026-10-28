@@ -32,7 +32,9 @@ export interface Producto {
   id: string
   sabor: string
   descripcion?: string
-  presentacion?: number // litros por envase (RF-032); sin dato, 1 L. Se fija al crear el sabor.
+  presentacion?: number // contenido de cada envase en `unidad` (RF-032); sin dato, 1. Se fija al crear el sabor.
+  unidad?: string // L (sin dato), kg, pz… (catálogo flexible, src/lib/unidades.ts). Se fija al crear el sabor.
+  envase?: string // frasco, garrafon, bolsa… (TIPOS_ENVASE); sin dato, sin envase propio. Se fija al crear el sabor.
   precio_litro: number
   costo_litro: number
   color_hex: string

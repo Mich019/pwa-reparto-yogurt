@@ -6,6 +6,8 @@ import { dinero, hoy } from '../../lib/fechas'
 import { borrarTodo } from '../../lib/demo'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
+import { TIPOS_ENVASE } from '../../lib/registro'
+import { formato, nombreUnidad, presentacionDe, unidadDe } from '../../lib/unidades'
 
 const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce', '#ef4444', '#22c55e', '#38bdf8', '#a3e635']
 
@@ -26,7 +28,7 @@ export function Ajustes() {
               <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
               {p.descripcion && <div className="truncate text-xs text-apagado">{p.descripcion}</div>}
               <div className="text-xs text-apagado">
-                Venta {dinero(p.precio_litro)}/L · Costo {dinero(p.costo_litro)}/L{(p.presentacion ?? 1) !== 1 && ` · envase de ${p.presentacion} L`}
+                Venta {dinero(p.precio_litro)}/{unidadDe(p)} · Costo {dinero(p.costo_litro)}/{unidadDe(p)}{presentacionDe(p) && ` · ${presentacionDe(p)}`}
               </div>
             </div>
             <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
@@ -120,18 +122,23 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
   const [sabor, setSabor] = useState(producto?.sabor ?? '')
   const [descripcion, setDescripcion] = useState(producto?.descripcion ?? '')
   const [presentacion, setPresentacion] = useState(String(producto?.presentacion ?? 1))
+  // Catálogo flexible (src/lib/unidades.ts): en qué se mide y en qué se entrega. Como la presentación, sólo al crearlo.
+  const [unidad, setUnidad] = useState(producto ? unidadDe(producto) : 'L')
+  const [tipoEnvase, setTipoEnvase] = useState(producto?.envase ?? '')
   const [precio, setPrecio] = useState(String(producto?.precio_litro ?? ''))
   const [costo, setCosto] = useState(String(producto?.costo_litro ?? ''))
   const [color, setColor] = useState(producto?.color_hex ?? COLORES[0])
   const [disponible, setDisponible] = useState(producto?.disponible ?? true)
-  // RF-032: litros por envase. Se elige al crear el sabor y ya no cambia: lo vendido se guarda en envases de ese tamaño.
+  // RF-032: contenido por envase. Se elige al crear el sabor y ya no cambia: lo vendido se guarda en envases de ese tamaño.
   const envase = producto ? (producto.presentacion ?? 1) : Math.round(Number(presentacion.replace(',', '.')) * 100) / 100
 
   async function guardarSabor() {
     if (!sabor.trim() || !Number(precio)) return aviso('Falta nombre o precio')
-    if (!(envase > 0 && envase <= 999)) return aviso('La presentación son los litros de cada envase, por ejemplo 1 o 0.5')
+    if (!(envase > 0 && envase <= 999)) return aviso(`La presentación es lo que trae cada envase en ${unidad}, por ejemplo 1 o 0.5`)
+    if (!unidad.trim()) return aviso('Escribe la unidad, por ejemplo L, kg o pz')
     await guardar('productos', {
       id: producto?.id ?? uid(), sabor: sabor.trim(), descripcion: descripcion.trim(), presentacion: envase,
+      ...(producto ? { unidad: producto.unidad, envase: producto.envase } : { unidad: unidad.trim(), envase: tipoEnvase || undefined }),
       precio_litro: Number(precio), costo_litro: Number(costo) || 0, color_hex: color, disponible,
     })
     onCerrar()
@@ -146,19 +153,37 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
         </Campo>
         {producto ? (
           <div className="rounded-xl bg-niebla px-4 py-3 text-sm">
-            Presentación: <b>envase de {envase} L</b>. <span className="text-apagado">Se elige al crear el sabor.</span>
+            Presentación: <b>{presentacionDe(producto) ?? `por ${nombreUnidad(unidad, 1)}`}</b>. <span className="text-apagado">Se elige al crear el sabor.</span>
           </div>
         ) : (
-          <Campo etiqueta="Presentación (litros por envase)">
-            <input className={claseInput} inputMode="decimal" value={presentacion} onChange={(e) => setPresentacion(e.target.value)} placeholder="Ej. 1 o 0.5" />
-          </Campo>
+          <>
+            <Campo etiqueta="Se mide en">
+              <div className="flex flex-wrap gap-2">
+                {['L', 'kg', 'pz'].map((u) => (
+                  <button key={u} type="button" onClick={() => setUnidad(u)} className={`rounded-full px-4 py-2.5 text-sm font-semibold ${unidad === u ? 'bg-tinta text-white' : 'bg-niebla'}`}>
+                    {nombreUnidad(u, 2)}
+                  </button>
+                ))}
+                <input className={`${claseInput.replace('w-full', '')} w-28 py-2.5`} value={['L', 'kg', 'pz'].includes(unidad) ? '' : unidad} onChange={(e) => setUnidad(e.target.value.slice(0, 10))} placeholder="Otra" aria-label="Otra unidad" />
+              </div>
+            </Campo>
+            <Campo etiqueta="Envase">
+              <select className={claseInput} value={tipoEnvase} onChange={(e) => setTipoEnvase(e.target.value)}>
+                <option value="">Sin envase (se vende suelto)</option>
+                {TIPOS_ENVASE.filter((t) => t.tipo !== 'pieza' && t.tipo !== 'granel').map((t) => <option key={t.tipo} value={t.tipo}>{t.nombre}</option>)}
+              </select>
+            </Campo>
+            <Campo etiqueta={`Contenido por envase (en ${unidad || 'la unidad'})`}>
+              <input className={claseInput} inputMode="decimal" value={presentacion} onChange={(e) => setPresentacion(e.target.value)} placeholder="Ej. 1, 0.5 o 20" />
+            </Campo>
+          </>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Precio por litro"><input className={claseInput} inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Campo>
-          <Campo etiqueta="Costo por litro"><input className={claseInput} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} /></Campo>
+          <Campo etiqueta={`Precio por ${nombreUnidad(unidad, 1)}`}><input className={claseInput} inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Campo>
+          <Campo etiqueta={`Costo por ${nombreUnidad(unidad, 1)}`}><input className={claseInput} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} /></Campo>
         </div>
-        {envase > 0 && envase !== 1 && Number(precio) > 0 && (
-          <p className="-mt-2 text-xs text-apagado">El envase de {envase} L se vende en {dinero(Number(precio) * envase)} y cuesta {dinero((Number(costo) || 0) * envase)}.</p>
+        {envase > 0 && (envase !== 1 || tipoEnvase) && Number(precio) > 0 && (
+          <p className="-mt-2 text-xs text-apagado">Cada envase de {formato(envase)} {unidad} se vende en {dinero(Number(precio) * envase)} y cuesta {dinero((Number(costo) || 0) * envase)}.</p>
         )}
         <div>
           <div className="mb-1.5 text-sm font-semibold text-apagado">Color</div>

@@ -4,6 +4,7 @@ import type { EstadoPedido, Producto } from '../../lib/db'
 import { litrosTxt, type VentaSabor } from '../../lib/admin-datos'
 import { cambio } from '../../lib/reportes'
 import { dinero } from '../../lib/fechas'
+import { presentacionDe, unidadDe } from '../../lib/unidades'
 import { AveEmpresa, Frasco } from './marca'
 
 // Cambio contra el periodo anterior, con signo y flecha (nunca sólo con color). null = no hay con qué comparar.
@@ -76,7 +77,7 @@ export function TarjetaSabor({ producto, venta, posicion, conPrecio = false, fra
           <span className="tabular-nums">{vendido ? litrosTxt(venta.litros) : 'Sin ventas'}</span>
           <Delta valor={cambio(venta.litros, venta.litrosAntes)} />
         </div>
-        {conPrecio && <div className="mt-1 text-xs text-apagado tabular-nums">{dinero(producto.precio_litro)}/L · envase de {producto.presentacion ?? 1} L</div>}
+        {conPrecio && <div className="mt-1 text-xs text-apagado tabular-nums">{dinero(producto.precio_litro)}/{unidadDe(producto)}{presentacionDe(producto) && ` · ${presentacionDe(producto)}`}</div>}
       </div>
     </button>
   )
