@@ -48,6 +48,8 @@ CREATE TABLE empresas (
   zona_horaria   varchar(64) NOT NULL DEFAULT 'America/Mexico_City',
   color_marca    char(7),
   logo           text,
+  giros          text[] NOT NULL DEFAULT '{}',           -- qué vende, según el registro (/registro)
+  control_retornables boolean NOT NULL DEFAULT false,    -- lleva la cuenta de envases prestados
   activa         boolean NOT NULL DEFAULT true,          -- false = suspendida: nadie de ella entra
   creado_en      timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now(),
@@ -107,6 +109,35 @@ CREATE TABLE recuperaciones_password (
 );
 CREATE INDEX recuperaciones_usuario ON recuperaciones_password (id_usuario) WHERE usado_en IS NULL;
 CREATE INDEX recuperaciones_ip ON recuperaciones_password (ip, creado_en DESC);
+
+-- Registro de una empresa nueva: el código que confirma el correo antes de crear la cuenta (aún no hay empresa).
+CREATE TABLE verificaciones_correo (
+  id_verificacion uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  correo          varchar(150) NOT NULL,
+  codigo_hash     text NOT NULL,
+  creado_en       timestamptz NOT NULL DEFAULT now(),
+  expira_en       timestamptz NOT NULL,
+  usado_en        timestamptz,
+  intentos        smallint NOT NULL DEFAULT 0,                 -- códigos incorrectos; a los 5 se invalida
+  ip              inet
+);
+CREATE INDEX verificaciones_correo_abiertas ON verificaciones_correo (lower(correo), creado_en DESC);
+CREATE INDEX verificaciones_correo_ip ON verificaciones_correo (ip, creado_en DESC);
+
+-- El enlace con el que un repartidor invitado crea su cuenta. Sólo se guarda un HMAC del enlace.
+CREATE TABLE invitaciones (
+  id_invitacion uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa    uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE CASCADE,
+  correo        varchar(150) NOT NULL,
+  rol           rol_usuario NOT NULL DEFAULT 'vendedor',
+  token_hash    text NOT NULL UNIQUE,
+  id_invitador  uuid,
+  creado_en     timestamptz NOT NULL DEFAULT now(),
+  expira_en     timestamptz NOT NULL,
+  usado_en      timestamptz,
+  CONSTRAINT invitaciones_invitador_misma_empresa FOREIGN KEY (id_empresa, id_invitador) REFERENCES usuarios (id_empresa, id_usuario) ON DELETE SET NULL (id_invitador)
+);
+CREATE INDEX invitaciones_empresa ON invitaciones (id_empresa);
 
 -- RF-003: registro de intentos de inicio de sesión. Los límites cuentan por cuenta + IP y por IP (api/_lib/auth.ts):
 -- así nadie bloquea la cuenta de otro desde fuera ni prueba contraseñas en muchas cuentas.
@@ -542,6 +573,8 @@ BEGIN
   -- Lo que creen 02_vistas.sql y las migraciones futuras también.
   EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO reparto_app', current_schema());
   EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT ON SEQUENCES TO reparto_app', current_schema());
+  -- No es de ninguna empresa: sólo la usa el registro, antes de que la empresa exista.
+  REVOKE ALL ON verificaciones_correo FROM reparto_app;
 END $$;
 
 DO $$
@@ -551,7 +584,7 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY['empresas', 'usuarios', 'clientes', 'productos', 'stock_diario', 'produccion_diaria', 'pedidos',
                            'detalle_pedido', 'recordatorios', 'auditoria', 'operaciones_sync', 'eliminaciones',
-                           'retiros_vendedor', 'suscripciones_push', 'notificaciones'] LOOP
+                           'retiros_vendedor', 'suscripciones_push', 'notificaciones', 'invitaciones'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('CREATE POLICY por_empresa ON %I TO reparto_app USING (%s) WITH CHECK (%s)', t, regla, regla);
   END LOOP;

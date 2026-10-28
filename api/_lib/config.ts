@@ -139,12 +139,13 @@ export function leerConfig() {
   // En Vercel cuenta como producción también la vista previa: es pública y no debe escribir códigos en el registro.
   const produccion = process.env.NODE_ENV === 'production' || !!process.env.VERCEL
   const prueba = process.env.NODE_ENV === 'test'
+  const corsOrigins = leerCors(produccion)
   return {
     port: Number(process.env.PORT ?? 3000),
     conexion: leerConexion(),
     jwtSecret,
     ...leerPimienta(jwtSecret),
-    corsOrigins: leerCors(produccion),
+    corsOrigins,
     trustProxy: leerProxy(),
     enVercel: !!process.env.VERCEL,
     sinLimiteDePeticiones: prueba, // las pruebas inician sesión decenas de veces desde la misma IP (los límites de la base sí aplican)
@@ -166,6 +167,14 @@ export function leerConfig() {
     recuperacionPorDiaCuenta: 6, // y por día: con 5 intentos por código, como mucho 30 intentos de adivinarlo al día
     recuperacionPorHoraIp: 10,
     recuperacionPisoMs: prueba ? 300 : 2000, // /auth/recuperar tarda siempre lo mismo: el tiempo no dice si el correo existe
+    // Registro de empresas (/registro): el código que confirma el correo, con los mismos topes que la recuperación, y
+    // cuánto vale la confirmación para terminar el formulario (se puede dejar a medias y seguir otro día).
+    verificacionMinutos: 15,
+    verificacionHoras: 24,
+    // Invitaciones a repartidores: el enlace va a la app (APP_URL; si no, el primer CORS_ORIGINS o el dominio de Vercel).
+    invitacionDias: 7,
+    urlApp: (process.env.APP_URL?.trim() || corsOrigins[0]
+      || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:5173')).replace(/\/+$/, ''),
     // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.
     ...leerPush(),
     // Para saber cuál es «hoy» al avisar de cambios en la ruta del día.

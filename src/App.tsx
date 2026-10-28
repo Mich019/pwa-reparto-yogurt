@@ -4,6 +4,7 @@ import { AdminLayout } from './views/admin/AdminLayout'
 import { Login, CambioObligatorio } from './views/pwa/Login'
 import { PwaLayout } from './views/pwa/PwaLayout'
 import { RegistroEmpresa } from './views/registro/RegistroEmpresa'
+import { AceptarInvitacion } from './views/registro/AceptarInvitacion'
 import { Avisos } from './components/ui'
 import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
@@ -16,17 +17,21 @@ function esRuta(ruta: string) {
 }
 const esRutaAdmin = () => esRuta('/admin')
 const esRutaRegistro = () => esRuta('/registro')
+// El enlace de la invitación va en el fragmento (/invitacion#…), así que aquí sólo cuenta la ruta.
+const esRutaInvitacion = () => typeof window !== 'undefined' && window.location.pathname.startsWith('/invitacion')
 
 export default function App() {
   const sesion = useSesion()
   const oscuro = useTemaOscuro()
   const [esAdmin, setEsAdmin] = useState(esRutaAdmin)
   const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
+  const [esInvitacion, setEsInvitacion] = useState(esRutaInvitacion)
 
   useEffect(() => {
     const alCambiar = () => {
       setEsAdmin(esRutaAdmin())
       setEsRegistro(esRutaRegistro())
+      setEsInvitacion(esRutaInvitacion())
     }
     window.addEventListener('popstate', alCambiar)
     window.addEventListener('hashchange', alCambiar)
@@ -55,6 +60,24 @@ export default function App() {
     window.history.pushState({}, '', '/admin')
     setEsRegistro(false)
     setEsAdmin(true)
+  }
+
+  function irAPwaDesdeInvitacion() {
+    window.history.pushState({}, '', '/')
+    setEsInvitacion(false)
+    setEsAdmin(false)
+  }
+
+  // =========================================================================
+  // INVITACIÓN A UN REPARTIDOR (/invitacion#…): crea su cuenta y entra a la app
+  // =========================================================================
+  if (esInvitacion && MODO_SERVIDOR) {
+    return (
+      <div className="tema-admin tema-campo">
+        <Avisos />
+        <AceptarInvitacion onListo={irAPwaDesdeInvitacion} />
+      </div>
+    )
   }
 
   // =========================================================================

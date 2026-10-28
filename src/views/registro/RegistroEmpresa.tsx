@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Eye, EyeOff, ImagePlus, Mail, Minus, Plus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, ErrorApi, ErrorRed } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
+import { iniciarSesion } from '../../lib/sesion'
 import {
   alternarTamano, alternarTipo, aplicarGiros, borrarBorrador, COLORES_MARCA, colorPara, correoValido, cuerpoRegistro,
   GIROS, guardarBorrador, leerBorrador, leerTamano, nombreEnvase, numero, presentaciones, productoNuevo, registroVacio,
@@ -33,7 +34,7 @@ interface Pantalla {
   contenido: ReactNode
 }
 
-type Envio = { estado: 'nada' } | { estado: 'enviando' } | { estado: 'listo' } | { estado: 'error'; mensaje: string; pendiente?: boolean }
+type Envio = { estado: 'nada' } | { estado: 'enviando' } | { estado: 'listo' } | { estado: 'error'; mensaje: string }
 
 export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
   const [inicial] = useState(leerBorrador)
@@ -94,10 +95,18 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
     try {
       await api('/registro/empresa', { cuerpo: cuerpoRegistro(r, password) })
       borrarBorrador()
+      // Ya con su cuenta: entra al panel sin volver a escribir la contraseña. Si algo falla, la pantalla final lo
+      // manda a iniciar sesión.
+      await iniciarSesion(r.correo, password, { cookie: true }).catch(() => {})
       setEnvio({ estado: 'listo' })
     } catch (e) {
-      if (e instanceof ErrorApi && e.status === 404) {
-        setEnvio({ estado: 'error', pendiente: true, mensaje: 'El servidor todavía no recibe altas de empresas: llega con la fase multiempresa. Tus datos quedaron guardados en este equipo.' })
+      if (e instanceof ErrorApi && e.codigo === 'CORREO_SIN_CONFIRMAR') {
+        // El comprobante venció (más de 24 h con el registro a medias): se confirma el correo otra vez.
+        setR((x) => ({ ...x, verificado: '', comprobante: '' }))
+        setClave('verificar')
+        setEnvio({ estado: 'nada' })
+      } else if (e instanceof ErrorApi && e.codigo === 'CORREO_REPETIDO') {
+        setEnvio({ estado: 'error', mensaje: 'Ese correo ya tiene una cuenta. Entra con tu contraseña o usa «¿Olvidaste tu contraseña?» en el panel.' })
       } else if (e instanceof ErrorRed) {
         setEnvio({ estado: 'error', mensaje: 'Sin conexión con el servidor. Tus datos quedaron guardados; inténtalo en un momento.' })
       } else {
@@ -157,23 +166,26 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
       <form
         id="pantalla"
         onSubmit={(e) => { e.preventDefault(); alContinuar() }}
-        className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-6 pb-40"
+        className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pb-32"
         noValidate
       >
-        {retomado && actual.clave === inicial?.paso && (
-          <div className="mb-6 flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3 text-sm">
-            <span className="flex-1">Seguimos donde te quedaste.</span>
-            <button type="button" onClick={empezarDeNuevo} className="flex items-center gap-1 font-semibold text-azul hover:underline">
-              <RotateCcw size={14} /> Empezar de nuevo
-            </button>
-          </div>
-        )}
+        {/* Centrada en el alto que queda entre el encabezado y los botones; si no cabe, empieza arriba y se desplaza. */}
+        <div className="my-auto w-full py-8">
+          {retomado && actual.clave === inicial?.paso && (
+            <div className="mb-6 flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3 text-sm">
+              <span className="flex-1">Seguimos donde te quedaste.</span>
+              <button type="button" onClick={empezarDeNuevo} className="flex items-center gap-1 font-semibold text-azul hover:underline">
+                <RotateCcw size={14} /> Empezar de nuevo
+              </button>
+            </div>
+          )}
 
-        <div key={actual.clave} className="animate-[paso-entrar_.35s_ease-out]">
-          {/* Sin campo que enfocar, la pregunta tiene el foco: Enter también avanza desde ahí. */}
-          <h1 ref={titulo} tabIndex={-1} onKeyDown={(e) => e.key === 'Enter' && alContinuar()} className="text-[1.9rem] font-semibold leading-[1.15] outline-none">{actual.pregunta}</h1>
-          {actual.ayuda && <p className="mt-2 text-[15px] text-apagado">{actual.ayuda}</p>}
-          <div className="mt-7">{actual.contenido}</div>
+          <div key={actual.clave} className="animate-[paso-entrar_.35s_ease-out]">
+            {/* Sin campo que enfocar, la pregunta tiene el foco: Enter también avanza desde ahí. */}
+            <h1 ref={titulo} tabIndex={-1} onKeyDown={(e) => e.key === 'Enter' && alContinuar()} className="text-[1.9rem] font-semibold leading-[1.15] outline-none">{actual.pregunta}</h1>
+            {actual.ayuda && <p className="mt-2 text-[15px] text-apagado">{actual.ayuda}</p>}
+            <div className="mt-7">{actual.contenido}</div>
+          </div>
         </div>
       </form>
 
@@ -185,7 +197,7 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
             </p>
           )}
           {envio.estado === 'error' && ultima && (
-            <div role="alert" className={`mb-2 flex items-start gap-2 rounded-2xl p-3 text-sm font-medium ${envio.pendiente ? 'bg-niebla text-tinta' : 'bg-rojo/10 text-rojo'}`}>
+            <div role="alert" className="mb-2 flex items-start gap-2 rounded-2xl bg-rojo/10 p-3 text-sm font-medium text-rojo">
               <AlertCircle size={16} className="mt-0.5 shrink-0" /> <span>{envio.mensaje}</span>
             </div>
           )}
@@ -281,7 +293,7 @@ function armarPantallas(
         <PasoVerificar
           correo={r.correo.trim().toLowerCase()}
           verificado={r.verificado}
-          onVerificado={(c) => { cambiar((x) => ({ ...x, verificado: c })); avanzar() }}
+          onVerificado={(c, comprobante) => { cambiar((x) => ({ ...x, verificado: c, comprobante })); avanzar() }}
         />
       ),
     },
@@ -604,11 +616,16 @@ function PasoPassword({ password, setPassword, correo }: { password: string; set
 
 const ESPERA_REENVIO = 60 // segundos
 
-// Confirmación del correo con un código de 6 dígitos; al completarlo avanza solo.
-function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; verificado: string; onVerificado: (correo: string) => void }) {
+// Los códigos ya pedidos en esta visita, por correo: volver a esta pantalla no manda otro (para eso está el botón).
+const codigoPedido = new Set<string>()
+
+// Confirmación del correo con un código de 6 dígitos (api/_lib/registro.ts); al completarlo avanza solo.
+function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; verificado: string; onVerificado: (correo: string, comprobante: string) => void }) {
   const [codigo, setCodigo] = useState('')
   const [espera, setEspera] = useState(ESPERA_REENVIO)
   const [reenviado, setReenviado] = useState(false)
+  const [revisando, setRevisando] = useState(false)
+  const [error, setError] = useState('')
   const listo = verificado === correo
 
   useEffect(() => {
@@ -617,12 +634,37 @@ function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; v
     return () => clearTimeout(t)
   }, [espera, listo])
 
-  // Prototipo: todavía no hay servidor que mande el correo, así que cualquier código de 6 dígitos confirma.
-  // Con la Fase 2 (registro por cuenta propia) aquí se valida el código en el servidor.
-  function escribir(v: string) {
+  async function pedir() {
+    codigoPedido.add(correo)
+    setError('')
+    try {
+      await api('/registro/codigo', { cuerpo: { correo } })
+    } catch (e) {
+      codigoPedido.delete(correo)
+      setError(e instanceof ErrorRed ? 'Sin conexión: no pudimos mandar el código. Inténtalo en un momento.' : e instanceof Error ? e.message : 'No pudimos mandar el código')
+      setEspera(0)
+    }
+  }
+
+  useEffect(() => {
+    if (!listo && !codigoPedido.has(correo)) void pedir()
+  }, [correo, listo])
+
+  async function escribir(v: string) {
     const limpio = v.replace(/\D/g, '').slice(0, 6)
     setCodigo(limpio)
-    if (limpio.length === 6) onVerificado(correo)
+    setError('')
+    if (limpio.length < 6) return
+    setRevisando(true)
+    try {
+      const r = await api<{ comprobante: string }>('/registro/verificar', { cuerpo: { correo, codigo: limpio } })
+      onVerificado(correo, r.comprobante)
+    } catch (e) {
+      setCodigo('')
+      setError(e instanceof ErrorRed ? 'Sin conexión: revisa tu señal y vuelve a escribir el código.' : e instanceof Error ? e.message : 'No pudimos revisar el código')
+    } finally {
+      setRevisando(false)
+    }
   }
 
   if (listo) {
@@ -648,8 +690,10 @@ function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; v
         maxLength={6}
         placeholder="000000"
         aria-label="Código de 6 dígitos"
-        className={`${claseInput} py-5 text-center text-3xl font-semibold tracking-[0.5em] tabular-nums`}
+        disabled={revisando}
+        className={`${claseInput} py-5 text-center text-3xl font-semibold tracking-[0.5em] tabular-nums disabled:opacity-60`}
       />
+      {error && <p role="alert" className="flex items-center gap-2 text-sm font-medium text-rojo"><AlertCircle size={16} className="shrink-0" /> {error}</p>}
       <div className="text-[15px]">
         {espera > 0 ? (
           <span className="text-apagado">
@@ -657,14 +701,11 @@ function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; v
             Puedes pedir otro en <span className="tabular-nums">{espera}</span> s.
           </span>
         ) : (
-          <button type="button" onClick={() => { setCodigo(''); setReenviado(true); setEspera(ESPERA_REENVIO) }} className="font-semibold text-azul hover:underline">
+          <button type="button" onClick={() => { setCodigo(''); setReenviado(true); setEspera(ESPERA_REENVIO); void pedir() }} className="font-semibold text-azul hover:underline">
             Mandar otro código
           </button>
         )}
       </div>
-      <p className="rounded-2xl bg-niebla px-4 py-3 text-sm text-apagado">
-        Versión de prueba: todavía no se manda el correo, cualquier código de 6 dígitos sirve.
-      </p>
     </div>
   )
 }
@@ -1052,7 +1093,7 @@ function Listo({ r, onIrAlPanel }: { r: Registro; onIrAlPanel: () => void }) {
         <Check size={40} strokeWidth={3} />
       </div>
       <h1 className="mt-6 text-[2rem] font-semibold leading-tight">¡{r.negocio} ya está lista!</h1>
-      <p className="mt-2 max-w-sm text-apagado">Entra al panel con tu correo y tu contraseña para empezar a levantar pedidos.</p>
+      <p className="mt-2 max-w-sm text-apagado">Desde el panel das de alta a tus clientes y sigues las entregas de tus repartidores.</p>
       <button type="button" onClick={onIrAlPanel} className="mt-8 rounded-full bg-tinta px-8 py-4 font-semibold text-white hover:bg-marca-oscuro">
         Ir al panel
       </button>

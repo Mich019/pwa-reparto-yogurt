@@ -17,6 +17,7 @@ import { rutasUsuarios } from './usuarios.js'
 import { rutasAdmin } from './admin.js'
 import { rutasSync } from './sync/rutas.js'
 import { rutasRecuperacion } from './recuperacion.js'
+import { rutasRegistro } from './registro.js'
 import { ipCliente } from './seguridad.js'
 
 export type Rol = 'administrador' | 'vendedor'
@@ -131,6 +132,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasAuth(app, ctx, { requiereSesionAunConPasswordPendiente })
   await rutasDosPasos(app, ctx, { requiereSesion })
   await rutasRecuperacion(app, ctx)
+  await rutasRegistro(app, ctx, { requiereAdmin })
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })
   await rutasCartera(app, ctx, { requiereAdmin }, despachador)

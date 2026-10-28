@@ -31,7 +31,7 @@ const sinTransaccion = (texto: string) => texto.replace(/^\s*(BEGIN|COMMIT);\s*$
 const TABLAS = [
   'notificaciones', 'suscripciones_push', 'eliminaciones', 'retiros_vendedor', 'operaciones_sync', 'auditoria',
   'recordatorios', 'detalle_pedido', 'pedidos', 'produccion_diaria', 'stock_diario', 'productos', 'clientes',
-  'dos_pasos', 'intentos_login', 'recuperaciones_password', 'sesiones', 'usuarios', 'empresas',
+  'invitaciones', 'verificaciones_correo', 'dos_pasos', 'intentos_login', 'recuperaciones_password', 'sesiones', 'usuarios', 'empresas',
 ]
 const TIPOS = [
   // 01_esquema.sql

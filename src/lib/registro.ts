@@ -127,6 +127,7 @@ export interface Registro {
   nombre: string
   correo: string
   verificado: string // el correo que ya se confirmó con el código; si se cambia el correo, hay que confirmarlo otra vez
+  comprobante: string // lo que devuelve el servidor al confirmar el correo; vale 24 h para terminar el registro
   terminos: boolean
   giros: string[]
   tipos: TipoEnvase[] // envases elegidos, en orden
@@ -142,7 +143,7 @@ const nuevoId = () => crypto.randomUUID()
 
 export function registroVacio(): Registro {
   return {
-    negocio: '', nombre: '', correo: '', verificado: '', terminos: false,
+    negocio: '', nombre: '', correo: '', verificado: '', comprobante: '', terminos: false,
     giros: [], tipos: [], envases: [], controlRetornables: false, productos: [],
     marca: { color: COLORES_MARCA[0], logo: null },
     zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Mexico_City',
@@ -291,9 +292,11 @@ export function presentaciones(r: Registro) {
   })
 }
 
-// Lo que se manda al servidor. La contraseña va aparte: nunca se guarda en el borrador.
+// Lo que se manda al servidor (POST /registro/empresa, api/_lib/registro.ts). La contraseña va aparte: nunca se guarda
+// en el borrador. Se recorta como al iniciar sesión.
 export function cuerpoRegistro(r: Registro, password: string) {
   return {
+    comprobante: r.comprobante,
     empresa: {
       nombre: r.negocio.trim(),
       giros: r.giros,
@@ -302,8 +305,8 @@ export function cuerpoRegistro(r: Registro, password: string) {
       logo: r.marca.logo,
       controlRetornables: r.controlRetornables,
     },
-    administrador: { nombre: r.nombre.trim(), correo: r.correo.trim().toLowerCase(), password, aceptaTerminos: r.terminos },
-    envases: r.envases.map((e) => ({ id: e.id, tipo: e.tipo, contenido: e.contenido, unidad: e.unidad, retornable: e.retornable })),
+    administrador: { nombre: r.nombre.trim(), correo: r.correo.trim().toLowerCase(), password: password.trim(), aceptaTerminos: r.terminos },
+    envases: r.envases.map((e) => ({ id: e.id, nombre: nombreEnvase(e), tipo: e.tipo, contenido: e.contenido, unidad: e.unidad, retornable: e.retornable })),
     productos: r.productos.map((p) => ({
       nombre: p.nombre.trim(),
       color: p.color,
