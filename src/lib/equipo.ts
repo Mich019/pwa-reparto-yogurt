@@ -41,6 +41,10 @@ export async function crearMiembro(d: { nombre: string; correo: string; telefono
   return r
 }
 
+// Le llega un enlace por correo para crear su propia contraseña (api/_lib/registro.ts); la cuenta aparece al aceptarlo.
+export const invitar = (correo: string) =>
+  llamarAutenticado<{ correo: string; dias: number }>('/invitaciones', { metodo: 'POST', cuerpo: { correo } })
+
 export async function editarMiembro(id: string, d: Partial<{ nombre: string; correo: string; telefono: string; rol: Rol }>) {
   const r = await llamarAutenticado<{ usuario: Miembro }>(`/usuarios/${id}`, { metodo: 'PATCH', cuerpo: d })
   refrescar()

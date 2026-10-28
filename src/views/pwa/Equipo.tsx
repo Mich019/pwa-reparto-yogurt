@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, Check, ChevronRight, Copy, KeyRound, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, Check, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
-  cargarEquipo, crearMiembro, darDeBaja, editarMiembro, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
+  cargarEquipo, crearMiembro, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro,
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
@@ -36,6 +36,7 @@ export function Equipo() {
   const [form, setForm] = useState<Miembro | 'nuevo' | null>(null)
   const [clave, setClave] = useState<DatosClave | null>(null)
   const [cartera, setCartera] = useState<{ desde: string } | null>(null)
+  const [invitando, setInvitando] = useState(false)
 
   async function cargar() {
     setCargando(true)
@@ -76,9 +77,14 @@ export function Equipo() {
       <div className="px-4 pt-safe">
         <div className="mt-3 flex items-center justify-between gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Equipo</h1>
-          <button onClick={() => setForm('nuevo')} aria-label="Nueva cuenta" className="flex items-center gap-2 rounded-full bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700">
-            <UserPlus size={18} /> Nueva cuenta
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setInvitando(true)} className="flex items-center gap-2 rounded-full bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
+              <Mail size={18} /> Invitar
+            </button>
+            <button onClick={() => setForm('nuevo')} aria-label="Nueva cuenta" className="flex items-center gap-2 rounded-full bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700">
+              <UserPlus size={18} /> Nueva cuenta
+            </button>
+          </div>
         </div>
       </div>
 
@@ -132,8 +138,39 @@ export function Equipo() {
         />
       )}
       {clave && <ClaveTemporal datos={clave} onCerrar={() => setClave(null)} />}
+      {invitando && <Invitar onCerrar={() => setInvitando(false)} />}
       {cartera && equipo && <ReasignarCartera equipo={equipo.usuarios} sinAsignar={equipo.clientesSinAsignar} desdeInicial={cartera.desde} onCerrar={() => setCartera(null)} />}
     </div>
+  )
+}
+
+// Invitar por correo: la persona crea su propia contraseña con el enlace y entra como vendedor.
+function Invitar({ onCerrar }: { onCerrar: () => void }) {
+  const [correo, setCorreo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+  async function enviar() {
+    setEnviando(true)
+    setError('')
+    try {
+      const r = await invitar(correo.trim())
+      aviso(`Invitación enviada a ${r.correo}`)
+      onCerrar()
+    } catch (e) {
+      setError(mensaje(e))
+    } finally {
+      setEnviando(false)
+    }
+  }
+  return (
+    <Hoja abierta onCerrar={onCerrar} titulo="Invitar a un vendedor"
+      pie={<Boton className="w-full" onClick={() => void enviar()} disabled={enviando || !correo.trim()}>{enviando ? 'Enviando…' : 'Enviar invitación'}</Boton>}>
+      <p className="mb-3 text-sm text-apagado">Le llega un enlace por correo para crear su propia contraseña. Su cuenta aparece aquí cuando lo acepte; el enlace vence en 7 días.</p>
+      <Campo etiqueta="Correo">
+        <input className={claseInput} type="email" autoComplete="off" value={correo} onChange={(e) => setCorreo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && correo.trim() && void enviar()} placeholder="correo@ejemplo.com" />
+      </Campo>
+      {error && <p role="alert" className="mt-2 text-sm font-medium text-rojo">{error}</p>}
+    </Hoja>
   )
 }
 
