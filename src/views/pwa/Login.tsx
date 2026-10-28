@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AlertCircle, Eye, EyeOff, KeyRound, Mail, ShieldAlert } from 'lucide-react'
 import { cerrarSesion, iniciarSesion, mensajeErrorLogin } from '../../lib/sesion'
 import { ErrorApi } from '../../lib/api'
-import { LogoDanelle } from '../admin/marca'
+import { LogoEmpresa } from '../admin/marca'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
@@ -45,7 +45,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
       <div className="mx-auto w-full max-w-sm">
         {/* Cabecera limpia */}
         <div className="mb-8 flex flex-col items-center text-center">
-          <LogoDanelle className="h-24" />
+          <LogoEmpresa className="h-24" />
         </div>
 
         {pideCodigo ? (

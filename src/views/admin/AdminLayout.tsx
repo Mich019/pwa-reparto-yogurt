@@ -5,7 +5,7 @@ import { cerrarSesion, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
-import { LogoDanelle } from './marca'
+import { LogoEmpresa } from './marca'
 import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
@@ -83,7 +83,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   if (sesion && sesion.usuario.rol !== 'administrador') {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10 text-center">
-        <LogoDanelle className="h-16" />
+        <LogoEmpresa className="h-16" />
         <div className="mt-10 grid h-14 w-14 place-items-center rounded-full bg-rojo/10 text-rojo">
           <ShieldAlert size={28} aria-hidden="true" />
         </div>
@@ -133,7 +133,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
             aria-label="Ir al resumen"
             className={`rounded-xl ${anillo}`}
           >
-            <LogoDanelle className="h-11 lg:h-14" />
+            <LogoEmpresa className="h-11 lg:h-14" />
           </button>
         </div>
 

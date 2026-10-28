@@ -4,7 +4,7 @@ import type { EstadoPedido, Producto } from '../../lib/db'
 import { litrosTxt, type VentaSabor } from '../../lib/admin-datos'
 import { cambio } from '../../lib/reportes'
 import { dinero } from '../../lib/fechas'
-import { AveDanelle, Frasco } from './marca'
+import { AveEmpresa, Frasco } from './marca'
 
 // Cambio contra el periodo anterior, con signo y flecha (nunca sólo con color). null = no hay con qué comparar.
 export function Delta({ valor, className = 'text-xs' }: { valor: number | null; className?: string }) {
@@ -24,7 +24,7 @@ export function Delta({ valor, className = 'text-xs' }: { valor: number | null; 
 export function Vacio({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
-      <AveDanelle className="h-16 opacity-80" />
+      <AveEmpresa className="h-16 opacity-80" />
       <p className="max-w-xs text-sm text-apagado">{children}</p>
     </div>
   )

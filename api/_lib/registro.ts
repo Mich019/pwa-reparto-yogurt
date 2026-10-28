@@ -19,7 +19,7 @@ import { ipCliente, tokenAleatorio } from './seguridad.js'
 //    en el fragmento (#) de la dirección, que el navegador no manda a ningún servidor; aquí sólo se guarda su HMAC.
 
 const correo = z.string().trim().toLowerCase().max(150).regex(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'Correo no válido')
-const color = z.string().regex(/^#[0-9A-Fa-f]{6}$/)
+export const color = z.string().regex(/^#[0-9A-Fa-f]{6}$/)
 const zona = z.string().max(64).refine((z) => {
   try {
     new Intl.DateTimeFormat('es', { timeZone: z })
@@ -30,7 +30,7 @@ const zona = z.string().max(64).refine((z) => {
 }, 'Zona horaria no válida')
 // El logo va en la base como data URL (hasta 500 KB de imagen ≈ 700 000 caracteres). Se muestra siempre con <img>,
 // donde un SVG no puede ejecutar nada.
-const logo = z.string().max(700_000).regex(/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/]+=*$/, 'El logo debe ser una imagen PNG, JPG, WEBP o SVG')
+export const logo = z.string().max(700_000).regex(/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/]+=*$/, 'El logo debe ser una imagen PNG, JPG, WEBP o SVG')
 
 const bodyCodigo = z.object({ correo })
 const bodyVerificar = z.object({ correo, codigo: z.string().trim().regex(/^\d{6}$/) })

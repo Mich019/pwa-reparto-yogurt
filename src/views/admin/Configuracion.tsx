@@ -7,8 +7,10 @@ import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { SeccionSuscripcion } from './Suscripcion'
+import { MarcaEmpresa } from './MarcaEmpresa'
 
-// Configuración del panel: apariencia (de este navegador), la cuenta y su seguridad, la suscripción y cerrar sesión.
+// Configuración del panel: apariencia (de este navegador), la marca de la empresa, la cuenta y su seguridad, la
+// suscripción y cerrar sesión.
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
 
@@ -56,7 +58,7 @@ export function Configuracion() {
     <div className="mx-auto max-w-[880px] px-4 pt-2 sm:px-8">
       <header className="pb-6 pt-4">
         <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">Configuración</h1>
-        <p className="mt-3 text-sm text-apagado">Cómo se ve el panel, tu cuenta y su seguridad.</p>
+        <p className="mt-3 text-sm text-apagado">Cómo se ve el panel, la marca de tu negocio, tu cuenta y su seguridad.</p>
       </header>
 
       <div className="space-y-4">
@@ -85,6 +87,10 @@ export function Configuracion() {
               )
             })}
           </div>
+        </Seccion>
+
+        <Seccion id="marca" titulo="Marca" descripcion="El nombre, el logo y el color de tu negocio. Los ven tú, tus repartidores en su app y tus clientes en los PDF.">
+          <MarcaEmpresa />
         </Seccion>
 
         {u && (

@@ -10,6 +10,7 @@ import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
 import { useTemaOscuro } from './lib/tema'
+import { estiloMarca, useCargarMarca, useMarca } from './lib/marca'
 
 function esRuta(ruta: string) {
   if (typeof window === 'undefined') return false
@@ -23,6 +24,9 @@ const esRutaInvitacion = () => typeof window !== 'undefined' && window.location.
 export default function App() {
   const sesion = useSesion()
   const oscuro = useTemaOscuro()
+  // Marca de la empresa (src/lib/marca.ts): su color en los botones del panel y de la app de reparto.
+  useCargarMarca(sesion?.usuario.id)
+  const colorMarca = estiloMarca(useMarca())
   const [esAdmin, setEsAdmin] = useState(esRutaAdmin)
   const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
   const [esInvitacion, setEsInvitacion] = useState(esRutaInvitacion)
@@ -100,7 +104,7 @@ export default function App() {
     return (
       // `.tema-admin` lleva los colores y la letra del panel; la app de reparto no la usa (views/admin/tema.css).
       // `.oscuro`: el modo oscuro que se elige en Configuración (src/lib/tema.ts).
-      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`} style={colorMarca}>
         <Avisos />
         <VisorPdf />
         {!sesion ? <LoginAdmin onIrAPwa={irAPwa} onIrARegistro={irARegistro} />
@@ -116,7 +120,7 @@ export default function App() {
   // Con la imagen del panel (`.tema-admin`, siempre en claro); `.tema-campo` deja la hoja de «Nuevo pedido» con su
   // diseño de antes (views/pwa/tema-campo.css).
   return (
-    <div className="tema-admin tema-campo">
+    <div className="tema-admin tema-campo" style={colorMarca}>
       <Avisos />
       {MODO_SERVIDOR && !sesion ? <Login onIrAAdmin={irAAdmin} />
         : MODO_SERVIDOR && sesion?.usuario.debeCambiarPassword ? <CambioObligatorio />

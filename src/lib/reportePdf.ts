@@ -1,4 +1,5 @@
 import { ajustarTexto, anchoTexto, Documento, type Color, type Fuente, type PdfListo } from './pdf'
+import { colorLegible, esDanelle, marcaActual } from './marca'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
 // Informes en PDF para leer o imprimir (RF-048): el reporte de ventas y la libreta de clientes. Estilo sobrio de
@@ -15,7 +16,18 @@ const TENUE: Color = [0.42, 0.447, 0.502] // #6B7280
 const REGLA: Color = [0.82, 0.835, 0.859] // #D1D5DB
 const FINA: Color = [0.898, 0.906, 0.922] // #E5E7EB
 const FONDO: Color = [0.976, 0.98, 0.984] // #F9FAFB
-const ACENTO: Color = [3 / 255, 93 / 255, 56 / 255] // --color-marca
+// Marca de la empresa (src/lib/marca.ts): su nombre arriba de cada página y su color como acento. Sin marca propia,
+// «Reparto Yogurt» y el verde de Danelle.
+const acento = (): Color => {
+  const c = marcaActual()?.color
+  if (!c) return [3 / 255, 93 / 255, 56 / 255]
+  const h = colorLegible(c)
+  return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number]
+}
+const empresa = () => {
+  const m = marcaActual()
+  return m && !esDanelle(m) ? m.nombre : 'Reparto Yogurt'
+}
 const POSITIVO: Color = [0.016, 0.471, 0.341] // #047857
 const NEGATIVO: Color = [0.725, 0.11, 0.11] // #B91C1C
 
@@ -68,8 +80,8 @@ class Informe {
   portada(subtitulo: string, datos: [string, string][], ahora: Date) {
     const { pdf } = this
     pdf.pagina(this.ancho, this.alto)
-    pdf.rect(0, 0, this.ancho, 2.2, { relleno: ACENTO })
-    pdf.texto('REPARTO YOGURT', M, 15, { fuente: 'negrita', tam: 8, color: ACENTO })
+    pdf.rect(0, 0, this.ancho, 2.2, { relleno: acento() })
+    pdf.texto(empresa().toUpperCase(), M, 15, { fuente: 'negrita', tam: 8, color: acento() })
     pdf.texto(this.titulo, M, 26, { fuente: 'negrita', tam: 22, color: TINTA })
     pdf.texto(subtitulo, M, 33, { tam: 10.5, color: SECUNDARIO })
     const filas: [string, string][] = [...datos, ['Generado', fechaHora(ahora)]]
@@ -87,8 +99,8 @@ class Informe {
   private nuevaPagina() {
     const { pdf } = this
     pdf.pagina(this.ancho, this.alto)
-    pdf.rect(0, 0, this.ancho, 1.2, { relleno: ACENTO })
-    pdf.texto('REPARTO YOGURT', M, 11, { fuente: 'negrita', tam: 7, color: ACENTO })
+    pdf.rect(0, 0, this.ancho, 1.2, { relleno: acento() })
+    pdf.texto(empresa().toUpperCase(), M, 11, { fuente: 'negrita', tam: 7, color: acento() })
     pdf.texto(`${this.titulo} · ${this.referencia}`, this.ancho - M, 11, { tam: 7.5, color: TENUE, alinear: 'der' })
     pdf.linea(M, 13.5, this.ancho - M, 13.5, { color: REGLA, grosor: 0.2 })
     this.y = 21
@@ -101,7 +113,7 @@ class Informe {
     const { pdf } = this
     this.asegurar(30)
     this.seccion++
-    pdf.texto(dos(this.seccion), M, this.y + 4, { fuente: 'negrita', tam: 10, color: ACENTO })
+    pdf.texto(dos(this.seccion), M, this.y + 4, { fuente: 'negrita', tam: 10, color: acento() })
     pdf.texto(texto, M + 8, this.y + 4, { fuente: 'negrita', tam: 10.5, color: TINTA })
     if (nota) pdf.texto(nota, this.ancho - M, this.y + 4, { tam: 7.5, color: TENUE, alinear: 'der' })
     pdf.linea(M, this.y + 6.8, this.ancho - M, this.y + 6.8, { color: REGLA, grosor: 0.2 })
@@ -178,7 +190,7 @@ class Informe {
   listo(): PdfListo {
     this.pdf.enCadaPagina((n, total) => {
       this.pdf.linea(M, this.alto - 13, this.ancho - M, this.alto - 13, { color: REGLA, grosor: 0.2 })
-      this.pdf.texto('Reparto Yogurt · Documento interno y confidencial', M, this.alto - 8.5, { tam: 7, color: TENUE })
+      this.pdf.texto(`${empresa()} · Documento interno y confidencial`, M, this.alto - 8.5, { tam: 7, color: TENUE })
       this.pdf.texto(`Página ${n} de ${total}`, this.ancho - M, this.alto - 8.5, { tam: 7, color: TENUE, alinear: 'der' })
     })
     return this.pdf.listo()
@@ -256,7 +268,7 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
     r.periodos.forEach((p, i) => {
       const bx = ejeX + i * hueco + (hueco - barra) / 2
       const h = (p.ingreso / max) * alto
-      if (h > 0) pdf.rect(bx, inf.y + alto - h, barra, h, { relleno: ACENTO })
+      if (h > 0) pdf.rect(bx, inf.y + alto - h, barra, h, { relleno: acento() })
       if (r.periodos.length <= 12 && p.ingreso > 0) pdf.texto(dinCorto(p.ingreso), bx + barra / 2, inf.y + alto - h - 1.4, { tam: 6.5, color: SECUNDARIO, alinear: 'centro' })
       if (i % cadaCuanto === 0) pdf.texto(textoPeriodo(p, r.agrupar, false), bx + barra / 2, inf.y + alto + 4, { tam: 6.5, color: TENUE, alinear: 'centro' })
     })

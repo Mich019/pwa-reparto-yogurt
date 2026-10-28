@@ -3,7 +3,7 @@ import { AlertCircle, CreditCard, LogOut, Sparkles } from 'lucide-react'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion } from '../../lib/sesion'
 import { cancelarSuscripcion, suscribirse, type Suscripcion } from '../../lib/suscripcion'
-import { LogoDanelle } from './marca'
+import { LogoEmpresa } from './marca'
 
 // Cobro en el panel: el aviso de días de prueba, la pantalla cuando la prueba o la suscripción se acaban, y la sección
 // de Configuración. El pago pasa en Mercado Pago (src/lib/suscripcion.ts).
@@ -67,7 +67,7 @@ export function PantallaCobro({ s }: { s: Suscripcion }) {
   const pendiente = s.suscripcion === 'pending'
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10 text-center">
-      <LogoDanelle className="h-16" />
+      <LogoEmpresa className="h-16" />
       <h1 className="mt-10 max-w-md text-3xl font-semibold leading-tight">{s.suscripcion === 'cancelled' || s.suscripcion === 'paused' ? 'Tu suscripción terminó' : 'Tu prueba gratis terminó'}</h1>
       <p className="mt-3 max-w-md text-apagado">
         Tus clientes, pedidos y reportes siguen guardados. Suscríbete para que tú y tus repartidores sigan trabajando.

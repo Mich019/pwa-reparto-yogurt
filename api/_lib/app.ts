@@ -20,6 +20,7 @@ import { rutasRecuperacion } from './recuperacion.js'
 import { rutasRegistro } from './registro.js'
 import { crearClienteMp, type ClienteMp } from './mercadopago.js'
 import { CON_ACCESO, rutasSuscripcion, SUSCRIPCION_VENCIDA } from './suscripcion.js'
+import { rutasEmpresa } from './empresa.js'
 import { ipCliente } from './seguridad.js'
 
 export type Rol = 'administrador' | 'vendedor'
@@ -128,6 +129,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
     if (!rep.sent && req.usuario.rol !== 'administrador') return rep.code(403).send({ error: 'Sólo el administrador puede hacer esto', codigo: 'SIN_PERMISO' })
   }
 
+  const requiereSesionSinCobro = (req: FastifyRequest, rep: FastifyReply) => autenticar(req, rep, { sinCobro: true })
   const requiereAdminSinCobro = async (req: FastifyRequest, rep: FastifyReply) => {
     await autenticar(req, rep, { sinCobro: true })
     if (!rep.sent && req.usuario.rol !== 'administrador') return rep.code(403).send({ error: 'Sólo el administrador puede hacer esto', codigo: 'SIN_PERMISO' })
@@ -143,6 +145,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasDosPasos(app, ctx, { requiereSesion })
   await rutasRecuperacion(app, ctx)
   await rutasRegistro(app, ctx, { requiereAdmin })
+  await rutasEmpresa(app, ctx, { requiereSesionSinCobro, requiereAdmin })
   await rutasSuscripcion(app, ctx, ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config), { requiereAdminSinCobro })
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })
