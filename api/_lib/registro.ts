@@ -113,6 +113,9 @@ export function productosDelRegistro(b: Pick<z.infer<typeof bodyEmpresa>, 'envas
   return filas
 }
 
+// Lo que se guarda de un enlace de invitación (nunca el enlace): lo usan el registro y el panel de la plataforma.
+export const hashInvitacion = (config: Contexto['config'], token: string) => createHmac('sha256', config.pimienta).update(`invitacion:${token}`).digest('hex')
+
 export async function rutasRegistro(app: FastifyInstance, { db, config }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
   const hmac = (uso: string, valor: string) => createHmac('sha256', config.pimienta).update(`${uso}:${valor}`).digest('hex')
   const iguales = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
@@ -194,7 +197,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
     const token = tokenAleatorio()
     await cx.query(
       `INSERT INTO invitaciones (correo, token_hash, id_invitador, expira_en) VALUES ($1, $2, $3, now() + make_interval(days => $4))`,
-      [c, hmac('invitacion', token), idInvitador, config.invitacionDias],
+      [c, hashInvitacion(config, token), idInvitador, config.invitacionDias],
     )
     return { correo: c, url: `${config.urlApp}/invitacion#${token}` }
   }
@@ -277,7 +280,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
          FROM invitaciones i JOIN empresas e USING (id_empresa)
         WHERE i.token_hash = $1 AND i.usado_en IS NULL AND i.expira_en > now() AND e.activa
         ${bloquear ? 'FOR UPDATE OF i' : ''}`,
-      [hmac('invitacion', token)],
+      [hashInvitacion(config, token)],
     )
     return i
   }

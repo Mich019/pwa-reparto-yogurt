@@ -55,7 +55,7 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
           <div className="flex gap-2">
             <div className="relative w-9 shrink-0 text-right text-[11px] leading-none text-apagado tabular-nums" style={{ height: alto }} aria-hidden="true">
               <span className="absolute right-0 top-0 -translate-y-1/2">{compacto(maximo)}</span>
-              <span className="absolute right-0 top-1/2 -translate-y-1/2">{compacto(maximo / 2)}</span>
+              {Number.isInteger(maximo / 2) && <span className="absolute right-0 top-1/2 -translate-y-1/2">{compacto(maximo / 2)}</span>}
               <span className="absolute bottom-0 right-0 translate-y-1/2">0</span>
             </div>
             <div className="relative min-w-0 flex-1" style={{ height: alto }}>

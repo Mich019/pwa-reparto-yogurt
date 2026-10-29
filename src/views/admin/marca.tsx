@@ -21,7 +21,7 @@ export function LogoDelisy({ className = 'h-12' }: { className?: string }) {
   return (
     <svg viewBox="0 0 600 200" role="img" aria-label="Delisy" className={`w-auto select-none ${className}`}>
       <image href={delisy} width="240" height="200" />
-      <text x="250" y="138" fontSize="112" fontWeight="600" letterSpacing="-3" fill="#113250" style={{ fontFamily: 'var(--font-display)' }}>Delisy</text>
+      <text x="250" y="138" fontSize="112" fontWeight="600" letterSpacing="-3" className="fill-[#113250] [.oscuro_&]:fill-tinta" style={{ fontFamily: 'var(--font-display)' }}>Delisy</text>
     </svg>
   )
 }
