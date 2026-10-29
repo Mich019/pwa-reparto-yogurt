@@ -24,7 +24,7 @@ const escapar = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<'
 const marco = (contenido: string) => `<!doctype html><html><body style="margin:0;background:#f3f3f3;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;color:#000">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:480px;background:#fff;border-radius:20px;padding:32px">
-<tr><td style="font-size:22px;font-weight:700;letter-spacing:-0.02em">Reparto Yogurt</td></tr>
+<tr><td style="font-size:22px;font-weight:700;letter-spacing:-0.02em">Delisy</td></tr>
 ${contenido}
 </table></td></tr></table></body></html>`
 const parrafo = (html: string) => `<tr><td style="padding-top:20px;font-size:16px;line-height:1.5">${html}</td></tr>`
@@ -39,7 +39,7 @@ const primerNombre = (nombre: string) => escapar(nombre.split(' ')[0] ?? '')
 export function correoCodigo(nombre: string, codigo: string, minutos: number) {
   return {
     asunto: `${codigo} es tu código para restablecer la contraseña`,
-    texto: `Hola ${nombre}:\n\nTu código para restablecer la contraseña de Reparto Yogurt es ${codigo}.\nVence en ${minutos} minutos.\n\nSi no lo pediste, ignora este correo: tu contraseña no cambia.`,
+    texto: `Hola ${nombre}:\n\nTu código para restablecer la contraseña de Delisy es ${codigo}.\nVence en ${minutos} minutos.\n\nSi no lo pediste, ignora este correo: tu contraseña no cambia.`,
     html: marco(parrafo(`Hola ${primerNombre(nombre)}, usa este código para restablecer tu contraseña:`) + bloqueCodigo(codigo)
       + nota(`Vence en ${minutos} minutos. Si no lo pediste, ignora este correo: tu contraseña no cambia.`)),
   }
@@ -49,7 +49,7 @@ export function correoCodigo(nombre: string, codigo: string, minutos: number) {
 export function correoVerificacion(codigo: string, minutos: number) {
   return {
     asunto: `${codigo} es tu código para crear tu cuenta`,
-    texto: `Tu código para confirmar tu correo en Reparto Yogurt es ${codigo}.\nVence en ${minutos} minutos.\n\nSi no estás creando una cuenta, ignora este correo.`,
+    texto: `Tu código para confirmar tu correo en Delisy es ${codigo}.\nVence en ${minutos} minutos.\n\nSi no estás creando una cuenta, ignora este correo.`,
     html: marco(parrafo('Usa este código para confirmar tu correo y terminar de crear tu cuenta:') + bloqueCodigo(codigo)
       + nota(`Vence en ${minutos} minutos. Si no estás creando una cuenta, ignora este correo.`)),
   }
@@ -59,7 +59,7 @@ export function correoVerificacion(codigo: string, minutos: number) {
 // revela quién tiene cuenta).
 export function correoYaRegistrado(nombre: string, url: string) {
   return {
-    asunto: 'Ya tienes una cuenta en Reparto Yogurt',
+    asunto: 'Ya tienes una cuenta en Delisy',
     texto: `Hola ${nombre}:\n\nAlguien (quizá tú) intentó crear una cuenta nueva con este correo, pero ya tienes una.\nEntra en ${url} y, si no recuerdas tu contraseña, usa «¿Olvidaste tu contraseña?».\n\nSi no fuiste tú, ignora este correo.`,
     html: marco(parrafo(`Hola ${primerNombre(nombre)}, alguien (quizá tú) intentó crear una cuenta nueva con este correo, pero ya tienes una.`)
       + boton(url, 'Entrar a mi cuenta')
@@ -70,8 +70,8 @@ export function correoYaRegistrado(nombre: string, url: string) {
 // Un administrador invita a un repartidor: el enlace abre la pantalla para crear su contraseña.
 export function correoInvitacion(empresa: string, quien: string, url: string, dias: number) {
   return {
-    asunto: `${empresa} te invita a repartir con Reparto Yogurt`,
-    texto: `${quien} te invitó a unirte a ${empresa} en Reparto Yogurt.\nCrea tu contraseña aquí: ${url}\n\nEl enlace vence en ${dias} días. Si no esperabas esta invitación, ignora este correo.`,
+    asunto: `${empresa} te invita a repartir con Delisy`,
+    texto: `${quien} te invitó a unirte a ${empresa} en Delisy.\nCrea tu contraseña aquí: ${url}\n\nEl enlace vence en ${dias} días. Si no esperabas esta invitación, ignora este correo.`,
     html: marco(parrafo(`${escapar(quien)} te invitó a unirte a <b>${escapar(empresa)}</b> para ver tu ruta y levantar pedidos desde tu teléfono.`)
       + boton(url, 'Crear mi contraseña')
       + nota(`El enlace vence en ${dias} días. Si no esperabas esta invitación, ignora este correo.`)),

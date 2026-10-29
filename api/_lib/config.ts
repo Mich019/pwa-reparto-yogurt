@@ -123,7 +123,7 @@ function leerCors(produccion: boolean): string[] {
     try {
       u = new URL(o)
     } catch {
-      throw new Error(`CORS_ORIGINS tiene una dirección no válida: ${o} (ejemplo: https://reparto-yogurt.vercel.app)`)
+      throw new Error(`CORS_ORIGINS tiene una dirección no válida: ${o} (ejemplo: https://app.delisy.mx)`)
     }
     if (u.origin !== o) throw new Error(`CORS_ORIGINS debe tener sólo el origen, sin ruta ni «/» al final: ${u.origin}`)
     if (produccion && (u.protocol !== 'https:' || /^(localhost|127\.|\[::1\])/.test(u.hostname))) {
@@ -175,7 +175,7 @@ export function leerConfig() {
     // RF-002: recuperación por correo con Resend. Sin RESEND_API_KEY, fuera de producción el código sale en la consola.
     produccion,
     resendApiKey: process.env.RESEND_API_KEY ?? '',
-    correoRemitente: process.env.MAIL_FROM ?? 'Reparto Yogurt <onboarding@resend.dev>',
+    correoRemitente: process.env.MAIL_FROM ?? 'Delisy <onboarding@resend.dev>',
     recuperacionMinutos: 15,
     recuperacionMaxIntentos: 5,
     recuperacionPorHoraCuenta: 3, // códigos por cuenta y por hora; pasado el tope no se manda otro (sin decirlo)

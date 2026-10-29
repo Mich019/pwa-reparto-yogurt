@@ -191,7 +191,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
               className="inline-flex items-center gap-1.5 rounded-md py-1 text-xs font-semibold text-apagado transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
             >
               <ArrowLeft size={14} />
-              Ir a la App Móvil de Reparto
+              Ir a la app de reparto
             </button>
           </div>
         )}

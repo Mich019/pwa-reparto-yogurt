@@ -253,7 +253,7 @@ export class Documento {
     objeto(2, `<< /Type /Pages /Count ${this.paginas.length} /Kids [${ids.map((i) => `${i} 0 R`).join(' ')}] >>`)
     ;(['normal', 'negrita', 'mono'] as Fuente[]).forEach((f, i) =>
       objeto(3 + i, `<< /Type /Font /Subtype /Type1 /BaseFont /${BASE_FUENTE[f]} /Encoding /WinAnsiEncoding >>`))
-    objeto(6, `<< /Title (${escapar(paraPdf(this.titulo))}) /Producer (Reparto de yogurt) >>`)
+    objeto(6, `<< /Title (${escapar(paraPdf(this.titulo))}) /Producer (Delisy) >>`)
     this.paginas.forEach((p, i) => {
       const contenido = p.ops.join('\n')
       objeto(ids[i], `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(p.ancho * PT)} ${num(p.alto * PT)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${ids[i] + 1} 0 R >>`)

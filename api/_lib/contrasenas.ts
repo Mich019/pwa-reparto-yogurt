@@ -43,7 +43,7 @@ export const verificarRelleno = (c: Pimientas, password: string) => verificarPas
 
 export const PASSWORD_MIN = 10
 export const PASSWORD_MAX = 200
-const PALABRAS_DE_LA_APP = ['yogurt', 'reparto'] // lo primero que alguien probaría con estas cuentas
+const PALABRAS_DE_LA_APP = ['yogurt', 'reparto', 'delisy'] // lo primero que alguien probaría con estas cuentas
 
 // Regla de contraseñas (RF-004): null si sirve; si no, el porqué, listo para mostrarse.
 export function revisarPassword(p: string, correo?: string): string | null {

@@ -366,7 +366,7 @@ interface DatosClave { nombre: string; correo: string; telefono: string; passwor
 function ClaveTemporal({ datos, onCerrar }: { datos: DatosClave; onCerrar: () => void }) {
   const [copiado, setCopiado] = useState(false)
   const url = new URL('./', location.href).href
-  const texto = `Hola ${datos.nombre.split(' ')[0]}, ya tienes cuenta en Reparto Yogurt.\nAbre ${url}\nCorreo: ${datos.correo}\nContraseña temporal: ${datos.password}\nAl entrar te pedirá elegir tu propia contraseña.`
+  const texto = `Hola ${datos.nombre.split(' ')[0]}, ya tienes cuenta en Delisy.\nAbre ${url}\nCorreo: ${datos.correo}\nContraseña temporal: ${datos.password}\nAl entrar te pedirá elegir tu propia contraseña.`
 
   async function copiar(que: string, aviso_: string) {
     try {

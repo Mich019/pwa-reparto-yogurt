@@ -54,7 +54,7 @@ self.addEventListener('push', (e) => {
   try {
     aviso = e.data ? e.data.json() : {}
   } catch {
-    aviso = { titulo: 'Reparto Yogurt', cuerpo: e.data ? e.data.text() : '' }
+    aviso = { titulo: 'Delisy', cuerpo: e.data ? e.data.text() : '' }
   }
   e.waitUntil(
     (async () => {
@@ -62,7 +62,7 @@ self.addEventListener('push', (e) => {
       ventanas.forEach((v) => v.postMessage({ tipo: 'sincronizar' })) // trae el pedido o el cambio ya, sin esperar el minuto
       // Con la app a la vista no hace falta la notificación del sistema: la propia app muestra el aviso al sincronizar.
       if (ventanas.some((v) => v.visibilityState === 'visible')) return
-      await self.registration.showNotification(aviso.titulo || 'Reparto Yogurt', {
+      await self.registration.showNotification(aviso.titulo || 'Delisy', {
         body: aviso.cuerpo || '',
         tag: aviso.id || undefined,
         data: { pestana: aviso.datos && aviso.datos.pestana },

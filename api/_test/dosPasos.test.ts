@@ -20,7 +20,7 @@ async function get(s: S, url: string) {
 async function conDosPasos(rol: 'administrador' | 'vendedor' = 'administrador') {
   const s = await sesion(rol)
   const { body: { secreto, uri } } = await post(s, '/auth/dos-pasos/iniciar')
-  assert.match(uri, /^otpauth:\/\/totp\/Reparto%20Yogurt%3A.+\?secret=[A-Z2-7]{32}&issuer=Reparto%20Yogurt/)
+  assert.match(uri, /^otpauth:\/\/totp\/Delisy%3A.+\?secret=[A-Z2-7]{32}&issuer=Delisy/)
   const act = await post(s, '/auth/dos-pasos/activar', { codigo: codigoTotp(secreto, pasoActual()) })
   assert.equal(act.status, 200)
   return { ...s, secreto: secreto as string, respaldo: act.body.respaldo as string[] }

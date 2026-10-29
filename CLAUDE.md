@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-PWA for a yogurt delivery driver (route map, deliveries, flavors, production forecast, reports) plus its backend API. Code, comments, UI text, identifiers and docs are all in **Spanish** — keep new code consistent with that (`clientes`, `pedidos`, `sabores`, `vendedor`, `administrador`…). Requirement IDs like `RF-037`, `M10` in comments/docs refer to the functional spec.
+Delisy (formerly "Reparto Yogurt"): PWA for delivery drivers (route map, deliveries, flavors, production forecast, reports) plus its backend API. Code, comments, UI text, identifiers and docs are all in **Spanish** — keep new code consistent with that (`clientes`, `pedidos`, `sabores`, `vendedor`, `administrador`…). Requirement IDs like `RF-037`, `M10` in comments/docs refer to the functional spec.
 
 ## Commands
 

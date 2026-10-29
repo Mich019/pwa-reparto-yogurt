@@ -278,7 +278,7 @@ export function reglasPassword(p: string, correo: string) {
   return [
     { texto: 'Al menos 10 caracteres', ok: p.length >= 10 && p.length <= 200 },
     { texto: 'Letras y números', ok: /[A-Za-z]/.test(p) && /\d/.test(p) },
-    { texto: 'Sin tu correo ni el nombre de la app', ok: p !== '' && !(usuario.length >= 4 && baja.includes(usuario)) && !['yogurt', 'reparto'].some((w) => baja.includes(w)) },
+    { texto: 'Sin tu correo ni el nombre de la app', ok: p !== '' && !(usuario.length >= 4 && baja.includes(usuario)) && !['yogurt', 'reparto', 'delisy'].some((w) => baja.includes(w)) },
   ]
 }
 

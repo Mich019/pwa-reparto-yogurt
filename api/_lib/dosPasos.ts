@@ -18,7 +18,7 @@ type Pimientas = Pick<Config, 'pimienta' | 'pimientaAnterior'>
 
 const DIGITOS = 6
 const PASO_S = 30
-const EMISOR = 'Reparto Yogurt'
+const EMISOR = 'Delisy'
 const NUM_RESPALDO = 10
 
 // ---------------------------------------------------------------- base32 (RFC 4648), como lo leen las apps

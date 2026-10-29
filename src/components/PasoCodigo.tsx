@@ -40,7 +40,7 @@ export function PasoCodigo({ onListo, onVolver }: { onListo?: () => void; onVolv
         <div>
           <div className="text-lg font-semibold">Verificación en dos pasos</div>
           <p className="text-sm text-apagado">
-            {respaldo ? 'Escribe uno de los códigos de respaldo que guardaste. Cada uno sirve una sola vez.' : 'Abre tu app de autenticación y escribe el código de 6 dígitos de Reparto Yogurt.'}
+            {respaldo ? 'Escribe uno de los códigos de respaldo que guardaste. Cada uno sirve una sola vez.' : 'Abre tu app de autenticación y escribe el código de 6 dígitos de Delisy.'}
           </p>
         </div>
       </div>

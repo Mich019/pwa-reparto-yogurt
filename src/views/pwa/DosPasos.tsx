@@ -152,7 +152,7 @@ function Configurar({ secreto, uri, onActivada, onCerrar }: { secreto: string; u
 }
 
 function CodigosRespaldo({ codigos, onCerrar }: { codigos: string[]; onCerrar: () => void }) {
-  const texto = `Reparto Yogurt · Códigos de respaldo de la verificación en dos pasos\nCada uno sirve una sola vez.\n\n${codigos.join('\n')}\n`
+  const texto = `Delisy · Códigos de respaldo de la verificación en dos pasos\nCada uno sirve una sola vez.\n\n${codigos.join('\n')}\n`
   return (
     <Hoja abierta onCerrar={onCerrar} titulo="Guarda tus códigos de respaldo"
       pie={<Boton className="w-full" onClick={onCerrar}>Ya los guardé</Boton>}>
@@ -166,7 +166,7 @@ function CodigosRespaldo({ codigos, onCerrar }: { codigos: string[]; onCerrar: (
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Boton variante="secundario" onClick={() => navigator.clipboard?.writeText(texto).then(() => aviso('Códigos copiados'), () => {})}><Copy size={18} /> Copiar</Boton>
-          <Boton variante="secundario" onClick={() => descargarArchivo(new Blob([texto], { type: 'text/plain;charset=utf-8' }), 'codigos-respaldo-reparto-yogurt.txt')}><Download size={18} /> Descargar</Boton>
+          <Boton variante="secundario" onClick={() => descargarArchivo(new Blob([texto], { type: 'text/plain;charset=utf-8' }), 'codigos-respaldo-delisy.txt')}><Download size={18} /> Descargar</Boton>
         </div>
       </div>
     </Hoja>

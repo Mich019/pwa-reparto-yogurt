@@ -1,4 +1,4 @@
-# Reparto Yogurt · PWA
+# Delisy · PWA de reparto
 
 App para el repartidor: mapa 3D con la ruta del día, entrega en un toque, selector de sabores por litros y pronóstico de producción semanal. Funciona sin internet y guarda todo en el teléfono.
 

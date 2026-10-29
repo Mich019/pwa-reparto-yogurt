@@ -75,7 +75,7 @@ export async function rutasSuscripcion(app: FastifyInstance, { db, config }: Con
     const nueva = await mp.crear({
       empresa: req.usuario.empresa,
       correo: u.correo,
-      motivo: `Reparto Yogurt · ${e.nombre}`.slice(0, 120),
+      motivo: `Delisy · ${e.nombre}`.slice(0, 120),
       monto: cobro.precioMensual,
       moneda: cobro.moneda,
       inicio: enPrueba ? new Date(e.prueba_hasta) : null,
