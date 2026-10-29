@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { LoginAdmin } from './views/admin/LoginAdmin'
 import { AdminLayout } from './views/admin/AdminLayout'
 import { Login, CambioObligatorio } from './views/pwa/Login'
@@ -23,12 +23,18 @@ const esRutaPlataforma = () => esRuta('/plataforma')
 // El enlace de la invitación va en el fragmento (/invitacion#…), así que aquí sólo cuenta la ruta.
 const esRutaInvitacion = () => typeof window !== 'undefined' && window.location.pathname.startsWith('/invitacion')
 
+const DELISY = { nombre: 'Delisy', color: '#113250', logo: null }
+
 export default function App() {
   const sesion = useSesion()
   const oscuro = useTemaOscuro()
   // Marca de la empresa (src/lib/marca.ts): su color en los botones del panel y de la app de reparto.
   useCargarMarca(sesion?.usuario.id)
-  const colorMarca = estiloMarca(useMarca())
+  // Lo que es de Delisy (la entrada, el registro, la invitación y la plataforma) va con su azul, también en los enlaces;
+  // el color de la empresa, ya con la sesión iniciada en su panel o en la app de reparto.
+  const marca = useMarca()
+  const estiloDelisy = { ...estiloMarca(DELISY), ...(oscuro ? {} : { '--color-azul': '#1d5b8f' }) } as CSSProperties
+  const colorMarca = sesion ? estiloMarca(marca) : estiloDelisy
   const [esAdmin, setEsAdmin] = useState(esRutaAdmin)
   const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
   const [esPlataforma, setEsPlataforma] = useState(esRutaPlataforma)
@@ -101,7 +107,7 @@ export default function App() {
   // =========================================================================
   if (esPlataforma && sesion?.usuario.plataforma && MODO_SERVIDOR) {
     return (
-      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`} style={estiloDelisy}>
         <Avisos />
         {sesion.usuario.debeCambiarPassword ? <CambioObligatorio /> : <Plataforma />}
       </div>
@@ -113,7 +119,7 @@ export default function App() {
   // =========================================================================
   if (esInvitacion && MODO_SERVIDOR) {
     return (
-      <div className="tema-admin tema-campo">
+      <div className="tema-admin tema-campo" style={estiloDelisy}>
         <Avisos />
         <AceptarInvitacion onListo={irAPwaDesdeInvitacion} />
       </div>
@@ -125,7 +131,7 @@ export default function App() {
   // =========================================================================
   if (esRegistro && MODO_SERVIDOR) {
     return (
-      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`}>
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`} style={estiloDelisy}>
         <Avisos />
         <RegistroEmpresa onIrAlPanel={irAlPanelDesdeRegistro} />
       </div>

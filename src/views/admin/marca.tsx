@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { esDanelle, useMarca } from '../../lib/marca'
 import logo from '../../assets/danelle-logo.png'
 import ave from '../../assets/danelle-ave.png'
+import delisy from '../../assets/delisy-logo.svg'
 
 // Logo y ave de Danelle. Los SVG originales eran un mapa de bits dentro de un SVG de 380 KB; aquí van recortados y
 // reducidos a los tres colores de la marca (verde #035d38, amarillo #f9dc07, negro) con la transparencia como suavizado.
@@ -13,10 +14,29 @@ export function AveDanelle({ className = 'h-10' }: { className?: string }) {
   return <img src={ave} alt="" aria-hidden="true" className={`w-auto select-none ${className}`} draggable={false} />
 }
 
+// Delisy, la plataforma: su logo y su nombre. Donde todavía no hay empresa (el primer inicio de sesión en un equipo)
+// y en el panel de la plataforma.
+// Logo y nombre en un solo dibujo: crecen juntos con la altura que se le dé.
+export function LogoDelisy({ className = 'h-12' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 600 200" role="img" aria-label="Delisy" className={`w-auto select-none ${className}`}>
+      <image href={delisy} width="240" height="200" />
+      <text x="250" y="138" fontSize="112" fontWeight="600" letterSpacing="-3" fill="#113250" style={{ fontFamily: 'var(--font-display)' }}>Delisy</text>
+    </svg>
+  )
+}
+
+// El adorno grande y apagado de la pantalla de entrada: el logo de Delisy.
+export function AveDelisy({ className = 'h-10' }: { className?: string }) {
+  return <img src={delisy} alt="" aria-hidden="true" className={`w-auto select-none ${className}`} draggable={false} />
+}
+
 // Marca por empresa (src/lib/marca.ts): su logo; sin logo, su nombre con la inicial en su color; sin marca propia, Danelle.
+// Sin ninguna empresa recordada en este equipo, Delisy.
 export function LogoEmpresa({ className = 'h-12' }: { className?: string }) {
   const m = useMarca()
-  if (!m || esDanelle(m)) return <LogoDanelle className={className} />
+  if (!m) return <LogoDelisy className={className} />
+  if (esDanelle(m)) return <LogoDanelle className={className} />
   if (m.logo) return <img src={m.logo} alt={m.nombre} className={`w-auto max-w-[16rem] select-none object-contain ${className}`} draggable={false} />
   return (
     <span className={`inline-flex max-w-[16rem] items-center gap-2.5 ${className}`}>
@@ -29,7 +49,8 @@ export function LogoEmpresa({ className = 'h-12' }: { className?: string }) {
 // El adorno de las pantallas vacías: el ave de Danelle, o el logo de la empresa apagado.
 export function AveEmpresa({ className = 'h-10' }: { className?: string }) {
   const m = useMarca()
-  if (!m || esDanelle(m)) return <AveDanelle className={className} />
+  if (!m) return <img src={delisy} alt="" aria-hidden="true" className={`w-auto select-none object-contain opacity-60 grayscale ${className}`} draggable={false} />
+  if (esDanelle(m)) return <AveDanelle className={className} />
   if (m.logo) return <img src={m.logo} alt="" aria-hidden="true" className={`w-auto select-none object-contain opacity-60 grayscale ${className}`} draggable={false} />
   return null
 }

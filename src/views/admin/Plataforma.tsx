@@ -4,6 +4,7 @@ import { ErrorApi } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { aviso, Boton, Campo, claseInput, Hoja } from '../../components/ui'
+import { LogoDelisy } from './marca'
 import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
 
@@ -76,6 +77,7 @@ export function Plataforma() {
     <div className="mx-auto min-h-dvh max-w-[1100px] px-4 pb-16 sm:px-8">
       <header className="flex items-center justify-between gap-3 pt-6 pb-4">
         <div>
+          <LogoDelisy className="mb-4 h-9" />
           <h1 className="text-[2.25rem] font-semibold leading-none">Plataforma</h1>
           <p className="mt-2 text-sm text-apagado">Todas las empresas, su estado de pago y su uso.</p>
         </div>

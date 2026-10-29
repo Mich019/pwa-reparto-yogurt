@@ -5,7 +5,7 @@ import { cerrarSesion, iniciarSesion, mensajeErrorLogin, sesionActual } from '..
 import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
-import { AveEmpresa, LogoEmpresa } from './marca'
+import { AveDelisy, LogoDelisy } from './marca'
 
 type Modo = 'login' | 'recuperar' | 'codigo'
 
@@ -66,11 +66,11 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
   return (
     <div className="relative isolate flex min-h-dvh flex-col justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
       {/* El ave de la marca, enorme y casi transparente, asomando por la esquina */}
-      <AveEmpresa className="pointer-events-none absolute -bottom-20 -right-6 -z-10 hidden h-[36rem] opacity-[0.09] sm:block lg:right-[10%]" />
+      <AveDelisy className="pointer-events-none absolute -bottom-20 -right-6 -z-10 hidden h-[36rem] opacity-[0.09] sm:block lg:right-[10%]" />
 
       <div className="mx-auto w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <LogoEmpresa className="h-24" />
+          <LogoDelisy className="h-20" />
           <h1 className="mt-6 text-[2rem] font-semibold leading-tight">Panel de administración</h1>
         </div>
 
