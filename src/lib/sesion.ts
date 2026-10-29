@@ -14,6 +14,7 @@ export interface UsuarioSesion {
   correo: string
   rol: Rol
   debeCambiarPassword: boolean
+  plataforma?: boolean // administra el servicio: al entrar va a /plataforma (App.tsx)
 }
 // Con `cookie`, los tokens no están aquí: viven en cookies HttpOnly que el navegador manda solo (panel web, ver
 // api/_lib/cookies.ts). Lo que se guarda en el teléfono es sólo quién es y cuándo vence el acceso.

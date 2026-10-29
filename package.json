@@ -16,6 +16,7 @@
     "test:api": "tsx --test api/_test/*.test.ts",
     "db:migrar": "tsx --env-file-if-exists=.env db/migrar.ts",
     "db:admin": "tsx --env-file-if-exists=.env db/crear-admin.ts",
+    "db:plataforma": "tsx --env-file-if-exists=.env db/plataforma.ts",
     "db:probar": "tsx --env-file-if-exists=.env db/probar-conexion.ts",
     "push:claves": "tsx api/_lib/claves-push.ts"
   },

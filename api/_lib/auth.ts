@@ -6,6 +6,7 @@ import { hashPassword, PASSWORD_MAX, revisarPassword, verificarPassword, verific
 import { tx, type Db } from './db.js'
 import { tieneDosPasos, usarCodigo } from './dosPasos.js'
 import { borrarCookiesSesion, fijarCookiesSesion, leerCookie } from './cookies.js'
+import { esPlataforma } from './plataforma.js'
 import { ipCliente, sha256, tokenAleatorio } from './seguridad.js'
 
 // modo 'cookie': el panel web recibe la sesión en cookies HttpOnly en lugar de en la respuesta (ver cookies.ts).
@@ -76,14 +77,15 @@ export async function rutasAuth(
   // `refreshToken` sólo al abrir la sesión: al renovar, la cookie de la sesión ya está puesta.
   function respuestaSesion(
     rep: FastifyReply,
-    u: { id_usuario: string; nombre: string; correo: string; rol: string; debe_cambiar_password: boolean },
+    u: { id_usuario: string; nombre: string; correo: string; rol: string; debe_cambiar_password: boolean; es_plataforma: boolean; interna: boolean },
     sid: string,
     refreshToken: string,
     cookie: { nueva: boolean } | null,
   ) {
     const accessToken = app.jwt.sign({ sub: u.id_usuario, sid })
     const expiraEn = Date.now() + config.accesoMinutos * 60_000
-    const usuario = { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password }
+    // `plataforma`: al entrar, la app lo lleva a /plataforma (el panel vuelve a revisar el permiso en cada petición).
+    const usuario = { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password, plataforma: esPlataforma(u) }
     if (!cookie) return { accessToken, expiraEn, refreshToken, usuario }
     fijarCookiesSesion(rep, config, { acceso: accessToken, sesion: cookie.nueva ? refreshToken : undefined })
     return { cookie: true, expiraEn, usuario }
@@ -97,8 +99,8 @@ export async function rutasAuth(
     const ip = ipCliente(req, config)
 
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.password_hash, u.activo, u.debe_cambiar_password, u.password_cambiado_en,
-              e.activa AS empresa_activa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.password_hash, u.activo, u.debe_cambiar_password, u.password_cambiado_en, u.es_plataforma,
+              e.activa AS empresa_activa, e.interna
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE lower(u.correo) = lower($1)`,
       [correo],
     )
@@ -154,7 +156,7 @@ export async function rutasAuth(
     }
     const ip = ipCliente(req, config)
     const { rows: [u] } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.activo, u.debe_cambiar_password, u.password_cambiado_en, e.activa AS empresa_activa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.activo, u.debe_cambiar_password, u.password_cambiado_en, u.es_plataforma, e.activa AS empresa_activa, e.interna
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [sub],
     )
@@ -178,7 +180,7 @@ export async function rutasAuth(
     const refresh = body.data.refreshToken ?? deCookie
     if (!refresh) return rep.code(401).send({ error: 'Sesión vencida, inicia sesión de nuevo', codigo: 'SESION_INVALIDA' })
     const { rows } = await db.query(
-      `SELECT s.id_sesion, u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password, e.activa AS empresa_activa
+      `SELECT s.id_sesion, u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password, u.es_plataforma, e.activa AS empresa_activa, e.interna
          FROM sesiones s JOIN usuarios u USING (id_usuario) JOIN empresas e USING (id_empresa)
         WHERE s.refresh_token_hash = $1 AND s.revocado_en IS NULL AND s.expira_en > now() AND u.activo`,
       [sha256(refresh)],
@@ -204,9 +206,12 @@ export async function rutasAuth(
   })
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
-    const { rows } = await db.query(`SELECT id_usuario, nombre, correo, rol, debe_cambiar_password FROM usuarios WHERE id_usuario = $1`, [req.usuario.id])
+    const { rows } = await db.query(
+      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password, u.es_plataforma, e.interna FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
+      [req.usuario.id],
+    )
     const u = rows[0]
-    return { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password }
+    return { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password, plataforma: esPlataforma(u) }
   })
 
   // RF-039: quita la marca de "debe cambiar la contraseña". Cierra las demás sesiones. Probar la contraseña actual

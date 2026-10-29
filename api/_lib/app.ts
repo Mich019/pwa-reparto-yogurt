@@ -21,6 +21,7 @@ import { rutasRegistro } from './registro.js'
 import { crearClienteMp, type ClienteMp } from './mercadopago.js'
 import { CON_ACCESO, rutasSuscripcion, SUSCRIPCION_VENCIDA } from './suscripcion.js'
 import { rutasEmpresa } from './empresa.js'
+import { rutasPlataforma } from './plataforma.js'
 import { ipCliente } from './seguridad.js'
 
 export type Rol = 'administrador' | 'vendedor'
@@ -146,6 +147,8 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasRecuperacion(app, ctx)
   await rutasRegistro(app, ctx, { requiereAdmin })
   await rutasEmpresa(app, ctx, { requiereSesionSinCobro, requiereAdmin })
+  // Cruza empresas: con la conexión sin envolver (dueño de la base), no la de la empresa de quien llama.
+  await rutasPlataforma(app, { db: entrada.db, config: ctx.config }, { requiereSesionSinCobro })
   await rutasSuscripcion(app, ctx, ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config), { requiereAdminSinCobro })
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })

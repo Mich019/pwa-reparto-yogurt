@@ -54,7 +54,8 @@ try {
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'id_empresa') AS m007,
               to_regclass('public.invitaciones') IS NOT NULL AS m008,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'empresas' AND column_name = 'prueba_hasta') AS m009,
-              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'productos' AND column_name = 'unidad') AS m010`,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'productos' AND column_name = 'unidad') AS m010,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'es_plataforma') AS m011`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

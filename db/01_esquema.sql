@@ -52,6 +52,7 @@ CREATE TABLE empresas (
   control_retornables boolean NOT NULL DEFAULT false,    -- lleva la cuenta de envases prestados
   -- Cobro (api/_lib/suscripcion.ts): acceso si está exenta, en prueba o con la suscripción de Mercado Pago autorizada.
   exenta         boolean NOT NULL DEFAULT false,         -- no paga (p. ej. la primera empresa de una instalación propia)
+  interna        boolean NOT NULL DEFAULT false,         -- «Plataforma»: guarda las cuentas de super admin; fuera del panel
   prueba_hasta   timestamptz NOT NULL DEFAULT now() + interval '14 days',
   suscripcion_estado varchar(20),                        -- pending, authorized, paused, cancelled (Mercado Pago)
   mp_preapproval_id  varchar(64),
@@ -76,6 +77,7 @@ CREATE TABLE usuarios (
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040
   debe_cambiar_password boolean NOT NULL DEFAULT false,     -- RF-039 restablecimiento manual
+  es_plataforma         boolean NOT NULL DEFAULT false,     -- entra a /plataforma (con verificación en dos pasos)
   password_cambiado_en  timestamptz NOT NULL DEFAULT now(), -- RF-003: los intentos fallidos de antes ya no cuentan
   ultimo_acceso         timestamptz,
   creado_en             timestamptz NOT NULL DEFAULT now(),
