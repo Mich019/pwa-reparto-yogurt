@@ -25,6 +25,8 @@ base64 -w0 railway-ca.pem        # en Mac: base64 -i railway-ca.pem
 
 Pon ese texto en base64 en `DB_SSL_CA` (en tu `.env` y en Vercel) y corre `npm run db:probar`: si dice «conexión cifrada (SSL)», la API ya sólo acepta ese certificado. Si dice «No conecta … certificate», Railway presenta una cadena distinta: quita `DB_SSL_CA` y la conexión sigue cifrada sin verificar. Si Railway regenera el certificado (al recrear la base), hay que repetir este paso.
 
+**Si la base está en Supabase** el paso es el mismo, sólo cambia de dónde sale el certificado: en Supabase, **Project Settings → Database → SSL Configuration → Download certificate** (`prod-ca-2021.crt`). Ponlo en `DB_SSL_CA` (puedes pegar el PEM tal cual, con sus líneas `-----BEGIN CERTIFICATE-----`, o en base64 con `base64 -w0 prod-ca-2021.crt`) y comprueba con `npm run db:probar`. En la misma pantalla activa **Enforce SSL on incoming connections**, para que la base rechace cualquier conexión sin cifrar.
+
 ## 2. Variables de entorno
 
 Las mismas en tu `.env` local (para crear la base) y en Vercel (**Settings → Environment Variables**, para Production):
@@ -72,6 +74,12 @@ Conviene que la función de Vercel y la base estén en la misma región (Railway
 - **Respaldos:** en Railway, servicio Postgres → **Backups**: activa los respaldos programados.
 - **Seguridad de la base:** la dirección pública de Railway queda abierta a internet protegida sólo por la clave. Usa la clave larga que genera Railway y no la compartas. Si se filtra, en Railway: Postgres → Variables → regenera `PGPASSWORD`, y actualiza `DATABASE_URL` en Vercel.
 - **Cambios de esquema futuros:** van en `db/migraciones/NNN_*.sql` (repetibles) y se aplican con `npm run db:migrar` antes de desplegar la versión que los usa.
+- **Correo con tu propio dominio (SPF, DKIM y DMARC):** con `MAIL_FROM` en `onboarding@resend.dev` Resend sólo entrega a la dirección de tu propia cuenta, y los correos de recuperación, registro e invitaciones de los demás no llegan. Además, sin estos tres registros cualquiera puede mandar correos que parecen tuyos (p. ej. un falso «restablece tu contraseña»). En Resend, **Domains → Add domain** con un subdominio de correo (p. ej. `correo.tudominio.com`) y copia en el DNS de tu dominio los registros que te da:
+  - **SPF** (un `TXT` y un `MX` en `send.correo…`): dice qué servidores pueden mandar a nombre de tu dominio.
+  - **DKIM** (un `TXT` en `resend._domainkey.correo…`): firma cada correo para que no se pueda alterar ni falsificar.
+  - **DMARC**: éste lo agregas tú, un `TXT` en `_dmarc.tudominio.com` con `v=DMARC1; p=none; rua=mailto:tu@correo.com`. Le dice a Gmail, Outlook, etc. qué hacer con un correo que falla SPF/DKIM y te manda reportes. Empieza con `p=none`; cuando en un par de semanas los reportes sólo muestren tus envíos legítimos, súbelo a `p=quarantine` (a spam) y después a `p=reject` (rechazado).
+
+  Cuando Resend marque el dominio como **Verified**, cambia `MAIL_FROM` en Vercel a `Delisy <no-responder@correo.tudominio.com>` y vuelve a desplegar. Pruébalo con «¿Olvidaste tu contraseña?» a una cuenta de Gmail: en el correo, **Mostrar original** debe decir `PASS` en SPF, DKIM y DMARC.
 - **Rotar el pepper:** pon el actual en `AUTH_PEPPER_ANTERIOR` y uno nuevo en `AUTH_PEPPER_SECRET`; cuando todos hayan vuelto a entrar, borra `AUTH_PEPPER_ANTERIOR`.
 
 ## Si algo falla
@@ -85,3 +93,4 @@ Conviene que la función de Vercel y la base estén en la misma región (Railway
 | El panel muestra números de «mañana» | `ZONA_HORARIA` no es la del negocio |
 | Las llamadas fallan con error de CORS | `CORS_ORIGINS` no tiene exactamente la dirección de la app (con `https://`, sin `/` al final) |
 | La API no arranca: «CORS_ORIGINS …» | Tiene `*`, `localhost`, `http://` o una ruta: deja sólo orígenes `https://` exactos |
+| Los correos de recuperación o invitación no llegan, o caen en spam | `MAIL_FROM` sigue en `onboarding@resend.dev`, o el dominio no está verificado en Resend: ver «Correo con tu propio dominio» arriba |
