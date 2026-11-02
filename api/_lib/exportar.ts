@@ -45,6 +45,7 @@ const FILA_ENCABEZADO = 4
 // Estilos (Ã­ndice en cellXfs): 0 vacÃ­o Â· 1 tÃ­tulo Â· 2 subtÃ­tulo Â· 3 encabezado Â· desde 4, uno por tipo y variante
 // (renglÃ³n normal, renglÃ³n alterno, totales).
 const TIPOS: Tipo[] = ['texto', 'fecha', 'entero', 'litros', 'dinero', 'porcentaje']
+// Las cantidades van sin unidad en el formato: la dice el encabezado («Litros», «Kilos») o la columna «Unidad».
 const FORMATO: Record<Tipo, number> = { texto: 0, fecha: 164, entero: 3, litros: 167, dinero: 165, porcentaje: 166 }
 const VARIANTES = [
   { fontId: 0, fillId: 0, borderId: 1 }, // renglÃ³n
@@ -56,7 +57,7 @@ const estilo = (t: Tipo, v: Variante) => 4 + v * TIPOS.length + TIPOS.indexOf(t)
 
 const ESTILOS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="4"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="&quot;$&quot;#,##0.00;[Red]\\-&quot;$&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="0.0&quot;%&quot;;[Red]\\-0.0&quot;%&quot;"/><numFmt numFmtId="167" formatCode="#,##0.0&quot; L&quot;"/></numFmts>
+<numFmts count="4"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="&quot;$&quot;#,##0.00;[Red]\\-&quot;$&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="0.0&quot;%&quot;;[Red]\\-0.0&quot;%&quot;"/><numFmt numFmtId="167" formatCode="#,##0.0"/></numFmts>
 <fonts count="5"><font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF035D38"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FF6B6B6B"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/></font></fonts>
 <fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF035D38"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F7F4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE1EEE6"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFDDE5E0"/></bottom><diagonal/></border><border><left/><right/><top style="medium"><color rgb="FF035D38"/></top><bottom style="thin"><color rgb="FF035D38"/></bottom><diagonal/></border></borders>
@@ -103,12 +104,12 @@ function celdaXlsx(ref: string, x: Valor, base: Tipo, variante: Variante): strin
   return textoXlsx(ref, estilo('texto', variante), v)
 }
 
-// Lo que ocupa un valor ya con formato ("$1,234.00", "12.5 L"), para el ancho de la columna.
+// Lo que ocupa un valor ya con formato ("$1,234.00", "12.5"), para el ancho de la columna.
 function largo(x: Valor, base: Tipo) {
   const { v, t } = desenvolver(x, base)
   if (typeof v !== 'number') return t === 'fecha' ? 10 : String(v ?? '').length
   const entero = Math.round(Math.abs(v)).toLocaleString('en-US').length
-  return entero + (t === 'dinero' ? 5 : t === 'litros' ? 4 : t === 'porcentaje' ? 3 : 0)
+  return entero + (t === 'dinero' ? 5 : t === 'litros' ? 2 : t === 'porcentaje' ? 3 : 0)
 }
 
 export interface Encabezado {
