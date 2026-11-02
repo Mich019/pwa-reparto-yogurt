@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, Building2, CalendarDays, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
-import { dinero } from '../../lib/fechas'
+import { desdeIso, dinero, hoy as hoyLocal } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { useAplicarPreferencias } from '../../lib/tema'
 import { Avatar } from '../../components/Avatar'
 import { aviso, claseInputRecto } from '../../components/ui'
+import { SelectorFecha } from '../../components/Calendario'
 import { Configuracion, Fila, Seccion } from './Configuracion'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { LogoDelisy } from './marca'
@@ -604,10 +605,15 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
         <input value={nombre} onChange={(x) => setNombre(x.target.value)} className={claseInputRecto} maxLength={120} />
       </label>
       <div>
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-apagado">Prueba gratis hasta</span>
-          <input type="date" value={prueba} onChange={(x) => setPrueba(x.target.value)} className={claseInputRecto} disabled={exenta} />
-        </label>
+        <span className="mb-1.5 block text-xs font-medium text-apagado">Prueba gratis hasta</span>
+        {exenta ? (
+          <div className={`${claseInputRecto} opacity-50`}>{prueba ? desdeIso(prueba).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</div>
+        ) : (
+          <SelectorFecha valor={prueba || hoyLocal()} onCambiar={setPrueba} etiqueta="Prueba gratis hasta" className={`${claseInputRecto} flex items-center gap-2 text-left`}>
+            <CalendarDays size={18} className="shrink-0 text-apagado" />
+            {prueba ? desdeIso(prueba).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Elegir fecha'}
+          </SelectorFecha>
+        )}
         {!exenta && (
           <div className="mt-2 flex gap-1.5">
             {[7, 14, 30].map((n) => <button key={n} type="button" onClick={() => sumar(n)} className="rounded-md bg-niebla px-3 py-1.5 text-xs font-semibold hover:bg-linea">+{n} días</button>)}

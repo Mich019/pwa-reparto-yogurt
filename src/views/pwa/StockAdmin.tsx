@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, ChevronsRight, Copy, RefreshCw, TriangleAlert, WifiOff } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronsRight, Copy, Factory, RefreshCw, TriangleAlert, WifiOff } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
-import { hoy, sumarDias, textoFecha } from '../../lib/fechas'
+import { desdeIso, hoy, sumarDias, textoFecha } from '../../lib/fechas'
+import { SelectorFecha } from '../../components/Calendario'
 import { copiarCarga, guardarCarga, guardarProduccion, useDiaStock, type DiaStock } from '../../lib/stock'
 import { formato, sumaPorUnidad } from '../../lib/unidades'
 import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
+import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
 
 // RF-037 · El administrador registra, para un día, los litros producidos de cada sabor y los que le entrega a cada vendedor
 // al empezar la jornada (y, al cerrar, lo que devuelven). Se hace por internet: el servidor es quien lleva las cuentas.
@@ -24,7 +26,8 @@ function leerLitros(texto: string): number | null | 'mal' {
 }
 const aTexto = (n: number | undefined) => (n === undefined ? '' : String(Math.round(n * 100) / 100))
 
-export function StockAdmin({ selector }: { selector?: ReactNode }) {
+// `panel`: encabezado del panel con el selector, el cambio de día y «Registrar producción» entre sus acciones.
+export function StockAdmin({ selector, panel = false }: { selector?: ReactNode; panel?: boolean }) {
   const [fecha, setFecha] = useState(hoy())
   const { dia, error, cargando, recargar, adoptar } = useDiaStock(fecha)
   const [produccion, setProduccion] = useState(false)
@@ -67,11 +70,29 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">Stock del día</h1>
-      {selector && <div className="mt-3">{selector}</div>}
+    <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
+      {panel ? (
+        <Encabezado titulo="Producción" detalle={<span className="first-letter:uppercase">{textoFecha(fecha)}{fecha === hoy() ? '' : fecha < hoy() ? ' · día pasado' : ' · día por venir'}</span>}>
+          {selector}
+          <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+          <div className="flex gap-1">
+            <button onClick={() => setFecha(sumarDias(fecha, -1))} className={botonPanelIcono} aria-label="Día anterior"><ChevronLeft size={22} strokeWidth={2.25} /></button>
+            <SelectorFecha valor={fecha} onCambiar={setFecha} etiqueta="Elegir día" className={botonPanelSuave}>
+              <CalendarDays size={18} /> {fecha === hoy() ? 'Hoy' : desdeIso(fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')}
+            </SelectorFecha>
+            <button onClick={() => setFecha(sumarDias(fecha, 1))} className={botonPanelIcono} aria-label="Día siguiente"><ChevronRight size={22} strokeWidth={2.25} /></button>
+          </div>
+          <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+          <button onClick={() => setProduccion(true)} disabled={!actual} className={botonPanel}><Factory size={18} /> Registrar producción</button>
+        </Encabezado>
+      ) : (
+        <>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">Stock del día</h1>
+          {selector && <div className="mt-3">{selector}</div>}
+        </>
+      )}
 
-      <div className="mt-3 flex items-center gap-2">
+      {!panel && <div className="mt-3 flex items-center gap-2">
         <button onClick={() => setFecha(sumarDias(fecha, -1))} className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea" aria-label="Día anterior"><ChevronLeft size={20} /></button>
         <div className="min-w-0 flex-1 text-center">
           <div className="font-semibold capitalize">{textoFecha(fecha)}</div>
@@ -79,7 +100,7 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
         </div>
         <button onClick={() => setFecha(sumarDias(fecha, 1))} className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea" aria-label="Día siguiente"><ChevronRight size={20} /></button>
         {fecha !== hoy() && <button onClick={() => setFecha(hoy())} className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea" aria-label="Ir a hoy"><ChevronsRight size={20} /></button>}
-      </div>
+      </div>}
 
       {error && (
         <div role="alert" className="mt-4 flex items-start gap-3 rounded-lg bg-niebla p-4">
@@ -104,7 +125,7 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
 
           <div className="mt-6 flex items-center justify-between">
             <h2 className="text-2xl font-bold tracking-tight">Por sabor</h2>
-            <Boton variante="secundario" className="!px-4 !py-2.5 text-sm" onClick={() => setProduccion(true)}>Registrar producción</Boton>
+            {!panel && <Boton variante="secundario" className="!px-4 !py-2.5 text-sm" onClick={() => setProduccion(true)}>Registrar producción</Boton>}
           </div>
           <div className="mt-1 divide-y divide-linea">
             {cuentas.filas.map(({ producto, producido, asignado, entregado, libre }) => (

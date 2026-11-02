@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { createContext, useContext, useId, type ReactNode } from 'react'
 
 // Dibujos de los envases más comunes, del mismo estilo que el frasco de Danelle (views/admin/marca.tsx): el cuerpo
 // toma el color del producto, con una etiqueta crema, brillo y sombra. Sirven de «foto» del producto mientras las
@@ -17,11 +17,15 @@ const borde = 'color-mix(in oklab, var(--c) 62%, #002014)'
 const oscuro = 'color-mix(in oklab, var(--c) 55%, #002014)'
 const claro = 'color-mix(in oklab, var(--c) 45%, #ffffff)'
 
-export function DibujoEnvase({ tipo, color, className = 'h-28', etiqueta, apagado = false }: {
+// El logo de la empresa sobre la etiqueta crema, como en el frasco de la marca; sin logo, la letra.
+const LogoEtiqueta = createContext<string | null>(null)
+
+export function DibujoEnvase({ tipo, color, className = 'h-28', etiqueta, logo, apagado = false }: {
   tipo: string
   color?: string
   className?: string
   etiqueta?: string // una o dos letras sobre la etiqueta (la inicial del producto)
+  logo?: string | null // imagen (URL o data URL) que va en la etiqueta en lugar de la letra
   apagado?: boolean
 }) {
   const id = useId().replace(/:/g, '')
@@ -35,13 +39,18 @@ export function DibujoEnvase({ tipo, color, className = 'h-28', etiqueta, apagad
       style={{ '--c': c, ...(apagado ? { filter: 'grayscale(1)', opacity: 0.5 } : {}) } as React.CSSProperties}
     >
       <ellipse cx="60" cy="131" rx="36" ry="4.5" fill={TINTA} opacity="0.1" />
-      {dibujo(id, etiqueta)}
+      <LogoEtiqueta.Provider value={logo ?? null}>{dibujo(id, etiqueta)}</LogoEtiqueta.Provider>
     </svg>
   )
 }
 
-// Texto corto centrado sobre una etiqueta.
-function Letra({ x, y, texto, tam = 15, color = TINTA }: { x: number; y: number; texto?: string; tam?: number; color?: string }) {
+// Lo que va centrado sobre una etiqueta: el logo (si lo hay) dentro de una caja de ancho × alto, si no un texto corto.
+function Letra({ x, y, texto, tam = 15, color = TINTA, caja }: { x: number; y: number; texto?: string; tam?: number; color?: string; caja?: [number, number] }) {
+  const logo = useContext(LogoEtiqueta)
+  if (logo) {
+    const [w, h] = caja ?? [tam * 2.7, tam * 1.85]
+    return <image href={logo} x={x - w / 2} y={y - h / 2} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
+  }
   if (!texto) return null
   return (
     <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={tam} fontWeight="700" fill={color} style={{ fontFamily: 'var(--font-display)' }}>
@@ -92,13 +101,13 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
         <path d={d} style={{ fill: claro }} opacity="0.95" />
         <g clipPath={`url(#c-${id})`}>
           <rect x="0" y="40" width="120" height="100" style={{ fill: 'var(--c)' }} opacity="0.55" />
-          <rect x="0" y="70" width="120" height="24" fill={CREMA} />
+          <rect x="0" y="68" width="120" height="28" fill={CREMA} />
           <path d="M28 58 H92 M28 106 H92" style={{ stroke: borde }} strokeOpacity="0.5" strokeWidth="2" />
           {brillo(35, 46, 118)}
         </g>
         <path d={d} fill="none" strokeWidth="1.5" style={{ stroke: borde }} />
         <rect x="45" y="9" width="30" height="11" rx="3" style={{ fill: oscuro }} />
-        <Letra x={60} y={82} texto={l} />
+        <Letra x={60} y={82} texto={l} caja={[44, 24]} />
       </>
     )
   },
@@ -137,8 +146,8 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
         </g>
         <path d={d} fill="none" strokeWidth="1.5" style={{ stroke: borde }} />
         <ellipse cx="60" cy="30" rx="6" ry="4" style={{ fill: oscuro }} />
-        <circle cx="62" cy="88" r="15" fill={CREMA} style={{ stroke: borde }} strokeWidth="1.2" />
-        <Letra x={62} y={88} texto={l} tam={13} />
+        <rect x="37" y="74" width="50" height="30" rx="4" fill={CREMA} style={{ stroke: borde }} strokeWidth="1.2" />
+        <Letra x={62} y={89} texto={l} tam={13} caja={[42, 24]} />
       </>
     )
   },
@@ -154,7 +163,7 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
         <path d="M30 20 H90 V34 H30 Z" style={{ fill: oscuro }} />
         <path d="M30 20 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4" fill="none" style={{ stroke: oscuro }} strokeWidth="2" />
         <circle cx="60" cy="27" r="2.5" fill={CREMA} />
-        <Letra x={60} y={73} texto={l} tam={17} />
+        <Letra x={60} y={72} texto={l} tam={17} caja={[42, 28]} />
       </>
     )
   },
@@ -178,7 +187,7 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
         </g>
         <path d={d} fill="none" stroke="#9c8352" strokeWidth="1.5" />
         <path d="M44 40 Q60 46 76 40" fill="none" style={{ stroke: oscuro }} strokeWidth="4" strokeLinecap="round" />
-        <Letra x={60} y={86.5} texto={l} tam={14} />
+        <Letra x={60} y={86.5} texto={l} tam={14} caja={[36, 21]} />
       </>
     )
   },
@@ -202,7 +211,7 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
       <rect x="8" y="88" width="104" height="8" rx="4" fill="#e4dfcf" stroke="#b9b39f" strokeWidth="1.5" />
       <path d="M14 70 Q60 48 106 70" stroke="#fff" strokeOpacity="0.6" strokeWidth="2" fill="none" />
       <rect x="44" y="100" width="32" height="16" rx="3" fill={CREMA} stroke="#b9b39f" />
-      <Letra x={60} y={108} texto={l} tam={11} />
+      <Letra x={60} y={108} texto={l} tam={11} caja={[28, 13]} />
     </>
   ),
   cubeta: (id, l) => {
@@ -243,7 +252,7 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
       <path d="M72 50 L74 30 L90 42 Z" style={{ fill: 'var(--c)', stroke: borde }} strokeWidth="1.5" strokeLinejoin="round" />
       <rect x="44" y="22" width="30" height="9" style={{ fill: claro, stroke: borde }} strokeWidth="1.5" />
       <rect x="36" y="68" width="32" height="40" rx="3" fill={CREMA} />
-      <Letra x={52} y={88} texto={l} tam={16} />
+      <Letra x={52} y={88} texto={l} tam={16} caja={[28, 34]} />
     </>
   ),
   pieza: (_id, l) => (
@@ -254,7 +263,7 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
       <path d="M92 60 L104 48" stroke="#7d8a82" strokeWidth="1.5" />
       <path d="M96 30 L112 30 L112 50 L104 58 L96 50 Z" fill={CREMA} stroke="#7d8a82" strokeWidth="1.5" strokeLinejoin="round" />
       <circle cx="104" cy="36" r="2" fill="#7d8a82" />
-      <Letra x={104} y={45} texto={l} tam={9} />
+      <Letra x={104} y={44} texto={l} tam={9} caja={[14, 12]} />
     </>
   ),
   granel: (_id, l) => (
@@ -281,7 +290,7 @@ const DIBUJOS: Record<TipoEnvase, (id: string, letra?: string) => ReactNode> = {
       <path d="M16 80 H104 L98 118 Q97 124 91 124 H29 Q23 124 22 118 Z" style={{ fill: claro, stroke: borde }} strokeWidth="1.5" />
       <path d="M16 80 Q30 92 40 80 Q50 92 60 80 Q70 92 80 80 Q90 92 104 80" fill="none" style={{ stroke: borde }} strokeWidth="1.5" />
       <rect x="44" y="98" width="32" height="16" rx="3" fill={CREMA} />
-      <Letra x={60} y={106} texto={l} tam={11} />
+      <Letra x={60} y={106} texto={l} tam={11} caja={[28, 13]} />
     </>
   ),
 }

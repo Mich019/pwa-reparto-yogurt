@@ -6,10 +6,11 @@ import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { PuntoSabor, Segmentado } from '../../components/ui'
 import { pronosticoSemanal, resumenVentas } from '../../lib/pronostico'
 import { formato, sumaPorUnidad, unidadDe } from '../../lib/unidades'
+import { Encabezado } from '../admin/piezas'
 
 const PERIODOS = { hoy: 'Hoy', semana: '7 días', mes: '30 días' } as const
 
-export function Pronostico({ selector, conVentas = true }: { selector?: ReactNode; conVentas?: boolean }) {
+export function Pronostico({ selector, conVentas = true, panel = false }: { selector?: ReactNode; conVentas?: boolean; panel?: boolean }) {
   const clientes = useLiveQuery(() => db.clientes.toArray(), []) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
@@ -33,15 +34,27 @@ export function Pronostico({ selector, conVentas = true }: { selector?: ReactNod
   const entregado = sumaPorUnidad(ventas.porSabor.map((s) => ({ unidad: s.producto.unidad, cantidad: s.litros }))) || l(0, productos[0])
 
   return (
-    <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">{conVentas ? 'Producción y ventas' : 'Producción'}</h1>
-      {selector && <div className="mt-3">{selector}</div>}
+    <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
+      {panel ? (
+        <Encabezado titulo={conVentas ? 'Producción y ventas' : 'Producción'} detalle={`Para la próxima semana · ${textoFecha(pron.desde)} a ${textoFecha(pron.hasta)}`}>
+          {selector}
+        </Encabezado>
+      ) : (
+        <>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">{conVentas ? 'Producción y ventas' : 'Producción'}</h1>
+          {selector && <div className="mt-3">{selector}</div>}
+        </>
+      )}
 
-      <section className="mt-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-apagado">
-          <Factory size={18} /> Producción para la próxima semana
-        </div>
-        <div className="text-xs text-apagado">{textoFecha(pron.desde)} a {textoFecha(pron.hasta)}</div>
+      <section className={panel ? '' : 'mt-4'}>
+        {!panel && (
+          <>
+            <div className="flex items-center gap-2 text-sm font-medium text-apagado">
+              <Factory size={18} /> Producción para la próxima semana
+            </div>
+            <div className="text-xs text-apagado">{textoFecha(pron.desde)} a {textoFecha(pron.hasta)}</div>
+          </>
+        )}
         <div className="mt-2 text-5xl leading-none font-bold tracking-tight tabular-nums">{totalProd}</div>
         {pron.filas.length === 0 && <div className="mt-3 text-sm text-apagado">Aún no hay pedidos agendados ni historial para proyectar.</div>}
         <div className="mt-5 divide-y divide-linea">

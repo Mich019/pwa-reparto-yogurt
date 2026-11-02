@@ -7,9 +7,8 @@ import { dinero } from '../../lib/fechas'
 import { cambio } from '../../lib/reportes'
 import { FormSabor } from '../pwa/Ajustes'
 import { BarrasPeriodo } from './graficas'
-import { Frasco } from './marca'
 import { nombreUnidad, presentacionDe, unidadDe } from '../../lib/unidades'
-import { Delta } from './piezas'
+import { Delta, ImagenSabor } from './piezas'
 
 interface Foto { producto: Producto; venta: VentaSabor; posicion: number }
 
@@ -100,7 +99,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
         role="dialog"
         aria-modal="true"
         aria-labelledby={titulo}
-        className={`absolute inset-x-2 bottom-2 flex max-h-[90dvh] flex-col overflow-hidden rounded-lg border border-white/70 bg-papel shadow-[0_24px_80px_rgba(0,32,20,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] supports-[backdrop-filter]:bg-[rgba(253,253,248,0.8)] supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 sm:inset-x-auto sm:bottom-3 sm:left-3 sm:top-3 sm:max-h-none sm:w-[26rem] ${visible ? 'translate-y-0 sm:translate-x-0' : 'translate-y-[110%] sm:translate-y-0 sm:-translate-x-[110%]'}`}
+        className={`absolute inset-x-2 bottom-2 flex max-h-[90dvh] flex-col overflow-hidden rounded-lg border border-linea bg-papel shadow-[0_24px_80px_rgba(0,32,20,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] supports-[backdrop-filter]:bg-papel/80 supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 sm:inset-x-auto sm:bottom-3 sm:left-3 sm:top-3 sm:max-h-none sm:w-[26rem] ${visible ? 'translate-y-0 sm:translate-x-0' : 'translate-y-[110%] sm:translate-y-0 sm:-translate-x-[110%]'}`}
       >
         <button
           ref={cerrar}
@@ -114,7 +113,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
 
         <div className="flex-1 overflow-y-auto px-6 pb-4 pt-8">
           <div className="grid place-items-center pb-2 pt-1">
-            <Frasco color={p.color_hex} apagado={!p.disponible} className="h-48" />
+            <ImagenSabor producto={p} className="h-48" />
           </div>
 
           <span className={`mt-3 inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${primero ? 'bg-limon text-tinta' : p.disponible ? 'bg-(--chip-ok-fondo) text-(--chip-ok-texto)' : 'bg-niebla text-apagado'}`}>

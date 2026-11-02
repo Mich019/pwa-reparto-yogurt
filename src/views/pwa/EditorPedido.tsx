@@ -6,7 +6,8 @@ import { useRol } from '../../lib/sesion'
 import { db, guardar, totalDe, uid, type Cliente, type Pedido } from '../../lib/db'
 import { hoy, siguienteVisita, sumarDias, textoFecha } from '../../lib/fechas'
 import { SelectorSabores, aCantidades, aItems, type Cantidades } from './SelectorSabores'
-import { Boton, Hoja, aviso, claseInput } from '../../components/ui'
+import { Boton, Hoja, aviso } from '../../components/ui'
+import { SelectorFecha } from '../../components/Calendario'
 
 // Crear un pedido nuevo (RF-024) o editar uno pendiente (RF-025): sabores, litros y fecha.
 export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaInicial, onGuardado }: {
@@ -87,7 +88,10 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaIn
               {d === sugerida && <span className="ml-1 opacity-70">★</span>}
             </button>
           ))}
-          <input type="date" value={fechaVista} min={hoy()} onChange={(e) => e.target.value && setFecha(e.target.value)} className={`${claseInput} !w-auto !py-2 text-sm`} />
+          <SelectorFecha valor={fechaVista} onCambiar={setFecha} min={hoy()} etiqueta="Otro día"
+            className={`flex items-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-semibold ${opciones.includes(fechaVista) ? 'bg-niebla text-tinta' : 'bg-tinta text-white'}`}>
+            <CalendarDays size={16} /> {opciones.includes(fechaVista) ? 'Otro día' : textoFecha(fechaVista)}
+          </SelectorFecha>
         </div>
       </div>
       <SelectorSabores productos={productos} valor={cant} onChange={setCant} />

@@ -212,13 +212,8 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'configuracion' && <Configuracion key={apartado.vez} inicial={apartado.id} />}
           {seccion === 'equipo' && <Equipo panel />}
           {seccion === 'clientes' && <Clientes panel />}
-          {(seccion === 'produccion' || seccion === 'reportes') && (
-            // Estas dos son las pantallas de la app de reparto, que traen su propio margen interior de 16 px.
-            <div className="mx-auto max-w-[1100px] px-0 pt-2 sm:px-4">
-              {seccion === 'produccion' && <Produccion />}
-              {seccion === 'reportes' && <Reportes />}
-            </div>
-          )}
+          {seccion === 'produccion' && <Produccion panel />}
+          {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>
 

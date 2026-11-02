@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
 import { dinero, hoy, sumarDias } from '../../lib/fechas'
 import {
   agrupacionesPosibles, agrupacionSugerida, cambio, diasDelRango, exportarReporte, mover, rangoDe, TABLAS_CSV, textoPeriodo, textoRango, useReporte,
@@ -8,6 +8,8 @@ import {
 import { aviso, Boton, claseInput, Hoja, PuntoSabor, Segmentado } from '../../components/ui'
 import { textoPorUnidad, tituloUnidad } from '../../lib/unidades'
 import { Columnas } from '../../components/graficas'
+import { SelectorRango, textoRangoCorto } from '../../components/Calendario'
+import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
 
 // Reportes del administrador (RF-043 a RF-048): corte del día, comparativos por semana y mes, utilidad por sabor,
 // ranking de sabores, rendimiento de cada vendedor y exportación a Excel o CSV. Los arma el servidor.
@@ -28,7 +30,8 @@ const porcentaje = (n: number | null) => (n === null ? '—' : `${num(n)}%`)
 const dineroEje = (n: number) => `$${n >= 1000 ? `${num(n / 1000)}k` : num(n)}`
 const ejeLitros = (n: number) => (n >= 1000 ? `${num(n / 1000)}k` : num(n))
 
-export function Reportes() {
+// `panel`: encabezado del panel con el tipo de periodo, el cambio de periodo (o las fechas del rango) y «Exportar».
+export function Reportes({ panel = false }: { panel?: boolean } = {}) {
   const [vista, setVista] = useState<Vista>('dia')
   const [ancla, setAncla] = useState(hoy)
   const [libre, setLibre] = useState<Rango>(() => ({ desde: sumarDias(hoy(), -29), hasta: hoy() }))
@@ -49,31 +52,47 @@ export function Reportes() {
     setVista(v)
     setAncla(hoy())
   }
-  function cambiarLibre(campo: keyof Rango, valor: string) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return
-    const r = { ...libre, [campo]: valor > hoy() ? hoy() : valor }
-    if (r.desde > r.hasta) r[campo === 'desde' ? 'hasta' : 'desde'] = r[campo]
-    if (diasDelRango(r) > MAX_DIAS) r[campo === 'desde' ? 'hasta' : 'desde'] = sumarDias(r[campo], campo === 'desde' ? MAX_DIAS - 1 : 1 - MAX_DIAS)
-    setLibre(r)
+  // El calendario ya no deja pasar de hoy; aquí sólo se recorta a MAX_DIAS desde el final.
+  function cambiarLibre(r: Rango) {
+    setLibre(diasDelRango(r) > MAX_DIAS ? { desde: sumarDias(r.hasta, 1 - MAX_DIAS), hasta: r.hasta } : r)
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <div className="mx-auto max-w-5xl">
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">Reportes</h1>
-
-        <Segmentado valor={vista} onChange={cambiarVista} opciones={VISTAS} className="mt-4" />
-        {vista === 'rango' ? (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-apagado">Desde</span>
-              <input type="date" className={claseInput} value={libre.desde} max={libre.hasta} onChange={(e) => cambiarLibre('desde', e.target.value)} />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-apagado">Hasta</span>
-              <input type="date" className={claseInput} value={libre.hasta} min={libre.desde} max={hoy()} onChange={(e) => cambiarLibre('hasta', e.target.value)} />
-            </label>
-          </div>
+    <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
+      <div className={panel ? '' : 'mx-auto max-w-5xl'}>
+        {panel ? (
+          <Encabezado titulo="Reportes" detalle={`${textoRango(vista, rango)}${vista === 'dia' ? '' : ` · ${enCurso ? 'en curso' : `${diasDelRango(rango)} días`}`}`}>
+            <div className="flex gap-1" role="group" aria-label="Periodo">
+              {VISTAS.map((v) => (
+                <button key={v.valor} onClick={() => cambiarVista(v.valor)} aria-pressed={vista === v.valor} className={vista === v.valor ? botonPanel : botonPanelSuave}>{v.texto}</button>
+              ))}
+            </div>
+            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+            {vista === 'rango' ? (
+              <SelectorRango valor={libre} onCambiar={cambiarLibre} max={hoy()} etiqueta="Elegir fechas" className={botonPanelSuave}>
+                <CalendarDays size={18} /> {textoRangoCorto(libre)}
+              </SelectorRango>
+            ) : (
+              <div className="flex gap-1">
+                <button onClick={() => setAncla(mover(vista, ancla, -1))} aria-label="Periodo anterior" className={botonPanelIcono}><ChevronLeft size={22} strokeWidth={2.25} /></button>
+                <button onClick={() => setAncla(hoy())} disabled={enCurso} className={botonPanelSuave}>Actual</button>
+                <button onClick={() => setAncla(mover(vista, ancla, 1))} disabled={enCurso} aria-label="Periodo siguiente" className={botonPanelIcono}><ChevronRight size={22} strokeWidth={2.25} /></button>
+              </div>
+            )}
+            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+            <button onClick={() => setExportando(true)} disabled={!vigente} className={botonPanel}><Download size={18} /> Exportar</button>
+          </Encabezado>
+        ) : (
+          <>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">Reportes</h1>
+            <Segmentado valor={vista} onChange={cambiarVista} opciones={VISTAS} className="mt-4" />
+          </>
+        )}
+        {panel ? null : vista === 'rango' ? (
+          <SelectorRango valor={libre} onCambiar={cambiarLibre} max={hoy()} etiqueta="Elegir fechas"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-niebla px-4 py-3 font-semibold active:bg-linea">
+            <CalendarDays size={20} /> {textoRangoCorto(libre)}
+          </SelectorRango>
         ) : (
           <div className="mt-3 flex items-center justify-between gap-2">
             <button onClick={() => setAncla(mover(vista, ancla, -1))} aria-label="Periodo anterior" className="grid h-11 w-11 place-items-center rounded-full bg-niebla active:bg-linea">
@@ -103,7 +122,7 @@ export function Reportes() {
               posibles={posibles}
               agrupar={agrupar}
               onAgrupar={setElegida}
-              exportar={() => setExportando(true)}
+              exportar={panel ? undefined : () => setExportando(true)}
             />
           </div>
         )}
@@ -134,7 +153,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
   posibles: Agrupar[]
   agrupar: Agrupar
   onAgrupar: (a: Agrupar) => void
-  exportar: () => void
+  exportar?: () => void // sin él (panel) Exportar va en el encabezado
 }) {
   const { resumen: r, anterior } = reporte
   const comparar = !enCurso && anterior
@@ -158,9 +177,11 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
     <>
       <div className="mt-5 flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold tracking-tight">Resumen</h2>
-        <button onClick={exportar} className="flex items-center gap-1.5 rounded-md bg-niebla px-4 py-2.5 text-[13px] font-semibold active:bg-linea">
-          <Download size={16} /> Exportar
-        </button>
+        {exportar && (
+          <button onClick={exportar} className="flex items-center gap-1.5 rounded-md bg-niebla px-4 py-2.5 text-[13px] font-semibold active:bg-linea">
+            <Download size={16} /> Exportar
+          </button>
+        )}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">

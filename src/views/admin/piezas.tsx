@@ -5,7 +5,8 @@ import { litrosTxt, type VentaSabor } from '../../lib/admin-datos'
 import { cambio } from '../../lib/reportes'
 import { dinero } from '../../lib/fechas'
 import { presentacionDe, unidadDe } from '../../lib/unidades'
-import { AveEmpresa, Frasco } from './marca'
+import { AveEmpresa, Frasco, useLogoEtiqueta } from './marca'
+import { DibujoEnvase } from '../registro/dibujos'
 
 // Cambio contra el periodo anterior, con signo y flecha (nunca sólo con color). null = no hay con qué comparar.
 export function Delta({ valor, className = 'text-xs' }: { valor: number | null; className?: string }) {
@@ -40,6 +41,8 @@ const anilloFoco = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus
 const baseBoton = `flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-40 ${anilloFoco}`
 export const botonPanel = `${baseBoton} bg-tinta text-white hover:bg-marca-oscuro`
 export const botonPanelSuave = `${baseBoton} bg-niebla text-tinta hover:bg-linea`
+// Sólo un ícono (flechas de periodo): cuadrado de 40 px, sin el relleno lateral de los botones con texto.
+export const botonPanelIcono = `grid h-10 w-10 shrink-0 place-items-center rounded-md bg-niebla text-tinta transition-colors hover:bg-linea disabled:opacity-40 ${anilloFoco}`
 
 // Buscador del encabezado: sólo la lupa, del alto de los botones; al tocarla se despliega el campo (anima el ancho de
 // un solo input). Desde 1280 px crece hacia la izquierda por encima del hueco junto al título, sin empujar los
@@ -83,6 +86,14 @@ export function Subrayado({ children, dibujar = false }: { children: ReactNode; 
       </svg>
     </span>
   )
+}
+
+// La «foto» de un sabor: el dibujo de su envase (bolsa, garrafón, botella…), para que coincida con lo que dice su
+// presentación, con la etiqueta crema y el logo de la marca como el frasco; sin envase o en frasco, el frasco.
+export function ImagenSabor({ producto, className }: { producto: Pick<Producto, 'color_hex' | 'disponible' | 'envase' | 'sabor'>; className?: string }) {
+  const logo = useLogoEtiqueta()
+  if (!producto.envase || producto.envase === 'frasco') return <Frasco color={producto.color_hex} apagado={!producto.disponible} className={className} />
+  return <DibujoEnvase tipo={producto.envase} color={producto.color_hex} apagado={!producto.disponible} logo={logo} etiqueta={producto.sabor.trim().charAt(0).toUpperCase()} className={className} />
 }
 
 // Lo que se ve donde todavía no hay nada: el ave de la marca y una línea que dice qué hacer.
@@ -133,7 +144,7 @@ export function TarjetaSabor({ producto, venta, posicion, conPrecio = false, fra
       )}
       {!producto.disponible && <span className="absolute right-3 top-3 rounded-full bg-niebla px-2 py-0.5 text-[11px] font-semibold text-apagado">Sin stock</span>}
       <div className="flex flex-1 items-center justify-center">
-        <Frasco color={producto.color_hex} apagado={!producto.disponible} className={`${frasco} transition-transform duration-300 group-hover:scale-[1.03]`} />
+        <ImagenSabor producto={producto} className={`${frasco} transition-transform duration-300 group-hover:scale-[1.03]`} />
       </div>
       <div className="mt-3 w-full min-w-0">
         <div className="truncate text-sm font-semibold">{producto.sabor}</div>

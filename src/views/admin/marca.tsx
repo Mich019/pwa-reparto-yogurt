@@ -59,11 +59,17 @@ const HEX = /^#[0-9a-f]{6}$/i
 
 // Un envase de Danelle del color del sabor: tapa verde con la franja amarilla del logo y etiqueta crema con el logo.
 // Hace de «foto del producto» en las tarjetas del panel; los sabores no traen imagen, sólo su color.
+// Lo que va en la etiqueta de los envases dibujados: el logo de la empresa (el de Danelle si es la marca de siempre).
+export function useLogoEtiqueta() {
+  const m = useMarca()
+  return !m || esDanelle(m) ? logo : m.logo ?? null
+}
+
 export function Frasco({ color, className = 'h-28', apagado = false }: { color?: string; className?: string; apagado?: boolean }) {
   const id = useId().replace(/:/g, '')
   const m = useMarca()
   const danelle = !m || esDanelle(m)
-  const etiqueta = danelle ? logo : m.logo
+  const etiqueta = useLogoEtiqueta()
   const c = color && HEX.test(color) ? color : '#d4d4d4'
   const cuerpo = 'M23 34 H97 L93 116 Q92.4 125 83 125 H37 Q27.6 125 27 116 Z'
   return (

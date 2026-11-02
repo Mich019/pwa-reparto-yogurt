@@ -76,3 +76,8 @@ body {
 @keyframes trazo-dibujar { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 .trazo-dibujar { stroke-dasharray: 1; animation: trazo-dibujar 0.55s cubic-bezier(0.65, 0, 0.35, 1) 0.05s both; }
 @media (prefers-reduced-motion: reduce) { .trazo-dibujar { animation: none; } }
+
+/* La ventanita del calendario (components/Calendario.tsx) entra con un leve desliz; sin él si se pide menos movimiento. */
+@keyframes calendario-entrar { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+.calendario-entrar { animation: calendario-entrar 0.14s ease-out; transform-origin: top right; }
+@media (prefers-reduced-motion: reduce) { .calendario-entrar { animation: none; } }
