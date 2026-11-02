@@ -375,7 +375,7 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   // ---------------------------------------------------------------- tablas
   const signo = (u: number) => (u < 0 ? NEGATIVO : undefined)
   const nota = (s: SaborVendido) => (s.id === r.ranking.estrella ? 'Mayor venta' : s.id === r.ranking.menorRotacion ? 'Menor rotación' : s.sinCosto ? 'Sin costo capturado' : '')
-  inf.tituloSeccion('Rentabilidad por sabor', 'Ordenado de mayor a menor volumen')
+  inf.tituloSeccion('Rentabilidad por sabor', varias ? 'Ordenado de mayor a menor ingreso' : 'Ordenado de mayor a menor volumen')
   inf.tabla<SaborVendido>([
     { titulo: 'Sabor', ancho: 0.18, valor: (s) => s.sabor, muestra: (s) => hex(s.color) },
     { titulo: tituloCant, ancho: 0.1, der: true, valor: (s) => lit(s.litros, s.unidad) },

@@ -440,9 +440,15 @@ describe('libreta de clientes', () => {
       assert.deepEqual(r.body.periodos.find((p: { periodo: string }) => p.periodo === '2026-10-07').porUnidad.kg, 10)
       assert.deepEqual(r.body.vendedores.find((v: { id: string }) => v.id === ana.id).porUnidad.kg, 10)
       assert.equal(r.body.sabores.find((s: { sabor: string }) => s.sabor === 'Hielo').unidad, 'kg')
+      // 10 kg de hielo no le gana a 8 L de vainilla: con varias unidades el ranking va por ingresos.
+      assert.deepEqual(r.body.sabores.map((s: { sabor: string }) => s.sabor), ['Vainilla', 'Fresa', 'Mango', 'Hielo', 'Nuez'])
+      assert.equal(r.body.ranking.estrella, r.body.sabores[0].id)
       // En el Excel/CSV, una columna por unidad.
       const per = (await pedir(srv, admin, `/reportes/exportar?${OCTUBRE}&formato=csv&tabla=periodos`)).rawPayload.toString('utf8')
       assert.match(per.split('\r\n')[0], /Litros.*Kilos/)
+      const ven = (await pedir(srv, admin, `/reportes/exportar?${OCTUBRE}&formato=csv&tabla=ventas`)).rawPayload.toString('utf8')
+      assert.match(ven, /,Sabor,Cantidad,Unidad,Importe,/)
+      assert.match(ven, /,Hielo,10,kg,70,/)
       const lib = await json(srv, admin, '/reportes/clientes')
       assert.equal(lib.body.clientes.find((c: { porUnidad: Record<string, number> }) => c.porUnidad.kg).porUnidad.kg, 10)
     })

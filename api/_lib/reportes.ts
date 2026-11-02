@@ -137,7 +137,7 @@ export interface Reporte {
   resumen: Resumen
   anterior: { desde: string; hasta: string; resumen: Resumen } | null // mismo largo, justo antes
   periodos: Periodo[]
-  sabores: Sabor[] // de más a menos litros: el primero es el sabor estrella y el último el de menor rotación
+  sabores: Sabor[] // de más a menos litros (con varias unidades, de más a menos ingresos): el primero es el sabor estrella y el último el de menor rotación
   ranking: { estrella: string | null; menorRotacion: string | null }
   vendedores: Vendedor[] // de más a menos ingreso
 }
@@ -289,6 +289,8 @@ export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
   const ven = vendedores(f.vendedores, f.vendedores_u, f.gente)
   // Las unidades del catálogo: las de los sabores disponibles (la lista de sabores ya los trae todos).
   const unidades = ordenarUnidades([...sab.filter((x) => x.disponible).map((x) => x.unidad), ...Object.keys(r.porUnidad)])
+  // Con varias unidades 10 kg no se compara con 8 L: el ranking (estrella, menor rotación) va por ingresos.
+  if (unidades.length > 1) sab.sort((a, b) => b.ingreso - a.ingreso || b.litros - a.litros || a.sabor.localeCompare(b.sabor, 'es'))
   return {
     desde: q.desde,
     hasta: q.hasta,
