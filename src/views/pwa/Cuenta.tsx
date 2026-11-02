@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Bell, BellRing, CloudOff, Eye, EyeOff, Flame, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
@@ -11,6 +11,7 @@ import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
 import { FotoPerfil } from '../../components/Avatar'
+import { Ayuda } from '../ayuda/Ayuda'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
 
@@ -257,6 +258,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
   const pendientes = useLiveQuery(() => db.cola.count(), []) ?? 0
   const problemas = useLiveQuery(() => db.problemas.filter((p) => !p.visto).toArray(), []) ?? []
   const [cambiando, setCambiando] = useState(false)
+  const [ayuda, setAyuda] = useState(false)
   const [saliendo, setSaliendo] = useState(false)
   if (!sesion) return null
   const u = sesion.usuario
@@ -313,11 +315,21 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
         </div>
       )}
 
+      <button onClick={() => setAyuda(true)} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-niebla p-4 text-left active:bg-linea">
+        <LifeBuoy size={20} className="shrink-0" />
+        <span className="min-w-0 flex-1"><span className="block font-semibold">Ayuda</span><span className="block text-sm text-apagado">Guías paso a paso: pedidos, entregas, clientes…</span></span>
+        <ChevronRight size={18} className="shrink-0 text-apagado" />
+      </button>
+
       <div className="mt-3 space-y-2">
         <Boton variante="secundario" className="w-full" onClick={() => setCambiando(true)}>Cambiar contraseña</Boton>
         <Boton variante="peligro" className="w-full" onClick={() => void salir()} disabled={saliendo}><LogOut size={18} />{saliendo ? 'Cerrando…' : 'Cerrar sesión'}</Boton>
         {pendientes > 0 && <p className="px-1 text-xs text-apagado">Los cambios por enviar se guardan en este teléfono y salen cuando vuelvas a entrar con esta cuenta.</p>}
       </div>
+
+      <Hoja abierta={ayuda} onCerrar={() => setAyuda(false)} titulo="Ayuda" alto>
+        <div className="pb-6"><Ayuda donde="app" /></div>
+      </Hoja>
 
       <Hoja abierta={cambiando} onCerrar={() => setCambiando(false)} titulo="Cambiar contraseña">
         <div className="pb-4"><FormPassword onListo={() => setCambiando(false)} /></div>

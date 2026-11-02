@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CreditCard, KeyRound, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { CreditCard, KeyRound, LifeBuoy, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
@@ -10,6 +10,7 @@ import { DosPasos } from '../pwa/DosPasos'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { SeccionSuscripcion } from './Suscripcion'
 import { MarcaEmpresa } from './MarcaEmpresa'
+import { Ayuda } from '../ayuda/Ayuda'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -21,7 +22,7 @@ const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-vis
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Sin conexión con el servidor')
 const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')
 
-export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'apariencia'
+export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'apariencia' | 'ayuda'
 export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
@@ -73,7 +74,8 @@ function Muestra({ valor }: { valor: PreferenciaTema }) {
   )
 }
 
-export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = [] }: { inicial?: ApartadoConfig; plataforma?: boolean; extra?: ApartadoExtra[] }) {
+// `irA`: abre otra sección del panel (el «Ir a…» de las guías de Ayuda).
+export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = [], irA }: { inicial?: ApartadoConfig; plataforma?: boolean; extra?: ApartadoExtra[]; irA?: (seccion: string) => void }) {
   const u = useSesion()?.usuario
   const suscripcion = useSuscripcion(plataforma ? undefined : u?.id)
   const [apartado, setApartado] = useState<string>(inicial)
@@ -85,6 +87,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
     ...extra,
     { id: 'apariencia', texto: 'Apariencia', ayuda: 'Tema, texto y movimiento', icono: Palette },
+    ...(plataforma ? [] : [{ id: 'ayuda', texto: 'Ayuda', ayuda: 'Guías paso a paso', icono: LifeBuoy }]),
   ]
   const visible = menu.some((m) => m.id === apartado) ? apartado : 'cuenta'
   const elegir = (id: string) => {
@@ -96,7 +99,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     <div className="mx-auto max-w-[1280px] 2xl:max-w-[1600px] px-4 pt-2 sm:px-8 lg:flex lg:h-full lg:flex-col">
       <header className="pb-6 pt-4 lg:shrink-0">
         <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">Configuración</h1>
-        <p className="mt-3 text-sm text-apagado">{plataforma ? 'Tu cuenta y su seguridad, cómo está configurado el servicio y cómo se ve el panel.' : 'Tu cuenta y su seguridad, la marca de tu negocio, tu plan y cómo se ve el panel.'}</p>
+        <p className="mt-3 text-sm text-apagado">{plataforma ? 'Tu cuenta y su seguridad, cómo está configurado el servicio y cómo se ve el panel.' : 'Tu cuenta y su seguridad, la marca de tu negocio, tu plan, cómo se ve el panel y la ayuda.'}</p>
       </header>
 
       <div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
@@ -135,6 +138,11 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
             </Seccion>
           )}
           {visible === 'apariencia' && <Apariencia />}
+          {visible === 'ayuda' && (
+            <Seccion id="ayuda" titulo="Ayuda" descripcion="Guías cortas de lo que más se hace, con lo que hay que tocar resaltado. Sólo ves lo que tu cuenta puede hacer.">
+              <Ayuda donde="panel" ir={(d) => (menu.some((m) => m.id === d) ? elegir(d) : irA?.(d))} />
+            </Seccion>
+          )}
         </div>
       </div>
     </div>

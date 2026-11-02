@@ -81,3 +81,11 @@ body {
 @keyframes calendario-entrar { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
 .calendario-entrar { animation: calendario-entrar 0.14s ease-out; transform-origin: top right; }
 @media (prefers-reduced-motion: reduce) { .calendario-entrar { animation: none; } }
+
+/* Cada «captura» de la Ayuda (views/ayuda) entra con un leve fundido al cambiar de paso. */
+@keyframes ayuda-entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.ayuda-entrar { animation: ayuda-entrar 0.22s ease-out; }
+/* Lo que hay que tocar late con una onda que sale unos pixeles (igual en un botón chico que en un campo ancho). */
+@keyframes ayuda-pulso { from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-marca) 55%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }
+.ayuda-pulso { animation: ayuda-pulso 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ayuda-entrar, .ayuda-pulso { animation: none; } }

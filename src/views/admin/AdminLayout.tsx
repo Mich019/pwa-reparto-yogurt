@@ -209,7 +209,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
         <div className={`pb-[calc(7rem+env(safe-area-inset-bottom))] ${seccion === 'configuracion' ? 'lg:h-full lg:pb-0' : 'lg:pb-12'}`}>
           {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
           {seccion === 'sabores' && <AdminSabores />}
-          {seccion === 'configuracion' && <Configuracion key={apartado.vez} inicial={apartado.id} />}
+          {seccion === 'configuracion' && <Configuracion key={apartado.vez} inicial={apartado.id} irA={(s) => setSeccion(s as SeccionAdmin)} />}
           {seccion === 'equipo' && <Equipo panel />}
           {seccion === 'clientes' && <Clientes panel />}
           {seccion === 'produccion' && <Produccion panel />}
