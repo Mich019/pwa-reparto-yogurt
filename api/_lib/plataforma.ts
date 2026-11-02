@@ -48,14 +48,30 @@ const bodyEmpresaNueva = z.object({
   exenta: z.boolean().default(false),
 })
 
-// Ajustes de la plataforma (plataforma_ajustes). '' o null quita el correo, el anuncio o los días propios.
+// Ajustes de la plataforma (plataforma_ajustes). '' o null quita el correo o los días propios.
 const bodyAjustesPlataforma = z.object({
   registroAbierto: z.boolean().optional(),
   pruebaDias: z.number().int().min(0, 'Los días de prueba van de 0 a 365').max(365, 'Los días de prueba van de 0 a 365').nullable().optional(),
   correoSoporte: z.union([z.literal(''), z.string().trim().toLowerCase().email('Escribe un correo válido').max(150)]).nullable().optional(),
-  anuncio: z.string().trim().max(280, 'El anuncio es de 280 letras como máximo').nullable().optional(),
-  anuncioTipo: z.enum(['info', 'aviso']).optional(),
+  avisoPruebaDias: z.number().int().min(0, 'El aviso va de 0 a 60 días antes').max(60, 'El aviso va de 0 a 60 días antes').optional(),
+  avisoPruebaVendedores: z.boolean().optional(),
 }).strict().refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
+
+// Un aviso escrito por la plataforma: a quién va y entre qué fechas sale (null = sin límite por ese lado).
+const momento = z.iso.datetime({ offset: true, message: 'Fecha no válida' }).nullable()
+const bodyAviso = z.object({
+  texto: z.string().trim().min(1, 'Escribe el aviso').max(280, 'El aviso es de 280 letras como máximo'),
+  tipo: z.enum(['info', 'aviso']).default('info'),
+  para: z.enum(['todos', 'administradores', 'vendedores']).default('todos'),
+  desde: momento.default(null),
+  hasta: momento.default(null),
+}).strict().refine((b) => !b.desde || !b.hasta || new Date(b.hasta) > new Date(b.desde), { message: 'El final va después del inicio', path: ['hasta'] })
+const idAviso = z.object({ id: z.uuid() })
+type FilaAviso = { id_aviso: string; texto: string; tipo: string; para: string; desde: Date | null; hasta: Date | null; actualizado_en: Date }
+const wireAviso = (a: FilaAviso) => ({
+  id: a.id_aviso, texto: a.texto, tipo: a.tipo, para: a.para,
+  desde: a.desde?.toISOString() ?? null, hasta: a.hasta?.toISOString() ?? null, actualizado: a.actualizado_en.toISOString(),
+})
 
 const bodyCuenta = z.object({ nombre: z.string().trim().min(2, 'Escribe el nombre').max(100), correo })
 
@@ -115,29 +131,104 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
   app.patch('/plataforma/ajustes', { preHandler: requierePlataforma, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyAjustesPlataforma.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
-    const { registroAbierto, pruebaDias, correoSoporte, anuncio, anuncioTipo } = b.data
+    const { registroAbierto, pruebaDias, correoSoporte, avisoPruebaDias, avisoPruebaVendedores } = b.data
     await db.query(
       `UPDATE plataforma_ajustes SET
               registro_abierto = coalesce($1, registro_abierto),
               prueba_dias = CASE WHEN $2 THEN $3::int ELSE prueba_dias END,
               correo_soporte = CASE WHEN $4 THEN $5 ELSE correo_soporte END,
-              anuncio = CASE WHEN $6 THEN $7 ELSE anuncio END,
-              anuncio_tipo = coalesce($8, anuncio_tipo),
+              aviso_prueba_dias = coalesce($6, aviso_prueba_dias),
+              aviso_prueba_vendedores = coalesce($7, aviso_prueba_vendedores),
               actualizado_en = now()
         WHERE id`,
       [registroAbierto ?? null, pruebaDias !== undefined, pruebaDias ?? null, correoSoporte !== undefined, correoSoporte || null,
-        anuncio !== undefined, anuncio || null, anuncioTipo ?? null],
+        avisoPruebaDias ?? null, avisoPruebaVendedores ?? null],
     )
     req.log.info({ cambios: Object.keys(b.data) }, 'ajustes de la plataforma cambiados')
     return leerAjustes(db, config)
   })
 
-  // Lo que cualquiera puede leer, con o sin sesión: el anuncio (también en la pantalla de entrada), si el registro está
-  // abierto y a dónde escribir.
+  // Lo que cualquiera puede leer, con o sin sesión: si el registro está abierto y a dónde escribir.
   app.get('/plataforma/publico', async (_req, rep) => {
     const a = await leerAjustes(db, config)
     rep.header('cache-control', 'public, max-age=60')
-    return { anuncio: a.anuncio, registroAbierto: a.registroAbierto, correoSoporte: a.correoSoporte }
+    return { registroAbierto: a.registroAbierto, correoSoporte: a.correoSoporte }
+  })
+
+  // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.
+  app.get('/plataforma/avisos', { preHandler: requierePlataforma }, async () => {
+    const { rows } = await db.query<FilaAviso>(
+      `SELECT * FROM avisos_plataforma ORDER BY coalesce(hasta, 'infinity') < now(), coalesce(desde, creado_en) DESC`,
+    )
+    return { avisos: rows.map(wireAviso), avisoPrueba: (await leerAjustes(db, config)).avisoPrueba }
+  })
+
+  app.post('/plataforma/avisos', { preHandler: requierePlataforma, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const b = bodyAviso.safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
+    const { rows: [a] } = await db.query<FilaAviso>(
+      `INSERT INTO avisos_plataforma (texto, tipo, para, desde, hasta) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [b.data.texto, b.data.tipo, b.data.para, b.data.desde, b.data.hasta],
+    )
+    req.log.info({ aviso: a.id_aviso, por: req.usuario.id }, 'plataforma: aviso nuevo')
+    return rep.code(201).send({ aviso: wireAviso(a) })
+  })
+
+  // Se cambia entero (el editor manda todo). Cambiarlo lo vuelve a mostrar a quien lo había cerrado.
+  app.put('/plataforma/avisos/:id', { preHandler: requierePlataforma, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const p = idAviso.safeParse(req.params)
+    if (!p.success) return rep.code(404).send({ error: 'Ese aviso no existe' })
+    const b = bodyAviso.safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
+    const { rows: [a] } = await db.query<FilaAviso>(
+      `UPDATE avisos_plataforma SET texto = $2, tipo = $3, para = $4, desde = $5, hasta = $6, actualizado_en = now()
+        WHERE id_aviso = $1 RETURNING *`,
+      [p.data.id, b.data.texto, b.data.tipo, b.data.para, b.data.desde, b.data.hasta],
+    )
+    if (!a) return rep.code(404).send({ error: 'Ese aviso no existe' })
+    return { aviso: wireAviso(a) }
+  })
+
+  app.delete('/plataforma/avisos/:id', { preHandler: requierePlataforma }, async (req, rep) => {
+    const p = idAviso.safeParse(req.params)
+    if (!p.success) return rep.code(404).send({ error: 'Ese aviso no existe' })
+    const { rowCount } = await db.query(`DELETE FROM avisos_plataforma WHERE id_aviso = $1`, [p.data.id])
+    if (!rowCount) return rep.code(404).send({ error: 'Ese aviso no existe' })
+    return rep.code(204).send()
+  })
+
+  // Lo que ve cada cuenta arriba del panel o de la app de reparto: sólo con sesión (también con la prueba vencida), nunca
+  // en las pantallas de entrada. Los avisos vigentes que van a su rol y, si su prueba gratis está por terminar y no hay
+  // suscripción en marcha, el automático. «clave» cambia cuando cambia el aviso (o pasa un día de prueba): así, lo que se
+  // cerró vuelve a salir.
+  app.get('/plataforma/avisos/vigentes', { preHandler: requiereSesionSinCobro }, async (req, rep) => {
+    rep.header('cache-control', 'private, no-store')
+    const admin = req.usuario.rol === 'administrador'
+    const { rows } = await db.query<FilaAviso>(
+      `SELECT * FROM avisos_plataforma
+        WHERE (desde IS NULL OR desde <= now()) AND (hasta IS NULL OR hasta > now()) AND para IN ('todos', $1)
+        ORDER BY tipo = 'aviso' DESC, coalesce(desde, creado_en) DESC`,
+      [admin ? 'administradores' : 'vendedores'],
+    )
+    const avisos: { clave: string; texto: string; tipo: string; accion?: 'suscripcion' }[] = rows.map((a) => ({
+      clave: `${a.id_aviso}:${a.actualizado_en.getTime()}`, texto: a.texto, tipo: a.tipo,
+    }))
+    const { avisoPrueba } = await leerAjustes(db, config)
+    if (avisoPrueba.dias > 0 && (admin || avisoPrueba.vendedores)) {
+      const { rows: [e] } = await db.query(
+        `SELECT nombre, ceil(extract(epoch FROM prueba_hasta - now()) / 86400)::int AS dias FROM empresas
+          WHERE id_empresa = $1 AND NOT exenta AND prueba_hasta > now()
+            AND coalesce(suscripcion_estado, '') NOT IN ('authorized', 'pending')`,
+        [req.usuario.empresa],
+      )
+      if (e && e.dias <= avisoPrueba.dias) {
+        const quedan = e.dias === 1 ? 'Queda 1 día' : `Quedan ${e.dias} días`
+        avisos.unshift(admin
+          ? { clave: `prueba:${e.dias}`, tipo: 'aviso', accion: 'suscripcion', texto: `${quedan} de prueba gratis. Suscríbete para que tu equipo no pierda el acceso.` }
+          : { clave: `prueba:${e.dias}`, tipo: 'aviso', texto: `${quedan} de prueba gratis de ${e.nombre}. Avísale a tu administrador para que no se corte el acceso.` })
+      }
+    }
+    return { avisos }
   })
 
   app.get('/plataforma/empresas', { preHandler: requierePlataforma }, async () => {

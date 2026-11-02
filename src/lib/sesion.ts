@@ -215,7 +215,7 @@ async function conSesion<T>(llamada: (token: string) => Promise<T>): Promise<T> 
   }
 }
 
-export function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PUT' | 'PATCH'; cuerpo?: unknown } = {}): Promise<T> {
+export function llamarAutenticado<T>(ruta: string, opciones: { metodo?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; cuerpo?: unknown } = {}): Promise<T> {
   return conSesion((token) => api<T>(ruta, { ...opciones, token }))
 }
 

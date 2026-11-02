@@ -7,7 +7,6 @@ import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
 import { FormPassword } from './Cuenta'
-import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
 export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
   const [correo, setCorreo] = useState('')
@@ -43,7 +42,6 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
 
   return (
     <div className="flex h-dvh flex-col justify-center bg-lienzo px-6 pt-safe pb-safe">
-      <AnuncioPlataforma className="fixed inset-x-0 top-0 z-30 pt-[max(0.625rem,env(safe-area-inset-top))]" />
       <div className="mx-auto w-full max-w-sm">
         {/* Cabecera limpia */}
         <div className="mb-8 flex flex-col items-center text-center">

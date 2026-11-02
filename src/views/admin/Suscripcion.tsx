@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { AlertCircle, CreditCard, LogOut, Sparkles } from 'lucide-react'
+import { AlertCircle, CreditCard, LogOut } from 'lucide-react'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion } from '../../lib/sesion'
 import { cancelarSuscripcion, suscribirse, type Suscripcion } from '../../lib/suscripcion'
 import { usePlataformaPublica } from '../../lib/plataforma'
 import { LogoEmpresa } from './marca'
 
-// Cobro en el panel: el aviso de días de prueba, la pantalla cuando la prueba o la suscripción se acaban, y la sección
+// Cobro en el panel: la pantalla cuando la prueba o la suscripción se acaban, y la sección
 // de Configuración. El pago pasa en Mercado Pago (src/lib/suscripcion.ts).
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
@@ -48,22 +48,6 @@ function BotonSuscribirse({ s, grande = false }: { s: Suscripcion; grande?: bool
         </p>
       )}
       {error && <p role="alert" className="mt-2 flex items-center gap-2 text-sm font-medium text-rojo"><AlertCircle size={15} className="shrink-0" /> {error}</p>}
-    </div>
-  )
-}
-
-// Encima del panel durante la última semana de prueba.
-export function AvisoPrueba({ s, onVer }: { s: Suscripcion; onVer: () => void }) {
-  if (s.estado !== 'prueba' || s.diasPrueba > 7 || s.suscripcion === 'pending') return null
-  return (
-    <div className="mx-4 mb-2 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-marca/10 px-4 py-3 text-sm sm:mx-8">
-      <Sparkles size={18} className="shrink-0 text-marca" aria-hidden="true" />
-      <span className="flex-1">
-        {s.diasPrueba === 0 ? 'Tu prueba gratis termina hoy.' : <>Te {s.diasPrueba === 1 ? 'queda' : 'quedan'} <b>{dias(s.diasPrueba)}</b> de prueba gratis.</>} Suscríbete para no perder el acceso.
-      </span>
-      <button type="button" onClick={onVer} className={`rounded-full bg-tinta px-4 py-2 font-semibold text-white hover:bg-marca-oscuro ${anillo}`}>
-        Ver suscripción
-      </button>
     </div>
   )
 }

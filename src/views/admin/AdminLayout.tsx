@@ -13,7 +13,7 @@ import { Reportes } from '../pwa/Reportes'
 import { useAplicarPreferencias } from '../../lib/tema'
 import { Configuracion, type ApartadoConfig } from './Configuracion'
 import { Avatar } from '../../components/Avatar'
-import { AvisoPrueba, PantallaCobro } from './Suscripcion'
+import { PantallaCobro } from './Suscripcion'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
@@ -133,7 +133,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
 
   return (
     <div className="flex h-dvh flex-col text-tinta antialiased">
-      <AnuncioPlataforma />
+      <AnuncioPlataforma onVerSuscripcion={() => abrirConfiguracion('suscripcion')} />
       <header className="z-20 flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8 lg:pb-4 lg:pt-4">
         <div className="flex flex-1 items-center">
           <button
@@ -200,8 +200,6 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           </button>
         </div>
       </header>
-
-      {suscripcion && <AvisoPrueba s={suscripcion} onVer={() => abrirConfiguracion('suscripcion')} />}
 
       {/* En la computadora, Configuración lleva su propio desplazamiento: el título y su menú quedan fijos. */}
       <main className={`min-h-0 flex-1 overflow-y-auto ${seccion === 'configuracion' ? 'lg:overflow-hidden' : ''}`}>

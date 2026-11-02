@@ -101,11 +101,24 @@ CREATE TABLE plataforma_ajustes (
   registro_abierto boolean NOT NULL DEFAULT true,
   prueba_dias      integer CHECK (prueba_dias BETWEEN 0 AND 365),
   correo_soporte   varchar(150),
-  anuncio          varchar(280),
-  anuncio_tipo     varchar(10) NOT NULL DEFAULT 'info' CHECK (anuncio_tipo IN ('info', 'aviso')),
+  aviso_prueba_dias integer NOT NULL DEFAULT 7 CHECK (aviso_prueba_dias BETWEEN 0 AND 60), -- 015: aviso de la prueba por vencer (0 = nunca)
+  aviso_prueba_vendedores boolean NOT NULL DEFAULT false,
   actualizado_en   timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO plataforma_ajustes DEFAULT VALUES;
+
+-- Avisos de la plataforma para las empresas (migración 015): sólo con sesión, mientras estén vigentes y a quien van.
+CREATE TABLE avisos_plataforma (
+  id_aviso       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  texto          varchar(280) NOT NULL CHECK (btrim(texto) <> ''),
+  tipo           varchar(10) NOT NULL DEFAULT 'info' CHECK (tipo IN ('info', 'aviso')),
+  para           varchar(20) NOT NULL DEFAULT 'todos' CHECK (para IN ('todos', 'administradores', 'vendedores')),
+  desde          timestamptz,
+  hasta          timestamptz,
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT avisos_plataforma_vigencia CHECK (hasta IS NULL OR desde IS NULL OR hasta > desde)
+);
 
 -- RF-006: sesiones con refresh token; cerrar sesión = revocar.
 CREATE TABLE sesiones (
@@ -605,6 +618,7 @@ BEGIN
   REVOKE ALL ON verificaciones_correo FROM reparto_app;
   -- De la plataforma: las empresas la leen, no la cambian.
   REVOKE INSERT, UPDATE, DELETE ON plataforma_ajustes FROM reparto_app;
+  REVOKE ALL ON avisos_plataforma FROM reparto_app;
 END $$;
 
 DO $$

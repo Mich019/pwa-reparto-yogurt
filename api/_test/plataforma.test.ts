@@ -13,9 +13,9 @@ await db.query(`UPDATE usuarios SET es_plataforma = true WHERE id_usuario = $1`,
 const srv = await construirApp({ db, config: { ...config, mercadoPago: { ...config.mercadoPago, precioMensual: 299 } } })
 after(async () => { await srv.close(); await app.close(); await db.end() })
 
-const pedir = async (s: { token: string }, metodo: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) => {
+const pedir = async (s: { token: string }, metodo: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', url: string, payload?: object) => {
   const r = await srv.inject({ method: metodo, url, headers: { authorization: `Bearer ${s.token}` }, payload })
-  return { status: r.statusCode, body: r.json() }
+  return { status: r.statusCode, body: r.body ? r.json() : null }
 }
 const conDosPasos = (id: string) => db.query(`INSERT INTO dos_pasos (id_usuario, secreto, activado_en) VALUES ($1, 'x', now()) ON CONFLICT (id_usuario) DO UPDATE SET activado_en = now()`, [id])
 
@@ -31,20 +31,20 @@ describe('panel de la plataforma', () => {
     assert.ok(!JSON.stringify(r.body).includes(config.jwtSecret))
     const ajena = await sesion('administrador')
     assert.equal((await pedir(ajena, 'GET', '/plataforma/servicio')).status, 403)
-    assert.equal((await pedir(ajena, 'PATCH', '/plataforma/ajustes', { anuncio: 'hola' })).status, 403)
+    assert.equal((await pedir(ajena, 'PATCH', '/plataforma/ajustes', { correoSoporte: 'a@b.mx' })).status, 403)
 
-    // Ajustes: el anuncio y el correo de soporte se leen sin sesión; '' los quita. (Registro y días de prueba se
-    // prueban en registro.test.ts, para no cruzarse con sus altas.)
-    const a = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { anuncio: '  Mantenimiento el domingo  ', anuncioTipo: 'aviso', correoSoporte: 'Ayuda@Delisy.MX' })
+    // Ajustes: el correo de soporte se lee sin sesión; null lo quita. (Registro y días de prueba se prueban en
+    // registro.test.ts, para no cruzarse con sus altas.)
+    const a = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { correoSoporte: 'Ayuda@Delisy.MX' })
     assert.equal(a.status, 200)
-    assert.deepEqual(a.body.anuncio, { texto: 'Mantenimiento el domingo', tipo: 'aviso' })
+    assert.equal(a.body.correoSoporte, 'ayuda@delisy.mx')
     const publico = await srv.inject({ method: 'GET', url: '/plataforma/publico' })
-    assert.deepEqual(publico.json(), { anuncio: { texto: 'Mantenimiento el domingo', tipo: 'aviso' }, registroAbierto: true, correoSoporte: 'ayuda@delisy.mx' })
+    assert.deepEqual(publico.json(), { registroAbierto: true, correoSoporte: 'ayuda@delisy.mx' })
     assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { correoSoporte: 'no-es-correo' })).status, 400)
     assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { pruebaDias: 400 })).status, 400)
     assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { otro: 1 })).status, 400)
-    const b = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { anuncio: '', correoSoporte: null })
-    assert.equal(b.body.anuncio, null)
+    assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { avisoPruebaDias: 90 })).status, 400)
+    const b = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { correoSoporte: null })
     assert.equal(b.body.correoSoporte, null)
     // Una empresa la lee pero no la cambia, ni con una consulta propia (sin permiso de escritura para reparto_app).
     const cx = await db.connect()
@@ -52,12 +52,72 @@ describe('panel de la plataforma', () => {
       await cx.query('BEGIN')
       await cx.query('SET LOCAL ROLE reparto_app')
       assert.equal((await cx.query('SELECT registro_abierto FROM plataforma_ajustes')).rowCount, 1)
-      await assert.rejects(cx.query(`UPDATE plataforma_ajustes SET anuncio = 'x'`), /permission denied|permiso denegado/)
+      await cx.query('SAVEPOINT s')
+      await assert.rejects(cx.query(`SELECT 1 FROM avisos_plataforma`), /permission denied|permiso denegado/) // ni la lee: sólo por la API
+      await cx.query('ROLLBACK TO s')
+      await assert.rejects(cx.query(`UPDATE plataforma_ajustes SET correo_soporte = 'x'`), /permission denied|permiso denegado/)
     } finally {
       await cx.query('ROLLBACK')
       cx.release()
     }
     await db.query(`DELETE FROM dos_pasos WHERE id_usuario = $1`, [dueno.id]) // la prueba siguiente empieza sin ella
+  })
+
+  it('los avisos salen sólo con sesión, mientras están vigentes y a quien van; y el automático de la prueba por vencer', async () => {
+    await conDosPasos(dueno.id)
+    const empresa = await crearEmpresa('Avisos')
+    await db.query(`UPDATE empresas SET exenta = false, prueba_hasta = now() + interval '3 days', suscripcion_estado = null WHERE id_empresa = $1`, [empresa])
+    const admin = await sesion('administrador', 'panel', empresa)
+    const vendedor = await sesion('vendedor', 'tel-1', empresa)
+    const hora = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+    const crear = (cuerpo: object) => pedir(dueno, 'POST', '/plataforma/avisos', cuerpo)
+    const vigentes = async (s: { token: string }) => (await pedir(s, 'GET', '/plataforma/avisos/vigentes')).body.avisos as { clave: string; texto: string; accion?: string }[]
+    const textos = async (s: { token: string }) => (await vigentes(s)).map((a) => a.texto)
+
+    assert.equal((await pedir(admin, 'POST', '/plataforma/avisos', { texto: 'x' })).status, 403)
+    assert.equal((await crear({ texto: '   ' })).status, 400)
+    assert.equal((await crear({ texto: 'x', desde: hora(2), hasta: hora(1) })).status, 400)
+    assert.equal((await crear({ texto: 'x', para: 'nadie' })).status, 400)
+    const todos = await crear({ texto: '  Mantenimiento el domingo  ', tipo: 'aviso' })
+    assert.equal(todos.status, 201)
+    assert.equal(todos.body.aviso.texto, 'Mantenimiento el domingo')
+    const soloVendedores = await crear({ texto: 'Ruta nueva', para: 'vendedores', hasta: hora(1) })
+    const futuro = await crear({ texto: 'Mañana', desde: hora(20) })
+    const vencido = await crear({ texto: 'Ayer', desde: hora(-30), hasta: hora(-2) })
+
+    assert.equal((await srv.inject({ method: 'GET', url: '/plataforma/avisos/vigentes' })).statusCode, 401)
+    // Al administrador: el automático primero (con su botón), y sólo lo vigente que va a todos.
+    const delAdmin = await vigentes(admin)
+    assert.deepEqual(delAdmin.map((a) => a.texto), ['Quedan 3 días de prueba gratis. Suscríbete para que tu equipo no pierda el acceso.', 'Mantenimiento el domingo'])
+    assert.equal(delAdmin[0].accion, 'suscripcion')
+    assert.equal(delAdmin[0].clave, 'prueba:3')
+    // Al vendedor no le sale el automático hasta que se active para ellos.
+    assert.deepEqual(await textos(vendedor), ['Mantenimiento el domingo', 'Ruta nueva'])
+    const ajustes = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { avisoPruebaVendedores: true })
+    assert.deepEqual(ajustes.body.avisoPrueba, { dias: 7, vendedores: true })
+    assert.match((await textos(vendedor))[0], /^Quedan 3 días de prueba gratis de Avisos\. Avísale/)
+    // Fuera del plazo del aviso, suscrita o exenta, no hay automático.
+    await pedir(dueno, 'PATCH', '/plataforma/ajustes', { avisoPruebaDias: 2 })
+    assert.deepEqual(await textos(admin), ['Mantenimiento el domingo'])
+    await pedir(dueno, 'PATCH', '/plataforma/ajustes', { avisoPruebaDias: 7 })
+    await db.query(`UPDATE empresas SET suscripcion_estado = 'authorized' WHERE id_empresa = $1`, [empresa])
+    assert.deepEqual(await textos(admin), ['Mantenimiento el domingo'])
+
+    // Cambiarlo cambia su clave (vuelve a salir a quien lo cerró); la lista de la plataforma trae todos, vencidos al final.
+    const antes = (await vigentes(admin))[0].clave
+    const cambiado = await pedir(dueno, 'PUT', `/plataforma/avisos/${todos.body.aviso.id}`, { texto: 'Mantenimiento el lunes', tipo: 'aviso' })
+    assert.equal(cambiado.status, 200)
+    assert.notEqual((await vigentes(admin))[0].clave, antes)
+    const lista = await pedir(dueno, 'GET', '/plataforma/avisos')
+    assert.equal(lista.body.avisos.at(-1).texto, 'Ayer')
+    assert.equal(lista.body.avisos.length, 4)
+    assert.equal((await pedir(dueno, 'PUT', `/plataforma/avisos/${crypto.randomUUID()}`, { texto: 'x' })).status, 404)
+
+    for (const a of [todos, soloVendedores, futuro, vencido]) assert.equal((await pedir(dueno, 'DELETE', `/plataforma/avisos/${a.body.aviso.id}`)).status, 204)
+    assert.equal((await pedir(dueno, 'DELETE', `/plataforma/avisos/${todos.body.aviso.id}`)).status, 404)
+    assert.deepEqual(await vigentes(vendedor), [])
+    await pedir(dueno, 'PATCH', '/plataforma/ajustes', { avisoPruebaVendedores: false })
+    await db.query(`DELETE FROM dos_pasos WHERE id_usuario = $1`, [dueno.id])
   })
 
 

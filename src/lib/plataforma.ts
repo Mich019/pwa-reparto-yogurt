@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api, MODO_SERVIDOR } from './api'
 
-// Lo que la plataforma publica para todos, con o sin sesión (GET /plataforma/publico, api/_lib/plataforma.ts): un
-// anuncio, si el registro de empresas está abierto y el correo de soporte. Se pide una vez por carga de la página; sin
-// conexión no hay nada que mostrar.
+// Lo que la plataforma publica para todos, con o sin sesión (GET /plataforma/publico, api/_lib/plataforma.ts): si el
+// registro de empresas está abierto y el correo de soporte. Se pide una vez por carga de la página; sin conexión no hay
+// nada que mostrar. El anuncio para las empresas va aparte y sólo con sesión (components/AnuncioPlataforma.tsx).
 
 export interface PlataformaPublica {
-  anuncio: { texto: string; tipo: 'info' | 'aviso' } | null
   registroAbierto: boolean
   correoSoporte: string | null
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Plus, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Megaphone, Plus, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
@@ -12,8 +12,8 @@ import { LogoDelisy } from './marca'
 
 // Panel de la plataforma (/plataforma, api/_lib/plataforma.ts): para quienes administran Delisy. Un tablero con menú
 // lateral: el resumen de la plataforma, las empresas con su detalle y sus ajustes, el alta de empresas, las cuentas de
-// la plataforma y la configuración (la de Configuracion.tsx: cuenta, seguridad y apariencia, más los ajustes de la
-// plataforma y el estado del servicio).
+// la plataforma, los avisos para las empresas y la configuración (la de Configuracion.tsx: cuenta, seguridad y
+// apariencia, más los ajustes de la plataforma y el estado del servicio).
 // Todo en páginas, sin ventanas encima; las secciones se separan con líneas finas, no con tarjetas.
 //
 // Gráficos de graficas.tsx (skill dataviz) con los colores de Delisy: la serie en su azul marino y el periodo en curso
@@ -77,7 +77,7 @@ const diasHasta = (s: string) => Math.ceil((new Date(s).getTime() - Date.now()) 
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Sin conexión con el servidor')
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
 
-type Vista = { de: 'resumen' } | { de: 'empresas' } | { de: 'empresa'; id: string } | { de: 'nueva' } | { de: 'cuentas' } | { de: 'config' }
+type Vista = { de: 'resumen' } | { de: 'empresas' } | { de: 'empresa'; id: string } | { de: 'nueva' } | { de: 'cuentas' } | { de: 'avisos' } | { de: 'config' }
 
 export function Plataforma() {
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -101,6 +101,7 @@ export function Plataforma() {
     { de: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
     { de: 'empresas', texto: 'Empresas', icono: Building2 },
     { de: 'nueva', texto: 'Nueva empresa', icono: Plus },
+    { de: 'avisos', texto: 'Avisos', icono: Megaphone },
     { de: 'cuentas', texto: 'Cuentas de la plataforma', icono: ShieldCheck },
     { de: 'config', texto: 'Configuración', icono: Settings },
   ]
@@ -145,9 +146,10 @@ export function Plataforma() {
           </div>
         )}
         {vista.de === 'config' ? <Configuracion plataforma extra={[
-          { id: 'ajustes', texto: 'Ajustes', ayuda: 'Registro, prueba y anuncio', icono: SlidersHorizontal, contenido: <AjustesServicio /> },
+          { id: 'ajustes', texto: 'Ajustes', ayuda: 'Registro, prueba y soporte', icono: SlidersHorizontal, contenido: <AjustesServicio /> },
           { id: 'servicio', texto: 'Servicio', ayuda: 'Estado, cobro y entorno', icono: Server, contenido: <Servicio /> },
         ]} />
+          : vista.de === 'avisos' ? <Avisos />
           : !datos ? !error && <p className="py-20 text-center text-apagado">Cargando la plataforma…</p>
           : vista.de === 'resumen' ? <Resumen d={datos} ir={ir} recargar={cargar} />
           : vista.de === 'empresas' ? <Empresas d={datos} ir={ir} />
@@ -807,6 +809,241 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
   )
 }
 
+// ---------------------------------------------------------------------------------------------------------- avisos
+
+type Para = 'todos' | 'administradores' | 'vendedores'
+interface AvisoPlataforma { id: string; texto: string; tipo: 'info' | 'aviso'; para: Para; desde: string | null; hasta: string | null; actualizado: string }
+const PARA: Record<Para, string> = { todos: 'Todos', administradores: 'Administradores', vendedores: 'Vendedores' }
+// <input type="datetime-local"> habla en la hora de este navegador, sin zona: de ida y vuelta a ISO.
+const aLocal = (iso: string | null) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
+const deLocal = (v: string) => (v ? new Date(v).toISOString() : null)
+const momento = (iso: string) => new Date(iso).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+const estadoAviso = (a: { desde: string | null; hasta: string | null }) =>
+  a.hasta && new Date(a.hasta).getTime() <= Date.now() ? 'terminado' : a.desde && new Date(a.desde).getTime() > Date.now() ? 'programado' : 'activo'
+const ESTADO_AVISO = {
+  activo: { texto: 'Se ve ahora', color: '#1baf7a' },
+  programado: { texto: 'Programado', color: '#2a78d6' },
+  terminado: { texto: 'Terminado', color: '#9a948a' },
+}
+
+function MuestraAviso({ texto, tipo, accion }: { texto: string; tipo: 'info' | 'aviso'; accion?: string }) {
+  const aviso_ = tipo === 'aviso'
+  return (
+    <div className={`flex items-start gap-3 rounded-xl px-4 py-2.5 text-sm ${aviso_ ? 'bg-ambar/15' : 'bg-azul/10'}`}>
+      {aviso_ ? <CircleAlert size={17} className="mt-0.5 shrink-0 text-ambar" aria-hidden="true" /> : <Info size={17} className="mt-0.5 shrink-0 text-azul" aria-hidden="true" />}
+      <p className="min-w-0 flex-1 leading-snug">{texto}{accion && <span className="ml-2 font-semibold underline underline-offset-2">{accion}</span>}</p>
+    </div>
+  )
+}
+
+function Opciones<T extends string>({ valor, opciones, alCambiar, etiqueta }: { valor: T; opciones: [T, string][]; alCambiar: (v: T) => void; etiqueta: string }) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={etiqueta}>
+      {opciones.map(([v, texto]) => (
+        <button key={v} type="button" role="radio" aria-checked={valor === v} onClick={() => alCambiar(v)}
+          className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${valor === v ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>{texto}</button>
+      ))}
+    </div>
+  )
+}
+
+// Apartado «Avisos»: lo que ven las empresas arriba del panel y de la app de reparto (components/AnuncioPlataforma.tsx),
+// sólo con la sesión abierta. Avisos escritos aquí, cada uno con a quién va y entre qué fechas sale, y el automático de
+// la prueba gratis por vencer (plataforma_ajustes).
+function Avisos() {
+  const [lista, setLista] = useState<{ avisos: AvisoPlataforma[]; avisoPrueba: { dias: number; vendedores: boolean } } | null>(null)
+  const [error, setError] = useState('')
+  const cargar = () => llamarAutenticado<NonNullable<typeof lista>>('/plataforma/avisos').then(setLista).catch((e) => setError(mensaje(e)))
+  useEffect(() => { void cargar() }, [])
+  const [editando, setEditando] = useState<AvisoPlataforma | null>(null)
+
+  return (
+    <>
+      <Encabezado titulo="Avisos" detalle="Salen arriba del panel y de la app de reparto, sólo a quien tiene la sesión abierta. Cada quien puede cerrarlos; vuelven a salir si los cambias." />
+      {error && <p role="alert" className="mb-6 text-sm font-medium text-rojo">{error}</p>}
+      {!lista ? !error && <p className="text-sm text-apagado">Cargando…</p> : (
+        <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+          <div className="min-w-0 space-y-10">
+            <EditorAviso key={editando?.id ?? 'nuevo'} aviso={editando} alTerminar={async () => { setEditando(null); await cargar() }} />
+            <Panel titulo="Escritos" detalle={lista.avisos.length ? 'Los terminados quedan al final; quítalos cuando ya no los quieras ver.' : undefined}>
+              {lista.avisos.length === 0 ? <p className="text-sm text-apagado">Todavía no hay avisos.</p> : (
+                <ul className="divide-y divide-linea">
+                  {lista.avisos.map((a) => <FilaAviso key={a.id} a={a} editando={editando?.id === a.id} alEditar={() => { setEditando(a); window.scrollTo({ top: 0, behavior: 'smooth' }) }} alQuitar={cargar} />)}
+                </ul>
+              )}
+            </Panel>
+          </div>
+          <AvisoAutomatico inicial={lista.avisoPrueba} alGuardar={cargar} />
+        </div>
+      )}
+    </>
+  )
+}
+
+function FilaAviso({ a, editando, alEditar, alQuitar }: { a: AvisoPlataforma; editando: boolean; alEditar: () => void; alQuitar: () => Promise<void> }) {
+  const [quitando, setQuitando] = useState(false)
+  const e = ESTADO_AVISO[estadoAviso(a)]
+  const vigencia = a.desde && a.hasta ? `Del ${momento(a.desde)} al ${momento(a.hasta)}`
+    : a.desde ? `Desde el ${momento(a.desde)}, sin fin` : a.hasta ? `Hasta el ${momento(a.hasta)}` : 'Sin fecha de fin'
+  async function quitar() {
+    if (!confirm('¿Quitar este aviso? Deja de salir en todas las empresas.')) return
+    setQuitando(true)
+    try {
+      await llamarAutenticado(`/plataforma/avisos/${a.id}`, { metodo: 'DELETE' })
+      aviso('Aviso quitado')
+      await alQuitar()
+    } catch (x) {
+      aviso(mensaje(x))
+      setQuitando(false)
+    }
+  }
+  return (
+    <li className={`py-4 ${estadoAviso(a) === 'terminado' ? 'opacity-70' : ''}`}>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-niebla px-2.5 py-1 font-semibold">
+          <span className="h-2 w-2 rounded-full" style={{ background: e.color }} aria-hidden="true" />{e.texto}
+        </span>
+        <span className="font-medium text-apagado">{PARA[a.para]} · {vigencia}</span>
+      </div>
+      <div className="mt-2.5"><MuestraAviso texto={a.texto} tipo={a.tipo} /></div>
+      <div className="mt-2 flex gap-4 text-sm font-semibold">
+        <button type="button" onClick={alEditar} disabled={editando} className={`text-[var(--plat-texto)] hover:underline disabled:opacity-40 ${anillo}`}>{editando ? 'Editando…' : 'Editar'}</button>
+        <button type="button" onClick={() => void quitar()} disabled={quitando} className={`text-rojo hover:underline disabled:opacity-40 ${anillo}`}>Quitar</button>
+      </div>
+    </li>
+  )
+}
+
+function EditorAviso({ aviso: original, alTerminar }: { aviso: AvisoPlataforma | null; alTerminar: () => Promise<void> }) {
+  const [texto, setTexto] = useState(original?.texto ?? '')
+  const [tipo, setTipo] = useState<'info' | 'aviso'>(original?.tipo ?? 'info')
+  const [para, setPara] = useState<Para>(original?.para ?? 'todos')
+  const [desde, setDesde] = useState(aLocal(original?.desde ?? null))
+  const [hasta, setHasta] = useState(aLocal(original?.hasta ?? null))
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+  // Atajos para el final: a partir del inicio (o de ahora, si sale ya).
+  const durante = (horas: number) => {
+    const base = desde ? new Date(desde).getTime() : Date.now()
+    setHasta(aLocal(new Date(base + horas * 3600_000).toISOString()))
+  }
+  const alReves = !!desde && !!hasta && new Date(hasta) <= new Date(desde)
+  const vencido = !!hasta && new Date(hasta).getTime() <= Date.now()
+
+  async function guardar() {
+    setGuardando(true)
+    setError('')
+    try {
+      const cuerpo = { texto: texto.trim(), tipo, para, desde: deLocal(desde), hasta: deLocal(hasta) }
+      if (original) await llamarAutenticado(`/plataforma/avisos/${original.id}`, { metodo: 'PUT', cuerpo })
+      else await llamarAutenticado('/plataforma/avisos', { metodo: 'POST', cuerpo })
+      aviso(original ? 'Aviso guardado' : 'Aviso publicado')
+      if (!original) { setTexto(''); setDesde(''); setHasta('') }
+      await alTerminar()
+    } catch (e) {
+      setError(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Panel titulo={original ? 'Editar aviso' : 'Aviso nuevo'} detalle="Por ejemplo, un mantenimiento, una función nueva o un cambio de precio.">
+      <form onSubmit={(e) => { e.preventDefault(); void guardar() }} className="space-y-5">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Campo t="Tipo"><Opciones etiqueta="Tipo de aviso" valor={tipo} alCambiar={setTipo} opciones={[['info', 'Información'], ['aviso', 'Importante']]} /></Campo>
+          <Campo t="Para"><Opciones etiqueta="A quién va" valor={para} alCambiar={setPara} opciones={Object.entries(PARA) as [Para, string][]} /></Campo>
+        </div>
+        <Campo t="Texto">
+          <textarea value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={280} rows={3}
+            placeholder="Ej. El domingo de 2 a 4 a.m. haremos mantenimiento; la app de reparto sigue funcionando sin conexión."
+            className={`${claseInput} resize-y`} />
+          <span className="mt-1 block text-right text-xs tabular-nums text-apagado">{texto.length}/280</span>
+        </Campo>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Campo t="Sale desde">
+            <input type="datetime-local" value={desde} onChange={(e) => setDesde(e.target.value)} className={claseInput} />
+            <span className="mt-1 block text-xs text-apagado">{desde ? <button type="button" onClick={() => setDesde('')} className="font-semibold hover:underline">Que salga ya</button> : 'Vacío: sale en cuanto lo publiques.'}</span>
+          </Campo>
+          <Campo t="Hasta">
+            <input type="datetime-local" value={hasta} onChange={(e) => setHasta(e.target.value)} className={claseInput} />
+            <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-apagado">
+              {hasta ? <button type="button" onClick={() => setHasta('')} className="font-semibold hover:underline">Sin fin</button> : <span>Vacío: hasta que lo quites.</span>}
+              {([[24, '1 día'], [72, '3 días'], [168, '1 semana']] as const).map(([h, t]) => <button key={h} type="button" onClick={() => durante(h)} className="font-semibold hover:underline">{t}</button>)}
+            </span>
+          </Campo>
+        </div>
+        {texto.trim() && <div><span className="mb-1.5 block text-xs text-apagado">Así se verá:</span><MuestraAviso texto={texto.trim()} tipo={tipo} /></div>}
+        {(alReves || vencido) && <p role="alert" className="text-sm font-medium text-ambar">{alReves ? 'El final va después del inicio.' : 'Esa fecha de fin ya pasó: no lo verá nadie.'}</p>}
+        {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
+        <div className="flex flex-wrap gap-3">
+          <button type="submit" disabled={guardando || !texto.trim() || alReves} className={botonPrimario}>{guardando ? 'Guardando…' : original ? 'Guardar cambios' : desde && new Date(desde).getTime() > Date.now() ? 'Programar' : 'Publicar'}</button>
+          {original && <button type="button" onClick={() => void alTerminar()} className={botonSuave}>Cancelar</button>}
+        </div>
+      </form>
+    </Panel>
+  )
+}
+
+// El aviso que el servidor arma solo para cada empresa en prueba: cuántos días antes y si también a sus vendedores.
+function AvisoAutomatico({ inicial, alGuardar }: { inicial: { dias: number; vendedores: boolean }; alGuardar: () => Promise<void> }) {
+  const [dias, setDias] = useState(String(inicial.dias))
+  const [vendedores, setVendedores] = useState(inicial.vendedores)
+  const [guardando, setGuardando] = useState(false)
+  const n = Number(dias || 0)
+  const hay = n !== inicial.dias || vendedores !== inicial.vendedores
+  async function guardar() {
+    setGuardando(true)
+    try {
+      await llamarAutenticado('/plataforma/ajustes', { metodo: 'PATCH', cuerpo: { avisoPruebaDias: n, avisoPruebaVendedores: vendedores } })
+      aviso('Aviso automático guardado')
+      await alGuardar()
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  const ejemplo = Math.min(3, n) || 1
+  return (
+    <Panel titulo="Prueba por vencer" detalle="Automático: a cada empresa en prueba gratis, sin suscripción en marcha, en sus últimos días. Cambia solo cada día.">
+      <div className="space-y-5">
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          Avisar
+          <input inputMode="numeric" value={dias} onChange={(e) => setDias(e.target.value.replace(/\D/g, '').slice(0, 2))}
+            aria-label="Días antes del fin de la prueba" className={`${claseInput} max-w-20 text-center tabular-nums`} />
+          días antes de que termine
+        </label>
+        {n > 60 && <p role="alert" className="text-sm font-medium text-rojo">Hasta 60 días antes.</p>}
+        {n === 0 ? <p className="text-sm text-apagado">En 0 no sale ningún aviso automático.</p> : (
+          <>
+            <div><span className="mb-1.5 block text-xs text-apagado">A los administradores:</span>
+              <MuestraAviso tipo="aviso" accion="Ver suscripción" texto={`${ejemplo === 1 ? 'Queda 1 día' : `Quedan ${ejemplo} días`} de prueba gratis. Suscríbete para que tu equipo no pierda el acceso.`} /></div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold">También a los vendedores</div>
+                <div className="text-xs text-apagado">Para que le recuerden a su administrador.</div>
+              </div>
+              <Interruptor activo={vendedores} alCambiar={setVendedores} etiqueta="También a los vendedores" />
+            </div>
+            {vendedores && <MuestraAviso tipo="aviso" texto={`${ejemplo === 1 ? 'Queda 1 día' : `Quedan ${ejemplo} días`} de prueba gratis de Tu Empresa. Avísale a tu administrador para que no se corte el acceso.`} />}
+          </>
+        )}
+        {hay && (
+          <div className="flex gap-3">
+            <button type="button" onClick={() => void guardar()} disabled={guardando || n > 60} className={botonPrimario}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+            <button type="button" onClick={() => { setDias(String(inicial.dias)); setVendedores(inicial.vendedores) }} className={botonSuave}>Deshacer</button>
+          </div>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
 // ---------------------------------------------------------------------------------------------------------- servicio
 
 interface AjustesPlataforma {
@@ -814,7 +1051,6 @@ interface AjustesPlataforma {
   pruebaDias: number
   pruebaDiasPropia: number | null
   correoSoporte: string | null
-  anuncio: { texto: string; tipo: 'info' | 'aviso' } | null
   actualizado: string | null
 }
 interface EstadoServicio {
@@ -860,15 +1096,13 @@ function Interruptor({ activo, alCambiar, etiqueta }: { activo: boolean; alCambi
 // «Guardar»; sólo viaja lo que cambió.
 function AjustesServicio() {
   const { s, error, cargar } = useServicio()
-  const [b, setB] = useState<{ registroAbierto: boolean; pruebaDias: string; correoSoporte: string; anuncio: string; anuncioTipo: 'info' | 'aviso' } | null>(null)
+  const [b, setB] = useState<{ registroAbierto: boolean; pruebaDias: string; correoSoporte: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState('')
   const desde = (a: AjustesPlataforma) => ({
     registroAbierto: a.registroAbierto,
     pruebaDias: a.pruebaDiasPropia === null ? '' : String(a.pruebaDiasPropia),
     correoSoporte: a.correoSoporte ?? '',
-    anuncio: a.anuncio?.texto ?? '',
-    anuncioTipo: a.anuncio?.tipo ?? 'info' as const,
   })
   useEffect(() => { if (s) setB(desde(s.ajustes)) }, [s])
   if (error) return <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
@@ -879,8 +1113,6 @@ function AjustesServicio() {
     ...(b.registroAbierto !== o.registroAbierto ? { registroAbierto: b.registroAbierto } : {}),
     ...(b.pruebaDias.trim() !== o.pruebaDias ? { pruebaDias: b.pruebaDias.trim() === '' ? null : Number(b.pruebaDias) } : {}),
     ...(b.correoSoporte.trim() !== o.correoSoporte ? { correoSoporte: b.correoSoporte.trim() || null } : {}),
-    ...(b.anuncio.trim() !== o.anuncio ? { anuncio: b.anuncio.trim() || null } : {}),
-    ...(b.anuncioTipo !== o.anuncioTipo && b.anuncio.trim() ? { anuncioTipo: b.anuncioTipo } : {}),
   }
   const hay = Object.keys(cambios).length > 0
   const poner = (c: Partial<NonNullable<typeof b>>) => { setErrorGuardar(''); setB((x) => x && { ...x, ...c }) }
@@ -899,7 +1131,6 @@ function AjustesServicio() {
     }
   }
 
-  const aviso_ = b.anuncioTipo === 'aviso'
   return (
     <>
       <Seccion id="registro" titulo="Empresas nuevas" descripcion="Cómo llegan los negocios a Delisy.">
@@ -918,31 +1149,6 @@ function AjustesServicio() {
       <Seccion id="soporte" titulo="Soporte" descripcion="A dónde te escriben las empresas: sale en la pantalla de cobro y con el registro cerrado.">
         <input type="email" value={b.correoSoporte} onChange={(e) => poner({ correoSoporte: e.target.value })} maxLength={150}
           placeholder="soporte@tudominio.com" aria-label="Correo de soporte" className={`${claseInput} max-w-md`} />
-      </Seccion>
-
-      <Seccion id="anuncio" titulo="Anuncio para todas las empresas" descripcion="Sale arriba del panel, de la app de reparto y de las pantallas de entrada. Cada quien puede cerrarlo; vuelve a salir si cambias el texto.">
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Tipo de anuncio">
-            {([['info', 'Información'], ['aviso', 'Aviso importante']] as const).map(([t, texto]) => (
-              <button key={t} type="button" role="radio" aria-checked={b.anuncioTipo === t} onClick={() => poner({ anuncioTipo: t })}
-                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${b.anuncioTipo === t ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>{texto}</button>
-            ))}
-          </div>
-          <textarea value={b.anuncio} onChange={(e) => poner({ anuncio: e.target.value })} maxLength={280} rows={3}
-            placeholder="Ej. El domingo de 2 a 4 a.m. haremos mantenimiento; la app de reparto sigue funcionando sin conexión."
-            aria-label="Texto del anuncio" className={`${claseInput} resize-y`} />
-          <div className="flex items-center justify-between text-xs text-apagado">
-            <span>{b.anuncio.trim() ? 'Así se verá:' : 'Vacío: no hay anuncio.'}</span>
-            <span className="tabular-nums">{b.anuncio.length}/280</span>
-          </div>
-          {b.anuncio.trim() && (
-            <div className={`flex items-start gap-3 rounded-xl px-4 py-2.5 text-sm ${aviso_ ? 'bg-ambar/15' : 'bg-azul/10'}`}>
-              {aviso_ ? <CircleAlert size={17} className="mt-0.5 shrink-0 text-ambar" aria-hidden="true" /> : <Info size={17} className="mt-0.5 shrink-0 text-azul" aria-hidden="true" />}
-              <p className="min-w-0 flex-1 leading-snug">{b.anuncio.trim()}</p>
-            </div>
-          )}
-          {o.anuncio && <button type="button" onClick={() => poner({ anuncio: '' })} className={`text-sm font-semibold text-rojo hover:underline ${anillo}`}>Quitar el anuncio</button>}
-        </div>
       </Seccion>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-6">

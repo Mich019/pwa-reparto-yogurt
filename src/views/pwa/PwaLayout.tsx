@@ -82,7 +82,8 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   return (
     <div className="flex h-dvh flex-col bg-lienzo text-tinta">
       <Avisos />
-      <AnuncioPlataforma className="pt-[max(0.625rem,env(safe-area-inset-top))]" />
+      {/* El primero se baja de la muesca y, si hay botón «Panel Admin», le deja su lugar a la derecha. */}
+      <AnuncioPlataforma className={`[&>div:first-child]:pt-[max(0.625rem,env(safe-area-inset-top))] ${esAdmin && onIrAAdmin ? '[&>div:first-child]:pr-32' : ''}`} />
 
       {/* Botón flotante para administradores que están usando la PWA */}
       {esAdmin && onIrAAdmin && (

@@ -80,7 +80,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
     rep.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'")
   })
 
-  await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'] })
+  await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] })
   await app.register(rateLimit, { global: false, allowList: () => ctx.config.sinLimiteDePeticiones, keyGenerator: (req) => ipCliente(req, ctx.config) })
   await app.register(jwt, {
     secret: ctx.config.jwtSecret,
