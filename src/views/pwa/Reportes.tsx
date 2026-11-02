@@ -9,7 +9,7 @@ import { aviso, Boton, claseInput, Hoja, PuntoSabor, Segmentado } from '../../co
 import { textoPorUnidad, tituloUnidad } from '../../lib/unidades'
 import { Columnas } from '../../components/graficas'
 import { SelectorRango, textoRangoCorto } from '../../components/Calendario'
-import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
+import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
 // Reportes del administrador (RF-043 a RF-048): corte del día, comparativos por semana y mes, utilidad por sabor,
 // ranking de sabores, rendimiento de cada vendedor y exportación a Excel o CSV. Los arma el servidor.
@@ -62,24 +62,24 @@ export function Reportes({ panel = false }: { panel?: boolean } = {}) {
       <div className={panel ? '' : 'mx-auto max-w-5xl'}>
         {panel ? (
           <Encabezado titulo="Reportes" detalle={`${textoRango(vista, rango)}${vista === 'dia' ? '' : ` · ${enCurso ? 'en curso' : `${diasDelRango(rango)} días`}`}`}>
-            <div className="flex gap-1" role="group" aria-label="Periodo">
+            <div className={`${grupoPanel} max-sm:basis-full`} role="group" aria-label="Periodo">
               {VISTAS.map((v) => (
                 <button key={v.valor} onClick={() => cambiarVista(v.valor)} aria-pressed={vista === v.valor} className={vista === v.valor ? botonPanel : botonPanelSuave}>{v.texto}</button>
               ))}
             </div>
-            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+            <Separador />
             {vista === 'rango' ? (
-              <SelectorRango valor={libre} onCambiar={cambiarLibre} max={hoy()} etiqueta="Elegir fechas" className={botonPanelSuave}>
+              <SelectorRango valor={libre} onCambiar={cambiarLibre} max={hoy()} etiqueta="Elegir fechas" className={`${botonPanelSuave} max-sm:grow`}>
                 <CalendarDays size={18} /> {textoRangoCorto(libre)}
               </SelectorRango>
             ) : (
-              <div className="flex gap-1">
+              <div className="flex grow gap-1 sm:grow-0">
                 <button onClick={() => setAncla(mover(vista, ancla, -1))} aria-label="Periodo anterior" className={botonPanelIcono}><ChevronLeft size={22} strokeWidth={2.25} /></button>
-                <button onClick={() => setAncla(hoy())} disabled={enCurso} className={botonPanelSuave}>Actual</button>
+                <button onClick={() => setAncla(hoy())} disabled={enCurso} className={`${botonPanelSuave} max-sm:grow`}>Actual</button>
                 <button onClick={() => setAncla(mover(vista, ancla, 1))} disabled={enCurso} aria-label="Periodo siguiente" className={botonPanelIcono}><ChevronRight size={22} strokeWidth={2.25} /></button>
               </div>
             )}
-            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+            <Separador />
             <button onClick={() => setExportando(true)} disabled={!vigente} className={botonPanel}><Download size={18} /> Exportar</button>
           </Encabezado>
         ) : (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { Segmentado } from '../../components/ui'
-import { botonPanel, botonPanelSuave } from '../admin/piezas'
+import { botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
 import { Pronostico } from './Pronostico'
 import { StockAdmin } from './StockAdmin'
 
@@ -14,7 +14,7 @@ export function Produccion({ panel = false }: { panel?: boolean } = {}) {
   if (!MODO_SERVIDOR) return <Pronostico panel={panel} />
   const opciones = [{ valor: 'pronostico', texto: 'Pronóstico' }, { valor: 'stock', texto: 'Stock del día' }] as const
   const selector = panel ? (
-    <div className="flex gap-1" role="group" aria-label="Vista">
+    <div className={grupoPanel} role="group" aria-label="Vista">
       {opciones.map((o) => (
         <button key={o.valor} type="button" onClick={() => setVista(o.valor)} aria-pressed={vista === o.valor} className={vista === o.valor ? botonPanel : botonPanelSuave}>{o.texto}</button>
       ))}

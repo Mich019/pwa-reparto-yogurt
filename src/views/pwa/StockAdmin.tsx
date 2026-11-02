@@ -6,7 +6,7 @@ import { SelectorFecha } from '../../components/Calendario'
 import { copiarCarga, guardarCarga, guardarProduccion, useDiaStock, type DiaStock } from '../../lib/stock'
 import { formato, sumaPorUnidad } from '../../lib/unidades'
 import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
-import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
+import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
 
 // RF-037 · El administrador registra, para un día, los litros producidos de cada sabor y los que le entrega a cada vendedor
 // al empezar la jornada (y, al cerrar, lo que devuelven). Se hace por internet: el servidor es quien lleva las cuentas.
@@ -74,16 +74,16 @@ export function StockAdmin({ selector, panel = false }: { selector?: ReactNode; 
       {panel ? (
         <Encabezado titulo="Producción" detalle={<span className="first-letter:uppercase">{textoFecha(fecha)}{fecha === hoy() ? '' : fecha < hoy() ? ' · día pasado' : ' · día por venir'}</span>}>
           {selector}
-          <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
-          <div className="flex gap-1">
+          <Separador />
+          <div className="flex grow gap-1 sm:grow-0">
             <button onClick={() => setFecha(sumarDias(fecha, -1))} className={botonPanelIcono} aria-label="Día anterior"><ChevronLeft size={22} strokeWidth={2.25} /></button>
-            <SelectorFecha valor={fecha} onCambiar={setFecha} etiqueta="Elegir día" className={botonPanelSuave}>
+            <SelectorFecha valor={fecha} onCambiar={setFecha} etiqueta="Elegir día" className={`${botonPanelSuave} max-sm:grow`}>
               <CalendarDays size={18} /> {fecha === hoy() ? 'Hoy' : desdeIso(fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')}
             </SelectorFecha>
             <button onClick={() => setFecha(sumarDias(fecha, 1))} className={botonPanelIcono} aria-label="Día siguiente"><ChevronRight size={22} strokeWidth={2.25} /></button>
           </div>
-          <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
-          <button onClick={() => setProduccion(true)} disabled={!actual} className={botonPanel}><Factory size={18} /> Registrar producción</button>
+          <Separador />
+          <button onClick={() => setProduccion(true)} disabled={!actual} className={`${botonPanel} max-sm:basis-full`}><Factory size={18} /> Registrar producción</button>
         </Encabezado>
       ) : (
         <>

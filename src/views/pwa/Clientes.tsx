@@ -15,7 +15,7 @@ import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
-import { BuscadorDesplegable, Encabezado, botonPanel, botonPanelSuave } from '../admin/piezas'
+import { BuscadorDesplegable, Encabezado, Separador, TextoBoton, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -85,15 +85,15 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
           {/* Una sola fila a la altura del detalle: buscar y filtrar, y luego las acciones; todo de 40 px de alto. */}
           <Encabezado titulo="Clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} archivados` : ''}`}>
             <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" />
-            <div className="flex gap-1" role="group" aria-label="Mostrar">
+            <div className={grupoPanel} role="group" aria-label="Mostrar">
               <button onClick={() => setVerInactivos(false)} aria-pressed={!verInactivos} className={verInactivos ? botonPanelSuave : botonPanel}>Activos</button>
               <button onClick={() => setVerInactivos(true)} aria-pressed={verInactivos} className={verInactivos ? botonPanel : botonPanelSuave}>Archivados</button>
             </div>
-            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
-            <button onClick={() => setEscaner(true)} className={botonPanelSuave}><ScanLine size={18} /> Escanear</button>
-            <button onClick={() => setImprimir(true)} className={botonPanelSuave}><Printer size={18} /> Imprimir QR</button>
-            {MODO_SERVIDOR && rol === 'administrador' && <button onClick={() => setLibreta(true)} className={botonPanelSuave}><BookUser size={18} /> Libreta</button>}
-            <button onClick={() => setForm('nuevo')} className={botonPanel}><UserPlus size={18} /> Nuevo cliente</button>
+            <Separador />
+            <button onClick={() => setEscaner(true)} className={`${botonPanelSuave} max-sm:w-10 max-sm:px-0`}><ScanLine size={18} /> <TextoBoton>Escanear</TextoBoton></button>
+            <button onClick={() => setImprimir(true)} className={`${botonPanelSuave} max-sm:w-10 max-sm:px-0`}><Printer size={18} /> <TextoBoton>Imprimir QR</TextoBoton></button>
+            {MODO_SERVIDOR && rol === 'administrador' && <button onClick={() => setLibreta(true)} className={`${botonPanelSuave} max-sm:w-10 max-sm:px-0`}><BookUser size={18} /> <TextoBoton>Libreta</TextoBoton></button>}
+            <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nuevo cliente</button>
           </Encabezado>
         </>
       ) : (

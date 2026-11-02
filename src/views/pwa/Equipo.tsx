@@ -11,7 +11,7 @@ import { hace } from '../../lib/fechas'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
-import { BuscadorDesplegable, Encabezado, botonPanel, botonPanelSuave } from '../admin/piezas'
+import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
 // M07 · Alta y baja de vendedores y reasignación de clientes (RF-038 a RF-041). Sólo para el administrador.
 
@@ -83,10 +83,10 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
 
   const botones = (
     <>
-      <button onClick={() => setInvitando(true)} className={panel ? botonPanelSuave : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+      <button onClick={() => setInvitando(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
         <Mail size={18} /> Invitar
       </button>
-      <button onClick={() => setForm('nuevo')} className={panel ? botonPanel : 'flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700'}>
+      <button onClick={() => setForm('nuevo')} className={panel ? `${botonPanel} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700'}>
         <UserPlus size={18} /> Nueva cuenta
       </button>
     </>
@@ -98,11 +98,11 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
       {panel ? (
         <Encabezado titulo="Equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : 'Cargando…'}>
           <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" />
-          <div className="flex gap-1" role="group" aria-label="Mostrar">
+          <div className={grupoPanel} role="group" aria-label="Mostrar">
             <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activas</button>
             <button onClick={() => setVerBaja(true)} aria-pressed={verBaja} className={verBaja ? botonPanel : botonPanelSuave}>Dadas de baja</button>
           </div>
-          <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+          <Separador />
           {botones}
         </Encabezado>
       ) : (

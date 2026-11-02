@@ -23,14 +23,15 @@ export function Delta({ valor, className = 'text-xs' }: { valor: number | null; 
 }
 
 // Encabezado de una sección del panel: título grande, una línea de detalle y, a la derecha, sus acciones. Las acciones
-// siempre llevan texto (Nuevo cliente, Invitar…), nunca un «+» suelto.
+// siempre llevan texto (Nuevo cliente, Invitar…), nunca un «+» suelto. En el teléfono, si no caben junto al título,
+// bajan a su propia fila y la llenan (los grupos con `grupoPanel` se reparten el ancho).
 export function Encabezado({ titulo, detalle, children }: { titulo: string; detalle?: ReactNode; children?: ReactNode }) {
   return (
     // Las acciones se centran con el título (no con el título y el detalle juntos); el detalle va debajo.
     <header className="pb-6 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">{titulo}</h1>
-        {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+        <h1 className="text-[2.25rem] font-semibold leading-none sm:text-[2.5rem] lg:text-[3.25rem]">{titulo}</h1>
+        {children && <div className="flex flex-wrap items-center gap-2 max-sm:grow max-sm:justify-end">{children}</div>}
       </div>
       {detalle && <p className="mt-3 text-sm text-apagado">{detalle}</p>}
     </header>
@@ -38,23 +39,34 @@ export function Encabezado({ titulo, detalle, children }: { titulo: string; deta
 }
 
 const anilloFoco = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
-const baseBoton = `flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-40 ${anilloFoco}`
+const baseBoton = `flex h-10 items-center whitespace-nowrap justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-40 ${anilloFoco}`
 export const botonPanel = `${baseBoton} bg-tinta text-white hover:bg-marca-oscuro`
 export const botonPanelSuave = `${baseBoton} bg-niebla text-tinta hover:bg-linea`
+// Botones que van juntos (filtro, periodo, vista): en el teléfono se reparten el ancho de su fila; desde 640 px, a su medida.
+export const grupoPanel = 'flex grow gap-1 sm:grow-0 [&>*]:grow sm:[&>*]:grow-0'
+// Texto de un botón secundario que en el teléfono queda en sólo ícono (el texto sigue para el lector de pantalla).
+export function TextoBoton({ children }: { children: ReactNode }) {
+  return <span className="max-sm:sr-only">{children}</span>
+}
+// Línea vertical entre grupos de acciones; en el teléfono, donde las acciones se acomodan en filas, no va.
+export function Separador() {
+  return <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-linea sm:block" />
+}
 // Sólo un ícono (flechas de periodo): cuadrado de 40 px, sin el relleno lateral de los botones con texto.
 export const botonPanelIcono = `grid h-10 w-10 shrink-0 place-items-center rounded-md bg-niebla text-tinta transition-colors hover:bg-linea disabled:opacity-40 ${anilloFoco}`
 
 // Buscador del encabezado: sólo la lupa, del alto de los botones; al tocarla se despliega el campo (anima el ancho de
 // un solo input). Desde 1280 px crece hacia la izquierda por encima del hueco junto al título, sin empujar los
-// botones; en pantalla chica, donde las acciones ya van en su propia fila, ocupa su lugar. Se queda abierto mientras
+// botones; en pantalla chica, donde las acciones ya van en su propia fila, ocupa su lugar (en el teléfono, abierto,
+// toma una fila entera). Se queda abierto mientras
 // haya texto; Escape lo borra y lo cierra.
 export function BuscadorDesplegable({ valor, onChange, placeholder }: { valor: string; onChange: (v: string) => void; placeholder: string }) {
   const [abierto, setAbierto] = useState(false)
   const campo = useRef<HTMLInputElement>(null)
   const visible = abierto || valor !== ''
   return (
-    <div className="relative h-10 xl:w-10">
-    <div className={`z-10 flex h-10 flex-row-reverse items-center rounded-md bg-niebla transition-colors xl:absolute xl:right-0 xl:top-0 ${visible ? '' : 'hover:bg-linea'}`}>
+    <div className={`relative h-10 xl:w-10 ${visible ? 'max-sm:basis-full' : ''}`}>
+    <div className={`z-10 flex h-10 max-sm:w-full flex-row-reverse items-center rounded-md bg-niebla transition-colors xl:absolute xl:right-0 xl:top-0 ${visible ? '' : 'hover:bg-linea'}`}>
       <button type="button" aria-label="Buscar" aria-expanded={visible} onClick={() => { setAbierto(true); campo.current?.focus() }}
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${anilloFoco}`}>
         <Search size={18} aria-hidden="true" />
@@ -68,7 +80,7 @@ export function BuscadorDesplegable({ valor, onChange, placeholder }: { valor: s
         tabIndex={visible ? 0 : -1}
         aria-label={placeholder}
         placeholder={placeholder}
-        className={`h-full min-w-0 bg-transparent text-sm outline-none transition-[width,padding] duration-200 ease-out placeholder:text-apagado motion-reduce:transition-none ${visible ? 'w-40 pl-4 xl:w-52 2xl:w-64' : 'w-0 p-0'}`}
+        className={`h-full min-w-0 bg-transparent text-sm outline-none transition-[width,padding] duration-200 ease-out placeholder:text-apagado motion-reduce:transition-none ${visible ? 'w-40 pl-4 max-sm:grow xl:w-52 2xl:w-64' : 'w-0 p-0'}`}
       />
     </div>
     </div>
