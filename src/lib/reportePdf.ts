@@ -156,7 +156,9 @@ class Informe {
   }
 
   celda(texto: string, x: number, ancho: number, base: number, o: { fuente?: Fuente; tam?: number; color?: Color; der?: boolean }) {
-    const tam = o.tam ?? 8.3
+    // Las cifras (columnas a la derecha) no se cortan: con varias unidades se achican hasta 6 pt para caber enteras.
+    const tamNormal = o.tam ?? 8.3
+    const tam = o.der ? Math.max(6, Math.min(tamNormal, (tamNormal * (ancho - 3.5)) / anchoTexto(texto, o.fuente ?? 'normal', tamNormal))) : tamNormal
     const [t = ''] = ajustarTexto(texto, o.fuente ?? 'normal', tam, ancho - 3.5, 1)
     this.pdf.texto(t, o.der ? x + ancho - 1.75 : x + 1.75, base, { fuente: o.fuente, tam, color: o.color ?? TINTA, alinear: o.der ? 'der' : 'izq' })
   }
@@ -328,7 +330,9 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
     const ty = inf.y + Math.floor(i / 3) * 22
     if (i % 3) pdf.linea(M + (i % 3) * col, ty + 1, M + (i % 3) * col, ty + 17, { color: REGLA, grosor: 0.2 })
     pdf.texto(t.titulo.toUpperCase(), tx, ty + 4.5, { fuente: 'negrita', tam: 6.5, color: TENUE })
-    pdf.texto(t.valor, tx, ty + 12, { fuente: 'negrita', tam: 15, color: TINTA })
+    // Con varias unidades («73,179 L + 5,301.5 kg + 48,058 pz») el valor no cabe a 15 pt: se achica hasta su casilla.
+    const tam = Math.max(8, Math.min(15, (15 * (col - 10)) / anchoTexto(t.valor, 'negrita', 15)))
+    pdf.texto(t.valor, tx, ty + 12, { fuente: 'negrita', tam, color: TINTA })
     pdf.texto(t.pie.texto, tx, ty + 17, { tam: 7, color: t.pie.color })
   })
   pdf.linea(M + 4, inf.y + 20.5, M + inf.util - 4, inf.y + 20.5, { color: REGLA, grosor: 0.2 })
