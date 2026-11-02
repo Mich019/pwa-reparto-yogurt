@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { ErrorApi } from '../lib/api'
 import { cancelarCodigo, confirmarCodigo, mensajeErrorLogin } from '../lib/sesion'
-import { Campo, claseInput } from './ui'
+import { Campo, claseInputRecto } from './ui'
 
 // Segundo paso del inicio de sesión: el código de 6 dígitos de la app de autenticación o un código de respaldo.
 export function PasoCodigo({ onListo, onVolver }: { onListo?: () => void; onVolver: () => void }) {
@@ -56,18 +56,18 @@ export function PasoCodigo({ onListo, onVolver }: { onListo?: () => void; onVolv
           autoCapitalize="none"
           spellCheck={false}
           placeholder={respaldo ? 'abcde-fghij' : '123456'}
-          className={`${claseInput} text-center font-mono text-2xl tracking-[0.3em]`}
+          className={`${claseInputRecto} text-center font-mono text-2xl tracking-[0.3em]`}
         />
       </Campo>
 
       {error && (
-        <div role="alert" className="flex items-start gap-2.5 rounded-2xl bg-rojo/10 p-3.5 text-sm font-medium text-rojo">
+        <div role="alert" className="flex items-start gap-2.5 rounded-md bg-rojo/10 p-3.5 text-sm font-medium text-rojo">
           <AlertCircle size={18} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <button type="submit" disabled={enviando} className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40">
+      <button type="submit" disabled={enviando} className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40">
         {enviando ? 'Verificando…' : 'Verificar y entrar'}
       </button>
 

@@ -115,6 +115,9 @@ CREATE TABLE avisos_plataforma (
   para           varchar(20) NOT NULL DEFAULT 'todos' CHECK (para IN ('todos', 'administradores', 'vendedores')),
   desde          timestamptz,
   hasta          timestamptz,
+  por_correo     boolean NOT NULL DEFAULT false, -- migración 016: los importantes también por correo, una vez
+  correo_enviado_en timestamptz,
+  correo_destinatarios integer,
   creado_en      timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT avisos_plataforma_vigencia CHECK (hasta IS NULL OR desde IS NULL OR hasta > desde)

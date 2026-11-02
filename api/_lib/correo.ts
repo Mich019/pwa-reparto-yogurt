@@ -77,3 +77,39 @@ export function correoInvitacion(empresa: string, quien: string, url: string, di
       + nota(`El enlace vence en ${dias} días. Si no esperabas esta invitación, ignora este correo.`)),
   }
 }
+
+// Muchos correos de una vez (avisos de la plataforma): la API de lotes de Resend, de 100 en 100. Devuelve cuántos salieron;
+// si falla un lote, los anteriores ya se mandaron y el error dice cuántos.
+export async function enviarCorreos(config: Config, msjs: { para: string; asunto: string; html: string; texto: string }[], log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }) {
+  if (!config.resendApiKey) {
+    if (config.produccion) throw new Error('Falta RESEND_API_KEY para enviar correos')
+    log.warn({ cuantos: msjs.length }, 'RESEND_API_KEY vacío: correos NO enviados (sólo desarrollo)')
+    return msjs.length
+  }
+  let enviados = 0
+  for (let i = 0; i < msjs.length; i += 100) {
+    const lote = msjs.slice(i, i + 100)
+    const r = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${config.resendApiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify(lote.map((m) => ({ from: config.correoRemitente, to: [m.para], subject: m.asunto, html: m.html, text: m.texto }))),
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!r.ok) throw Object.assign(new Error(`Resend respondió ${r.status} tras ${enviados} correos: ${await r.text().catch(() => '')}`), { enviados })
+    enviados += lote.length
+  }
+  log.info({ enviados }, 'correos enviados')
+  return enviados
+}
+
+// Un aviso importante de la plataforma (apartado «Avisos» en /plataforma), a cada cuenta a la que va.
+export function correoAviso(nombre: string, texto: string, url: string) {
+  const corto = texto.length > 60 ? `${texto.slice(0, 57).trimEnd()}…` : texto
+  return {
+    asunto: `Aviso de Delisy: ${corto}`,
+    texto: `Hola ${nombre}:\n\n${texto}\n\nEntra a Delisy: ${url}\n\nTe escribimos porque tienes una cuenta en Delisy.`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)},`) + parrafo(escapar(texto).replace(/\n/g, '<br>'))
+      + boton(url, 'Entrar a Delisy')
+      + nota('Te escribimos porque tienes una cuenta en Delisy.')),
+  }
+}

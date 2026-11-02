@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../lib/api'
 import { mensajeErrorLogin, restablecerPassword, solicitarRecuperacion } from '../lib/sesion'
-import { Campo, claseInput } from './ui'
+import { Campo, claseInputRecto } from './ui'
 
 function mensajeError(e: unknown) {
   if (e instanceof ErrorRed) return 'Sin conexión con el servidor. Revisa tu internet e intenta de nuevo.'
@@ -59,7 +59,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
   }
 
   const aviso = error && (
-    <div role="alert" className="flex items-center gap-2.5 rounded-2xl bg-rojo/10 p-3.5 text-sm font-medium text-rojo">
+    <div role="alert" className="flex items-center gap-2.5 rounded-md bg-rojo/10 p-3.5 text-sm font-medium text-rojo">
       <AlertCircle size={18} className="shrink-0" />
       <span>{error}</span>
     </div>
@@ -73,7 +73,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
         </div>
         <h3 className="text-xl font-bold tracking-tight text-tinta">¡Contraseña restablecida!</h3>
         <p className="text-sm leading-relaxed text-apagado">Ya puedes iniciar sesión con tu contraseña nueva. Se cerró la sesión en los demás teléfonos.</p>
-        <button onClick={volver} className="w-full rounded-xl bg-tinta py-3.5 text-base font-semibold text-white active:bg-neutral-800">
+        <button onClick={volver} className="w-full rounded-md bg-tinta py-3.5 text-base font-semibold text-white active:bg-neutral-800">
           Iniciar sesión
         </button>
       </div>
@@ -83,7 +83,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
   if (paso === 'codigo') {
     return (
       <form onSubmit={restablecer} className="space-y-5">
-        <div className="rounded-2xl bg-niebla p-3.5 text-xs text-apagado">
+        <div className="rounded-md bg-niebla p-3.5 text-xs text-apagado">
           Si hay una cuenta con <strong className="text-tinta">{correo.trim()}</strong>, te mandamos ahí un código. Vence en {minutos} minutos.
         </div>
         <Campo etiqueta="Código de 6 dígitos">
@@ -96,7 +96,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
             placeholder="000000"
-            className={`${claseInput} text-center text-2xl font-bold tracking-[0.5em]`}
+            className={`${claseInputRecto} text-center text-2xl font-bold tracking-[0.5em]`}
           />
         </Campo>
         <Campo etiqueta="Nueva contraseña">
@@ -108,7 +108,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
               value={nueva}
               onChange={(e) => setNueva(e.target.value)}
               placeholder="Mínimo 10 caracteres (letras y números)"
-              className={`${claseInput} pr-11`}
+              className={`${claseInputRecto} pr-11`}
             />
             <button
               type="button"
@@ -128,14 +128,14 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
             value={confirmar}
             onChange={(e) => setConfirmar(e.target.value)}
             placeholder="Repite tu nueva contraseña"
-            className={claseInput}
+            className={claseInputRecto}
           />
         </Campo>
         {aviso}
         <button
           type="submit"
           disabled={cargando}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
         >
           {cargando ? 'Actualizando contraseña…' : 'Restablecer contraseña'}
         </button>
@@ -165,7 +165,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
             value={correo}
             onChange={(e) => setCorreo(e.target.value)}
             placeholder="correo@ejemplo.com"
-            className={`${claseInput} pl-11`}
+            className={`${claseInputRecto} pl-11`}
           />
           <Mail size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-apagado" />
         </div>
@@ -175,7 +175,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
       <button
         type="submit"
         disabled={cargando}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
+        className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
       >
         {cargando ? 'Enviando código…' : 'Enviar código'}
       </button>

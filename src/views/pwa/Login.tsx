@@ -5,7 +5,7 @@ import { ErrorApi } from '../../lib/api'
 import { LogoDelisy } from '../admin/marca'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
-import { Campo, claseInput } from '../../components/ui'
+import { Campo, claseInputRecto } from '../../components/ui'
 import { FormPassword } from './Cuenta'
 
 export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
@@ -65,7 +65,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
                   value={correo}
                   onChange={(e) => setCorreo(e.target.value)}
                   placeholder="correo@ejemplo.com"
-                  className={`${claseInput} pl-11`}
+                  className={`${claseInputRecto} pl-11`}
                 />
                 <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
               </div>
@@ -80,7 +80,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`${claseInput} pl-11 pr-11`}
+                  className={`${claseInputRecto} pl-11 pr-11`}
                 />
                 <KeyRound size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
                 <button
@@ -103,7 +103,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
             {error && (
               <div
                 role="alert"
-                className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-sm font-medium ${
+                className={`flex items-start gap-2.5 rounded-md p-3.5 text-sm font-medium ${
                   esBloqueo ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rojo/10 text-rojo'
                 }`}
               >
@@ -115,7 +115,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
             <button
               type="submit"
               disabled={cargando}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
             >
               {cargando ? (
                 <>

@@ -4,7 +4,7 @@ import { ErrorApi } from '../../lib/api'
 import { cerrarSesion, iniciarSesion, mensajeErrorLogin, sesionActual } from '../../lib/sesion'
 import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
-import { Campo, claseInput } from '../../components/ui'
+import { Campo, claseInputRecto } from '../../components/ui'
 import { AveDelisy, LogoDelisy } from './marca'
 
 type Modo = 'login' | 'recuperar' | 'codigo'
@@ -66,7 +66,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
   return (
     <div className="relative isolate flex min-h-dvh flex-col justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
       {/* El ave de la marca, enorme y casi transparente, asomando por la esquina */}
-      <AveDelisy className="pointer-events-none absolute -bottom-20 -right-6 -z-10 hidden h-[36rem] opacity-[0.09] sm:block lg:right-[10%]" />
+      <AveDelisy className="pointer-events-none absolute -bottom-24 -right-32 -z-10 hidden h-[36rem] opacity-[0.09] lg:block" />
 
       <div className="mx-auto w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
@@ -74,8 +74,8 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
           <h1 className="mt-6 text-[2rem] font-semibold leading-tight">Panel de administración</h1>
         </div>
 
-        {/* Tarjeta principal */}
-        <div className="rounded-[28px] border border-linea bg-papel p-6 shadow-[0_16px_48px_rgba(0,32,20,0.08)] sm:p-8">
+        {/* El formulario, sin tarjeta: directo sobre el fondo */}
+        <div>
 
           {/* MODO 1: LOGIN */}
           {modo === 'login' && (
@@ -89,7 +89,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
                     value={correo}
                     onChange={(e) => setCorreo(e.target.value)}
                     placeholder="correo@ejemplo.com"
-                    className={`${claseInput} pl-11`}
+                    className={`${claseInputRecto} pl-11`}
                   />
                   <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
                 </div>
@@ -104,7 +104,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className={`${claseInput} pl-11 pr-11`}
+                    className={`${claseInputRecto} pl-11 pr-11`}
                   />
                   <KeyRound size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-apagado" />
                   <button
@@ -132,7 +132,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
               {error && (
                 <div
                   role="alert"
-                  className={`flex items-start gap-3 rounded-2xl p-4 text-sm font-medium ${
+                  className={`flex items-start gap-3 rounded-md p-4 text-sm font-medium ${
                     esBloqueo ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rojo/10 text-rojo'
                   }`}
                 >
@@ -144,7 +144,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
               <button
                 type="submit"
                 disabled={cargando}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-colors hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white transition-colors hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40"
               >
                 {cargando ? (
                   <>

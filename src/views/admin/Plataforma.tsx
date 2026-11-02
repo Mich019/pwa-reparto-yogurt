@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Megaphone, Plus, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, Plus, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
@@ -812,7 +812,10 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
 // ---------------------------------------------------------------------------------------------------------- avisos
 
 type Para = 'todos' | 'administradores' | 'vendedores'
-interface AvisoPlataforma { id: string; texto: string; tipo: 'info' | 'aviso'; para: Para; desde: string | null; hasta: string | null; actualizado: string }
+interface AvisoPlataforma {
+  id: string; texto: string; tipo: 'info' | 'aviso'; para: Para; desde: string | null; hasta: string | null; actualizado: string
+  porCorreo: boolean; correo: { enviado: string; destinatarios: number } | null
+}
 const PARA: Record<Para, string> = { todos: 'Todos', administradores: 'Administradores', vendedores: 'Vendedores' }
 // <input type="datetime-local"> habla en la hora de este navegador, sin zona: de ida y vuelta a ISO.
 const aLocal = (iso: string | null) => {
@@ -855,7 +858,7 @@ function Opciones<T extends string>({ valor, opciones, alCambiar, etiqueta }: { 
 // sólo con la sesión abierta. Avisos escritos aquí, cada uno con a quién va y entre qué fechas sale, y el automático de
 // la prueba gratis por vencer (plataforma_ajustes).
 function Avisos() {
-  const [lista, setLista] = useState<{ avisos: AvisoPlataforma[]; avisoPrueba: { dias: number; vendedores: boolean } } | null>(null)
+  const [lista, setLista] = useState<{ avisos: AvisoPlataforma[]; avisoPrueba: { dias: number; vendedores: boolean }; correoActivo: boolean } | null>(null)
   const [error, setError] = useState('')
   const cargar = () => llamarAutenticado<NonNullable<typeof lista>>('/plataforma/avisos').then(setLista).catch((e) => setError(mensaje(e)))
   useEffect(() => { void cargar() }, [])
@@ -868,7 +871,7 @@ function Avisos() {
       {!lista ? !error && <p className="text-sm text-apagado">Cargando…</p> : (
         <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
           <div className="min-w-0 space-y-10">
-            <EditorAviso key={editando?.id ?? 'nuevo'} aviso={editando} alTerminar={async () => { setEditando(null); await cargar() }} />
+            <EditorAviso key={editando?.id ?? 'nuevo'} aviso={editando} correoActivo={lista.correoActivo} alTerminar={async () => { setEditando(null); await cargar() }} />
             <Panel titulo="Escritos" detalle={lista.avisos.length ? 'Los terminados quedan al final; quítalos cuando ya no los quieras ver.' : undefined}>
               {lista.avisos.length === 0 ? <p className="text-sm text-apagado">Todavía no hay avisos.</p> : (
                 <ul className="divide-y divide-linea">
@@ -908,6 +911,12 @@ function FilaAviso({ a, editando, alEditar, alQuitar }: { a: AvisoPlataforma; ed
           <span className="h-2 w-2 rounded-full" style={{ background: e.color }} aria-hidden="true" />{e.texto}
         </span>
         <span className="font-medium text-apagado">{PARA[a.para]} · {vigencia}</span>
+        {a.tipo === 'aviso' && a.porCorreo && (
+          <span className="inline-flex items-center gap-1 font-medium text-apagado">
+            <Mail size={13} aria-hidden="true" />
+            {a.correo ? `Por correo a ${a.correo.destinatarios} ${a.correo.destinatarios === 1 ? 'cuenta' : 'cuentas'} el ${momento(a.correo.enviado)}` : 'Por correo al empezar'}
+          </span>
+        )}
       </div>
       <div className="mt-2.5"><MuestraAviso texto={a.texto} tipo={a.tipo} /></div>
       <div className="mt-2 flex gap-4 text-sm font-semibold">
@@ -918,12 +927,14 @@ function FilaAviso({ a, editando, alEditar, alQuitar }: { a: AvisoPlataforma; ed
   )
 }
 
-function EditorAviso({ aviso: original, alTerminar }: { aviso: AvisoPlataforma | null; alTerminar: () => Promise<void> }) {
+function EditorAviso({ aviso: original, correoActivo, alTerminar }: { aviso: AvisoPlataforma | null; correoActivo: boolean; alTerminar: () => Promise<void> }) {
   const [texto, setTexto] = useState(original?.texto ?? '')
   const [tipo, setTipo] = useState<'info' | 'aviso'>(original?.tipo ?? 'info')
   const [para, setPara] = useState<Para>(original?.para ?? 'todos')
   const [desde, setDesde] = useState(aLocal(original?.desde ?? null))
   const [hasta, setHasta] = useState(aLocal(original?.hasta ?? null))
+  const [porCorreo, setPorCorreo] = useState(original?.porCorreo ?? false)
+  const yaMandado = !!original?.correo
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   // Atajos para el final: a partir del inicio (o de ahora, si sale ya).
@@ -938,11 +949,11 @@ function EditorAviso({ aviso: original, alTerminar }: { aviso: AvisoPlataforma |
     setGuardando(true)
     setError('')
     try {
-      const cuerpo = { texto: texto.trim(), tipo, para, desde: deLocal(desde), hasta: deLocal(hasta) }
+      const cuerpo = { texto: texto.trim(), tipo, para, desde: deLocal(desde), hasta: deLocal(hasta), porCorreo: tipo === 'aviso' && porCorreo }
       if (original) await llamarAutenticado(`/plataforma/avisos/${original.id}`, { metodo: 'PUT', cuerpo })
       else await llamarAutenticado('/plataforma/avisos', { metodo: 'POST', cuerpo })
       aviso(original ? 'Aviso guardado' : 'Aviso publicado')
-      if (!original) { setTexto(''); setDesde(''); setHasta('') }
+      if (!original) { setTexto(''); setDesde(''); setHasta(''); setPorCorreo(false) }
       await alTerminar()
     } catch (e) {
       setError(mensaje(e))
@@ -977,6 +988,19 @@ function EditorAviso({ aviso: original, alTerminar }: { aviso: AvisoPlataforma |
             </span>
           </Campo>
         </div>
+        {tipo === 'aviso' && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold">Mandarlo también por correo</div>
+              <div className="text-xs text-apagado">
+                {yaMandado ? `Ya salió por correo el ${momento(original!.correo!.enviado)}; los cambios sólo se ven en la app.`
+                  : !correoActivo ? 'El correo no está configurado (RESEND_API_KEY).'
+                  : `Una sola vez, a ${para === 'todos' ? 'todas las cuentas' : `los ${PARA[para].toLowerCase()}`} de las empresas activas, ${desde && new Date(desde).getTime() > Date.now() ? 'cuando empiece' : 'al publicarlo'}.`}
+              </div>
+            </div>
+            <Interruptor activo={porCorreo && (correoActivo || yaMandado)} alCambiar={(v) => setPorCorreo(v)} etiqueta="Mandarlo también por correo" />
+          </div>
+        )}
         {texto.trim() && <div><span className="mb-1.5 block text-xs text-apagado">Así se verá:</span><MuestraAviso texto={texto.trim()} tipo={tipo} /></div>}
         {(alReves || vencido) && <p role="alert" className="text-sm font-medium text-ambar">{alReves ? 'El final va después del inicio.' : 'Esa fecha de fin ya pasó: no lo verá nadie.'}</p>}
         {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}

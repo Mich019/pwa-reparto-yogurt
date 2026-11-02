@@ -120,6 +120,8 @@ export function Campo({ etiqueta, children }: { etiqueta: string; children: Reac
 
 export const claseInput =
   'w-full rounded-xl border-2 border-transparent bg-niebla px-4 py-3.5 text-base text-tinta outline-none placeholder:text-apagado focus:border-tinta'
+// Las pantallas de entrada (login, código, recuperar contraseña) van con esquinas apenas redondeadas.
+export const claseInputRecto = claseInput.replace('rounded-xl', 'rounded-md')
 
 let avisar: (t: string) => void = () => {}
 export const aviso = (t: string) => avisar(t)

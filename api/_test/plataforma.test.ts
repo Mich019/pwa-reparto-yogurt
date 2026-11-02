@@ -113,6 +113,21 @@ describe('panel de la plataforma', () => {
     assert.equal(lista.body.avisos.length, 4)
     assert.equal((await pedir(dueno, 'PUT', `/plataforma/avisos/${crypto.randomUUID()}`, { texto: 'x' })).status, 404)
 
+    // Los importantes «por correo» salen una vez al empezar su vigencia (sin RESEND_API_KEY, fuera de producción, sólo se
+    // cuentan); los informativos nunca.
+    const porCorreo = await crear({ texto: 'Corte de luz', tipo: 'aviso', para: 'administradores', porCorreo: true })
+    assert.ok(porCorreo.body.aviso.correo.destinatarios > 0)
+    const enviado = porCorreo.body.aviso.correo.enviado
+    assert.equal((await pedir(dueno, 'PUT', `/plataforma/avisos/${porCorreo.body.aviso.id}`, { texto: 'Corte de luz (corregido)', tipo: 'aviso', porCorreo: true })).body.aviso.correo.enviado, enviado)
+    assert.equal((await crear({ texto: 'Info', porCorreo: true })).body.aviso.correo, null)
+    const programado = await crear({ texto: 'Mañana sin servicio', tipo: 'aviso', porCorreo: true, desde: hora(5) })
+    assert.equal(programado.body.aviso.correo, null)
+    await db.query(`UPDATE avisos_plataforma SET desde = now() - interval '1 minute' WHERE id_aviso = $1`, [programado.body.aviso.id])
+    await vigentes(vendedor) // la siguiente consulta de cualquier cuenta lo manda
+    const tras = (await pedir(dueno, 'GET', '/plataforma/avisos')).body.avisos.find((a: { id: string }) => a.id === programado.body.aviso.id)
+    assert.ok(tras.correo.destinatarios > 0)
+    await db.query(`DELETE FROM avisos_plataforma WHERE texto IN ('Corte de luz (corregido)', 'Info', 'Mañana sin servicio')`)
+
     for (const a of [todos, soloVendedores, futuro, vencido]) assert.equal((await pedir(dueno, 'DELETE', `/plataforma/avisos/${a.body.aviso.id}`)).status, 204)
     assert.equal((await pedir(dueno, 'DELETE', `/plataforma/avisos/${todos.body.aviso.id}`)).status, 404)
     assert.deepEqual(await vigentes(vendedor), [])

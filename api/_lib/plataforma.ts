@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { leerAjustes } from './ajustes.js'
 import type { Config } from './config.js'
 import { hashPassword } from './contrasenas.js'
-import { correoInvitacion, enviarCorreo } from './correo.js'
+import { correoAviso, correoInvitacion, enviarCorreo, enviarCorreos } from './correo.js'
 import type { Db } from './db.js'
 import { hashInvitacion } from './registro.js'
 import { passwordTemporal, tokenAleatorio } from './seguridad.js'
@@ -65,12 +65,17 @@ const bodyAviso = z.object({
   para: z.enum(['todos', 'administradores', 'vendedores']).default('todos'),
   desde: momento.default(null),
   hasta: momento.default(null),
+  porCorreo: z.boolean().default(false), // sólo cuenta en los de tipo «aviso»
 }).strict().refine((b) => !b.desde || !b.hasta || new Date(b.hasta) > new Date(b.desde), { message: 'El final va después del inicio', path: ['hasta'] })
 const idAviso = z.object({ id: z.uuid() })
-type FilaAviso = { id_aviso: string; texto: string; tipo: string; para: string; desde: Date | null; hasta: Date | null; actualizado_en: Date }
+type FilaAviso = {
+  id_aviso: string; texto: string; tipo: string; para: string; desde: Date | null; hasta: Date | null; actualizado_en: Date
+  por_correo: boolean; correo_enviado_en: Date | null; correo_destinatarios: number | null
+}
 const wireAviso = (a: FilaAviso) => ({
   id: a.id_aviso, texto: a.texto, tipo: a.tipo, para: a.para,
   desde: a.desde?.toISOString() ?? null, hasta: a.hasta?.toISOString() ?? null, actualizado: a.actualizado_en.toISOString(),
+  porCorreo: a.por_correo, correo: a.correo_enviado_en ? { enviado: a.correo_enviado_en.toISOString(), destinatarios: a.correo_destinatarios ?? 0 } : null,
 })
 
 const bodyCuenta = z.object({ nombre: z.string().trim().min(2, 'Escribe el nombre').max(100), correo })
@@ -155,23 +160,58 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     return { registroAbierto: a.registroAbierto, correoSoporte: a.correoSoporte }
   })
 
+  // Los avisos importantes marcados «por correo» salen una sola vez, cuando empieza su vigencia: al publicarlos, o el
+  // primero que pase por aquí después de su hora (los programados no tienen quien los dispare a la hora exacta: los
+  // reclama la siguiente consulta de avisos de cualquier cuenta). Se marcan antes de mandar, así dos consultas a la vez
+  // no los mandan dos veces; si no sale ninguno, se desmarcan para reintentar.
+  async function mandarAvisosPorCorreo(log: FastifyRequest['log']) {
+    const { rows } = await db.query<FilaAviso>(
+      `UPDATE avisos_plataforma SET correo_enviado_en = now()
+        WHERE por_correo AND tipo = 'aviso' AND correo_enviado_en IS NULL
+          AND (desde IS NULL OR desde <= now()) AND (hasta IS NULL OR hasta > now())
+        RETURNING *`,
+    )
+    for (const a of rows) {
+      const { rows: cuentas } = await db.query<{ nombre: string; correo: string }>(
+        `SELECT u.nombre, u.correo FROM usuarios u JOIN empresas e ON e.id_empresa = u.id_empresa
+          WHERE u.activo AND e.activa AND NOT e.interna AND ($1 = 'todos' OR u.rol::text = $2)`,
+        [a.para, a.para === 'administradores' ? 'administrador' : 'vendedor'],
+      )
+      let enviados = 0
+      try {
+        enviados = await enviarCorreos(config, cuentas.map((c) => ({ para: c.correo, ...correoAviso(c.nombre, a.texto, config.urlApp) })), log)
+      } catch (e) {
+        enviados = (e as { enviados?: number }).enviados ?? 0
+        log.error({ err: e, aviso: a.id_aviso }, 'plataforma: no salieron todos los correos de un aviso')
+      }
+      await db.query(
+        `UPDATE avisos_plataforma SET correo_destinatarios = $2, correo_enviado_en = CASE WHEN $2 > 0 OR $3 = 0 THEN correo_enviado_en END WHERE id_aviso = $1`,
+        [a.id_aviso, enviados, cuentas.length],
+      )
+    }
+  }
+  const releer = async (id: string) => (await db.query<FilaAviso>(`SELECT * FROM avisos_plataforma WHERE id_aviso = $1`, [id])).rows[0]
+  const correosPendientes = (log: FastifyRequest['log']) => mandarAvisosPorCorreo(log).catch((e) => log.error({ err: e }, 'plataforma: avisos por correo'))
+
   // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.
-  app.get('/plataforma/avisos', { preHandler: requierePlataforma }, async () => {
+  app.get('/plataforma/avisos', { preHandler: requierePlataforma }, async (req) => {
+    await correosPendientes(req.log)
     const { rows } = await db.query<FilaAviso>(
       `SELECT * FROM avisos_plataforma ORDER BY coalesce(hasta, 'infinity') < now(), coalesce(desde, creado_en) DESC`,
     )
-    return { avisos: rows.map(wireAviso), avisoPrueba: (await leerAjustes(db, config)).avisoPrueba }
+    return { avisos: rows.map(wireAviso), avisoPrueba: (await leerAjustes(db, config)).avisoPrueba, correoActivo: !!config.resendApiKey || !config.produccion }
   })
 
   app.post('/plataforma/avisos', { preHandler: requierePlataforma, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyAviso.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
     const { rows: [a] } = await db.query<FilaAviso>(
-      `INSERT INTO avisos_plataforma (texto, tipo, para, desde, hasta) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [b.data.texto, b.data.tipo, b.data.para, b.data.desde, b.data.hasta],
+      `INSERT INTO avisos_plataforma (texto, tipo, para, desde, hasta, por_correo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [b.data.texto, b.data.tipo, b.data.para, b.data.desde, b.data.hasta, b.data.porCorreo],
     )
     req.log.info({ aviso: a.id_aviso, por: req.usuario.id }, 'plataforma: aviso nuevo')
-    return rep.code(201).send({ aviso: wireAviso(a) })
+    await correosPendientes(req.log)
+    return rep.code(201).send({ aviso: wireAviso(await releer(a.id_aviso)) })
   })
 
   // Se cambia entero (el editor manda todo). Cambiarlo lo vuelve a mostrar a quien lo había cerrado.
@@ -181,12 +221,13 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     const b = bodyAviso.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
     const { rows: [a] } = await db.query<FilaAviso>(
-      `UPDATE avisos_plataforma SET texto = $2, tipo = $3, para = $4, desde = $5, hasta = $6, actualizado_en = now()
+      `UPDATE avisos_plataforma SET texto = $2, tipo = $3, para = $4, desde = $5, hasta = $6, por_correo = $7, actualizado_en = now()
         WHERE id_aviso = $1 RETURNING *`,
-      [p.data.id, b.data.texto, b.data.tipo, b.data.para, b.data.desde, b.data.hasta],
+      [p.data.id, b.data.texto, b.data.tipo, b.data.para, b.data.desde, b.data.hasta, b.data.porCorreo],
     )
     if (!a) return rep.code(404).send({ error: 'Ese aviso no existe' })
-    return { aviso: wireAviso(a) }
+    await correosPendientes(req.log)
+    return { aviso: wireAviso(await releer(a.id_aviso)) }
   })
 
   app.delete('/plataforma/avisos/:id', { preHandler: requierePlataforma }, async (req, rep) => {
@@ -203,6 +244,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
   // cerró vuelve a salir.
   app.get('/plataforma/avisos/vigentes', { preHandler: requiereSesionSinCobro }, async (req, rep) => {
     rep.header('cache-control', 'private, no-store')
+    await correosPendientes(req.log)
     const admin = req.usuario.rol === 'administrador'
     const { rows } = await db.query<FilaAviso>(
       `SELECT * FROM avisos_plataforma
