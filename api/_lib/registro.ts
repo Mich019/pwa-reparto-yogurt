@@ -1,6 +1,7 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { leerAjustes } from './ajustes.js'
 import type { Contexto } from './app.js'
 import { hashPassword, revisarPassword } from './contrasenas.js'
 import { correoInvitacion, correoVerificacion, correoYaRegistrado, enviarCorreo } from './correo.js'
@@ -156,9 +157,21 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
     await enviarCorreo(config, { para: c, ...msj }, log)
   }
 
+  // La plataforma puede cerrar el registro (Configuración → Servicio): no se mandan códigos ni se crean empresas.
+  async function registroCerrado(rep: FastifyReply) {
+    const a = await leerAjustes(db, config)
+    if (a.registroAbierto) return false
+    rep.code(403).send({
+      error: `Por ahora no estamos dando de alta empresas nuevas.${a.correoSoporte ? ` Escríbenos a ${a.correoSoporte}.` : ''}`,
+      codigo: 'REGISTRO_CERRADO',
+    })
+    return true
+  }
+
   app.post('/registro/codigo', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (req, rep) => {
     const b = bodyCodigo.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: 'Escribe un correo válido' })
+    if (await registroCerrado(rep)) return rep
     const listo = Date.now() + config.recuperacionPisoMs
     try {
       await mandarCodigo(b.data.correo, ipCliente(req, config), req.log)
@@ -219,6 +232,8 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
     if (regla) return rep.code(400).send({ error: regla })
     const productos = productosDelRegistro(b.data)
     if (!productos.length) return rep.code(400).send({ error: 'Agrega al menos un producto con su precio' })
+    if (await registroCerrado(rep)) return rep
+    const { pruebaDias } = await leerAjustes(db, config)
     const hash = await hashPassword(config, a.password)
 
     try {
@@ -227,7 +242,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         const { rows: [emp] } = await cx.query(
           `INSERT INTO empresas (nombre, zona_horaria, color_marca, logo, giros, control_retornables, prueba_hasta)
            VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(days => $7)) RETURNING id_empresa`,
-          [e.nombre, e.zonaHoraria, e.color, e.logo, e.giros, e.controlRetornables, config.pruebaDias],
+          [e.nombre, e.zonaHoraria, e.color, e.logo, e.giros, e.controlRetornables, pruebaDias],
         )
         await cx.query(`SELECT set_config('app.id_empresa', $1, true)`, [emp.id_empresa])
         const { rows: [u] } = await cx.query(
@@ -248,7 +263,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         return { idEmpresa: emp.id_empresa as string, enlaces }
       })
       await mandarInvitaciones(r.enlaces, e.nombre, a.nombre, req.log)
-      return rep.code(201).send({ empresa: { id: r.idEmpresa, nombre: e.nombre }, productos: productos.length, invitaciones: r.enlaces.length, diasPrueba: config.pruebaDias })
+      return rep.code(201).send({ empresa: { id: r.idEmpresa, nombre: e.nombre }, productos: productos.length, invitaciones: r.enlaces.length, diasPrueba: pruebaDias })
     } catch (err) {
       if (err instanceof CorreoRepetido) return rep.code(409).send(CORREO_REPETIDO)
       throw err

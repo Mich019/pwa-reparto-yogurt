@@ -15,6 +15,7 @@ import { Configuracion, type ApartadoConfig } from './Configuracion'
 import { Avatar } from '../../components/Avatar'
 import { AvisoPrueba, PantallaCobro } from './Suscripcion'
 import { useSuscripcion } from '../../lib/suscripcion'
+import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
 export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes' | 'configuracion'
 
@@ -132,6 +133,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
 
   return (
     <div className="flex h-dvh flex-col text-tinta antialiased">
+      <AnuncioPlataforma />
       <header className="z-20 flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8 lg:pb-4 lg:pt-4">
         <div className="flex flex-1 items-center">
           <button

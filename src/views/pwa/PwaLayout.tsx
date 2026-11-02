@@ -14,6 +14,7 @@ import { useAlertasLocales } from '../../lib/alertas'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { alCerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica } from '../../lib/sync'
+import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
 type PestanaPwa = 'ruta' | 'clientes' | 'stock' | 'produccion' | 'sabores' | 'cuenta'
 
@@ -81,6 +82,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   return (
     <div className="flex h-dvh flex-col bg-lienzo text-tinta">
       <Avisos />
+      <AnuncioPlataforma className="pt-[max(0.625rem,env(safe-area-inset-top))]" />
 
       {/* Botón flotante para administradores que están usando la PWA */}
       {esAdmin && onIrAAdmin && (

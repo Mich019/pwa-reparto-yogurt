@@ -4,6 +4,7 @@ import { api, ErrorApi, ErrorRed } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import { prepararLogo } from '../../lib/logo'
 import { iniciarSesion } from '../../lib/sesion'
+import { usePlataformaPublica } from '../../lib/plataforma'
 import {
   alternarTamano, alternarTipo, aplicarGiros, borrarBorrador, COLORES_MARCA, colorPara, correoValido, cuerpoRegistro,
   GIROS, guardarBorrador, leerBorrador, leerTamano, nombreEnvase, numero, presentaciones, productoNuevo, registroVacio,
@@ -38,6 +39,7 @@ interface Pantalla {
 type Envio = { estado: 'nada' } | { estado: 'enviando' } | { estado: 'listo' } | { estado: 'error'; mensaje: string }
 
 export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
+  const publica = usePlataformaPublica()
   const [inicial] = useState(leerBorrador)
   const [r, setR] = useState<Registro>(() => inicial?.registro ?? registroVacio())
   const [clave, setClave] = useState(() => inicial?.paso ?? 'negocio')
@@ -172,6 +174,12 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
       >
         {/* Centrada en el alto que queda entre el encabezado y los botones; si no cabe, empieza arriba y se desplaza. */}
         <div className="my-auto w-full py-8">
+          {publica && !publica.registroAbierto && (
+            <div role="alert" className="mb-6 rounded-2xl bg-ambar/15 px-4 py-3 text-sm leading-relaxed">
+              <b>Por ahora no estamos dando de alta empresas nuevas.</b>{' '}
+              {publica.correoSoporte ? <>Escríbenos a <a href={`mailto:${publica.correoSoporte}`} className="font-semibold text-azul hover:underline">{publica.correoSoporte}</a> y te avisamos cuando abramos.</> : 'Vuelve a intentarlo más adelante.'}
+            </div>
+          )}
           {retomado && actual.clave === inicial?.paso && (
             <div className="mb-6 flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3 text-sm">
               <span className="flex-1">Seguimos donde te quedaste.</span>

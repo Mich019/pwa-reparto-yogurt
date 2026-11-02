@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { leerAjustes } from './ajustes.js'
 import type { Config } from './config.js'
 import { hashPassword } from './contrasenas.js'
 import { correoInvitacion, enviarCorreo } from './correo.js'
@@ -47,6 +48,15 @@ const bodyEmpresaNueva = z.object({
   exenta: z.boolean().default(false),
 })
 
+// Ajustes de la plataforma (plataforma_ajustes). '' o null quita el correo, el anuncio o los días propios.
+const bodyAjustesPlataforma = z.object({
+  registroAbierto: z.boolean().optional(),
+  pruebaDias: z.number().int().min(0, 'Los días de prueba van de 0 a 365').max(365, 'Los días de prueba van de 0 a 365').nullable().optional(),
+  correoSoporte: z.union([z.literal(''), z.string().trim().toLowerCase().email('Escribe un correo válido').max(150)]).nullable().optional(),
+  anuncio: z.string().trim().max(280, 'El anuncio es de 280 letras como máximo').nullable().optional(),
+  anuncioTipo: z.enum(['info', 'aviso']).optional(),
+}).strict().refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
+
 const bodyCuenta = z.object({ nombre: z.string().trim().min(2, 'Escribe el nombre').max(100), correo })
 
 // Lo que la empresa vive hoy: suspendida por ustedes, exenta, pagando, en prueba o sin acceso (vencida/cancelada).
@@ -66,9 +76,69 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     )
     if (!u || !esPlataforma(u)) return rep.code(403).send({ error: 'Sólo para quienes administran la plataforma', codigo: 'SIN_PERMISO' })
     if (!u.dos_pasos) {
-      return rep.code(403).send({ error: 'Activa la verificación en dos pasos en «Mi cuenta y seguridad» para entrar al panel de la plataforma.', codigo: 'DOS_PASOS_REQUERIDOS' })
+      return rep.code(403).send({ error: 'Activa la verificación en dos pasos en Configuración → Seguridad para entrar al panel de la plataforma.', codigo: 'DOS_PASOS_REQUERIDOS' })
     }
   }
+
+  // Cómo está el servicio: los ajustes que se cambian aquí, lo que viene del entorno (sólo si cada pieza está lista,
+  // nunca sus claves), la versión desplegada, la base y el uso. Las cuentas de la empresa interna no cuentan.
+  app.get('/plataforma/servicio', { preHandler: requierePlataforma }, async () => {
+    const { rows: [b] } = await db.query(
+      `SELECT current_setting('server_version') AS version, pg_database_size(current_database())::bigint AS tamano,
+              (SELECT count(*) FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.activo AND NOT e.interna)::int AS usuarios,
+              (SELECT count(*) FROM sesiones s JOIN usuarios u USING (id_usuario) JOIN empresas e ON e.id_empresa = u.id_empresa
+                WHERE s.revocado_en IS NULL AND s.expira_en > now() AND NOT e.interna)::int AS sesiones,
+              (SELECT count(*) FROM suscripciones_push)::int AS push,
+              (SELECT count(*) FROM invitaciones WHERE usado_en IS NULL AND expira_en > now())::int AS invitaciones`,
+    )
+    return {
+      ajustes: await leerAjustes(db, config),
+      pruebaDiasEntorno: config.pruebaDias,
+      cobro: config.mercadoPago.activo,
+      precioMensual: config.mercadoPago.precioMensual,
+      moneda: config.mercadoPago.moneda,
+      webhookFirmado: !!config.mercadoPago.webhookSecret,
+      invitacionDias: config.invitacionDias,
+      correo: !!config.resendApiKey,
+      remitente: config.correoRemitente,
+      push: !!config.vapidPublica,
+      urlApp: config.urlApp,
+      zonaHoraria: config.zonaHoraria,
+      produccion: config.produccion,
+      despliegue: config.despliegue,
+      seguridad: { sesionDias: config.sesionDias, accesoMinutos: config.accesoMinutos, maxIntentos: config.maxIntentos, bloqueoMinutos: config.bloqueoMinutos },
+      base: { version: String(b.version).split(' ')[0], tamano: Number(b.tamano) },
+      uso: { usuarios: b.usuarios, sesiones: b.sesiones, dispositivosPush: b.push, invitaciones: b.invitaciones },
+    }
+  })
+
+  app.patch('/plataforma/ajustes', { preHandler: requierePlataforma, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const b = bodyAjustesPlataforma.safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
+    const { registroAbierto, pruebaDias, correoSoporte, anuncio, anuncioTipo } = b.data
+    await db.query(
+      `UPDATE plataforma_ajustes SET
+              registro_abierto = coalesce($1, registro_abierto),
+              prueba_dias = CASE WHEN $2 THEN $3::int ELSE prueba_dias END,
+              correo_soporte = CASE WHEN $4 THEN $5 ELSE correo_soporte END,
+              anuncio = CASE WHEN $6 THEN $7 ELSE anuncio END,
+              anuncio_tipo = coalesce($8, anuncio_tipo),
+              actualizado_en = now()
+        WHERE id`,
+      [registroAbierto ?? null, pruebaDias !== undefined, pruebaDias ?? null, correoSoporte !== undefined, correoSoporte || null,
+        anuncio !== undefined, anuncio || null, anuncioTipo ?? null],
+    )
+    req.log.info({ cambios: Object.keys(b.data) }, 'ajustes de la plataforma cambiados')
+    return leerAjustes(db, config)
+  })
+
+  // Lo que cualquiera puede leer, con o sin sesión: el anuncio (también en la pantalla de entrada), si el registro está
+  // abierto y a dónde escribir.
+  app.get('/plataforma/publico', async (_req, rep) => {
+    const a = await leerAjustes(db, config)
+    rep.header('cache-control', 'public, max-age=60')
+    return { anuncio: a.anuncio, registroAbierto: a.registroAbierto, correoSoporte: a.correoSoporte }
+  })
 
   app.get('/plataforma/empresas', { preHandler: requierePlataforma }, async () => {
     const { rows } = await db.query(
@@ -260,7 +330,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     const b = bodyEmpresaNueva.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
     const { nombre, zonaHoraria, administrador: a, exenta } = b.data
-    const dias = b.data.pruebaDias ?? config.pruebaDias
+    const dias = b.data.pruebaDias ?? (await leerAjustes(db, config)).pruebaDias
     const { rows: [ya] } = await db.query(`SELECT 1 FROM usuarios WHERE lower(correo) = $1`, [a.correo])
     if (ya) return rep.code(409).send({ error: 'Ya hay una cuenta con ese correo', codigo: 'CORREO_REPETIDO' })
     const token = tokenAleatorio()

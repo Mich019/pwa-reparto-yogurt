@@ -6,6 +6,7 @@ import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInput } from '../../components/ui'
 import { AveDelisy, LogoDelisy } from './marca'
+import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
 type Modo = 'login' | 'recuperar' | 'codigo'
 
@@ -65,6 +66,7 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
 
   return (
     <div className="relative isolate flex min-h-dvh flex-col justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
+      <AnuncioPlataforma className="fixed inset-x-0 top-0 z-30" />
       {/* El ave de la marca, enorme y casi transparente, asomando por la esquina */}
       <AveDelisy className="pointer-events-none absolute -bottom-20 -right-6 -z-10 hidden h-[36rem] opacity-[0.09] sm:block lg:right-[10%]" />
 

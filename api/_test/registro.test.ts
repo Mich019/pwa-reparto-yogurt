@@ -152,3 +152,30 @@ describe('catálogo del registro', () => {
     ])
   })
 })
+
+// Los ajustes de la plataforma son de toda la base: se prueban aquí, en el único archivo que registra empresas, y se
+// dejan como estaban.
+describe('ajustes de la plataforma en el registro', () => {
+  it('usa los días de prueba propios y, cerrado, no manda códigos ni crea empresas', async () => {
+    try {
+      await db.query(`UPDATE plataforma_ajustes SET prueba_dias = 30`)
+      const correo = nuevoCorreo()
+      const comprobante = await confirmar(correo)
+      const r = await post('/registro/empresa', cuerpo(correo, comprobante))
+      assert.equal(r.statusCode, 201)
+      assert.equal(r.json().diasPrueba, 30)
+
+      await db.query(`UPDATE plataforma_ajustes SET registro_abierto = false`)
+      const c = await post('/registro/codigo', { correo: nuevoCorreo() })
+      assert.equal(c.statusCode, 403)
+      assert.equal(c.json().codigo, 'REGISTRO_CERRADO')
+      const otro = nuevoCorreo()
+      await db.query(`UPDATE plataforma_ajustes SET registro_abierto = true`)
+      const comp = await confirmar(otro)
+      await db.query(`UPDATE plataforma_ajustes SET registro_abierto = false`)
+      assert.equal((await post('/registro/empresa', cuerpo(otro, comp))).json().codigo, 'REGISTRO_CERRADO')
+    } finally {
+      await db.query(`UPDATE plataforma_ajustes SET prueba_dias = NULL, registro_abierto = true`)
+    }
+  })
+})

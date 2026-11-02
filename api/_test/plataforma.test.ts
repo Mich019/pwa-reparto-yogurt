@@ -20,6 +20,47 @@ const pedir = async (s: { token: string }, metodo: 'GET' | 'POST' | 'PATCH', url
 const conDosPasos = (id: string) => db.query(`INSERT INTO dos_pasos (id_usuario, secreto, activado_en) VALUES ($1, 'x', now()) ON CONFLICT (id_usuario) DO UPDATE SET activado_en = now()`, [id])
 
 describe('panel de la plataforma', () => {
+  it('el estado del servicio dice qué está listo, sin claves, y sólo a la plataforma', async () => {
+    await conDosPasos(dueno.id)
+    const r = await pedir(dueno, 'GET', '/plataforma/servicio')
+    assert.equal(r.status, 200)
+    assert.equal(r.body.precioMensual, 299)
+    assert.equal(typeof r.body.cobro, 'boolean')
+    assert.equal(typeof r.body.uso.usuarios, 'number')
+    assert.ok(r.body.base.tamano > 0)
+    assert.ok(!JSON.stringify(r.body).includes(config.jwtSecret))
+    const ajena = await sesion('administrador')
+    assert.equal((await pedir(ajena, 'GET', '/plataforma/servicio')).status, 403)
+    assert.equal((await pedir(ajena, 'PATCH', '/plataforma/ajustes', { anuncio: 'hola' })).status, 403)
+
+    // Ajustes: el anuncio y el correo de soporte se leen sin sesión; '' los quita. (Registro y días de prueba se
+    // prueban en registro.test.ts, para no cruzarse con sus altas.)
+    const a = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { anuncio: '  Mantenimiento el domingo  ', anuncioTipo: 'aviso', correoSoporte: 'Ayuda@Delisy.MX' })
+    assert.equal(a.status, 200)
+    assert.deepEqual(a.body.anuncio, { texto: 'Mantenimiento el domingo', tipo: 'aviso' })
+    const publico = await srv.inject({ method: 'GET', url: '/plataforma/publico' })
+    assert.deepEqual(publico.json(), { anuncio: { texto: 'Mantenimiento el domingo', tipo: 'aviso' }, registroAbierto: true, correoSoporte: 'ayuda@delisy.mx' })
+    assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { correoSoporte: 'no-es-correo' })).status, 400)
+    assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { pruebaDias: 400 })).status, 400)
+    assert.equal((await pedir(dueno, 'PATCH', '/plataforma/ajustes', { otro: 1 })).status, 400)
+    const b = await pedir(dueno, 'PATCH', '/plataforma/ajustes', { anuncio: '', correoSoporte: null })
+    assert.equal(b.body.anuncio, null)
+    assert.equal(b.body.correoSoporte, null)
+    // Una empresa la lee pero no la cambia, ni con una consulta propia (sin permiso de escritura para reparto_app).
+    const cx = await db.connect()
+    try {
+      await cx.query('BEGIN')
+      await cx.query('SET LOCAL ROLE reparto_app')
+      assert.equal((await cx.query('SELECT registro_abierto FROM plataforma_ajustes')).rowCount, 1)
+      await assert.rejects(cx.query(`UPDATE plataforma_ajustes SET anuncio = 'x'`), /permission denied|permiso denegado/)
+    } finally {
+      await cx.query('ROLLBACK')
+      cx.release()
+    }
+    await db.query(`DELETE FROM dos_pasos WHERE id_usuario = $1`, [dueno.id]) // la prueba siguiente empieza sin ella
+  })
+
+
   it('sólo entra una cuenta de la plataforma y con verificación en dos pasos', async () => {
     const otro = await sesion('administrador')
     assert.equal((await pedir(otro, 'GET', '/plataforma/empresas')).status, 403)

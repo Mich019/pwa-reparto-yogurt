@@ -14,12 +14,15 @@ import { MarcaEmpresa } from './MarcaEmpresa'
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
 // navegador). En la computadora el título y el menú quedan fijos y sólo se desplaza el apartado (AdminLayout).
+// El panel de la plataforma la usa con `plataforma`: sin marca ni suscripción (sus cuentas no tienen negocio) y con sus
+// propios apartados en `extra`.
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Sin conexión con el servidor')
 const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')
 
 export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'apariencia'
+export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
   { valor: 'claro', texto: 'Claro', ayuda: 'Crema, el de siempre', icono: Sun },
@@ -32,7 +35,7 @@ const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
   { valor: 'mas-grande', texto: 'Más grande', muestra: 'text-xl' },
 ]
 
-function Seccion({ id, titulo, descripcion, children }: { id: string; titulo: string; descripcion?: string; children: ReactNode }) {
+export function Seccion({ id, titulo, descripcion, children }: { id: string; titulo: string; descripcion?: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="border-t border-linea pt-7 first:border-t-0 first:pt-0">
       <h2 id={id} className="text-xl font-semibold">{titulo}</h2>
@@ -43,7 +46,7 @@ function Seccion({ id, titulo, descripcion, children }: { id: string; titulo: st
 }
 
 // Una opción con su explicación a la izquierda y el control a la derecha.
-function Fila({ titulo, ayuda, children }: { titulo: string; ayuda: string; children: ReactNode }) {
+export function Fila({ titulo, ayuda, children }: { titulo: string; ayuda: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-linea py-4 first:border-t-0 first:pt-0 last:pb-0">
       <div className="min-w-0 max-w-md">
@@ -66,20 +69,21 @@ function Muestra({ valor }: { valor: PreferenciaTema }) {
   )
 }
 
-export function Configuracion({ inicial = 'cuenta' }: { inicial?: ApartadoConfig }) {
+export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = [] }: { inicial?: ApartadoConfig; plataforma?: boolean; extra?: ApartadoExtra[] }) {
   const u = useSesion()?.usuario
-  const suscripcion = useSuscripcion(u?.id)
-  const [apartado, setApartado] = useState<ApartadoConfig>(inicial)
+  const suscripcion = useSuscripcion(plataforma ? undefined : u?.id)
+  const [apartado, setApartado] = useState<string>(inicial)
 
-  const menu: { id: ApartadoConfig; texto: string; ayuda: string; icono: typeof Sun }[] = [
+  const menu: { id: string; texto: string; ayuda: string; icono: typeof Sun }[] = [
     { id: 'cuenta', texto: 'Cuenta', ayuda: 'Tu perfil y tu actividad', icono: UserRound },
     { id: 'seguridad', texto: 'Seguridad', ayuda: 'Contraseña y sesiones', icono: ShieldCheck },
-    { id: 'marca', texto: 'Marca', ayuda: 'Nombre, logo y color', icono: SwatchBook },
-    ...(suscripcion ? [{ id: 'suscripcion' as const, texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
+    ...(plataforma ? [] : [{ id: 'marca', texto: 'Marca', ayuda: 'Nombre, logo y color', icono: SwatchBook }]),
+    ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
+    ...extra,
     { id: 'apariencia', texto: 'Apariencia', ayuda: 'Tema, texto y movimiento', icono: Palette },
   ]
   const visible = menu.some((m) => m.id === apartado) ? apartado : 'cuenta'
-  const elegir = (id: ApartadoConfig) => {
+  const elegir = (id: string) => {
     setApartado(id)
     document.getElementById('apartado-config')?.scrollTo({ top: 0 })
   }
@@ -88,7 +92,7 @@ export function Configuracion({ inicial = 'cuenta' }: { inicial?: ApartadoConfig
     <div className="mx-auto max-w-[1100px] px-4 pt-2 sm:px-8 lg:flex lg:h-full lg:flex-col">
       <header className="pb-6 pt-4 lg:shrink-0">
         <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">Configuración</h1>
-        <p className="mt-3 text-sm text-apagado">Tu cuenta y su seguridad, la marca de tu negocio, tu plan y cómo se ve el panel.</p>
+        <p className="mt-3 text-sm text-apagado">{plataforma ? 'Tu cuenta y su seguridad, cómo está configurado el servicio y cómo se ve el panel.' : 'Tu cuenta y su seguridad, la marca de tu negocio, tu plan y cómo se ve el panel.'}</p>
       </header>
 
       <div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
@@ -115,8 +119,9 @@ export function Configuracion({ inicial = 'cuenta' }: { inicial?: ApartadoConfig
 
         {/* Lo único que se desplaza en la computadora; el margen deja ver completo el anillo de foco. */}
         <div id="apartado-config" className="min-w-0 space-y-7 lg:-mx-2 lg:overflow-y-auto lg:px-2 lg:pb-12">
-          {visible === 'cuenta' && <Cuenta />}
-          {visible === 'seguridad' && <Seguridad />}
+          {visible === 'cuenta' && <Cuenta plataforma={plataforma} />}
+          {visible === 'seguridad' && <Seguridad plataforma={plataforma} />}
+          {extra.find((x) => x.id === visible)?.contenido}
           {visible === 'marca' && (
             <Seccion id="marca" titulo="Marca" descripcion="El nombre, el lema, el logo, el color y el contacto de tu negocio. Los ven tú, tus repartidores en su app y quien reciba tus PDF.">
               <MarcaEmpresa />
@@ -138,7 +143,7 @@ export function Configuracion({ inicial = 'cuenta' }: { inicial?: ApartadoConfig
 
 interface Yo { nombre: string; telefono: string; empresa: string; alta: string; ultimoAcceso: string | null }
 
-function Cuenta() {
+function Cuenta({ plataforma }: { plataforma: boolean }) {
   const u = useSesion()?.usuario
   const [yo, setYo] = useState<Yo | null>(null)
   const [nombre, setNombre] = useState(u?.nombre ?? '')
@@ -173,7 +178,7 @@ function Cuenta() {
   if (!u) return null
   return (
     <>
-      <Seccion id="perfil" titulo="Perfil" descripcion="Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.">
+      <Seccion id="perfil" titulo="Perfil" descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
         <FotoPerfil />
         <form onSubmit={(e) => { e.preventDefault(); if (cambios) void guardar() }} className="mt-6 grid gap-4 sm:grid-cols-2">
           <label className="block">
@@ -187,7 +192,7 @@ function Cuenta() {
           <label className="block sm:col-span-2">
             <span className="mb-1.5 block text-xs font-medium text-apagado">Correo</span>
             <input value={u.correo} readOnly className={`${claseInput} cursor-default opacity-70`} />
-            <span className="mt-1.5 block text-xs text-apagado">Es con lo que entras. Si necesitas cambiarlo, otro administrador lo hace desde Vendedores.</span>
+            <span className="mt-1.5 block text-xs text-apagado">{plataforma ? 'Es con lo que entras al panel de la plataforma.' : 'Es con lo que entras. Si necesitas cambiarlo, otro administrador lo hace desde Vendedores.'}</span>
           </label>
           {error && <p role="alert" className="text-sm font-medium text-rojo sm:col-span-2">{error}</p>}
           <div className="sm:col-span-2">
@@ -200,8 +205,8 @@ function Cuenta() {
 
       <Seccion id="actividad" titulo="Tu actividad">
         <dl className="grid gap-4 text-sm sm:grid-cols-4">
-          <div><dt className="text-xs text-apagado">Rol</dt><dd className="mt-0.5 inline-flex items-center gap-1 font-semibold"><ShieldCheck size={14} aria-hidden="true" />{u.rol === 'administrador' ? 'Administrador' : 'Vendedor'}</dd></div>
-          <div><dt className="text-xs text-apagado">Empresa</dt><dd className="mt-0.5 font-semibold">{yo?.empresa ?? '—'}</dd></div>
+          <div><dt className="text-xs text-apagado">Rol</dt><dd className="mt-0.5 inline-flex items-center gap-1 font-semibold"><ShieldCheck size={14} aria-hidden="true" />{plataforma ? 'Plataforma' : u.rol === 'administrador' ? 'Administrador' : 'Vendedor'}</dd></div>
+          <div><dt className="text-xs text-apagado">{plataforma ? 'Acceso' : 'Empresa'}</dt><dd className="mt-0.5 font-semibold">{plataforma ? 'Todas las empresas' : yo?.empresa ?? '—'}</dd></div>
           <div><dt className="text-xs text-apagado">Miembro desde</dt><dd className="mt-0.5 font-semibold">{yo ? new Date(yo.alta).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</dd></div>
           <div><dt className="text-xs text-apagado">Último acceso</dt><dd className="mt-0.5 font-semibold">{fechaHora(yo?.ultimoAcceso ?? null)}</dd></div>
         </dl>
@@ -215,7 +220,7 @@ function Cuenta() {
 
 interface SesionAbierta { id: string; actual: boolean; ip: string | null; inicio: string; vence: string }
 
-function Seguridad() {
+function Seguridad({ plataforma }: { plataforma: boolean }) {
   // El formulario de la contraseña sólo se abre al pedirlo, y se cierra (y se vacía) al terminar o cancelar.
   const [cambiando, setCambiando] = useState(false)
   const [cambiada, setCambiada] = useState<string | null>(null)
@@ -261,7 +266,7 @@ function Seguridad() {
           </div>
         )}
       </Seccion>
-      <Seccion id="dos-pasos" titulo="Inicio de sesión" descripcion="Protege la cuenta aunque alguien conozca tu contraseña.">
+      <Seccion id="dos-pasos" titulo="Inicio de sesión" descripcion={plataforma ? 'Obligatoria para entrar al panel de la plataforma: sin ella sólo ves esta configuración.' : 'Protege la cuenta aunque alguien conozca tu contraseña.'}>
         {/* DosPasos trae su propia tarjeta; aquí sólo se le quita el margen de arriba. */}
         <div className="-mt-3"><DosPasos /></div>
       </Seccion>

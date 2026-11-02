@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, Copy, LayoutDashboard, LogOut, Plus, RefreshCw, Search, ShieldCheck, UserCog } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Plus, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
-import { Avatar, FotoPerfil } from '../../components/Avatar'
+import { useAplicarPreferencias } from '../../lib/tema'
+import { Avatar } from '../../components/Avatar'
 import { aviso, claseInput } from '../../components/ui'
-import { FormPassword } from '../pwa/Cuenta'
-import { DosPasos } from '../pwa/DosPasos'
+import { Configuracion, Fila, Seccion } from './Configuracion'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { LogoDelisy } from './marca'
 
 // Panel de la plataforma (/plataforma, api/_lib/plataforma.ts): para quienes administran Delisy. Un tablero con menú
 // lateral: el resumen de la plataforma, las empresas con su detalle y sus ajustes, el alta de empresas, las cuentas de
-// la plataforma y la cuenta propia. Todo en páginas, sin ventanas encima.
+// la plataforma y la configuración (la de Configuracion.tsx: cuenta, seguridad y apariencia, más los ajustes de la
+// plataforma y el estado del servicio).
+// Todo en páginas, sin ventanas encima; las secciones se separan con líneas finas, no con tarjetas.
 //
 // Gráficos de graficas.tsx (skill dataviz) con los colores de Delisy: la serie en su azul marino y el periodo en curso
 // en su coral (bajo 3:1: lleva su valor escrito, tooltip y tabla). Los estados usan una paleta categórica validada con
@@ -75,12 +77,13 @@ const diasHasta = (s: string) => Math.ceil((new Date(s).getTime() - Date.now()) 
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Sin conexión con el servidor')
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
 
-type Vista = { de: 'resumen' } | { de: 'empresas' } | { de: 'empresa'; id: string } | { de: 'nueva' } | { de: 'cuentas' } | { de: 'cuenta' }
+type Vista = { de: 'resumen' } | { de: 'empresas' } | { de: 'empresa'; id: string } | { de: 'nueva' } | { de: 'cuentas' } | { de: 'config' }
 
 export function Plataforma() {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState('')
   const [vista, setVista] = useState<Vista>({ de: 'resumen' })
+  useAplicarPreferencias()
 
   async function cargar() {
     setError('')
@@ -99,14 +102,14 @@ export function Plataforma() {
     { de: 'empresas', texto: 'Empresas', icono: Building2 },
     { de: 'nueva', texto: 'Nueva empresa', icono: Plus },
     { de: 'cuentas', texto: 'Cuentas de la plataforma', icono: ShieldCheck },
-    { de: 'cuenta', texto: 'Mi cuenta y seguridad', icono: UserCog },
+    { de: 'config', texto: 'Configuración', icono: Settings },
   ]
   const activo = vista.de === 'empresa' ? 'empresas' : vista.de
 
   return (
     <div className={`min-h-dvh text-tinta lg:grid lg:grid-cols-[264px_minmax(0,1fr)] ${COLORES}`}>
       {/* Menú: lateral en la computadora, una fila que se desliza en el teléfono */}
-      <aside className="bg-papel lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
+      <aside className="border-b border-linea lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-r lg:border-b-0">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 lg:pb-6">
           <LogoDelisy className="h-8" />
           <span className="flex items-center gap-1">
@@ -130,14 +133,21 @@ export function Plataforma() {
         <PiePropio />
       </aside>
 
-      <main className="min-w-0 px-4 pt-6 pb-20 sm:px-8 lg:px-10 lg:pt-8">
-        {error && (
+      {/* En Configuración, como en el panel: título y menú fijos, sólo se desplaza el apartado. */}
+      <main className={`min-w-0 ${vista.de === 'config' ? 'pt-4 pb-20 lg:h-dvh lg:overflow-hidden lg:pb-0' : 'px-4 pt-6 pb-20 sm:px-8 lg:px-10 lg:pt-8'}`}>
+        {error && vista.de !== 'config' && (
           <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rojo/10 px-5 py-4 text-sm font-medium text-rojo">
             {error}
-            <button type="button" onClick={() => void cargar()} className="rounded-full bg-papel px-4 py-2 font-semibold text-tinta">Reintentar</button>
+            <span className="flex gap-2">
+              {/^Activa la verificación/.test(error) && <button type="button" onClick={() => ir({ de: 'config' })} className="rounded-full bg-papel px-4 py-2 font-semibold text-tinta">Ir a Configuración</button>}
+              <button type="button" onClick={() => void cargar()} className="rounded-full bg-papel px-4 py-2 font-semibold text-tinta">Reintentar</button>
+            </span>
           </div>
         )}
-        {vista.de === 'cuenta' ? <MiCuenta />
+        {vista.de === 'config' ? <Configuracion plataforma extra={[
+          { id: 'ajustes', texto: 'Ajustes', ayuda: 'Registro, prueba y anuncio', icono: SlidersHorizontal, contenido: <AjustesServicio /> },
+          { id: 'servicio', texto: 'Servicio', ayuda: 'Estado, cobro y entorno', icono: Server, contenido: <Servicio /> },
+        ]} />
           : !datos ? !error && <p className="py-20 text-center text-apagado">Cargando la plataforma…</p>
           : vista.de === 'resumen' ? <Resumen d={datos} ir={ir} recargar={cargar} />
           : vista.de === 'empresas' ? <Empresas d={datos} ir={ir} />
@@ -183,7 +193,7 @@ function Encabezado({ titulo, detalle, children }: { titulo: ReactNode; detalle?
 
 function Panel({ titulo, detalle, children, className = '' }: { titulo: string; detalle?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-[22px] bg-papel p-5 sm:p-6 ${className}`}>
+    <section className={`min-w-0 border-t border-linea pt-5 ${className}`}>
       <h2 className="text-lg font-semibold">{titulo}</h2>
       {detalle && <p className="mt-0.5 text-sm text-apagado">{detalle}</p>}
       <div className="mt-5">{children}</div>
@@ -191,10 +201,10 @@ function Panel({ titulo, detalle, children, className = '' }: { titulo: string; 
   )
 }
 
-// La franja de cifras: una sola pieza, cada cifra con su nota. Sin tarjetas sueltas.
+// La franja de cifras: una sola pieza bajo una línea, cada cifra con su nota. Sin tarjetas.
 function Cifras({ cifras }: { cifras: { valor: string; etiqueta: string; nota?: string; acento?: boolean }[] }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-6 rounded-[22px] bg-papel px-6 py-6 sm:grid-cols-3 xl:grid-cols-5">
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-6 border-t border-linea pt-6 sm:grid-cols-3 xl:grid-cols-5">
       {cifras.map((c) => (
         <div key={c.etiqueta} className="min-w-0">
           <dt className="text-xs font-medium text-apagado">{c.etiqueta}</dt>
@@ -258,7 +268,7 @@ function Resumen({ d, ir, recargar }: { d: Datos; ir: (v: Vista) => void; recarg
         { valor: String(r.total), etiqueta: 'Empresas', nota: `${r.exentas} exentas · ${r.suspendidas} suspendidas` },
       ]} />
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="mt-10 grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel titulo="Pedidos entregados por día" detalle="Todas las empresas, últimos 30 días">
           <BarrasPeriodo datos={barrasDias(d.series.pedidosPorDia)} formato={(n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`} descripcion="Pedidos entregados por día en toda la plataforma" leyenda={['Días anteriores', 'Hoy']} alto={180} ejeEn={5} />
         </Panel>
@@ -277,7 +287,7 @@ function Resumen({ d, ir, recargar }: { d: Datos; ir: (v: Vista) => void; recarg
         </Panel>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+      <div className="mt-10 grid gap-x-12 gap-y-10 xl:grid-cols-3">
         <Panel titulo="Altas de empresas" detalle="Por mes, últimos 12 meses">
           <BarrasPeriodo datos={meses} formato={(n) => `${n} ${n === 1 ? 'empresa' : 'empresas'}`} descripcion="Empresas que se dieron de alta cada mes" leyenda={['Meses anteriores', 'Este mes']} alto={140} ejeEn={2} />
         </Panel>
@@ -355,14 +365,14 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="relative min-w-[16rem] flex-1">
           <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-apagado" aria-hidden="true" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar empresa" className={`${claseInput} bg-papel pl-11`} />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar empresa" className={`${claseInput} pl-11`} />
         </label>
         <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-1.5">
           {FILTROS.map((f) => {
             const n = d.empresas.filter(f.cumple).length
             return (
               <button key={f.clave} type="button" onClick={() => setFiltro(f.clave)} aria-pressed={filtro === f.clave}
-                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${filtro === f.clave ? 'bg-[var(--plat)] text-white' : 'bg-papel hover:bg-niebla'}`}>
+                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${filtro === f.clave ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>
                 {f.texto} <span className="tabular-nums opacity-70">{n}</span>
               </button>
             )
@@ -370,7 +380,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-[22px] bg-papel">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[56rem] text-left text-sm">
           <thead className="text-xs text-apagado">
             <tr>
@@ -385,9 +395,9 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
               <th scope="col" className="w-8"><span className="sr-only">Abrir</span></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-linea border-y border-linea">
             {lista.map((e) => (
-              <tr key={e.id} onClick={() => ir({ de: 'empresa', id: e.id })} className="cursor-pointer odd:bg-lienzo/50 hover:bg-niebla">
+              <tr key={e.id} onClick={() => ir({ de: 'empresa', id: e.id })} className="cursor-pointer hover:bg-niebla/60">
                 <td className="px-4 py-3">
                   <button type="button" onClick={() => ir({ de: 'empresa', id: e.id })} className={`block text-left ${anillo}`}>
                     <span className="block font-semibold">{e.nombre}</span>
@@ -453,7 +463,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
       {volver}
       <header className="mb-8 flex flex-wrap items-center gap-5">
         {e.logo
-          ? <img src={e.logo} alt="" className="h-16 w-16 rounded-2xl bg-papel object-contain p-2" />
+          ? <img src={e.logo} alt="" className="h-16 w-16 rounded-2xl bg-white object-contain p-2 ring-1 ring-linea" />
           : <span className="grid h-16 w-16 place-items-center rounded-2xl text-2xl font-bold text-white" style={{ background: e.color ?? 'var(--plat)' }}>{e.nombre.charAt(0).toUpperCase()}</span>}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
@@ -466,7 +476,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
           </p>
         </div>
         {confirmar ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-papel px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-rojo/10 px-4 py-3">
             <span className="text-sm">Nadie de {e.nombre} podrá entrar. No se borra nada.</span>
             <button type="button" onClick={() => void cambiarActiva(false)} disabled={trabajando} className={`${boton} bg-rojo text-white`}>Sí, suspender</button>
             <button type="button" onClick={() => setConfirmar(false)} className={botonSuave}>Cancelar</button>
@@ -474,7 +484,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
         ) : suspendida ? (
           <button type="button" onClick={() => void cambiarActiva(true)} disabled={trabajando} className={botonPrimario}>Reactivar</button>
         ) : (
-          <button type="button" onClick={() => setConfirmar(true)} className={`${boton} bg-papel text-rojo hover:bg-rojo/10`}>Suspender</button>
+          <button type="button" onClick={() => setConfirmar(true)} className={`${boton} bg-niebla text-rojo hover:bg-rojo/10`}>Suspender</button>
         )}
       </header>
 
@@ -486,7 +496,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
         { valor: fecha(e.conteos.ultimoPedido), etiqueta: 'Última entrega' },
       ]} />
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="mt-10 grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel titulo="Actividad" detalle="Pedidos entregados por día, últimos 30 días">
           {e.pedidosPorDia.every((x) => !x.n) ? <p className="py-16 text-center text-sm text-apagado">Sin pedidos entregados en los últimos 30 días.</p> : <BarrasPeriodo datos={barrasDias(e.pedidosPorDia)} formato={(n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`} descripcion={`Pedidos entregados por día de ${e.nombre}`} leyenda={['Días anteriores', 'Hoy']} alto={160} ejeEn={5} />}
         </Panel>
@@ -495,25 +505,25 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
         </Panel>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="mt-10 grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel titulo="Equipo" detalle={`${e.equipo.length} ${e.equipo.length === 1 ? 'cuenta' : 'cuentas'}`}>
-          <div className="-mx-5 overflow-x-auto sm:-mx-6">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] text-left text-sm">
               <thead className="text-xs text-apagado">
                 <tr>
-                  <th scope="col" className="px-5 py-2 font-medium sm:px-6">Nombre</th>
+                  <th scope="col" className="py-2 pr-3 font-medium">Nombre</th>
                   <th scope="col" className="px-3 py-2 font-medium">Rol</th>
                   <th scope="col" className="px-3 py-2 font-medium">Dos pasos</th>
-                  <th scope="col" className="px-5 py-2 font-medium sm:px-6">Último acceso</th>
+                  <th scope="col" className="py-2 pl-3 font-medium">Último acceso</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-linea border-t border-linea">
                 {e.equipo.map((u) => (
-                  <tr key={u.correo} className={`odd:bg-lienzo/50 ${u.activo ? '' : 'opacity-50'}`}>
-                    <td className="px-5 py-2.5 sm:px-6"><span className="block font-semibold">{u.nombre}</span><span className="block text-xs text-apagado">{u.correo}</span></td>
+                  <tr key={u.correo} className={u.activo ? '' : 'opacity-50'}>
+                    <td className="py-2.5 pr-3"><span className="block font-semibold">{u.nombre}</span><span className="block text-xs text-apagado">{u.correo}</span></td>
                     <td className="px-3 py-2.5">{u.rol === 'administrador' ? 'Administrador' : 'Vendedor'}{!u.activo && ' · de baja'}</td>
                     <td className="px-3 py-2.5">{u.dosPasos ? <span className="inline-flex items-center gap-1 font-semibold text-verde"><Check size={14} aria-hidden="true" /> Sí</span> : <span className="text-apagado">No</span>}</td>
-                    <td className="px-5 py-2.5 whitespace-nowrap tabular-nums sm:px-6">{fecha(u.ultimoAcceso)}</td>
+                    <td className="py-2.5 pl-3 whitespace-nowrap tabular-nums">{fecha(u.ultimoAcceso)}</td>
                   </tr>
                 ))}
                 {!e.equipo.length && <tr><td colSpan={4} className="px-6 py-6 text-center text-apagado">Nadie ha entrado todavía.</td></tr>}
@@ -602,7 +612,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
           </div>
         )}
       </div>
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl bg-niebla px-4 py-3">
+      <label className="flex cursor-pointer items-center justify-between gap-4 border-y border-linea py-3">
         <span>
           <span className="block text-sm font-semibold">Exenta</span>
           <span className="block text-xs text-apagado">No paga y nunca pierde el acceso.</span>
@@ -649,7 +659,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
     return (
       <>
         <Encabezado titulo={`${f.nombre.trim()} ya está en Delisy`} detalle="Su administrador recibió un correo para crear su contraseña." />
-        <section className="max-w-2xl rounded-[22px] bg-papel p-6">
+        <section className="max-w-2xl border-t border-linea pt-6">
           <h2 className="text-lg font-semibold">Enlace de la invitación</h2>
           <p className="mt-1 text-sm text-apagado">Si no le llega el correo, mándale este enlace por WhatsApp. Vence en {hecha.dias} días y sirve una sola vez.</p>
           <div className="mt-4 flex items-center gap-2 rounded-2xl bg-niebla p-3">
@@ -669,8 +679,8 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
   return (
     <>
       <Encabezado titulo="Nueva empresa" detalle="Para dar de alta a un negocio sin que pase por el registro. Su catálogo y su marca los pone su administrador al entrar." />
-      <form onSubmit={(x) => { x.preventDefault(); if (listo) void crear() }} className="grid max-w-4xl gap-6 lg:grid-cols-2">
-        <section className="rounded-[22px] bg-papel p-6">
+      <form onSubmit={(x) => { x.preventDefault(); if (listo) void crear() }} className="grid max-w-4xl gap-x-12 gap-y-10 lg:grid-cols-2">
+        <section className="border-t border-linea pt-6">
           <h2 className="text-lg font-semibold">El negocio</h2>
           <div className="mt-5 space-y-4">
             <Campo t="Nombre"><input value={f.nombre} onChange={(x) => poner({ nombre: x.target.value })} className={claseInput} placeholder="Ej. Agua La Fuente" maxLength={120} /></Campo>
@@ -696,7 +706,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
             )}
           </div>
         </section>
-        <section className="flex flex-col rounded-[22px] bg-papel p-6">
+        <section className="flex flex-col border-t border-linea pt-6">
           <h2 className="text-lg font-semibold">Su administrador</h2>
           <p className="mt-1 text-sm text-apagado">Le llega un enlace para crear su contraseña. Nadie más la ve.</p>
           <div className="mt-5 space-y-4">
@@ -747,28 +757,28 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
   return (
     <>
       <Encabezado titulo="Cuentas de la plataforma" detalle="Quienes administran Delisy. Ven todas las empresas y no administran ningún negocio." />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <section className="overflow-x-auto rounded-[22px] bg-papel">
+      <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <section className="overflow-x-auto">
           <table className="w-full min-w-[30rem] text-left text-sm">
             <thead className="text-xs text-apagado">
               <tr>
-                <th scope="col" className="px-6 py-3 font-medium">Nombre</th>
+                <th scope="col" className="py-3 pr-3 font-medium">Nombre</th>
                 <th scope="col" className="px-3 py-3 font-medium">Dos pasos</th>
-                <th scope="col" className="px-6 py-3 font-medium">Estado</th>
+                <th scope="col" className="py-3 pl-3 font-medium">Estado</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-linea border-y border-linea">
               {cuentas.map((c) => (
-                <tr key={c.correo} className="odd:bg-lienzo/50">
-                  <td className="px-6 py-3"><span className="block font-semibold">{c.nombre}</span><span className="block text-xs text-apagado">{c.correo}</span></td>
+                <tr key={c.correo}>
+                  <td className="py-3 pr-3"><span className="block font-semibold">{c.nombre}</span><span className="block text-xs text-apagado">{c.correo}</span></td>
                   <td className="px-3 py-3">{c.dosPasos ? <span className="inline-flex items-center gap-1 font-semibold text-verde"><Check size={14} aria-hidden="true" /> Activa</span> : <span className="font-medium text-rojo">Falta activarla</span>}</td>
-                  <td className="px-6 py-3">{c.activo ? 'Activa' : 'De baja'}</td>
+                  <td className="py-3 pl-3">{c.activo ? 'Activa' : 'De baja'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
-        <section className="rounded-[22px] bg-papel p-6">
+        <section className="border-t border-linea pt-5">
           <h2 className="text-lg font-semibold">Nueva cuenta</h2>
           {creada ? (
             <div className="mt-4 space-y-3 text-sm">
@@ -797,28 +807,226 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
   )
 }
 
-// ---------------------------------------------------------------------------------------------------------- mi cuenta
+// ---------------------------------------------------------------------------------------------------------- servicio
 
-function MiCuenta() {
-  const u = useSesion()?.usuario
+interface AjustesPlataforma {
+  registroAbierto: boolean
+  pruebaDias: number
+  pruebaDiasPropia: number | null
+  correoSoporte: string | null
+  anuncio: { texto: string; tipo: 'info' | 'aviso' } | null
+  actualizado: string | null
+}
+interface EstadoServicio {
+  ajustes: AjustesPlataforma
+  pruebaDiasEntorno: number
+  cobro: boolean
+  precioMensual: number
+  moneda: string
+  webhookFirmado: boolean
+  invitacionDias: number
+  correo: boolean
+  remitente: string
+  push: boolean
+  urlApp: string
+  zonaHoraria: string
+  produccion: boolean
+  despliegue: { commit: string | null; mensaje: string | null; entorno: string | null; region: string | null }
+  seguridad: { sesionDias: number; accesoMinutos: number; maxIntentos: number; bloqueoMinutos: number }
+  base: { version: string; tamano: number }
+  uso: { usuarios: number; sesiones: number; dispositivosPush: number; invitaciones: number }
+}
+
+// Las dos pantallas de Configuración que son de la plataforma piden lo mismo (GET /plataforma/servicio).
+function useServicio() {
+  const [s, setS] = useState<EstadoServicio | null>(null)
+  const [error, setError] = useState('')
+  const cargar = () => llamarAutenticado<EstadoServicio>('/plataforma/servicio').then(setS).catch((e) => setError(mensaje(e)))
+  useEffect(() => { void cargar() }, [])
+  return { s, error, cargar }
+}
+
+function Interruptor({ activo, alCambiar, etiqueta }: { activo: boolean; alCambiar: (v: boolean) => void; etiqueta: string }) {
+  return (
+    <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+      <input type="checkbox" role="switch" checked={activo} onChange={(e) => alCambiar(e.target.checked)} className="peer sr-only" aria-label={etiqueta} />
+      <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-[var(--plat)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
+      <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
+    </label>
+  )
+}
+
+// Configuración → Ajustes: lo que se cambia sin volver a desplegar (tabla plataforma_ajustes). Se guarda junto, con
+// «Guardar»; sólo viaja lo que cambió.
+function AjustesServicio() {
+  const { s, error, cargar } = useServicio()
+  const [b, setB] = useState<{ registroAbierto: boolean; pruebaDias: string; correoSoporte: string; anuncio: string; anuncioTipo: 'info' | 'aviso' } | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState('')
+  const desde = (a: AjustesPlataforma) => ({
+    registroAbierto: a.registroAbierto,
+    pruebaDias: a.pruebaDiasPropia === null ? '' : String(a.pruebaDiasPropia),
+    correoSoporte: a.correoSoporte ?? '',
+    anuncio: a.anuncio?.texto ?? '',
+    anuncioTipo: a.anuncio?.tipo ?? 'info' as const,
+  })
+  useEffect(() => { if (s) setB(desde(s.ajustes)) }, [s])
+  if (error) return <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
+  if (!s || !b) return <p className="text-sm text-apagado">Cargando…</p>
+
+  const o = desde(s.ajustes)
+  const cambios = {
+    ...(b.registroAbierto !== o.registroAbierto ? { registroAbierto: b.registroAbierto } : {}),
+    ...(b.pruebaDias.trim() !== o.pruebaDias ? { pruebaDias: b.pruebaDias.trim() === '' ? null : Number(b.pruebaDias) } : {}),
+    ...(b.correoSoporte.trim() !== o.correoSoporte ? { correoSoporte: b.correoSoporte.trim() || null } : {}),
+    ...(b.anuncio.trim() !== o.anuncio ? { anuncio: b.anuncio.trim() || null } : {}),
+    ...(b.anuncioTipo !== o.anuncioTipo && b.anuncio.trim() ? { anuncioTipo: b.anuncioTipo } : {}),
+  }
+  const hay = Object.keys(cambios).length > 0
+  const poner = (c: Partial<NonNullable<typeof b>>) => { setErrorGuardar(''); setB((x) => x && { ...x, ...c }) }
+
+  async function guardar() {
+    setGuardando(true)
+    setErrorGuardar('')
+    try {
+      await llamarAutenticado('/plataforma/ajustes', { metodo: 'PATCH', cuerpo: cambios })
+      aviso('Ajustes guardados')
+      await cargar()
+    } catch (e) {
+      setErrorGuardar(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const aviso_ = b.anuncioTipo === 'aviso'
   return (
     <>
-      <Encabezado titulo="Mi cuenta y seguridad" detalle={u ? `${u.nombre} · ${u.correo}` : undefined} />
-      <section className="mb-6 max-w-5xl rounded-[22px] bg-papel p-6">
-        <h2 className="mb-4 text-lg font-semibold">Foto de perfil</h2>
-        <FotoPerfil />
-      </section>
-      <div className="grid max-w-5xl gap-6 lg:grid-cols-2">
-        <section className="rounded-[22px] bg-papel p-6">
-          <h2 className="text-lg font-semibold">Contraseña</h2>
-          <div className="mt-4"><FormPassword /></div>
-        </section>
-        <section className="rounded-[22px] bg-papel p-6">
-          <h2 className="text-lg font-semibold">Verificación en dos pasos</h2>
-          <p className="mt-1 text-sm text-apagado">El panel de la plataforma la pide.</p>
-          <div className="mt-2"><DosPasos /></div>
-        </section>
+      <Seccion id="registro" titulo="Empresas nuevas" descripcion="Cómo llegan los negocios a Delisy.">
+        <Fila titulo="Registro abierto" ayuda={b.registroAbierto ? 'Cualquiera puede dar de alta su negocio en /registro.' : 'Cerrado: /registro avisa que no hay altas y no manda códigos. Tú sigues pudiendo dar de alta desde «Nueva empresa».'}>
+          <Interruptor activo={b.registroAbierto} alCambiar={(v) => poner({ registroAbierto: v })} etiqueta="Registro abierto" />
+        </Fila>
+        <Fila titulo="Días de prueba gratis" ayuda={`Para cada empresa nueva, se registre sola o la des de alta tú. Vacío: ${s.pruebaDiasEntorno} días (PRUEBA_DIAS). Las que ya existen no cambian.`}>
+          <label className="flex items-center gap-2 text-sm">
+            <input inputMode="numeric" value={b.pruebaDias} onChange={(e) => poner({ pruebaDias: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+              placeholder={String(s.pruebaDiasEntorno)} aria-label="Días de prueba gratis" className={`${claseInput} max-w-24 text-center tabular-nums`} />
+            días
+          </label>
+        </Fila>
+      </Seccion>
+
+      <Seccion id="soporte" titulo="Soporte" descripcion="A dónde te escriben las empresas: sale en la pantalla de cobro y con el registro cerrado.">
+        <input type="email" value={b.correoSoporte} onChange={(e) => poner({ correoSoporte: e.target.value })} maxLength={150}
+          placeholder="soporte@tudominio.com" aria-label="Correo de soporte" className={`${claseInput} max-w-md`} />
+      </Seccion>
+
+      <Seccion id="anuncio" titulo="Anuncio para todas las empresas" descripcion="Sale arriba del panel, de la app de reparto y de las pantallas de entrada. Cada quien puede cerrarlo; vuelve a salir si cambias el texto.">
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Tipo de anuncio">
+            {([['info', 'Información'], ['aviso', 'Aviso importante']] as const).map(([t, texto]) => (
+              <button key={t} type="button" role="radio" aria-checked={b.anuncioTipo === t} onClick={() => poner({ anuncioTipo: t })}
+                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${b.anuncioTipo === t ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>{texto}</button>
+            ))}
+          </div>
+          <textarea value={b.anuncio} onChange={(e) => poner({ anuncio: e.target.value })} maxLength={280} rows={3}
+            placeholder="Ej. El domingo de 2 a 4 a.m. haremos mantenimiento; la app de reparto sigue funcionando sin conexión."
+            aria-label="Texto del anuncio" className={`${claseInput} resize-y`} />
+          <div className="flex items-center justify-between text-xs text-apagado">
+            <span>{b.anuncio.trim() ? 'Así se verá:' : 'Vacío: no hay anuncio.'}</span>
+            <span className="tabular-nums">{b.anuncio.length}/280</span>
+          </div>
+          {b.anuncio.trim() && (
+            <div className={`flex items-start gap-3 rounded-xl px-4 py-2.5 text-sm ${aviso_ ? 'bg-ambar/15' : 'bg-azul/10'}`}>
+              {aviso_ ? <CircleAlert size={17} className="mt-0.5 shrink-0 text-ambar" aria-hidden="true" /> : <Info size={17} className="mt-0.5 shrink-0 text-azul" aria-hidden="true" />}
+              <p className="min-w-0 flex-1 leading-snug">{b.anuncio.trim()}</p>
+            </div>
+          )}
+          {o.anuncio && <button type="button" onClick={() => poner({ anuncio: '' })} className={`text-sm font-semibold text-rojo hover:underline ${anillo}`}>Quitar el anuncio</button>}
+        </div>
+      </Seccion>
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-6">
+        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? 'Guardando…' : 'Guardar ajustes'}</button>
+        {hay && <button type="button" onClick={() => { setErrorGuardar(''); setB(o) }} className={botonSuave}>Deshacer</button>}
+        {errorGuardar && <p role="alert" className="text-sm font-medium text-rojo">{errorGuardar}</p>}
+        {!hay && s.ajustes.actualizado && <span className="text-xs text-apagado">Último cambio: {new Date(s.ajustes.actualizado).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>}
       </div>
+    </>
+  )
+}
+
+const megas = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`)
+
+// Configuración → Servicio: cómo está Delisy en el servidor. Sólo se lee: lo del entorno se cambia en Vercel y se vuelve
+// a desplegar. El servidor nunca manda las claves, sólo si están puestas.
+function Servicio() {
+  const { s, error } = useServicio()
+  if (error) return <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
+  if (!s) return <p className="text-sm text-apagado">Cargando…</p>
+  const listo = (ok: boolean, si: string, no: string) => (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold ${ok ? 'text-verde' : 'text-ambar'}`}>
+      {ok ? <Check size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}{ok ? si : no}
+    </span>
+  )
+  const d = s.despliegue
+  return (
+    <>
+      <Seccion id="uso" titulo="Ahora mismo" descripcion="Sin contar las cuentas de la plataforma.">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+          {[
+            [s.uso.usuarios, 'Cuentas activas'],
+            [s.uso.sesiones, 'Sesiones abiertas'],
+            [s.uso.dispositivosPush, 'Teléfonos con avisos'],
+            [s.uso.invitaciones, 'Invitaciones pendientes'],
+          ].map(([n, t]) => (
+            <div key={t}>
+              <dt className="text-xs font-medium text-apagado">{t}</dt>
+              <dd className="mt-1 text-[1.6rem] font-semibold leading-none tracking-tight tabular-nums">{n}</dd>
+            </div>
+          ))}
+        </dl>
+      </Seccion>
+      <Seccion id="cobro" titulo="Cobro" descripcion="La suscripción mensual de cada empresa, con Mercado Pago.">
+        <Fila titulo="Mercado Pago" ayuda={s.cobro ? `${dinero(s.precioMensual)} ${s.moneda} al mes por empresa.` : 'Sin MP_ACCESS_TOKEN y MP_PRECIO_MENSUAL nadie puede suscribirse; la app funciona igual.'}>
+          {listo(s.cobro, 'Activo', 'Sin configurar')}
+        </Fila>
+        <Fila titulo="Avisos de pago firmados" ayuda="MP_WEBHOOK_SECRET: el servidor sólo cree los avisos de Mercado Pago que vienen firmados.">
+          {listo(s.webhookFirmado, 'Activos', 'Falta la clave')}
+        </Fila>
+      </Seccion>
+      <Seccion id="comunicacion" titulo="Correo y avisos" descripcion="Lo que la plataforma manda a las empresas y a sus repartidores.">
+        <Fila titulo="Correo" ayuda={s.correo ? `Sale como ${s.remitente}.` : 'Sin RESEND_API_KEY no salen invitaciones ni códigos (fuera de producción van a la consola).'}>
+          {listo(s.correo, 'Activo', 'Sin configurar')}
+        </Fila>
+        <Fila titulo="Notificaciones push" ayuda="Claves VAPID (npm run push:claves): avisos de pedidos urgentes y cambios de ruta en los teléfonos.">
+          {listo(s.push, 'Activas', 'Sin configurar')}
+        </Fila>
+        <Fila titulo="Invitaciones" ayuda="Cuánto vale el enlace que reciben los administradores y repartidores nuevos.">
+          <span className="text-sm font-semibold tabular-nums">{s.invitacionDias} días</span>
+        </Fila>
+      </Seccion>
+      <Seccion id="acceso" titulo="Acceso" descripcion="Cómo se protegen las cuentas de todas las empresas.">
+        <Fila titulo="Sesión" ayuda="Cuánto dura una sesión sin volver a escribir la contraseña, y cada cuánto se renueva el permiso de acceso.">
+          <span className="text-sm font-semibold tabular-nums">{s.seguridad.sesionDias} días · {s.seguridad.accesoMinutos} min</span>
+        </Fila>
+        <Fila titulo="Intentos fallidos" ayuda="Tras estos intentos seguidos con una cuenta desde una conexión, esa conexión espera antes de volver a probar.">
+          <span className="text-sm font-semibold tabular-nums">{s.seguridad.maxIntentos} intentos · {s.seguridad.bloqueoMinutos} min</span>
+        </Fila>
+        <Fila titulo="Verificación en dos pasos" ayuda="Obligatoria para las cuentas de la plataforma; opcional para las empresas.">
+          {listo(true, 'Obligatoria aquí', '')}
+        </Fila>
+      </Seccion>
+      <Seccion id="entorno" titulo="Entorno" descripcion="Se cambian en las variables de entorno de Vercel y aplican al volver a desplegar.">
+        <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
+          <Dato t="Versión desplegada" v={d.commit ? <span className="font-mono">{d.commit}</span> : 'Local'} />
+          <Dato t="Entorno" v={d.entorno ? ({ production: 'Producción', preview: 'Vista previa', development: 'Desarrollo' } as Record<string, string>)[d.entorno] ?? d.entorno : s.produccion ? 'Producción' : 'Desarrollo'} />
+          <Dato t="Región" v={d.region ?? '—'} />
+          {d.mensaje && <div className="sm:col-span-3"><Dato t="Último cambio" v={d.mensaje} /></div>}
+          <Dato t="Dirección de la app" v={<span className="break-all">{s.urlApp}</span>} />
+          <Dato t="Zona horaria del servidor" v={s.zonaHoraria} />
+          <Dato t="Base de datos" v={`PostgreSQL ${s.base.version} · ${megas(s.base.tamano)}`} />
+        </dl>
+      </Seccion>
     </>
   )
 }

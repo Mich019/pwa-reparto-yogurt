@@ -3,6 +3,7 @@ import { AlertCircle, CreditCard, LogOut, Sparkles } from 'lucide-react'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion } from '../../lib/sesion'
 import { cancelarSuscripcion, suscribirse, type Suscripcion } from '../../lib/suscripcion'
+import { usePlataformaPublica } from '../../lib/plataforma'
 import { LogoEmpresa } from './marca'
 
 // Cobro en el panel: el aviso de días de prueba, la pantalla cuando la prueba o la suscripción se acaban, y la sección
@@ -30,6 +31,7 @@ function useSuscribirse() {
 
 function BotonSuscribirse({ s, grande = false }: { s: Suscripcion; grande?: boolean }) {
   const { yendo, error, ir } = useSuscribirse()
+  const soporte = usePlataformaPublica()?.correoSoporte
   return (
     <div>
       <button
@@ -40,7 +42,11 @@ function BotonSuscribirse({ s, grande = false }: { s: Suscripcion; grande?: bool
       >
         <CreditCard size={grande ? 18 : 16} aria-hidden="true" /> {yendo ? 'Abriendo Mercado Pago…' : 'Suscribirme con Mercado Pago'}
       </button>
-      {!s.cobroDisponible && <p className="mt-2 text-sm text-apagado">El cobro todavía no está disponible. Escríbenos y lo activamos.</p>}
+      {!s.cobroDisponible && (
+        <p className="mt-2 text-sm text-apagado">
+          El cobro todavía no está disponible. {soporte ? <>Escríbenos a <a href={`mailto:${soporte}`} className="font-semibold text-azul hover:underline">{soporte}</a> y lo activamos.</> : 'Escríbenos y lo activamos.'}
+        </p>
+      )}
       {error && <p role="alert" className="mt-2 flex items-center gap-2 text-sm font-medium text-rojo"><AlertCircle size={15} className="shrink-0" /> {error}</p>}
     </div>
   )

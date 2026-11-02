@@ -198,6 +198,13 @@ export function leerConfig() {
     ...leerPush(),
     // Para saber cuál es «hoy» al avisar de cambios en la ruta del día.
     zonaHoraria: leerZona(),
+    // Qué versión corre (Vercel las pone solas); el panel de la plataforma la muestra.
+    despliegue: {
+      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
+      mensaje: process.env.VERCEL_GIT_COMMIT_MESSAGE?.split('\n')[0].slice(0, 120) || null,
+      entorno: process.env.VERCEL_ENV || null,
+      region: process.env.VERCEL_REGION || null,
+    },
   }
 }
 

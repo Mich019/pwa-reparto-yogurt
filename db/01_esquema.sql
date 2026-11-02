@@ -94,6 +94,19 @@ CREATE TABLE usuarios (
 CREATE UNIQUE INDEX usuarios_correo_unico ON usuarios (lower(correo));
 CREATE INDEX usuarios_empresa ON usuarios (id_empresa);
 
+-- Ajustes de la plataforma (migración 014): una sola fila que cambian quienes administran Delisy desde /plataforma.
+-- prueba_dias null = PRUEBA_DIAS del entorno. Las empresas sólo la leen (ver el REVOKE en «Multiempresa»).
+CREATE TABLE plataforma_ajustes (
+  id               boolean PRIMARY KEY DEFAULT true CHECK (id),
+  registro_abierto boolean NOT NULL DEFAULT true,
+  prueba_dias      integer CHECK (prueba_dias BETWEEN 0 AND 365),
+  correo_soporte   varchar(150),
+  anuncio          varchar(280),
+  anuncio_tipo     varchar(10) NOT NULL DEFAULT 'info' CHECK (anuncio_tipo IN ('info', 'aviso')),
+  actualizado_en   timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO plataforma_ajustes DEFAULT VALUES;
+
 -- RF-006: sesiones con refresh token; cerrar sesión = revocar.
 CREATE TABLE sesiones (
   id_sesion          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -590,6 +603,8 @@ BEGIN
   EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT ON SEQUENCES TO reparto_app', current_schema());
   -- No es de ninguna empresa: sólo la usa el registro, antes de que la empresa exista.
   REVOKE ALL ON verificaciones_correo FROM reparto_app;
+  -- De la plataforma: las empresas la leen, no la cambian.
+  REVOKE INSERT, UPDATE, DELETE ON plataforma_ajustes FROM reparto_app;
 END $$;
 
 DO $$
