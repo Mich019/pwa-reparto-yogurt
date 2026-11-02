@@ -56,4 +56,12 @@ describe('marca de la empresa', () => {
     assert.equal((await get(admin, '/empresa')).body.nombre, 'Vencida')
     assert.equal((await cambiar(admin, { nombre: 'Nueva' })).status, 402)
   })
+
+  it('se lee con la contraseña temporal pendiente (si no, quedaba la marca de otra empresa del navegador)', async () => {
+    const empresa = await crearEmpresa('Recién Llegada')
+    const vend = await sesion('vendedor', 'tel', empresa)
+    await db.query(`UPDATE usuarios SET debe_cambiar_password = true WHERE id_usuario = $1`, [vend.id])
+    assert.equal((await get(vend, '/empresa')).body.nombre, 'Recién Llegada')
+    assert.equal((await get(vend, '/sync/pull')).status, 403)
+  })
 })

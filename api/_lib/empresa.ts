@@ -19,7 +19,7 @@ const bodyMarca = z.object({
   contacto: z.string().trim().max(160, 'El contacto es de 160 letras como máximo').nullable().optional(),
 }).refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
 
-export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { requiereSesionSinCobro, requiereAdmin }: { requiereSesionSinCobro: Guardia; requiereAdmin: Guardia }) {
+export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { requiereSesionAunConPasswordPendiente, requiereAdmin }: { requiereSesionAunConPasswordPendiente: Guardia; requiereAdmin: Guardia }) {
   const leer = async (id: string) => {
     const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto FROM empresas WHERE id_empresa = $1`, [id])
     return {
@@ -31,7 +31,8 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
     }
   }
 
-  app.get('/empresa', { preHandler: requiereSesionSinCobro }, async (req) => leer(req.usuario.empresa))
+  // También con la contraseña temporal pendiente o sin suscripción: desde la primera pantalla se ve la marca de su empresa.
+  app.get('/empresa', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => leer(req.usuario.empresa))
 
   app.patch('/empresa', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyMarca.safeParse(req.body)

@@ -151,7 +151,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasDosPasos(app, ctx, { requiereSesion })
   await rutasRecuperacion(app, ctx)
   await rutasRegistro(app, ctx, { requiereAdmin })
-  await rutasEmpresa(app, ctx, { requiereSesionSinCobro, requiereAdmin })
+  await rutasEmpresa(app, ctx, { requiereSesionAunConPasswordPendiente, requiereAdmin })
   // Cruza empresas: con la conexión sin envolver (dueño de la base), no la de la empresa de quien llama.
   await rutasPlataforma(app, { db: entrada.db, config: ctx.config }, { requiereSesionSinCobro })
   await rutasSuscripcion(app, ctx, ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config), { requiereAdminSinCobro })

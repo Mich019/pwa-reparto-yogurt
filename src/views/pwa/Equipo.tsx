@@ -11,6 +11,7 @@ import { hace } from '../../lib/fechas'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
+import { usePaginas } from '../../components/Paginas'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
@@ -63,6 +64,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   // Panel: como Clientes, busca por nombre o correo y muestra una lista a la vez (activas o dadas de baja).
   const t = q.trim().toLowerCase()
   const lista = (verBaja ? deBaja : activos).filter((m) => !t || `${m.nombre} ${m.correo}`.toLowerCase().includes(t))
+  const vista = usePaginas(panel ? lista : activos, 30, `${t}|${verBaja}`)
 
   const fila =(m: Miembro) => (
     <button key={m.id} onClick={() => setFichaId(m.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left transition-colors hover:bg-niebla/40 active:bg-niebla">
@@ -136,13 +138,14 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
         )}
 
         {panel ? (
-          <div className={columnas}>
-            {equipo && lista.map(fila)}
+          <div ref={vista.ancla} className={`${columnas} scroll-mt-4`}>
+            {equipo && vista.visibles.map(fila)}
             {equipo && !lista.length && (
               <div className="py-12 text-center text-apagado lg:col-span-2">{t ? 'Sin resultados' : verBaja ? 'Nadie dado de baja.' : 'Todavía no hay cuentas activas.'}</div>
             )}
+            {vista.control}
           </div>
-        ) : <div className={columnas}>{activos.map(fila)}</div>}
+        ) : <div ref={vista.ancla} className="scroll-mt-4">{vista.visibles.map(fila)}{vista.control}</div>}
 
         {!panel && deBaja.length > 0 && (
           <>
@@ -454,6 +457,7 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
     const t = q.trim().toLowerCase()
     return locales.filter((c: Cliente) => (c.vendedorId ?? SIN_VENDEDOR) === desde && (!t || `${c.nombre} ${c.direccion}`.toLowerCase().includes(t)))
   }, [locales, desde, q])
+  const pagina = usePaginas(delOrigen, 40, `${q}|${desde}`)
 
   const cuantos = modo === 'toda' ? total : elegidos.size
   const nombreDestino = hacia === SIN_VENDEDOR ? 'a sin vendedor' : `a ${equipo.find((m) => m.id === hacia)?.nombre ?? ''}`
@@ -522,8 +526,8 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
                 {elegidos.size === delOrigen.length && delOrigen.length > 0 ? 'Quitar todos' : 'Elegir todos'}
               </button>
             </div>
-            <ul className="mt-1">
-              {delOrigen.map((c) => (
+            <ul ref={pagina.ancla} className="mt-1 scroll-mt-4">
+              {pagina.visibles.map((c) => (
                 <li key={c.id}>
                   <button onClick={() => alternar(c.id)} aria-pressed={elegidos.has(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3 text-left active:bg-niebla">
                     <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${elegidos.has(c.id) ? 'border-tinta bg-tinta text-white' : 'border-linea'}`}>{elegidos.has(c.id) && <Check size={16} />}</span>
@@ -534,6 +538,7 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
                   </button>
                 </li>
               ))}
+              {pagina.control && <li>{pagina.control}</li>}
               {delOrigen.length === 0 && <li className="py-6 text-center text-sm text-apagado">{locales.length ? 'Sin clientes que mostrar' : 'Este teléfono todavía no descarga los clientes. Sincroniza y vuelve a intentar.'}</li>}
             </ul>
           </div>

@@ -7,6 +7,7 @@ import {
 } from '../../lib/codigos'
 import { iniciarNfc, nfcDisponible } from '../../lib/escaneo'
 import { mostrarPdf } from '../../components/VisorPdf'
+import { usePaginas } from '../../components/Paginas'
 import { Boton, Hoja, aviso, claseInput } from '../../components/ui'
 
 // El QR del cliente en pantalla, como vector.
@@ -200,6 +201,7 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
 
   const t = q.trim().toLowerCase()
   const visibles = activos.filter((c) => !t || `${c.nombre} ${c.direccion}`.toLowerCase().includes(t))
+  const paginas = usePaginas(visibles, 50, t)
   const todosVisibles = visibles.length > 0 && visibles.every((c) => elegidos.has(c.id))
   const alternar = (id: string) => setElegidos((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const alternarVisibles = () => setElegidos((s) => {
@@ -235,8 +237,10 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
         <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente" className={`${claseInput} pl-11`} />
       </div>
-      <button onClick={alternarVisibles} className="mb-1 py-2 text-sm font-semibold text-azul">{todosVisibles ? 'Quitar la selección' : 'Elegir todos'}</button>
-      {visibles.map((c) => {
+      {/* «Elegir todos» toma todos los que coinciden con la búsqueda, no sólo los de esta página. */}
+      <button onClick={alternarVisibles} className="mb-1 py-2 text-sm font-semibold text-azul">{todosVisibles ? 'Quitar la selección' : `Elegir todos (${visibles.length})`}</button>
+      <div ref={paginas.ancla} className="scroll-mt-4" />
+      {paginas.visibles.map((c) => {
         const on = elegidos.has(c.id)
         return (
           <button key={c.id} onClick={() => alternar(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3 text-left active:bg-niebla">
@@ -248,6 +252,7 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
           </button>
         )
       })}
+      {paginas.control}
       {visibles.length === 0 && <div className="py-10 text-center text-apagado">{activos.length ? 'Sin resultados' : 'No hay clientes activos'}</div>}
     </Hoja>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownUp, ArrowLeft, Building2, CalendarDays, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
+import { usePaginas } from '../../components/Paginas'
 import { desdeIso, dinero, hoy as hoyLocal } from '../../lib/fechas'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
@@ -352,6 +353,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
       .filter((e) => f.cumple(e) && (!q || e.nombre.toLowerCase().includes(q) || (e.contacto ?? '').toLowerCase().includes(q)))
       .sort((a, b) => orden === 'nombre' ? a.nombre.localeCompare(b.nombre, 'es') : orden === 'pedidos' ? b.pedidos30 - a.pedidos30 : orden === 'clientes' ? b.clientes - a.clientes : b.alta.localeCompare(a.alta))
   }, [d.empresas, busca, filtro, orden])
+  const pagina = usePaginas(lista, 25, `${busca}|${filtro}|${orden}`)
   const columna = (clave: Orden, texto: string, der = false) => (
     <th scope="col" className={`px-4 py-3 font-medium ${der ? 'text-right' : ''}`}>
       <button type="button" onClick={() => setOrden(clave)} className={`inline-flex items-center gap-1 ${orden === clave ? 'text-tinta' : ''} ${anillo}`}>
@@ -384,7 +386,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div ref={pagina.ancla} className="scroll-mt-4 overflow-x-auto">
         <table className="w-full min-w-[56rem] text-left text-sm">
           <thead className="text-xs text-apagado">
             <tr>
@@ -400,7 +402,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-linea border-y border-linea">
-            {lista.map((e) => (
+            {pagina.visibles.map((e) => (
               <tr key={e.id} onClick={() => ir({ de: 'empresa', id: e.id })} className="cursor-pointer hover:bg-niebla/60">
                 <td className="px-4 py-3">
                   <button type="button" onClick={() => ir({ de: 'empresa', id: e.id })} className={`block text-left ${anillo}`}>
@@ -422,6 +424,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
           </tbody>
         </table>
       </div>
+      {pagina.control}
     </>
   )
 }

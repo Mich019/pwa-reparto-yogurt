@@ -11,6 +11,7 @@ export interface Marca {
   logo: string | null
   lema?: string | null // en los PDF; falta en la copia guardada antes de la migración 013
   contacto?: string | null
+  de?: string // id de la cuenta con la que se guardó la copia
 }
 
 const CLAVE = 'marca-empresa'
@@ -25,9 +26,9 @@ const leerCopia = (): Marca | null => {
 let actual: Marca | null = leerCopia()
 let deQuien: string | undefined
 const oyentes = new Set<() => void>()
-function fijar(m: Marca) {
+function fijar(m: Marca | null) {
   actual = m
-  try { localStorage.setItem(CLAVE, JSON.stringify(m)) } catch { /* sin almacenamiento: sólo no se recuerda */ }
+  try { if (m) localStorage.setItem(CLAVE, JSON.stringify(m)); else localStorage.removeItem(CLAVE) } catch { /* sin almacenamiento: sólo no se recuerda */ }
   oyentes.forEach((f) => f())
 }
 
@@ -50,12 +51,14 @@ export function useCargarMarca(idUsuario: string | undefined) {
   useEffect(() => {
     if (!idUsuario || idUsuario === deQuien) return
     deQuien = idUsuario
-    llamarAutenticado<Marca>('/empresa').then(fijar).catch(() => {})
+    // La copia de otra cuenta puede ser de otra empresa: no se muestra mientras llega la de ésta.
+    if (actual && actual.de !== idUsuario) fijar(null)
+    llamarAutenticado<Marca>('/empresa').then((m) => fijar({ ...m, de: idUsuario })).catch(() => {})
   }, [idUsuario])
 }
 
 export async function guardarMarca(cambios: Partial<Marca>) {
-  fijar(await llamarAutenticado<Marca>('/empresa', { metodo: 'PATCH', cuerpo: cambios }))
+  fijar({ ...(await llamarAutenticado<Marca>('/empresa', { metodo: 'PATCH', cuerpo: cambios })), de: deQuien })
 }
 
 // --- Color: el de la empresa en los botones y acentos, oscurecido si hace falta para que el texto blanco se lea. ---
