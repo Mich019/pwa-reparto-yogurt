@@ -171,6 +171,10 @@ export function leerConfig() {
     // al dueño de la cuenta desde otro lado, ni probar contraseñas en muchas cuentas.
     maxIntentos: 5,
     maxIntentosIp: 15,
+    // Una sola cuenta probada desde muchas conexiones: con 30 fallidos (de todas) en la ventana, sólo entra desde una
+    // conexión donde ya había entrado bien en los últimos 30 días; las demás esperan. Recuperar la contraseña sigue igual.
+    maxIntentosCuenta: 30,
+    diasIpConocida: 30,
     bloqueoMinutos: 15,
     // RF-002: recuperación por correo con Resend. Sin RESEND_API_KEY, fuera de producción el código sale en la consola.
     produccion,

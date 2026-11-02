@@ -23,6 +23,7 @@ import { CON_ACCESO, rutasSuscripcion, SUSCRIPCION_VENCIDA } from './suscripcion
 import { rutasEmpresa } from './empresa.js'
 import { rutasPlataforma } from './plataforma.js'
 import { ipCliente } from './seguridad.js'
+import { almacenLimites } from './limites.js'
 
 export type Rol = 'administrador' | 'vendedor'
 export interface Usuario {
@@ -81,7 +82,11 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   })
 
   await app.register(cors, { origin: ctx.config.corsOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] })
-  await app.register(rateLimit, { global: false, allowList: () => ctx.config.sinLimiteDePeticiones, keyGenerator: (req) => ipCliente(req, ctx.config) })
+  // Contadores en la base (limites.ts), con el pool sin empresa: el límite corre antes de saber quién llama.
+  await app.register(rateLimit, {
+    global: false, store: almacenLimites(entrada.db), skipOnError: true,
+    allowList: () => ctx.config.sinLimiteDePeticiones, keyGenerator: (req) => ipCliente(req, ctx.config),
+  })
   await app.register(jwt, {
     secret: ctx.config.jwtSecret,
     sign: { algorithm: 'HS256', expiresIn: `${ctx.config.accesoMinutos}m` },

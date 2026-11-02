@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownUp, ArrowLeft, Building2, CalendarDays, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { desdeIso, dinero, hoy as hoyLocal } from '../../lib/fechas'
+import { copiarDelicado } from '../../lib/portapapeles'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { useAplicarPreferencias } from '../../lib/tema'
 import { Avatar } from '../../components/Avatar'
@@ -672,7 +673,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
           <p className="mt-1 text-sm text-apagado">Si no le llega el correo, mándale este enlace por WhatsApp. Vence en {hecha.dias} días y sirve una sola vez.</p>
           <div className="mt-4 flex items-center gap-2 rounded-lg bg-niebla p-3">
             <code className="min-w-0 flex-1 truncate text-sm">{hecha.enlace}</code>
-            <button type="button" onClick={() => void navigator.clipboard?.writeText(hecha.enlace).then(() => aviso('Enlace copiado'))} className={botonSuave}><Copy size={15} aria-hidden="true" /> Copiar</button>
+            <button type="button" onClick={() => void copiarDelicado(hecha.enlace).then(() => aviso('Enlace copiado'), () => {})} className={botonSuave}><Copy size={15} aria-hidden="true" /> Copiar</button>
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
             <button type="button" onClick={() => ir({ de: 'empresa', id: hecha.id })} className={botonPrimario}>Ver la empresa</button>
@@ -795,7 +796,7 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
                 <div><span className="text-apagado">Correo:</span> <b>{creada.correo}</b></div>
                 <div className="flex items-center gap-2">
                   <span className="text-apagado">Contraseña temporal:</span> <b className="font-mono">{creada.passwordTemporal}</b>
-                  <button type="button" onClick={() => void navigator.clipboard?.writeText(creada.passwordTemporal).then(() => aviso('Copiada'))} aria-label="Copiar contraseña" className="grid h-8 w-8 place-items-center rounded-full hover:bg-linea"><Copy size={15} /></button>
+                  <button type="button" onClick={() => void copiarDelicado(creada.passwordTemporal).then(() => aviso('Copiada'), () => {})} aria-label="Copiar contraseña" className="grid h-8 w-8 place-items-center rounded-full hover:bg-linea"><Copy size={15} /></button>
                 </div>
               </div>
               <p className="text-xs text-apagado">No se vuelve a mostrar.</p>

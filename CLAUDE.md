@@ -48,6 +48,8 @@ Demo accounts (with `04_datos_demo.sql` / `--demo`): `admin@yogurt.local`, `vend
 - `administrador` vs `vendedor`. Sellers only see their own portfolio and **never receive costs/margins** — the server omits them; reports, stock capture and team management are admin-only routes.
 - Own profile: `PATCH /me` (name, phone, `foto`; never email or role), `GET /me/sesiones` + `POST /me/sesiones/cerrar` (never the current one). The profile photo (`usuarios.foto`, migration 012) is a 256 px WEBP data URL (JPEG fallback) framed by the user in a crop sheet (`EncuadreFoto` in `components/Avatar.tsx`, drawing in `src/lib/imagen.ts`); it is not in the login response — `refrescarPerfil()` loads it into the session. Show people with `components/Avatar.tsx`.
 - Every authenticated request re-checks `sesiones` + `usuarios.activo` in the DB (so logout/deactivation is immediate). `debe_cambiar_password` blocks everything except password change.
+- Rate limits (`@fastify/rate-limit`, per route) count in Postgres (`api/_lib/limites.ts`, UNLOGGED table `limites_peticion`, migration 017), not in memory: Vercel runs several instances. Login lockout (`intentos_login`, `registrarIntento` in `auth.ts`) is per IP + account, plus a cross-IP cap per account (`maxIntentosCuenta`) that spares IPs that logged in successfully recently (`diasIpConocida`), so an attacker can't lock the owner out.
+- Copy secrets (temporary passwords, invitation links, 2FA keys, backup codes) with `copiarDelicado` (`src/lib/portapapeles.ts`), which clears the clipboard after 60 s.
 - Inside transactions the API sets `SET LOCAL app.id_usuario` for DB-trigger auditing, and `SET LOCAL app.permitir_correccion = 'on'` to edit a closed order. Admin-count changes are serialized with `pg_advisory_xact_lock`.
 
 ### Multi-company (tenancy)
@@ -75,6 +77,6 @@ Demo accounts (with `04_datos_demo.sql` / `--demo`): `admin@yogurt.local`, `vend
 
 ### Deployment
 - Production target: app + API on Vercel, PostgreSQL on Railway — step by step in `docs/produccion-railway.md`.
-- `vercel.json`: Vite static build + the `api/index.ts` function. `.github/workflows/pages.yml` also deploys `dist/` to GitHub Pages (with `VITE_API_URL` from the repo variable `API_URL`); `server.yml` runs typecheck + API tests on changes to `api/`, `db/` or package files.
+- `vercel.json`: Vite static build + the `api/index.ts` function. It also sets the app pages' CSP: a new external origin (another OSRM or tile server, `VITE_API_URL` on another domain) must be added to its `connect-src`/`img-src`. `.github/workflows/pages.yml` also deploys `dist/` to GitHub Pages (with `VITE_API_URL` from the repo variable `API_URL`); `server.yml` runs typecheck + API tests on changes to `api/`, `db/` or package files.
 
 Note: some READMEs still refer to an old `server/` folder; the API now lives in `api/`.

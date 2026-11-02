@@ -181,7 +181,9 @@ CREATE TABLE invitaciones (
 CREATE INDEX invitaciones_empresa ON invitaciones (id_empresa);
 
 -- RF-003: registro de intentos de inicio de sesión. Los límites cuentan por cuenta + IP y por IP (api/_lib/auth.ts):
--- así nadie bloquea la cuenta de otro desde fuera ni prueba contraseñas en muchas cuentas.
+-- así nadie bloquea la cuenta de otro desde fuera ni prueba contraseñas en muchas cuentas. Además un tope por cuenta
+-- sumando todas las IPs frena a quien prueba una sola cuenta desde muchas; ese tope no aplica en una IP donde la cuenta
+-- ya entró bien hace poco, para que su dueño no quede fuera.
 CREATE TABLE intentos_login (
   id_intento  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   correo      varchar(150) NOT NULL,
@@ -192,6 +194,15 @@ CREATE TABLE intentos_login (
 );
 CREATE INDEX intentos_login_correo ON intentos_login (lower(correo), creado_en DESC);
 CREATE INDEX intentos_login_ip ON intentos_login (ip, creado_en DESC);
+
+-- Contadores de los límites de peticiones (api/_lib/limites.ts), compartidos por todas las instancias de la API.
+-- UNLOGGED: son de minutos; perderlos en un reinicio no importa.
+CREATE UNLOGGED TABLE limites_peticion (
+  clave   text PRIMARY KEY,
+  cuenta  integer NOT NULL,
+  vence   timestamptz NOT NULL
+);
+CREATE INDEX limites_peticion_vence ON limites_peticion (vence);
 
 -- Verificación en dos pasos (TOTP). Aparte de usuarios: su bitácora copia la fila entera y guardaría el secreto.
 -- El secreto va cifrado con una clave derivada de AUTH_PEPPER_SECRET (api/_lib/dosPasos.ts).

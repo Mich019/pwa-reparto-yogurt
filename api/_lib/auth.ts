@@ -41,22 +41,36 @@ const EMPRESA_SUSPENDIDA = { error: 'La cuenta de tu empresa está suspendida. H
 // (si resulta correcta, se marca como bueno). Contar y registrar va bajo un candado por IP: los intentos simultáneos
 // se forman y no se cuelan en paralelo. Se cuenta igual exista o no la cuenta, así el bloqueo no dice cuáles existen.
 // Fallidos que cuentan: los de esa cuenta desde esa IP después de su último acceso bueno desde ahí o de su último
-// cambio de contraseña, y todos los de esa IP, dentro de la ventana. null = bloqueado.
+// cambio de contraseña, y todos los de esa IP, dentro de la ventana. Aparte, los de esa cuenta desde cualquier IP
+// (después de su último acceso bueno o cambio de contraseña): pasado maxIntentosCuenta frena a quien la prueba desde
+// muchas IPs, pero no en una IP donde la cuenta entró bien en los últimos días, para que su dueño no quede fuera.
+// null = bloqueado.
 async function registrarIntento(db: Db, config: Config, intento: { correo: string; ip: string; idUsuario?: string; passwordCambiadoEn?: Date }) {
   return tx(db, null, async (c) => {
+    // Siempre en este orden (IP y luego cuenta), así dos intentos no se esperan en cruz.
     await c.query(`SELECT pg_advisory_xact_lock(hashtext('login:' || $1))`, [intento.ip])
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('login-cuenta:' || lower($1)))`, [intento.correo])
     const { rows: [f] } = await c.query(
       `WITH recientes AS (
          SELECT lower(correo) = lower($2) AS misma, exitoso, creado_en
-           FROM intentos_login WHERE ip = $1 AND creado_en > now() - make_interval(mins => $3))
+           FROM intentos_login WHERE ip = $1 AND creado_en > now() - make_interval(mins => $3)),
+       de_la_cuenta AS (
+         SELECT exitoso, creado_en FROM intentos_login
+          WHERE lower(correo) = lower($2) AND creado_en > now() - make_interval(mins => $3))
        SELECT count(*) FILTER (WHERE NOT exitoso)::int AS de_la_ip,
               count(*) FILTER (WHERE misma AND NOT exitoso
                                  AND creado_en > COALESCE((SELECT max(creado_en) FROM recientes WHERE misma AND exitoso), '-infinity')
-                                 AND creado_en > COALESCE($4::timestamptz, '-infinity'))::int AS de_la_cuenta
+                                 AND creado_en > COALESCE($4::timestamptz, '-infinity'))::int AS de_la_cuenta,
+              (SELECT count(*) FROM de_la_cuenta WHERE NOT exitoso
+                  AND creado_en > COALESCE((SELECT max(creado_en) FROM de_la_cuenta WHERE exitoso), '-infinity')
+                  AND creado_en > COALESCE($4::timestamptz, '-infinity'))::int AS de_la_cuenta_total,
+              EXISTS (SELECT 1 FROM intentos_login WHERE lower(correo) = lower($2) AND ip = $1 AND exitoso
+                         AND creado_en > now() - make_interval(days => $5)) AS ip_conocida
          FROM recientes`,
-      [intento.ip, intento.correo, config.bloqueoMinutos, intento.passwordCambiadoEn ?? null],
+      [intento.ip, intento.correo, config.bloqueoMinutos, intento.passwordCambiadoEn ?? null, config.diasIpConocida],
     )
     if (f.de_la_cuenta >= config.maxIntentos || f.de_la_ip >= config.maxIntentosIp) return null
+    if (f.de_la_cuenta_total >= config.maxIntentosCuenta && !f.ip_conocida) return null
     const { rows: [r] } = await c.query(
       `INSERT INTO intentos_login (correo, id_usuario, exitoso, ip) VALUES ($1, $2, false, $3) RETURNING id_intento`,
       [intento.correo.slice(0, 150), intento.idUsuario ?? null, intento.ip],

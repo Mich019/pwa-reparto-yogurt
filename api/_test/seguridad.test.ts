@@ -6,6 +6,7 @@ import { construirApp } from '../_lib/app.js'
 import { leerConfig } from '../_lib/config.js'
 import { verificarPassword } from '../_lib/contrasenas.js'
 import { app, config, crearUsuario, db, ipAleatoria, login, PASSWORD, sesion } from './ayuda.js'
+import { almacenLimites } from '../_lib/limites.js'
 
 after(async () => { await app.close(); await db.end() })
 
@@ -210,5 +211,54 @@ describe('respuestas de la API', () => {
     const ops = [0, 1].map(() => ({ id: randomUUID(), tabla: 'clientes', registroId: randomUUID(), op: 'put', ts: Date.now(), datos: { relleno } }))
     const sync = await app.inject({ method: 'POST', url: '/sync/push', headers: { authorization: `Bearer ${s.token}` }, payload: { dispositivo: 'x', ahoraCliente: Date.now(), operaciones: ops } })
     assert.equal(sync.statusCode, 200)
+  })
+})
+
+describe('tope por cuenta desde muchas conexiones', () => {
+  it('pasado el tope, una conexión nueva espera; donde la cuenta ya entró bien, su dueño sigue entrando', async () => {
+    const u = await crearUsuario('vendedor')
+    const conocida = ipAleatoria()
+    assert.equal((await login(u.correo, PASSWORD, 'x', conocida)).status, 200)
+    // 4 fallidos por conexión: nunca llega al bloqueo de cuenta + IP (5), sólo al tope de la cuenta.
+    const ips = Array.from({ length: Math.ceil(config.maxIntentosCuenta / 4) }, ipAleatoria)
+    for (let i = 0; i < config.maxIntentosCuenta; i++) assert.equal((await login(u.correo, 'mala-clave-1', 'x', ips[Math.floor(i / 4)])).status, 401)
+    assert.equal((await login(u.correo, PASSWORD, 'x', ipAleatoria())).status, 429)
+    assert.equal((await login(u.correo, PASSWORD, 'x', conocida)).status, 200)
+  })
+})
+
+describe('límites de peticiones en la base (todas las instancias suman juntas)', () => {
+  type Almacen = { incr: (k: string, cb: (e: Error | null, r?: { current: number; ttl: number }) => void, ventana: number, max: number) => void }
+  const sumar = (a: Almacen, clave: string, ventana = 60_000) =>
+    new Promise<{ current: number; ttl: number }>((ok, mal) => a.incr(clave, (e, r) => (e ? mal(e) : ok(r!)), ventana, 5))
+  const ruta = (method: string, url: string) => new (almacenLimites(db))().child({ routeInfo: { method, url } }) as Almacen
+
+  it('dos instancias cuentan en el mismo renglón, cada ruta aparte, y la ventana vencida empieza de nuevo', async () => {
+    const clave = ipAleatoria()
+    const [a, b, otra] = [ruta('POST', '/auth/recuperar'), ruta('POST', '/auth/recuperar'), ruta('POST', '/auth/login')]
+    assert.equal((await sumar(a, clave)).current, 1)
+    assert.equal((await sumar(b, clave)).current, 2)
+    assert.equal((await sumar(otra, clave)).current, 1)
+    const r = await sumar(a, clave)
+    assert.equal(r.current, 3)
+    assert.ok(r.ttl > 0 && r.ttl <= 60_000)
+    const corta = ruta('GET', `/corta-${randomUUID()}`)
+    await sumar(corta, clave, 50)
+    await new Promise((ok) => setTimeout(ok, 150))
+    assert.equal((await sumar(corta, clave, 50)).current, 1)
+  })
+
+  it('la API con límites responde 429 al pasarse, contando en la base', async () => {
+    const srv = await construirApp({ db, config: { ...config, sinLimiteDePeticiones: false } })
+    try {
+      const ip = ipAleatoria()
+      const pedir = () => srv.inject({ method: 'POST', url: '/auth/recuperar', payload: { correo: nadie() }, remoteAddress: ip })
+      for (let i = 0; i < 5; i++) assert.notEqual((await pedir()).statusCode, 429)
+      assert.equal((await pedir()).statusCode, 429)
+      const { rows } = await db.query(`SELECT cuenta FROM limites_peticion WHERE clave LIKE '%/auth/recuperar:' || $1`, [ip])
+      assert.equal(rows[0]?.cuenta, 6)
+    } finally {
+      await srv.close()
+    }
   })
 })

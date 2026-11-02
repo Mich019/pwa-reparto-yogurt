@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Copy, Download, KeyRound, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { ErrorRed } from '../../lib/api'
 import { descargarArchivo } from '../../lib/pdf'
+import { copiarDelicado } from '../../lib/portapapeles'
 import { llamarAutenticado, useRol } from '../../lib/sesion'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { ImagenQR } from './CodigosCliente'
@@ -135,7 +136,7 @@ function Configurar({ secreto, uri, onActivada, onCerrar }: { secreto: string; u
           <p className="mt-3 text-apagado">¿Estás en el mismo teléfono? Copia esta clave y pégala en la app («Ingresar clave de configuración»):</p>
           <button
             type="button"
-            onClick={() => navigator.clipboard?.writeText(secreto).then(() => aviso('Clave copiada'), () => {})}
+            onClick={() => copiarDelicado(secreto).then(() => aviso('Clave copiada'), () => {})}
             className="mt-1 flex w-full items-center justify-between gap-2 rounded-md bg-niebla px-3 py-2.5 text-left font-mono text-xs break-all active:bg-linea"
           >
             {secreto.match(/.{1,4}/g)?.join(' ')} <Copy size={16} className="shrink-0" />
@@ -165,7 +166,7 @@ function CodigosRespaldo({ codigos, onCerrar }: { codigos: string[]; onCerrar: (
           {codigos.map((c) => <span key={c} className="text-center">{c}</span>)}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <Boton variante="secundario" onClick={() => navigator.clipboard?.writeText(texto).then(() => aviso('Códigos copiados'), () => {})}><Copy size={18} /> Copiar</Boton>
+          <Boton variante="secundario" onClick={() => copiarDelicado(texto).then(() => aviso('Códigos copiados'), () => {})}><Copy size={18} /> Copiar</Boton>
           <Boton variante="secundario" onClick={() => descargarArchivo(new Blob([texto], { type: 'text/plain;charset=utf-8' }), 'codigos-respaldo-delisy.txt')}><Download size={18} /> Descargar</Boton>
         </div>
       </div>

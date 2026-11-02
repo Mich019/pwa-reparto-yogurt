@@ -8,6 +8,7 @@ import {
   type Miembro,
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
+import { copiarDelicado } from '../../lib/portapapeles'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
@@ -403,7 +404,7 @@ function ClaveTemporal({ datos, onCerrar }: { datos: DatosClave; onCerrar: () =>
 
   async function copiar(que: string, aviso_: string) {
     try {
-      await navigator.clipboard.writeText(que)
+      await copiarDelicado(que)
       setCopiado(true)
       aviso(aviso_)
     } catch {
