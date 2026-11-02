@@ -114,7 +114,7 @@ export function Plataforma() {
         <div className="flex items-center justify-between px-5 pt-5 pb-3 lg:pb-6">
           <LogoDelisy className="h-8" />
           <span className="flex items-center gap-1">
-            <span className="rounded-full bg-[var(--plat)] px-2.5 py-1 text-[11px] font-semibold text-white">Plataforma</span>
+            <span className="rounded-md bg-[var(--plat)] px-2.5 py-1 text-[11px] font-semibold text-white">Plataforma</span>
             <button type="button" onClick={() => void cerrarSesion()} aria-label="Cerrar sesión" className={`grid h-10 w-10 place-items-center rounded-full text-apagado hover:text-rojo lg:hidden ${anillo}`}><LogOut size={18} aria-hidden="true" /></button>
           </span>
         </div>
@@ -125,7 +125,7 @@ export function Plataforma() {
               type="button"
               onClick={() => ir({ de } as Vista)}
               aria-current={activo === de ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors ${anillo} ${activo === de ? 'bg-[var(--plat)] text-white' : 'text-tinta hover:bg-niebla'}`}
+              className={`flex shrink-0 items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold transition-colors ${anillo} ${activo === de ? 'bg-[var(--plat)] text-white' : 'text-tinta hover:bg-niebla'}`}
             >
               <Icono size={18} aria-hidden="true" /> {texto}
             </button>
@@ -137,11 +137,11 @@ export function Plataforma() {
       {/* En Configuración, como en el panel: título y menú fijos, sólo se desplaza el apartado. */}
       <main className={`min-w-0 ${vista.de === 'config' ? 'pt-4 pb-20 lg:h-dvh lg:overflow-hidden lg:pb-0' : 'px-4 pt-6 pb-20 sm:px-8 lg:px-10 lg:pt-8'}`}>
         {error && vista.de !== 'config' && (
-          <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rojo/10 px-5 py-4 text-sm font-medium text-rojo">
+          <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-rojo/10 px-5 py-4 text-sm font-medium text-rojo">
             {error}
             <span className="flex gap-2">
-              {/^Activa la verificación/.test(error) && <button type="button" onClick={() => ir({ de: 'config' })} className="rounded-full bg-papel px-4 py-2 font-semibold text-tinta">Ir a Configuración</button>}
-              <button type="button" onClick={() => void cargar()} className="rounded-full bg-papel px-4 py-2 font-semibold text-tinta">Reintentar</button>
+              {/^Activa la verificación/.test(error) && <button type="button" onClick={() => ir({ de: 'config' })} className="rounded-md bg-papel px-4 py-2 font-semibold text-tinta">Ir a Configuración</button>}
+              <button type="button" onClick={() => void cargar()} className="rounded-md bg-papel px-4 py-2 font-semibold text-tinta">Reintentar</button>
             </span>
           </div>
         )}
@@ -221,7 +221,7 @@ function Cifras({ cifras }: { cifras: { valor: string; etiqueta: string; nota?: 
 function ChipEstado({ estado }: { estado: Estado }) {
   const e = ESTADOS[estado]
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-niebla px-2.5 py-1 text-xs font-semibold">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-niebla px-2.5 py-1 text-xs font-semibold">
       <span className="h-2 w-2 rounded-full" style={{ background: e.color }} aria-hidden="true" />{e.texto}
     </span>
   )
@@ -313,8 +313,8 @@ function ListaEmpresas({ empresas, vacia, ir, dato }: { empresas: Empresa[]; vac
     <ul className="-mx-2">
       {empresas.map((e) => (
         <li key={e.id}>
-          <button type="button" onClick={() => ir({ de: 'empresa', id: e.id })} className={`flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-niebla ${anillo}`}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-niebla text-sm font-bold">{e.nombre.charAt(0).toUpperCase()}</span>
+          <button type="button" onClick={() => ir({ de: 'empresa', id: e.id })} className={`flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-niebla ${anillo}`}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-niebla text-sm font-bold">{e.nombre.charAt(0).toUpperCase()}</span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{e.nombre}</span>
               <span className="block truncate text-xs text-apagado">{e.contacto ?? 'Sin administrador'}</span>
@@ -374,7 +374,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
             const n = d.empresas.filter(f.cumple).length
             return (
               <button key={f.clave} type="button" onClick={() => setFiltro(f.clave)} aria-pressed={filtro === f.clave}
-                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${filtro === f.clave ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>
+                className={`rounded-md px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${filtro === f.clave ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>
                 {f.texto} <span className="tabular-nums opacity-70">{n}</span>
               </button>
             )
@@ -456,7 +456,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
   }
 
   const volver = <button type="button" onClick={() => ir({ de: 'empresas' })} className={`mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-apagado hover:text-tinta ${anillo}`}><ArrowLeft size={16} aria-hidden="true" /> Empresas</button>
-  if (error) return <>{volver}<p role="alert" className="rounded-2xl bg-rojo/10 p-5 text-rojo">{error}</p></>
+  if (error) return <>{volver}<p role="alert" className="rounded-lg bg-rojo/10 p-5 text-rojo">{error}</p></>
   if (!e) return <>{volver}<p className="py-20 text-center text-apagado">Cargando la empresa…</p></>
   const suspendida = e.estado === 'suspendida'
 
@@ -465,8 +465,8 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
       {volver}
       <header className="mb-8 flex flex-wrap items-center gap-5">
         {e.logo
-          ? <img src={e.logo} alt="" className="h-16 w-16 rounded-2xl bg-white object-contain p-2 ring-1 ring-linea" />
-          : <span className="grid h-16 w-16 place-items-center rounded-2xl text-2xl font-bold text-white" style={{ background: e.color ?? 'var(--plat)' }}>{e.nombre.charAt(0).toUpperCase()}</span>}
+          ? <img src={e.logo} alt="" className="h-16 w-16 rounded-lg bg-white object-contain p-2 ring-1 ring-linea" />
+          : <span className="grid h-16 w-16 place-items-center rounded-lg text-2xl font-bold text-white" style={{ background: e.color ?? 'var(--plat)' }}>{e.nombre.charAt(0).toUpperCase()}</span>}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[2.25rem] font-semibold leading-none tracking-tight">{e.nombre}</h1>
@@ -478,7 +478,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
           </p>
         </div>
         {confirmar ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-rojo/10 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-rojo/10 px-4 py-3">
             <span className="text-sm">Nadie de {e.nombre} podrá entrar. No se borra nada.</span>
             <button type="button" onClick={() => void cambiarActiva(false)} disabled={trabajando} className={`${boton} bg-rojo text-white`}>Sí, suspender</button>
             <button type="button" onClick={() => setConfirmar(false)} className={botonSuave}>Cancelar</button>
@@ -610,7 +610,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
         </label>
         {!exenta && (
           <div className="mt-2 flex gap-1.5">
-            {[7, 14, 30].map((n) => <button key={n} type="button" onClick={() => sumar(n)} className="rounded-full bg-niebla px-3 py-1.5 text-xs font-semibold hover:bg-linea">+{n} días</button>)}
+            {[7, 14, 30].map((n) => <button key={n} type="button" onClick={() => sumar(n)} className="rounded-md bg-niebla px-3 py-1.5 text-xs font-semibold hover:bg-linea">+{n} días</button>)}
           </div>
         )}
       </div>
@@ -664,7 +664,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
         <section className="max-w-2xl border-t border-linea pt-6">
           <h2 className="text-lg font-semibold">Enlace de la invitación</h2>
           <p className="mt-1 text-sm text-apagado">Si no le llega el correo, mándale este enlace por WhatsApp. Vence en {hecha.dias} días y sirve una sola vez.</p>
-          <div className="mt-4 flex items-center gap-2 rounded-2xl bg-niebla p-3">
+          <div className="mt-4 flex items-center gap-2 rounded-lg bg-niebla p-3">
             <code className="min-w-0 flex-1 truncate text-sm">{hecha.enlace}</code>
             <button type="button" onClick={() => void navigator.clipboard?.writeText(hecha.enlace).then(() => aviso('Enlace copiado'))} className={botonSuave}><Copy size={15} aria-hidden="true" /> Copiar</button>
           </div>
@@ -696,7 +696,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
               <div className="grid grid-cols-2 gap-2">
                 {(['prueba', 'exenta'] as const).map((p) => (
                   <button key={p} type="button" onClick={() => poner({ plan: p })} aria-pressed={f.plan === p}
-                    className={`rounded-2xl px-4 py-3 text-left transition-colors ${anillo} ${f.plan === p ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>
+                    className={`rounded-lg px-4 py-3 text-left transition-colors ${anillo} ${f.plan === p ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>
                     <span className="block text-sm font-semibold">{p === 'prueba' ? 'Prueba gratis' : 'Exenta'}</span>
                     <span className={`block text-xs ${f.plan === p ? 'text-white/70' : 'text-apagado'}`}>{p === 'prueba' ? 'Luego se suscribe' : 'No paga nunca'}</span>
                   </button>
@@ -785,7 +785,7 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
           {creada ? (
             <div className="mt-4 space-y-3 text-sm">
               <p>Compártele estos datos por un medio seguro. Al entrar se le pide cambiar la contraseña y activar la verificación en dos pasos.</p>
-              <div className="space-y-2 rounded-2xl bg-niebla p-4">
+              <div className="space-y-2 rounded-lg bg-niebla p-4">
                 <div><span className="text-apagado">Correo:</span> <b>{creada.correo}</b></div>
                 <div className="flex items-center gap-2">
                   <span className="text-apagado">Contraseña temporal:</span> <b className="font-mono">{creada.passwordTemporal}</b>
@@ -836,7 +836,7 @@ const ESTADO_AVISO = {
 function MuestraAviso({ texto, tipo, accion }: { texto: string; tipo: 'info' | 'aviso'; accion?: string }) {
   const aviso_ = tipo === 'aviso'
   return (
-    <div className={`flex items-start gap-3 rounded-xl px-4 py-2.5 text-sm ${aviso_ ? 'bg-ambar/15' : 'bg-azul/10'}`}>
+    <div className={`flex items-start gap-3 rounded-md px-4 py-2.5 text-sm ${aviso_ ? 'bg-ambar/15' : 'bg-azul/10'}`}>
       {aviso_ ? <CircleAlert size={17} className="mt-0.5 shrink-0 text-ambar" aria-hidden="true" /> : <Info size={17} className="mt-0.5 shrink-0 text-azul" aria-hidden="true" />}
       <p className="min-w-0 flex-1 leading-snug">{texto}{accion && <span className="ml-2 font-semibold underline underline-offset-2">{accion}</span>}</p>
     </div>
@@ -907,7 +907,7 @@ function FilaAviso({ a, editando, alEditar, alQuitar }: { a: AvisoPlataforma; ed
   return (
     <li className={`py-4 ${estadoAviso(a) === 'terminado' ? 'opacity-70' : ''}`}>
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-niebla px-2.5 py-1 font-semibold">
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-niebla px-2.5 py-1 font-semibold">
           <span className="h-2 w-2 rounded-full" style={{ background: e.color }} aria-hidden="true" />{e.texto}
         </span>
         <span className="font-medium text-apagado">{PARA[a.para]} · {vigencia}</span>

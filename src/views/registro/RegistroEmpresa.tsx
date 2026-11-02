@@ -153,7 +153,7 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
                 const hechas = n < faseActual ? deFase.length : n > faseActual ? 0 : deFase.findIndex((p) => p.clave === actual.clave) + 1
                 return (
                   <div key={f.clave} className="h-1.5 flex-1 overflow-hidden rounded-full bg-niebla">
-                    <div className="h-full rounded-full bg-marca transition-[width] duration-500" style={{ width: `${deFase.length ? (hechas / deFase.length) * 100 : 0}%` }} />
+                    <div className="h-full rounded-md bg-marca transition-[width] duration-500" style={{ width: `${deFase.length ? (hechas / deFase.length) * 100 : 0}%` }} />
                   </div>
                 )
               })}
@@ -175,13 +175,13 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
         {/* Centrada en el alto que queda entre el encabezado y los botones; si no cabe, empieza arriba y se desplaza. */}
         <div className="my-auto w-full py-8">
           {publica && !publica.registroAbierto && (
-            <div role="alert" className="mb-6 rounded-2xl bg-ambar/15 px-4 py-3 text-sm leading-relaxed">
+            <div role="alert" className="mb-6 rounded-lg bg-ambar/15 px-4 py-3 text-sm leading-relaxed">
               <b>Por ahora no estamos dando de alta empresas nuevas.</b>{' '}
               {publica.correoSoporte ? <>Escríbenos a <a href={`mailto:${publica.correoSoporte}`} className="font-semibold text-azul hover:underline">{publica.correoSoporte}</a> y te avisamos cuando abramos.</> : 'Vuelve a intentarlo más adelante.'}
             </div>
           )}
           {retomado && actual.clave === inicial?.paso && (
-            <div className="mb-6 flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3 text-sm">
+            <div className="mb-6 flex items-center gap-3 rounded-lg bg-niebla px-4 py-3 text-sm">
               <span className="flex-1">Seguimos donde te quedaste.</span>
               <button type="button" onClick={empezarDeNuevo} className="flex items-center gap-1 font-semibold text-azul hover:underline">
                 <RotateCcw size={14} /> Empezar de nuevo
@@ -206,13 +206,13 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
             </p>
           )}
           {envio.estado === 'error' && ultima && (
-            <div role="alert" className="mb-2 flex items-start gap-2 rounded-2xl bg-rojo/10 p-3 text-sm font-medium text-rojo">
+            <div role="alert" className="mb-2 flex items-start gap-2 rounded-lg bg-rojo/10 p-3 text-sm font-medium text-rojo">
               <AlertCircle size={16} className="mt-0.5 shrink-0" /> <span>{envio.mensaje}</span>
             </div>
           )}
           <div className="flex gap-2">
             {actual.opcional && (
-              <button type="button" onClick={() => irA(i + 1)} className="rounded-full bg-niebla px-6 py-4 text-base font-semibold text-tinta transition-colors hover:bg-linea">
+              <button type="button" onClick={() => irA(i + 1)} className="rounded-md bg-niebla px-6 py-4 text-base font-semibold text-tinta transition-colors hover:bg-linea">
                 Omitir
               </button>
             )}
@@ -220,7 +220,7 @@ export function RegistroEmpresa({ onIrAlPanel }: { onIrAlPanel: () => void }) {
               type="submit"
               form="pantalla"
               disabled={envio.estado === 'enviando'}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-[colors,opacity] hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40 ${actual.falta ? 'opacity-50' : ''}`}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white transition-[colors,opacity] hover:bg-marca-oscuro active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40 ${actual.falta ? 'opacity-50' : ''}`}
             >
               {envio.estado === 'enviando' ? (
                 <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Creando…</>
@@ -284,7 +284,7 @@ function armarPantallas(
       ayuda: 'Vas a guardar datos de tus clientes (nombre, teléfono, dirección). La ley de protección de datos personales (LFPDPPP) pide que lo hagas con su aviso de privacidad.',
       falta: !r.terminos ? 'Acepta los términos para continuar' : null,
       contenido: (
-        <label className={`flex cursor-pointer items-start gap-4 rounded-[22px] border-2 p-5 transition-colors ${r.terminos ? 'border-marca bg-marca/10' : 'border-linea bg-papel'}`}>
+        <label className={`flex cursor-pointer items-start gap-4 rounded-lg border-2 p-5 transition-colors ${r.terminos ? 'border-marca bg-marca/10' : 'border-linea bg-papel'}`}>
           <input type="checkbox" checked={r.terminos} onChange={(e) => cambiar((x) => ({ ...x, terminos: e.target.checked }))} className="mt-1 h-6 w-6 shrink-0" data-enfocar />
           <span className="text-base">
             Acepto los <span className="font-semibold">términos del servicio</span> y el <span className="font-semibold">aviso de privacidad</span>, y me comprometo a usar los datos de mis clientes sólo para sus pedidos.
@@ -313,7 +313,7 @@ function armarPantallas(
       pregunta: <>Listo, {nombreCorto || 'ya tienes cuenta'}. Ahora armemos tu catálogo</>,
       ayuda: 'Son unas preguntas rápidas sobre lo que vendes. Te proponemos todo según tu giro y tú sólo ajustas.',
       contenido: (
-        <div className="flex items-end justify-center gap-1 rounded-[28px] bg-niebla px-4 pt-8 pb-5">
+        <div className="flex items-end justify-center gap-1 rounded-lg bg-niebla px-4 pt-8 pb-5">
           <DibujoEnvase tipo="botella" color="#f28c28" className="h-28" />
           <DibujoEnvase tipo="costal" color="#b07a52" className="h-32" />
           <DibujoEnvase tipo="frasco" color="#e5484d" className="h-24" />
@@ -383,7 +383,7 @@ function armarPantallas(
       contenido: (
         <div className="space-y-2">
           {r.envases.map((e) => (
-            <label key={e.id} className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 px-3 py-2 transition-colors ${e.retornable ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla'}`}>
+            <label key={e.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 px-3 py-2 transition-colors ${e.retornable ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla'}`}>
               <DibujoEnvase tipo={e.tipo} color={colorDeGiro(r)} className="h-12" />
               <span className="flex-1 font-semibold">{nombreEnvase(e)}</span>
               <input
@@ -509,7 +509,7 @@ function Tarjeta({ elegida, onClick, children, compacta = false }: { elegida: bo
       type="button"
       onClick={onClick}
       aria-pressed={elegida}
-      className={`relative rounded-[22px] border-2 text-center transition-[colors,transform] active:scale-[0.98] ${compacta ? 'p-2.5' : 'p-3'} ${
+      className={`relative rounded-lg border-2 text-center transition-[colors,transform] active:scale-[0.98] ${compacta ? 'p-2.5' : 'p-3'} ${
         elegida ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla hover:border-linea'
       }`}
     >
@@ -529,7 +529,7 @@ function Opcion({ elegida, onClick, titulo, detalle }: { elegida: boolean; onCli
       type="button"
       onClick={onClick}
       aria-pressed={elegida}
-      className={`flex items-center gap-4 rounded-[22px] border-2 p-5 text-left transition-colors ${elegida ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla hover:border-linea'}`}
+      className={`flex items-center gap-4 rounded-lg border-2 p-5 text-left transition-colors ${elegida ? 'border-marca bg-marca/10' : 'border-transparent bg-niebla hover:border-linea'}`}
     >
       <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 ${elegida ? 'border-marca bg-marca text-white' : 'border-linea'}`}>
         {elegida && <Check size={14} strokeWidth={3.5} />}
@@ -548,7 +548,7 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       aria-pressed={activo}
-      className={`flex items-center gap-1.5 rounded-full px-5 py-3 text-base font-semibold transition-colors ${activo ? 'bg-tinta text-white' : 'bg-niebla text-tinta hover:bg-linea'}`}
+      className={`flex items-center gap-1.5 rounded-md px-5 py-3 text-base font-semibold transition-colors ${activo ? 'bg-tinta text-white' : 'bg-niebla text-tinta hover:bg-linea'}`}
     >
       {activo && <Check size={16} strokeWidth={3} />}
       {children}
@@ -579,7 +579,7 @@ function Agregar({ placeholder, onAgregar, tipo = 'text', enfocar = false }: { p
         placeholder={placeholder}
         className={`${claseInput} flex-1`}
       />
-      <button type="button" onClick={agregar} disabled={!v.trim()} className="grid w-14 shrink-0 place-items-center rounded-xl bg-tinta text-white disabled:opacity-30" aria-label="Agregar">
+      <button type="button" onClick={agregar} disabled={!v.trim()} className="grid w-14 shrink-0 place-items-center rounded-md bg-tinta text-white disabled:opacity-30" aria-label="Agregar">
         <Plus size={22} />
       </button>
     </div>
@@ -678,7 +678,7 @@ function PasoVerificar({ correo, verificado, onVerificado }: { correo: string; v
 
   if (listo) {
     return (
-      <div className="flex items-center gap-4 rounded-[22px] bg-marca/10 p-5">
+      <div className="flex items-center gap-4 rounded-lg bg-marca/10 p-5">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-verde text-white"><Check size={22} strokeWidth={3} /></span>
         <div>
           <div className="text-lg font-semibold">Correo confirmado</div>
@@ -727,7 +727,7 @@ function PasoTamanos({ r, tipo, cambiar }: { r: Registro; tipo: TipoEnvase; camb
   const elegidos = r.envases.filter((e) => e.tipo === tipo).sort((a, b) => base(a) - base(b))
   return (
     <div>
-      <div className="mb-6 flex items-end justify-center gap-2 rounded-[28px] bg-niebla px-4 pt-6 pb-4">
+      <div className="mb-6 flex items-end justify-center gap-2 rounded-lg bg-niebla px-4 pt-6 pb-4">
         {/* Los tamaños elegidos, del chico al grande, cada dibujo más alto que el anterior */}
         {elegidos.length ? elegidos.slice(0, 5).map((e, n, todos) => (
           <div key={e.id} className="flex flex-col items-center">
@@ -782,7 +782,7 @@ function PasoProductos({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro)
       {r.productos.length > 0 && (
         <ul className="space-y-2">
           {r.productos.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-papel px-4 py-3 ring-1 ring-linea">
+            <li key={p.id} className="flex items-center gap-3 rounded-lg bg-papel px-4 py-3 ring-1 ring-linea">
               <span className="h-4 w-4 shrink-0 rounded-full ring-1 ring-black/15" style={{ background: p.color }} />
               <span className="flex-1 text-lg font-semibold">{p.nombre}</span>
               <button
@@ -802,7 +802,7 @@ function PasoProductos({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro)
           <span className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-apagado"><Sparkles size={14} /> Sugerencias</span>
           <div className="flex flex-wrap gap-2">
             {sugeridos.map((s) => (
-              <button key={s.nombre} type="button" onClick={() => agregar(s.nombre, s.variantes)} className="flex items-center gap-1.5 rounded-full border-2 border-dashed border-linea px-4 py-2 font-semibold hover:border-marca">
+              <button key={s.nombre} type="button" onClick={() => agregar(s.nombre, s.variantes)} className="flex items-center gap-1.5 rounded-md border-2 border-dashed border-linea px-4 py-2 font-semibold hover:border-marca">
                 <Plus size={15} /> {s.nombre}
               </button>
             ))}
@@ -834,7 +834,7 @@ function PasoVariantes({ producto: p, indice, cambiar }: { producto: Producto; i
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {p.variantes.map((v, n) => (
-              <div key={v.nombre} className="flex items-center gap-2 rounded-2xl bg-niebla py-2 pr-2 pl-2.5">
+              <div key={v.nombre} className="flex items-center gap-2 rounded-lg bg-niebla py-2 pr-2 pl-2.5">
                 {/* El color se cambia tocando el círculo */}
                 <label className="relative grid h-8 w-8 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full ring-2 ring-white/70" style={{ background: v.color }} title="Cambiar color">
                   <input
@@ -878,7 +878,7 @@ function PasoPrecios({ r, producto: p, cambiar }: { r: Registro; producto: Produ
         const v = precio(e.id)
         const ganancia = numero(v.precio) - numero(v.costo)
         return (
-          <div key={e.id} className={`overflow-hidden rounded-[22px] border-2 transition-colors ${v.activo ? 'border-marca bg-papel' : 'border-transparent bg-niebla'}`}>
+          <div key={e.id} className={`overflow-hidden rounded-lg border-2 transition-colors ${v.activo ? 'border-marca bg-papel' : 'border-transparent bg-niebla'}`}>
             <button type="button" onClick={() => poner(e.id, { activo: !v.activo })} aria-pressed={v.activo} className="flex w-full items-center gap-3 p-3 text-left">
               <DibujoEnvase tipo={e.tipo} color={color} etiqueta={p.nombre.slice(0, 1).toUpperCase()} className="h-16" apagado={!v.activo} />
               <span className="flex-1">
@@ -936,8 +936,8 @@ function PasoLogo({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => R
   }
   return (
     <div>
-      <label className="flex cursor-pointer flex-col items-center gap-3 rounded-[28px] border-2 border-dashed border-linea p-8 text-center transition-colors hover:border-marca">
-        <div className="grid h-32 w-32 place-items-center overflow-hidden rounded-3xl bg-niebla">
+      <label className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-linea p-8 text-center transition-colors hover:border-marca">
+        <div className="grid h-32 w-32 place-items-center overflow-hidden rounded-lg bg-niebla">
           {r.marca.logo ? <img src={r.marca.logo} alt="Tu logo" className="h-full w-full object-contain p-2" /> : <ImagePlus size={36} className="text-apagado" />}
         </div>
         <div className="text-lg font-semibold">{r.marca.logo ? 'Cambiar logo' : 'Subir mi logo'}</div>
@@ -972,20 +972,20 @@ function PasoColor({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => 
             {r.marca.color === c && <Check size={22} strokeWidth={3} className="text-white" />}
           </button>
         ))}
-        <label className="flex h-14 items-center gap-2 rounded-full bg-niebla pr-5 pl-2 font-semibold">
+        <label className="flex h-14 items-center gap-2 rounded-md bg-niebla pr-5 pl-2 font-semibold">
           <input type="color" value={r.marca.color} onChange={(e) => poner(e.target.value)} className="h-10 w-10 cursor-pointer rounded-full border-0 bg-transparent" />
           Otro
         </label>
       </div>
-      <div className="overflow-hidden rounded-[22px] ring-1 ring-linea">
+      <div className="overflow-hidden rounded-lg ring-1 ring-linea">
         <div className="flex items-center gap-3 px-4 py-4 text-white" style={{ background: r.marca.color }}>
-          {r.marca.logo ? <img src={r.marca.logo} alt="" className="h-10 w-10 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/20 text-lg font-bold">{r.negocio.trim().slice(0, 1).toUpperCase()}</span>}
+          {r.marca.logo ? <img src={r.marca.logo} alt="" className="h-10 w-10 rounded-md bg-white object-contain p-1" /> : <span className="grid h-10 w-10 place-items-center rounded-md bg-white/20 text-lg font-bold">{r.negocio.trim().slice(0, 1).toUpperCase()}</span>}
           <span className="truncate text-lg font-semibold">{r.negocio || 'Tu negocio'}</span>
         </div>
         <div className="space-y-3 bg-papel p-4">
           <div className="h-3 w-2/3 rounded-full bg-niebla" />
           <div className="h-3 w-1/2 rounded-full bg-niebla" />
-          <div className="rounded-full py-3 text-center font-semibold text-white" style={{ background: r.marca.color }}>Nuevo pedido</div>
+          <div className="rounded-md py-3 text-center font-semibold text-white" style={{ background: r.marca.color }}>Nuevo pedido</div>
         </div>
       </div>
     </div>
@@ -1012,7 +1012,7 @@ function PasoVendedores({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro
       {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
       <ul className="space-y-2">
         {r.invitaciones.map((c) => (
-          <li key={c} className="flex items-center gap-3 rounded-2xl bg-niebla px-4 py-3">
+          <li key={c} className="flex items-center gap-3 rounded-lg bg-niebla px-4 py-3">
             <Mail size={18} className="shrink-0 text-apagado" />
             <span className="min-w-0 flex-1 truncate font-semibold">{c}</span>
             <button type="button" onClick={() => cambiar((x) => ({ ...x, invitaciones: x.invitaciones.filter((y) => y !== c) }))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-linea" aria-label={`Quitar ${c}`}>
@@ -1030,8 +1030,8 @@ function PasoResumen({ r }: { r: Registro }) {
   const lista = presentaciones(r)
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 rounded-[22px] px-4 py-4 text-white" style={{ background: r.marca.color }}>
-        {r.marca.logo ? <img src={r.marca.logo} alt="" className="h-12 w-12 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20 text-xl font-bold">{r.negocio.trim().slice(0, 1).toUpperCase()}</span>}
+      <div className="flex items-center gap-3 rounded-lg px-4 py-4 text-white" style={{ background: r.marca.color }}>
+        {r.marca.logo ? <img src={r.marca.logo} alt="" className="h-12 w-12 rounded-md bg-white object-contain p-1" /> : <span className="grid h-12 w-12 place-items-center rounded-md bg-white/20 text-xl font-bold">{r.negocio.trim().slice(0, 1).toUpperCase()}</span>}
         <div className="min-w-0">
           <div className="truncate text-lg font-semibold">{r.negocio}</div>
           <div className="truncate text-sm opacity-80">
@@ -1067,10 +1067,10 @@ function VistaRepartidor({ r }: { r: Registro }) {
         {lista.map((x) => {
           const c = cant[x.clave] ?? 0
           return (
-            <div key={x.clave} className={`flex flex-col overflow-hidden rounded-2xl transition-shadow ${c ? 'ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
+            <div key={x.clave} className={`flex flex-col overflow-hidden rounded-lg transition-shadow ${c ? 'ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
               <div className="relative flex justify-center px-2 pt-3 pb-1" style={{ background: `color-mix(in oklab, ${x.color} 22%, var(--color-papel))` }}>
                 <DibujoEnvase tipo={x.envase.tipo} color={x.color} etiqueta={x.nombre.slice(0, 1).toUpperCase()} className="h-20" />
-                {c > 0 && <span className="absolute top-2 right-2 grid h-7 min-w-7 place-items-center rounded-full bg-tinta px-1.5 text-sm font-bold text-white tabular-nums">{c}</span>}
+                {c > 0 && <span className="absolute top-2 right-2 grid h-7 min-w-7 place-items-center rounded-md bg-tinta px-1.5 text-sm font-bold text-white tabular-nums">{c}</span>}
               </div>
               <div className="flex flex-1 flex-col bg-papel px-2.5 pt-2 pb-2.5">
                 <div className="truncate text-sm leading-5 font-bold">{x.nombre}</div>
@@ -1105,7 +1105,7 @@ function Listo({ r, onIrAlPanel }: { r: Registro; onIrAlPanel: () => void }) {
       </div>
       <h1 className="mt-6 text-[2rem] font-semibold leading-tight">¡{r.negocio} ya está lista!</h1>
       <p className="mt-2 max-w-sm text-apagado">Desde el panel das de alta a tus clientes y sigues las entregas de tus repartidores.</p>
-      <button type="button" onClick={onIrAlPanel} className="mt-8 rounded-full bg-tinta px-8 py-4 font-semibold text-white hover:bg-marca-oscuro">
+      <button type="button" onClick={onIrAlPanel} className="mt-8 rounded-md bg-tinta px-8 py-4 font-semibold text-white hover:bg-marca-oscuro">
         Ir al panel
       </button>
     </div>

@@ -114,12 +114,12 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
         </div>
       </Campo>
 
-      {error && <p role="alert" className="rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
+      {error && <p role="alert" className="rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
 
       <button
         type="submit"
         disabled={cargando}
-        className="flex w-full items-center justify-center rounded-xl bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
+        className="flex w-full items-center justify-center rounded-md bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
       >
         {cargando ? 'Guardando…' : 'Guardar contraseña'}
       </button>
@@ -150,11 +150,11 @@ function Avisos({ irA }: { irA?: (p: PestanaAviso) => void }) {
   }
 
   return (
-    <div className="mt-3 rounded-2xl bg-niebla p-4">
+    <div className="mt-3 rounded-lg bg-niebla p-4">
       <div className="flex items-center gap-2 font-semibold">
         <BellRing size={18} /> Avisos
-        {sinLeer.length > 0 && <span className="rounded-full bg-tinta px-2 py-0.5 text-xs font-bold text-white">{sinLeer.length}</span>}
-        {sinLeer.length > 0 && <button onClick={() => void leerTodo()} className="ml-auto rounded-full bg-papel px-3 py-1 text-xs font-semibold">Marcar leídos</button>}
+        {sinLeer.length > 0 && <span className="rounded-md bg-tinta px-2 py-0.5 text-xs font-bold text-white">{sinLeer.length}</span>}
+        {sinLeer.length > 0 && <button onClick={() => void leerTodo()} className="ml-auto rounded-md bg-papel px-3 py-1 text-xs font-semibold">Marcar leídos</button>}
       </div>
       {avisos.length === 0 ? (
         <p className="mt-1 text-sm text-apagado">Aquí verás los pedidos urgentes, los cambios de tu ruta y las alertas de stock.</p>
@@ -164,7 +164,7 @@ function Avisos({ irA }: { irA?: (p: PestanaAviso) => void }) {
             const Icono = ICONO_AVISO[a.tipo] ?? Bell
             return (
               <li key={a.id}>
-                <button onClick={() => void abrir(a)} className="flex w-full items-start gap-3 rounded-xl bg-papel p-3 text-left active:bg-linea" data-aviso={a.tipo}>
+                <button onClick={() => void abrir(a)} className="flex w-full items-start gap-3 rounded-md bg-papel p-3 text-left active:bg-linea" data-aviso={a.tipo}>
                   <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-niebla"><Icono size={16} /></span>
                   <span className="min-w-0 flex-1">
                     <span className={`block text-sm ${a.leida ? 'font-medium' : 'font-bold'}`}>{a.titulo}</span>
@@ -221,7 +221,7 @@ function Notificaciones() {
   const activo = !!estado?.suscrito && estado.permiso === 'granted'
 
   return (
-    <div className="mt-3 rounded-2xl bg-niebla p-4">
+    <div className="mt-3 rounded-lg bg-niebla p-4">
       <div className="flex items-center gap-2 font-semibold"><Bell size={18} /> Notificaciones en este teléfono</div>
       <p className="mt-1 text-sm text-apagado" data-estado-push={activo ? 'activo' : 'inactivo'}>{texto}</p>
       {puede && (
@@ -241,7 +241,7 @@ function Notificaciones() {
         <select
           value={horaCierre}
           onChange={(e) => void cambiarHora(Number(e.target.value))}
-          className="rounded-xl bg-papel px-3 py-2 text-sm font-semibold"
+          className="rounded-md bg-papel px-3 py-2 text-sm font-semibold"
           aria-label="Hora a partir de la cual avisar de ventas sin enviar"
         >
           {[...new Set([HORA_CIERRE, 14, 15, 16, 17, 18, 19, 20, 21, 22, horaCierre])].sort((a, b) => a - b).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
@@ -272,16 +272,16 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Mi cuenta</h1>
 
-      <div className="mt-4 flex items-center gap-3 rounded-2xl bg-niebla p-4">
+      <div className="mt-4 flex items-center gap-3 rounded-lg bg-niebla p-4">
         <FotoPerfil tamano="h-12 w-12 text-lg" compacto />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{u.nombre}</div>
           <div className="truncate text-sm text-apagado">{u.correo}</div>
         </div>
-        <span className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} />{ROL[u.rol]}</span>
+        <span className="flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} />{ROL[u.rol]}</span>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-niebla p-4">
+      <div className="mt-3 rounded-lg bg-niebla p-4">
         <div className="flex items-center gap-2 font-semibold">
           {sync.error ? <CloudOff size={18} className="text-ambar" /> : <RefreshCw size={18} className={sync.sincronizando ? 'animate-spin' : ''} />}
           Sincronización
@@ -300,13 +300,13 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
       <Notificaciones />
 
       {problemas.length > 0 && (
-        <div className="mt-3 rounded-2xl bg-ambar/20 p-4">
+        <div className="mt-3 rounded-lg bg-ambar/20 p-4">
           <div className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} />Cambios que no se aplicaron</div>
           <ul className="mt-2 space-y-2">
             {problemas.map((p) => (
               <li key={p.id} className="flex items-start gap-2 text-sm">
                 <span className="flex-1">{p.mensaje}</span>
-                <button className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold" onClick={() => db.problemas.update(p.id, { visto: true })}>Entendido</button>
+                <button className="shrink-0 rounded-md bg-white px-3 py-1 text-xs font-semibold" onClick={() => db.problemas.update(p.id, { visto: true })}>Entendido</button>
               </li>
             ))}
           </ul>

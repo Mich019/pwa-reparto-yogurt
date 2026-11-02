@@ -46,7 +46,7 @@ export function SelectorSabores({ productos, valor, onChange }: {
           const precio = precioEnPantalla(p)
           const presentacion = presentacionDe(p)
           return (
-            <div key={p.id} className={`flex flex-col overflow-hidden rounded-2xl transition-shadow ${l ? 'shadow-tarjeta ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
+            <div key={p.id} className={`flex flex-col overflow-hidden rounded-lg transition-shadow ${l ? 'shadow-tarjeta ring-2 ring-tinta' : 'ring-1 ring-linea'}`}>
               <div className="flex items-center justify-between gap-1 px-2 py-4" style={{ background: p.color_hex, color }}>
                 <button
                   onClick={() => cambiar(p.id, -envase)}
@@ -80,7 +80,7 @@ export function SelectorSabores({ productos, valor, onChange }: {
           )
         })}
       </div>
-      <div className="mt-3 flex items-center justify-between rounded-2xl bg-marino px-4 py-3.5 text-white">
+      <div className="mt-3 flex items-center justify-between rounded-lg bg-marino px-4 py-3.5 text-white">
         <span className="text-white/70">{totalPorUnidad(items, productos) || `0 ${unidadDe(visibles[0] ?? {})}`} en total</span>
         <span className="text-2xl font-extrabold tracking-tight tabular-nums">{dinero(total)}</span>
       </div>

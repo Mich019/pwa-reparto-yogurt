@@ -47,7 +47,7 @@ export function DosPasos() {
   const cerrar = () => { setPaso({ t: 'reposo' }); cargar() }
 
   return (
-    <div className="mt-3 rounded-2xl bg-niebla p-4">
+    <div className="mt-3 rounded-lg bg-niebla p-4">
       <div className="flex items-center gap-2 font-semibold">
         {estado?.activa ? <ShieldCheck size={18} className="text-verde" /> : <ShieldAlert size={18} className={rol === 'administrador' ? 'text-ambar' : ''} />}
         Verificación en dos pasos
@@ -136,7 +136,7 @@ function Configurar({ secreto, uri, onActivada, onCerrar }: { secreto: string; u
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(secreto).then(() => aviso('Clave copiada'), () => {})}
-            className="mt-1 flex w-full items-center justify-between gap-2 rounded-xl bg-niebla px-3 py-2.5 text-left font-mono text-xs break-all active:bg-linea"
+            className="mt-1 flex w-full items-center justify-between gap-2 rounded-md bg-niebla px-3 py-2.5 text-left font-mono text-xs break-all active:bg-linea"
           >
             {secreto.match(/.{1,4}/g)?.join(' ')} <Copy size={16} className="shrink-0" />
           </button>
@@ -161,7 +161,7 @@ function CodigosRespaldo({ codigos, onCerrar }: { codigos: string[]; onCerrar: (
           Si pierdes el teléfono, entra con uno de estos códigos. Cada uno sirve una sola vez y <b>no se volverán a mostrar</b>.
           Guárdalos fuera de este teléfono (impresos o en tu gestor de contraseñas).
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-niebla p-4 font-mono text-base">
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-niebla p-4 font-mono text-base">
           {codigos.map((c) => <span key={c} className="text-center">{c}</span>)}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">

@@ -90,7 +90,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
         <button
           onClick={onIrAAdmin}
           title="Abrir Panel Web de Administración"
-          className="fixed top-3 right-3 z-40 flex items-center gap-1.5 rounded-full bg-tinta/90 px-3 py-1.5 text-xs font-semibold text-white shadow-tarjeta backdrop-blur transition-all hover:bg-tinta active:scale-95"
+          className="fixed top-3 right-3 z-40 flex items-center gap-1.5 rounded-md bg-tinta/90 px-3 py-1.5 text-xs font-semibold text-white shadow-tarjeta backdrop-blur transition-all hover:bg-tinta active:scale-95"
         >
           Panel Admin ↗
         </button>
@@ -110,7 +110,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
           nombre y las demás quedan en icono. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin
           servidor: Ruta, Clientes, Producción y Sabores. */}
       <nav aria-label="Secciones" className="z-30 flex justify-center bg-lienzo px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <ul className="flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.12)]">
+        <ul className="flex w-full max-w-md items-center gap-0.5 rounded-md border border-linea/80 bg-papel p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.12)]">
           {visibles.map(({ id, texto, icono: Icono }) => {
             const activa = actual === id
             const punto = id === 'cuenta' && sinVer + avisosSinLeer > 0
@@ -120,7 +120,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
                   onClick={() => setPestana(id)}
                   aria-label={texto}
                   aria-current={activa ? 'page' : undefined}
-                  className={`relative flex h-12 items-center justify-center gap-2 rounded-full transition-colors ${
+                  className={`relative flex h-12 items-center justify-center gap-2 rounded-md transition-colors ${
                     activa ? 'w-full bg-tinta px-3 text-white' : 'w-14 text-apagado active:bg-niebla'
                   }`}
                 >

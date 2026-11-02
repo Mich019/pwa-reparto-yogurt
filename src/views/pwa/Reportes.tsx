@@ -116,13 +116,13 @@ export function Reportes() {
 
 function Fallo({ error, reintentar, chico }: { error: { texto: string; sinRed: boolean }; reintentar: () => void; chico?: boolean }) {
   return (
-    <div className={`${chico ? 'mt-3' : 'mt-8'} flex items-center gap-3 rounded-2xl bg-niebla p-4`} role="alert">
+    <div className={`${chico ? 'mt-3' : 'mt-8'} flex items-center gap-3 rounded-lg bg-niebla p-4`} role="alert">
       <WifiOff size={22} className="shrink-0 text-apagado" />
       <div className="min-w-0 flex-1 text-sm">
         <div className="font-semibold">{error.sinRed ? 'Los reportes necesitan conexión' : 'No se pudo cargar el reporte'}</div>
         <div className="text-apagado">{error.sinRed ? 'Se arman en el servidor con todo el historial.' : error.texto}</div>
       </div>
-      <button onClick={reintentar} className="rounded-full bg-tinta px-4 py-2 text-xs font-semibold text-white active:bg-neutral-700">Reintentar</button>
+      <button onClick={reintentar} className="rounded-md bg-tinta px-4 py-2 text-xs font-semibold text-white active:bg-neutral-700">Reintentar</button>
     </div>
   )
 }
@@ -158,7 +158,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
     <>
       <div className="mt-5 flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold tracking-tight">Resumen</h2>
-        <button onClick={exportar} className="flex items-center gap-1.5 rounded-full bg-niebla px-4 py-2.5 text-[13px] font-semibold active:bg-linea">
+        <button onClick={exportar} className="flex items-center gap-1.5 rounded-md bg-niebla px-4 py-2.5 text-[13px] font-semibold active:bg-linea">
           <Download size={16} /> Exportar
         </button>
       </div>
@@ -177,7 +177,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
       )}
 
       {sinVentas ? (
-        <div className="mt-8 rounded-2xl bg-niebla p-6 text-center">
+        <div className="mt-8 rounded-lg bg-niebla p-6 text-center">
           <div className="font-semibold">Sin ventas entregadas en este periodo</div>
           <div className="mt-1 text-sm text-apagado">Cuando se entreguen pedidos aparecerán aquí.</div>
         </div>
@@ -195,7 +195,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                 <Columnas titulo="Ingresos" barras={barras((p) => p.ingreso)} color="bg-azul" formato={dinero} formatoEje={dineroEje} total={dinero(r.ingreso)} />
                 {!varias && <Columnas titulo={tituloUnidad(u0)} barras={barras((p) => p.litros)} color="bg-tinta" formato={(n) => litros(n, u0)} formatoEje={ejeLitros} total={litros(r.litros, u0)} />}
               </div>
-              <details className="mt-2 rounded-2xl bg-niebla px-4 py-3 text-sm">
+              <details className="mt-2 rounded-lg bg-niebla px-4 py-3 text-sm">
                 <summary className="cursor-pointer font-semibold">Ver como tabla</summary>
                 <div className="mt-2 overflow-x-auto">
                   <table className="w-full min-w-[26rem] text-left tabular-nums">
@@ -221,12 +221,12 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
               <p className="text-xs text-apagado">Del que más vendió al que menos. La utilidad usa el costo de cuando se vendió.</p>
               {estrella && menor && estrella.id !== menor.id && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl bg-niebla p-3">
+                  <div className="rounded-lg bg-niebla p-3">
                     <div className="flex items-center gap-1 text-xs font-medium text-verde"><TrendingUp size={14} /> Sabor estrella</div>
                     <div className="mt-1 font-semibold">{estrella.sabor}</div>
                     <div className="text-xs text-apagado tabular-nums">{litros(estrella.litros, estrella.unidad)}</div>
                   </div>
-                  <div className="rounded-2xl bg-niebla p-3">
+                  <div className="rounded-lg bg-niebla p-3">
                     <div className="flex items-center gap-1 text-xs font-medium text-rojo"><TrendingDown size={14} /> Menor rotación</div>
                     <div className="mt-1 font-semibold">{menor.sabor}</div>
                     <div className="text-xs text-apagado tabular-nums">{litros(menor.litros, menor.unidad)}</div>
@@ -246,7 +246,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                         <span className="shrink-0 text-sm font-semibold tabular-nums">{litros(s.litros, s.unidad)}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 rounded-full bg-niebla">
-                        <div className="h-full rounded-full bg-tinta" style={{ width: `${(s.litros / (maxPorUnidad.get(s.unidad || 'L') ?? 1)) * 100}%` }} />
+                        <div className="h-full rounded-md bg-tinta" style={{ width: `${(s.litros / (maxPorUnidad.get(s.unidad || 'L') ?? 1)) * 100}%` }} />
                       </div>
                       {s.litros === 0 ? (
                         <div className="mt-1 text-[11px] text-apagado">Sin ventas en el periodo</div>
@@ -279,12 +279,12 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="min-w-0 truncate font-semibold">
                           {v.nombre}
-                          {!v.activo && v.id && <span className="ml-1.5 rounded-full bg-niebla px-2 py-0.5 text-[10px] font-semibold text-apagado">Dado de baja</span>}
+                          {!v.activo && v.id && <span className="ml-1.5 rounded-md bg-niebla px-2 py-0.5 text-[10px] font-semibold text-apagado">Dado de baja</span>}
                         </span>
                         <span className="shrink-0 text-sm font-semibold tabular-nums">{dinero(v.ingreso)}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 rounded-full bg-niebla">
-                        <div className="h-full rounded-full bg-azul" style={{ width: `${(v.ingreso / maxIngreso) * 100}%` }} />
+                        <div className="h-full rounded-md bg-azul" style={{ width: `${(v.ingreso / maxIngreso) * 100}%` }} />
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-apagado tabular-nums">
                         <span>{v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
@@ -309,7 +309,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
 
 function Tarjeta({ etiqueta, valor, acento, pie, cambio: c }: { etiqueta: string; valor: string; acento?: boolean; pie?: string; cambio?: number | null }) {
   return (
-    <div className="rounded-2xl bg-niebla p-3">
+    <div className="rounded-lg bg-niebla p-3">
       <div className={`text-2xl font-semibold tracking-tight tabular-nums ${acento ? 'text-verde' : ''}`}>{valor}</div>
       <div className="text-xs text-apagado">{etiqueta}</div>
       {(pie || (c !== null && c !== undefined)) && (
@@ -384,7 +384,7 @@ function HojaExportar({ abierta, onCerrar, reporte }: { abierta: boolean; onCerr
                 role="radio"
                 aria-checked={tabla === t.valor}
                 onClick={() => setTabla(t.valor)}
-                className={`block w-full rounded-xl px-4 py-3 text-left transition-colors ${tabla === t.valor ? 'bg-tinta text-white' : 'bg-niebla active:bg-linea'}`}
+                className={`block w-full rounded-md px-4 py-3 text-left transition-colors ${tabla === t.valor ? 'bg-tinta text-white' : 'bg-niebla active:bg-linea'}`}
               >
                 <div className="font-semibold">{t.texto}</div>
                 <div className={`text-xs ${tabla === t.valor ? 'text-white/70' : 'text-apagado'}`}>{t.ayuda}</div>

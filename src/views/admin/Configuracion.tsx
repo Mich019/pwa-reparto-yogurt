@@ -280,7 +280,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
                   <div className="min-w-0 text-sm">
                     <div className="flex items-center gap-2 font-semibold">
                       {s.actual ? 'Este navegador' : 'Otro dispositivo'}
-                      {s.actual && <span className="rounded-full bg-niebla px-2 py-0.5 text-[11px] font-semibold">Aquí estás</span>}
+                      {s.actual && <span className="rounded-md bg-niebla px-2 py-0.5 text-[11px] font-semibold">Aquí estás</span>}
                     </div>
                     <div className="text-xs text-apagado">Desde el {fechaHora(s.inicio)}{s.ip ? ` · IP ${s.ip}` : ''}</div>
                   </div>

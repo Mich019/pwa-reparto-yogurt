@@ -86,7 +86,7 @@ export function Clientes() {
                 <BookUser size={20} />
               </button>
             )}
-            <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-full bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
+            <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-md bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
               {verInactivos ? 'Activos' : 'Archivados'}
             </button>
           </div>
@@ -118,7 +118,7 @@ export function Clientes() {
                   {fav && <> · <PuntoSabor color={fav.color_hex} className="h-2.5 w-2.5 align-middle" /> {fav.sabor}</>}
                 </div>
               </div>
-              {s?.proximo && <div className="rounded-full bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
+              {s?.proximo && <div className="rounded-md bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
               <ChevronRight size={18} className="shrink-0 text-apagado/60" />
             </button>
           )
@@ -202,7 +202,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
           />
         </div>
         {gestiona && (
-          <button onClick={() => setCambiandoVendedor(true)} className="flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-3 text-left active:bg-linea">
+          <button onClick={() => setCambiandoVendedor(true)} className="flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-3 text-left active:bg-linea">
             <UserCog size={20} className="shrink-0" />
             <span className="min-w-0 flex-1">
               <span className="block text-xs text-apagado">Vendedor</span>
@@ -234,7 +234,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
 
 function Dato({ valor, etiqueta, icono }: { valor: string; etiqueta: string; icono?: ReactNode }) {
   return (
-    <div className="rounded-xl bg-niebla px-2 py-3">
+    <div className="rounded-md bg-niebla px-2 py-3">
       <div className="truncate text-base font-semibold">{valor}</div>
       <div className="text-[11px] text-apagado">{icono} {etiqueta}</div>
     </div>
@@ -254,7 +254,7 @@ const ETIQUETA_ESTADO = { PENDIENTE: 'Agendado', ENTREGADO: 'Entregado', OMITIDO
 
 function FilaPedido({ p, sabor, onClick }: { p: Pedido; sabor: (id: string) => Producto | undefined; onClick?: () => void }) {
   return (
-    <button onClick={onClick} disabled={!onClick} className="flex w-full items-center gap-3 rounded-xl bg-niebla px-3 py-3 text-left">
+    <button onClick={onClick} disabled={!onClick} className="flex w-full items-center gap-3 rounded-md bg-niebla px-3 py-3 text-left">
       <div className="w-20 shrink-0 text-sm font-medium">{textoFecha(p.fecha)}</div>
       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
         {p.items.map((i) => (
@@ -409,7 +409,7 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
     } else marca.current.setLngLat(punto)
   }, [punto])
 
-  return <div ref={div} className="h-48 overflow-hidden rounded-2xl bg-niebla" />
+  return <div ref={div} className="h-48 overflow-hidden rounded-lg bg-niebla" />
 }
 
 const FORMATOS_LIBRETA: Record<Formato, string> = {

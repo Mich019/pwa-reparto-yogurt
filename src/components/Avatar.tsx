@@ -8,8 +8,8 @@ import { Boton, Hoja, aviso } from './ui'
 // La foto de perfil de una persona, o la inicial de su nombre si no tiene. El tamaño y el color de la inicial los pone
 // quien la usa (`className`).
 export function Avatar({ nombre, foto, className = 'h-10 w-10 text-sm bg-tinta text-white' }: { nombre: string; foto?: string | null; className?: string }) {
-  if (foto) return <img src={foto} alt="" className={`shrink-0 rounded-full object-cover ${className}`} />
-  return <span aria-hidden="true" className={`grid shrink-0 place-items-center rounded-full font-semibold ${className}`}>{nombre.trim().charAt(0).toUpperCase() || '?'}</span>
+  if (foto) return <img src={foto} alt="" className={`shrink-0 rounded-md object-cover ${className}`} />
+  return <span aria-hidden="true" className={`grid shrink-0 place-items-center rounded-md font-semibold ${className}`}>{nombre.trim().charAt(0).toUpperCase() || '?'}</span>
 }
 
 // La foto propia con sus botones: elegir una (se encuadra en una hoja y se guarda al aceptar) o quitarla. `compacto`: sólo la foto,
@@ -52,7 +52,7 @@ export function FotoPerfil({ tamano = 'h-20 w-20 text-3xl', compacto = false }: 
         onClick={() => entrada.current?.click()}
         disabled={guardando}
         aria-label={u.foto ? 'Cambiar foto de perfil' : 'Poner foto de perfil'}
-        className="group relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-60"
+        className="group relative shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-60"
       >
         <Avatar nombre={u.nombre} foto={u.foto} className={`${tamano} bg-tinta text-white`} />
         <span className={`absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full border-2 border-lienzo bg-papel text-tinta shadow-sm transition-colors group-hover:bg-niebla ${compacto ? 'h-6 w-6' : 'h-8 w-8'}`}>
@@ -116,7 +116,7 @@ function EncuadreFoto({ img, onAceptar, onCancelar }: { img: HTMLImageElement; o
   return (
     <div className="flex flex-col items-center gap-5 pb-4">
       <div
-        className="relative cursor-grab touch-none overflow-hidden rounded-2xl bg-niebla select-none active:cursor-grabbing"
+        className="relative cursor-grab touch-none overflow-hidden rounded-lg bg-niebla select-none active:cursor-grabbing"
         style={{ width: VISOR, height: VISOR }}
         onPointerDown={bajar}
         onPointerMove={mover}
@@ -127,7 +127,7 @@ function EncuadreFoto({ img, onAceptar, onCancelar }: { img: HTMLImageElement; o
         <img src={img.src} alt="" draggable={false} className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
           style={{ width: w * escala, height: h * escala, transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))` }} />
         {/* Fuera del círculo se oscurece: así se ve cómo quedará en el avatar redondo. */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_200px_rgb(0_0_0/0.45)] ring-2 ring-white/80" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-md shadow-[0_0_0_200px_rgb(0_0_0/0.45)] ring-2 ring-white/80" />
       </div>
       <label className="flex w-full max-w-[264px] items-center gap-3 text-apagado">
         <ZoomOut size={18} aria-hidden="true" />

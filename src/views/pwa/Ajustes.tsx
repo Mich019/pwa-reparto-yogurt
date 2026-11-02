@@ -22,7 +22,7 @@ export function Ajustes() {
 
       <div className="mt-4 space-y-2">
         {productos.map((p) => (
-          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-2xl bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
+          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-lg bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
             <PuntoSabor color={p.color_hex} className="h-11 w-11" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>
@@ -99,7 +99,7 @@ export function DatosYRespaldo({ equipo = 'teléfono' }: { equipo?: string }) {
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Boton variante="secundario" onClick={exportar}><Download size={18} /> Respaldo</Boton>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-niebla px-4 py-4 font-semibold active:bg-linea">
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md bg-niebla px-4 py-4 font-semibold active:bg-linea">
           <Upload size={18} /> Restaurar
           <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])} />
         </label>
@@ -152,7 +152,7 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
           <textarea className={claseInput} rows={2} maxLength={500} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Con trozos de fresa, endulzado con miel" />
         </Campo>
         {producto ? (
-          <div className="rounded-xl bg-niebla px-4 py-3 text-sm">
+          <div className="rounded-md bg-niebla px-4 py-3 text-sm">
             Presentación: <b>{presentacionDe(producto) ?? `por ${nombreUnidad(unidad, 1)}`}</b>. <span className="text-apagado">Se elige al crear el sabor.</span>
           </div>
         ) : (
@@ -160,7 +160,7 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
             <Campo etiqueta="Se mide en">
               <div className="flex flex-wrap gap-2">
                 {['L', 'kg', 'pz'].map((u) => (
-                  <button key={u} type="button" onClick={() => setUnidad(u)} className={`rounded-full px-4 py-2.5 text-sm font-semibold ${unidad === u ? 'bg-tinta text-white' : 'bg-niebla'}`}>
+                  <button key={u} type="button" onClick={() => setUnidad(u)} className={`rounded-md px-4 py-2.5 text-sm font-semibold ${unidad === u ? 'bg-tinta text-white' : 'bg-niebla'}`}>
                     {nombreUnidad(u, 2)}
                   </button>
                 ))}
@@ -194,7 +194,7 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
             <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded-full bg-transparent" />
           </div>
         </div>
-        <label className="flex items-center justify-between rounded-xl bg-niebla px-4 py-3">
+        <label className="flex items-center justify-between rounded-md bg-niebla px-4 py-3">
           <span className="font-semibold">Disponible</span>
           <input type="checkbox" checked={disponible} onChange={(e) => setDisponible(e.target.checked)} className="h-6 w-6 accent-black" />
         </label>

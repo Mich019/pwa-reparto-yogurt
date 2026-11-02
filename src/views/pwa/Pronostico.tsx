@@ -89,11 +89,11 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
       {ventas.porSabor.length > 0 && (
         <>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl bg-niebla p-3">
+            <div className="rounded-lg bg-niebla p-3">
               <div className="flex items-center gap-1 text-xs text-verde"><TrendingUp size={14} /> Más vendido</div>
               <div className="mt-1 flex items-center gap-1.5 font-semibold"><PuntoSabor color={ventas.porSabor[0].producto.color_hex} className="h-3.5 w-3.5" />{ventas.porSabor[0].producto.sabor}</div>
             </div>
-            <div className="rounded-2xl bg-niebla p-3">
+            <div className="rounded-lg bg-niebla p-3">
               <div className="flex items-center gap-1 text-xs text-amber-600"><TrendingDown size={14} /> Menos vendido</div>
               <div className="mt-1 flex items-center gap-1.5 font-semibold"><PuntoSabor color={ventas.porSabor[ventas.porSabor.length - 1].producto.color_hex} className="h-3.5 w-3.5" />{ventas.porSabor[ventas.porSabor.length - 1].producto.sabor}</div>
             </div>
@@ -108,7 +108,7 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
                     <span className="text-apagado tabular-nums">{l(s.litros, s.producto)} · {dinero(s.dinero)} · <span className="text-verde">+{dinero(s.margen)}</span></span>
                   </div>
                   <div className="mt-1.5 h-1.5 rounded-full bg-niebla">
-                    <div className="h-full rounded-full bg-tinta" style={{ width: `${(s.litros / maxVentaDe(s.producto)) * 100}%` }} />
+                    <div className="h-full rounded-md bg-tinta" style={{ width: `${(s.litros / maxVentaDe(s.producto)) * 100}%` }} />
                   </div>
                 </div>
               </div>
@@ -122,7 +122,7 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
 
 function Tarjeta({ valor, etiqueta, acento }: { valor: string; etiqueta: string; acento?: boolean }) {
   return (
-    <div className="rounded-2xl bg-niebla p-3">
+    <div className="rounded-lg bg-niebla p-3">
       <div className={`text-2xl font-semibold tracking-tight tabular-nums ${acento ? 'text-verde' : ''}`}>{valor}</div>
       <div className="text-xs text-apagado">{etiqueta}</div>
     </div>

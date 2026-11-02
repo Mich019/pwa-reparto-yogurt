@@ -82,7 +82,7 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
       </div>
 
       {error && (
-        <div role="alert" className="mt-4 flex items-start gap-3 rounded-2xl bg-niebla p-4">
+        <div role="alert" className="mt-4 flex items-start gap-3 rounded-lg bg-niebla p-4">
           {error.sinRed ? <WifiOff size={20} className="mt-0.5 shrink-0" /> : <TriangleAlert size={20} className="mt-0.5 shrink-0 text-rojo" />}
           <div className="min-w-0 flex-1">
             <div className="font-semibold">{error.sinRed ? 'El stock necesita conexión' : 'No se pudo cargar el stock'}</div>
@@ -150,11 +150,11 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-semibold">{v.nombre}</span>
-                      {!v.activo && <span className="shrink-0 rounded-full bg-rojo/10 px-2 py-0.5 text-xs font-semibold text-rojo">De baja</span>}
+                      {!v.activo && <span className="shrink-0 rounded-md bg-rojo/10 px-2 py-0.5 text-xs font-semibold text-rojo">De baja</span>}
                     </div>
                     <div className="text-xs text-apagado">{asignado > 0 ? `Lleva ${total(v.lineas.map((x) => ({ p: prod(x.productoId), n: x.asignada })))} · entregó ${total(v.lineas.map((x) => ({ p: prod(x.productoId), n: Math.min(x.entregado, x.asignada) })))}` : 'Sin carga asignada'}</div>
                     {asignado > 0 && (
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-niebla"><div className="h-full rounded-full bg-tinta" style={{ width: `${Math.min(100, (entregado / asignado) * 100)}%` }} /></div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-niebla"><div className="h-full rounded-md bg-tinta" style={{ width: `${Math.min(100, (entregado / asignado) * 100)}%` }} /></div>
                     )}
                   </div>
                   <ChevronRight size={18} className="shrink-0 text-apagado" />
@@ -178,7 +178,7 @@ export function StockAdmin({ selector }: { selector?: ReactNode }) {
 
 function Tarjeta({ valor, etiqueta }: { valor: string; etiqueta: string }) {
   return (
-    <div className="rounded-2xl bg-niebla p-3">
+    <div className="rounded-lg bg-niebla p-3">
       <div className="text-lg leading-6 font-semibold tabular-nums">{valor}</div>
       <div className="text-xs text-apagado">{etiqueta}</div>
     </div>
@@ -247,7 +247,7 @@ function HojaProduccion({ abierta, onCerrar, dia, sabores, onGuardado }: {
           </Fila>
         ))}
       </div>
-      {error && <p role="alert" className="mt-3 rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
+      {error && <p role="alert" className="mt-3 rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
     </Hoja>
   )
 }
@@ -303,7 +303,7 @@ function HojaCarga({ abierta, onCerrar, dia, sabores, vendedor, onGuardado }: {
       <p className="mb-1 text-sm text-apagado">
         Lo que se lleva de cada sabor al empezar el día.{puedeDevolver && ' Al cerrar, anota lo que regresa.'} Le llegará un aviso al guardar.
       </p>
-      {vendedor && !vendedor.activo && <p className="mb-1 rounded-xl bg-ambar/30 px-3 py-2 text-sm">Este vendedor está de baja: sólo se puede registrar lo que devolvió.</p>}
+      {vendedor && !vendedor.activo && <p className="mb-1 rounded-md bg-ambar/30 px-3 py-2 text-sm">Este vendedor está de baja: sólo se puede registrar lo que devolvió.</p>}
       <div className="divide-y divide-linea">
         {sabores.map((p) => {
           const antes = vendedor?.lineas.find((x) => x.productoId === p.id)
@@ -329,8 +329,8 @@ function HojaCarga({ abierta, onCerrar, dia, sabores, vendedor, onGuardado }: {
         const n = leerLitros(asignada[p.id] ?? '')
         const otros = suma(dia.vendedores.filter((v) => v.id !== vendedor?.id).flatMap((v) => v.lineas).filter((x) => x.productoId === p.id).map((x) => x.asignada))
         return prod && typeof n === 'number' && otros + n > prod.litros
-      }) && <p className="mt-3 rounded-xl bg-ambar/30 px-4 py-3 text-sm">Estás asignando más de lo que se produjo de algún sabor. Puedes guardarlo, pero revisa las cuentas.</p>}
-      {error && <p role="alert" className="mt-3 rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
+      }) && <p className="mt-3 rounded-md bg-ambar/30 px-4 py-3 text-sm">Estás asignando más de lo que se produjo de algún sabor. Puedes guardarlo, pero revisa las cuentas.</p>}
+      {error && <p role="alert" className="mt-3 rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
     </Hoja>
   )
 }

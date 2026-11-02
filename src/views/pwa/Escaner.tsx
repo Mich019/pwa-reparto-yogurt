@@ -76,7 +76,7 @@ export default function Escaner({ onCliente, onCerrar }: { onCliente: (c: Client
 
       {!errorCamara && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <div className="h-64 w-64 rounded-3xl border-4 border-white/90 shadow-[0_0_0_100vmax_rgba(0,0,0,0.45)]" />
+          <div className="h-64 w-64 rounded-lg border-4 border-white/90 shadow-[0_0_0_100vmax_rgba(0,0,0,0.45)]" />
         </div>
       )}
 
@@ -92,8 +92,8 @@ export default function Escaner({ onCliente, onCerrar }: { onCliente: (c: Client
       </div>
 
       <div className="absolute inset-x-0 bottom-0 px-4 pb-safe">
-        {mensaje && <div className="mx-auto mb-3 w-fit max-w-full rounded-full bg-ambar px-4 py-2.5 text-center text-sm font-semibold text-tinta">{mensaje}</div>}
-        <div className="mx-auto mb-2 max-w-xl space-y-1.5 rounded-2xl bg-papel p-4 text-tinta shadow-hoja">
+        {mensaje && <div className="mx-auto mb-3 w-fit max-w-full rounded-md bg-ambar px-4 py-2.5 text-center text-sm font-semibold text-tinta">{mensaje}</div>}
+        <div className="mx-auto mb-2 max-w-xl space-y-1.5 rounded-lg bg-papel p-4 text-tinta shadow-hoja">
           <div className="text-lg font-semibold">Escanear cliente</div>
           {errorCamara ? (
             <div className="text-sm text-rojo">{errorCamara}</div>

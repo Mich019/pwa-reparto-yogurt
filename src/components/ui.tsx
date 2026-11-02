@@ -64,7 +64,7 @@ export function Boton({ children, onClick, variante = 'primario', className = ''
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center justify-center gap-2 rounded-xl px-4 py-4 text-base font-semibold transition-colors disabled:opacity-40 ${estilos} ${className}`}
+      className={`flex items-center justify-center gap-2 rounded-md px-4 py-4 text-base font-semibold transition-colors disabled:opacity-40 ${estilos} ${className}`}
     >
       {children}
     </button>
@@ -84,7 +84,7 @@ export function Segmentado<T extends string>({ opciones, valor, onChange, classN
         <button
           key={o.valor}
           onClick={() => onChange(o.valor)}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${valor === o.valor ? 'bg-tinta text-white' : 'bg-niebla text-tinta active:bg-linea'}`}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${valor === o.valor ? 'bg-tinta text-white' : 'bg-niebla text-tinta active:bg-linea'}`}
         >
           {o.texto}
         </button>
@@ -106,7 +106,7 @@ export function Accion({ icono, texto, href, onClick }: { icono: ReactNode; text
 
 // Cada sabor se reconoce por su color en toda la app (el mismo de su tarjeta en el selector).
 export function PuntoSabor({ color, className = 'h-4 w-4' }: { color?: string; className?: string }) {
-  return <span aria-hidden="true" className={`inline-block shrink-0 rounded-full border border-black/15 ${className}`} style={{ background: color ?? '#d4d4d4' }} />
+  return <span aria-hidden="true" className={`inline-block shrink-0 rounded-md border border-black/15 ${className}`} style={{ background: color ?? '#d4d4d4' }} />
 }
 
 export function Campo({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
@@ -119,9 +119,9 @@ export function Campo({ etiqueta, children }: { etiqueta: string; children: Reac
 }
 
 export const claseInput =
-  'w-full rounded-xl border-2 border-transparent bg-niebla px-4 py-3.5 text-base text-tinta outline-none placeholder:text-apagado focus:border-tinta'
+  'w-full rounded-md border-2 border-transparent bg-niebla px-4 py-3.5 text-base text-tinta outline-none placeholder:text-apagado focus:border-tinta'
 // Las pantallas de entrada (login, código, recuperar contraseña) van con esquinas apenas redondeadas.
-export const claseInputRecto = claseInput.replace('rounded-xl', 'rounded-md')
+export const claseInputRecto = claseInput.replace('rounded-md', 'rounded-md')
 
 let avisar: (t: string) => void = () => {}
 export const aviso = (t: string) => avisar(t)
@@ -139,7 +139,7 @@ export function Avisos() {
   if (!texto) return null
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-center pt-safe">
-      <div className="mt-2 max-w-[92%] rounded-3xl bg-tinta px-5 py-3 text-center text-sm font-semibold text-white shadow-tarjeta">{texto}</div>
+      <div className="mt-2 max-w-[92%] rounded-lg bg-tinta px-5 py-3 text-center text-sm font-semibold text-white shadow-tarjeta">{texto}</div>
     </div>
   )
 }

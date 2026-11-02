@@ -255,11 +255,11 @@ export function MarcaEmpresa() {
           <div className="flex items-center gap-3 bg-papel px-4 py-3">
             {borrador.logo
               ? <img src={borrador.logo} alt="" className="h-10 max-w-[8rem] object-contain" />
-              : <span className="grid h-10 w-10 place-items-center rounded-xl text-lg font-bold text-white" style={{ background: fondoBoton }}>{iniciales}</span>}
+              : <span className="grid h-10 w-10 place-items-center rounded-md text-lg font-bold text-white" style={{ background: fondoBoton }}>{iniciales}</span>}
             <span className="truncate font-semibold">{borrador.nombre || 'Tu negocio'}</span>
           </div>
           <div className="bg-niebla p-4">
-            <div className="rounded-full py-3 text-center text-sm font-semibold text-white" style={{ background: fondoBoton }}>Nuevo pedido</div>
+            <div className="rounded-md py-3 text-center text-sm font-semibold text-white" style={{ background: fondoBoton }}>Nuevo pedido</div>
           </div>
         </div>
       </div>

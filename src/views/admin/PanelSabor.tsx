@@ -100,7 +100,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
         role="dialog"
         aria-modal="true"
         aria-labelledby={titulo}
-        className={`absolute inset-x-2 bottom-2 flex max-h-[90dvh] flex-col overflow-hidden rounded-[28px] border border-white/70 bg-papel shadow-[0_24px_80px_rgba(0,32,20,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] supports-[backdrop-filter]:bg-[rgba(253,253,248,0.8)] supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 sm:inset-x-auto sm:bottom-3 sm:left-3 sm:top-3 sm:max-h-none sm:w-[26rem] ${visible ? 'translate-y-0 sm:translate-x-0' : 'translate-y-[110%] sm:translate-y-0 sm:-translate-x-[110%]'}`}
+        className={`absolute inset-x-2 bottom-2 flex max-h-[90dvh] flex-col overflow-hidden rounded-lg border border-white/70 bg-papel shadow-[0_24px_80px_rgba(0,32,20,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] supports-[backdrop-filter]:bg-[rgba(253,253,248,0.8)] supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 sm:inset-x-auto sm:bottom-3 sm:left-3 sm:top-3 sm:max-h-none sm:w-[26rem] ${visible ? 'translate-y-0 sm:translate-x-0' : 'translate-y-[110%] sm:translate-y-0 sm:-translate-x-[110%]'}`}
       >
         <button
           ref={cerrar}
@@ -117,7 +117,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
             <Frasco color={p.color_hex} apagado={!p.disponible} className="h-48" />
           </div>
 
-          <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${primero ? 'bg-limon text-tinta' : p.disponible ? 'bg-(--chip-ok-fondo) text-(--chip-ok-texto)' : 'bg-niebla text-apagado'}`}>
+          <span className={`mt-3 inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${primero ? 'bg-limon text-tinta' : p.disponible ? 'bg-(--chip-ok-fondo) text-(--chip-ok-texto)' : 'bg-niebla text-apagado'}`}>
             {primero && <Trophy size={13} aria-hidden="true" />}
             {primero ? 'El que más se vendió' : p.disponible ? 'A la venta' : 'Sin stock'}
           </span>
@@ -128,7 +128,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
           {p.descripcion && <p className="mt-2 text-sm leading-relaxed text-tinta/80">{p.descripcion}</p>}
 
           {/* En la unidad del sabor: «Litros, 30 días», «Kilos, 30 días». */}
-          <dl className="mt-5 grid grid-cols-4 divide-x divide-linea rounded-2xl bg-papel/85 py-3 text-center">
+          <dl className="mt-5 grid grid-cols-4 divide-x divide-linea rounded-lg bg-papel/85 py-3 text-center">
             <Dato valor={litrosTxt(venta.litros, unidadDe(p))} etiqueta={`${mayuscula(nombreUnidad(unidadDe(p), 2))}, 30 días`} />
             <Dato valor={dinero(venta.ingreso)} etiqueta="Ingresos, 30 días" />
             <Dato valor={margen === null ? '—' : `${margen}%`} etiqueta={`Margen por ${nombreUnidad(unidadDe(p), 1)}`} />
@@ -149,14 +149,14 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
           <button
             type="button"
             onClick={() => onEditar(p)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-tinta px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-tinta px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
           >
             <Pencil size={16} aria-hidden="true" /> Editar sabor
           </button>
           <button
             type="button"
             onClick={() => void alternarDisponible()}
-            className="flex-1 rounded-full border border-tinta/25 bg-papel/60 px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-papel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
+            className="flex-1 rounded-md border border-tinta/25 bg-papel/60 px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-papel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
           >
             {p.disponible ? 'Marcar sin stock' : 'Poner a la venta'}
           </button>

@@ -30,9 +30,9 @@ export function ImagenQR({ texto, className = '', etiqueta = 'Código QR del cli
     }
     return d
   }, [m])
-  if (!m) return <div className={`aspect-square animate-pulse rounded-2xl bg-niebla ${className}`} />
+  if (!m) return <div className={`aspect-square animate-pulse rounded-lg bg-niebla ${className}`} />
   return (
-    <svg viewBox={`0 0 ${m.n + 8} ${m.n + 8}`} shapeRendering="crispEdges" role="img" aria-label={etiqueta} className={`aspect-square rounded-2xl bg-white ring-1 ring-linea ${className}`}>
+    <svg viewBox={`0 0 ${m.n + 8} ${m.n + 8}`} shapeRendering="crispEdges" role="img" aria-label={etiqueta} className={`aspect-square rounded-lg bg-white ring-1 ring-linea ${className}`}>
       <path d={ruta} fill="#000" />
     </svg>
   )
@@ -114,7 +114,7 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
         </div>
 
         {modo.t === 'reponer' ? (
-          <div className="space-y-3 rounded-2xl bg-niebla p-4">
+          <div className="space-y-3 rounded-lg bg-niebla p-4">
             <div className="font-semibold">¿Generar un QR nuevo?</div>
             <div className="text-sm text-apagado">El QR de ahora deja de funcionar en todos los teléfonos. Tendrás que imprimir el nuevo y cambiar el imán de {cliente.nombre}.</div>
             <div className="grid grid-cols-2 gap-2">
@@ -131,7 +131,7 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
 
         <div>
           <div className="mb-2 text-lg font-semibold tracking-tight">Tarjeta NFC</div>
-          <div className="rounded-2xl bg-niebla p-4">
+          <div className="rounded-lg bg-niebla p-4">
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-papel"><CreditCard size={22} /></span>
               <div className="min-w-0 flex-1">
@@ -142,7 +142,7 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
 
             {modo.t === 'leyendo' && (
               <div className="mt-4 space-y-3">
-                <div className="flex items-center gap-2 rounded-xl bg-papel p-3 text-sm font-semibold"><Nfc size={20} className="animate-pulse" /> Acerca la tarjeta a la parte trasera del teléfono…</div>
+                <div className="flex items-center gap-2 rounded-md bg-papel p-3 text-sm font-semibold"><Nfc size={20} className="animate-pulse" /> Acerca la tarjeta a la parte trasera del teléfono…</div>
                 <Boton variante="secundario" className="w-full" onClick={cancelar}>Cancelar</Boton>
               </div>
             )}

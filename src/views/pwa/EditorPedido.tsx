@@ -66,7 +66,7 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaIn
       }
       titulo={<div>{pedido ? 'Editar pedido' : 'Nuevo pedido'}<div className="text-base font-medium text-apagado">{cliente.nombre}</div></div>}>
       {puedeUrgente && (
-        <label className={`mb-4 flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 ${urgente ? 'border-rojo bg-rojo/10' : 'border-linea'}`}>
+        <label className={`mb-4 flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3 ${urgente ? 'border-rojo bg-rojo/10' : 'border-linea'}`}>
           <input type="checkbox" checked={urgente} onChange={(e) => setUrgente(e.target.checked)} className="h-5 w-5 accent-rojo" />
           <Flame size={18} className={urgente ? 'text-rojo' : 'text-apagado'} />
           <span className="min-w-0 flex-1 text-sm"><b>Urgente</b><span className="block text-xs text-apagado">Para hoy, va primero en la ruta y se le avisa al vendedor</span></span>
@@ -81,7 +81,7 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaIn
             <button
               key={d}
               onClick={() => setFecha(d)}
-              className={`rounded-full px-4 py-2.5 text-sm font-semibold ${fechaVista === d ? 'bg-tinta text-white' : 'bg-niebla text-tinta'}`}
+              className={`rounded-md px-4 py-2.5 text-sm font-semibold ${fechaVista === d ? 'bg-tinta text-white' : 'bg-niebla text-tinta'}`}
             >
               {textoFecha(d)}
               {d === sugerida && <span className="ml-1 opacity-70">★</span>}

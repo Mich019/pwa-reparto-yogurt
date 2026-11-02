@@ -25,7 +25,7 @@ function Etiqueta({ m }: { m: Miembro }) {
     : bloqueada(m) ? ['Bloqueada', 'bg-ambar/30 text-tinta']
     : m.debeCambiarPassword ? ['Clave temporal', 'bg-azul/10 text-azul']
     : ['', '']
-  return texto ? <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${clase}`}>{texto}</span> : null
+  return texto ? <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${clase}`}>{texto}</span> : null
 }
 
 export function Equipo() {
@@ -79,10 +79,10 @@ export function Equipo() {
         <div className="mt-3 flex items-center justify-between gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Equipo</h1>
           <div className="flex gap-2">
-            <button onClick={() => setInvitando(true)} className="flex items-center gap-2 rounded-full bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
+            <button onClick={() => setInvitando(true)} className="flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
               <Mail size={18} /> Invitar
             </button>
-            <button onClick={() => setForm('nuevo')} aria-label="Nueva cuenta" className="flex items-center gap-2 rounded-full bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700">
+            <button onClick={() => setForm('nuevo')} aria-label="Nueva cuenta" className="flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700">
               <UserPlus size={18} /> Nueva cuenta
             </button>
           </div>
@@ -91,7 +91,7 @@ export function Equipo() {
 
       <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28">
         {error && (
-          <div className="mt-3 rounded-2xl bg-rojo/10 p-4">
+          <div className="mt-3 rounded-lg bg-rojo/10 p-4">
             <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
             <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => void cargar()} disabled={cargando}>{cargando ? 'Cargando…' : 'Reintentar'}</Boton>
           </div>
@@ -99,7 +99,7 @@ export function Equipo() {
         {!equipo && !error && <div className="py-12 text-center text-apagado">Cargando equipo…</div>}
 
         {equipo && equipo.clientesSinAsignar > 0 && (
-          <button onClick={() => setCartera({ desde: SIN_VENDEDOR })} className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-ambar/20 p-4 text-left">
+          <button onClick={() => setCartera({ desde: SIN_VENDEDOR })} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-ambar/20 p-4 text-left">
             <TriangleAlert size={22} className="shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{plural(equipo.clientesSinAsignar, 'cliente sin vendedor', 'clientes sin vendedor')}</div>
@@ -231,13 +231,13 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
     <Hoja abierta onCerrar={onCerrar} titulo={m.nombre}>
       <div className="space-y-5 pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="flex items-center gap-1 rounded-full bg-niebla px-3 py-1.5 text-xs font-semibold">
+          <span className="flex items-center gap-1 rounded-md bg-niebla px-3 py-1.5 text-xs font-semibold">
             {m.rol === 'administrador' && <ShieldCheck size={14} />}{ROL_TEXTO[m.rol]}
           </span>
           <Etiqueta m={m} />
         </div>
 
-        <dl className="space-y-1 rounded-2xl bg-niebla p-4 text-sm">
+        <dl className="space-y-1 rounded-lg bg-niebla p-4 text-sm">
           <Linea t="Correo" v={m.correo} />
           <Linea t="Teléfono" v={m.telefono || '—'} />
           <Linea t="Último acceso" v={m.ultimoAcceso ? hace(new Date(m.ultimoAcceso).getTime()) : 'Todavía no ha entrado'} />
@@ -256,7 +256,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
         )}
 
         {confirmar === 'password' && (
-          <div className="space-y-3 rounded-2xl bg-niebla p-4">
+          <div className="space-y-3 rounded-lg bg-niebla p-4">
             <p className="font-semibold">¿Restablecer la contraseña de {m.nombre}?</p>
             <p className="text-sm text-apagado">Se cierran sus sesiones en todos sus teléfonos y, al entrar con la contraseña temporal, tendrá que elegir una propia.</p>
             <div className="grid grid-cols-2 gap-2">
@@ -267,7 +267,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
         )}
 
         {confirmar === 'baja' && (
-          <div className="space-y-3 rounded-2xl bg-rojo/10 p-4">
+          <div className="space-y-3 rounded-lg bg-rojo/10 p-4">
             <p className="font-semibold">¿Dar de baja a {m.nombre}?</p>
             <p className="text-sm">Deja de entrar al instante, en todos sus teléfonos. Sus clientes y su historial se conservan y puedes reactivarla cuando quieras.</p>
             {m.clientes > 0 && (
@@ -347,14 +347,14 @@ function FormMiembro({ miembro, esYo, onCerrar, onClave }: { miembro?: Miembro; 
         <div>
           <div className="mb-2 text-sm font-semibold text-apagado">Puesto</div>
           {esYo ? (
-            <p className="rounded-xl bg-niebla px-4 py-3.5 text-sm text-apagado">Eres administrador. Tu propio puesto no se puede cambiar; que lo haga otro administrador.</p>
+            <p className="rounded-md bg-niebla px-4 py-3.5 text-sm text-apagado">Eres administrador. Tu propio puesto no se puede cambiar; que lo haga otro administrador.</p>
           ) : (
             <Segmentado valor={rol} onChange={setRol} opciones={[{ valor: 'vendedor', texto: 'Vendedor' }, { valor: 'administrador', texto: 'Administrador' }]} />
           )}
           <p className="mt-2 text-xs text-apagado">El vendedor sólo ve su ruta y sus clientes. El administrador ve todo, incluidos costos y márgenes.</p>
         </div>
-        {!miembro && <p className="rounded-xl bg-niebla px-4 py-3 text-sm text-apagado">Al crearla se genera una contraseña temporal. En su primer ingreso tendrá que elegir una propia.</p>}
-        {error && <p role="alert" className="rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
+        {!miembro && <p className="rounded-md bg-niebla px-4 py-3 text-sm text-apagado">Al crearla se genera una contraseña temporal. En su primer ingreso tendrá que elegir una propia.</p>}
+        {error && <p role="alert" className="rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
         <button type="submit" className="hidden" />
       </form>
     </Hoja>
@@ -386,7 +386,7 @@ function ClaveTemporal({ datos, onCerrar }: { datos: DatosClave; onCerrar: () =>
         <p className="text-sm text-apagado">
           Dale a {datos.nombre} esta contraseña temporal por un medio privado. <strong className="text-tinta">Sólo se muestra ahora</strong>; al entrar con ella tendrá que elegir una propia.
         </p>
-        <div className="rounded-2xl bg-niebla px-4 py-5 text-center">
+        <div className="rounded-lg bg-niebla px-4 py-5 text-center">
           <div className="text-xs font-semibold text-apagado">{datos.correo}</div>
           <div data-testid="clave-temporal" className="mt-1.5 font-mono text-3xl font-bold tracking-wider select-all">{datos.password}</div>
         </div>
@@ -506,10 +506,10 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
           </div>
         )}
 
-        <p className="rounded-xl bg-niebla px-4 py-3 text-sm text-apagado">
+        <p className="rounded-md bg-niebla px-4 py-3 text-sm text-apagado">
           Los clientes pasan con sus pedidos agendados y recordatorios pendientes. Lo ya entregado se queda como venta de quien lo hizo, pero el nuevo vendedor lo ve en el historial. Al sincronizar, el teléfono anterior deja de mostrarlos.
         </p>
-        {error && <p role="alert" className="rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
+        {error && <p role="alert" className="rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
       </div>
     </Hoja>
   )
@@ -555,7 +555,7 @@ export function CambiarVendedor({ cliente, onCerrar }: { cliente: Cliente; onCer
             {o.id === actual ? <span className="flex items-center gap-1 text-sm font-semibold"><Check size={16} /> Actual</span> : <ChevronRight size={18} className="shrink-0 text-apagado/60" />}
           </button>
         ))}
-        {error && <p role="alert" className="mt-3 rounded-xl bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
+        {error && <p role="alert" className="mt-3 rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
       </div>
     </Hoja>
   )

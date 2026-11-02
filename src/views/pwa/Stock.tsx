@@ -39,7 +39,7 @@ export function Stock() {
       {filas === undefined ? (
         <div className="mt-10 text-center text-apagado">Cargando…</div>
       ) : filas.length === 0 ? (
-        <div className="mt-6 rounded-2xl bg-niebla p-6 text-center">
+        <div className="mt-6 rounded-lg bg-niebla p-6 text-center">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-papel"><Package size={26} /></span>
           <div className="mt-3 text-lg font-semibold">Aún no tienes carga asignada hoy</div>
           <p className="mt-1 text-sm text-apagado">Cuando el administrador registre lo que llevas, aparecerá aquí y te llegará un aviso.</p>
@@ -50,12 +50,12 @@ export function Stock() {
         </div>
       ) : (
         <>
-          <section className="mt-4 rounded-2xl bg-niebla p-4" aria-label="Resumen de la carga">
+          <section className="mt-4 rounded-lg bg-niebla p-4" aria-label="Resumen de la carga">
             <div className="text-sm font-medium text-apagado">Te quedan</div>
             <div className="mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums">{total((f) => f.restante)}</div>
             <div className="mt-1 text-sm text-apagado">de {total((f) => f.asignada)} que llevabas</div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-papel" role="img" aria-label={`Entregaste ${total((f) => Math.min(f.entregado, f.asignada))} de ${total((f) => f.asignada)}`}>
-              <div className="h-full rounded-full bg-tinta transition-[width]" style={{ width: `${asignada ? Math.min(100, (entregado / asignada) * 100) : 0}%` }} />
+              <div className="h-full rounded-md bg-tinta transition-[width]" style={{ width: `${asignada ? Math.min(100, (entregado / asignada) * 100) : 0}%` }} />
             </div>
             <div className="mt-2 flex justify-between text-xs text-apagado">
               <span>Entregaste {total((f) => Math.min(f.entregado, f.asignada))}</span>
@@ -74,7 +74,7 @@ export function Stock() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate font-semibold">{p?.sabor ?? 'Sabor'}</span>
-                        {etiqueta && <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${etiqueta.clase}`}>{etiqueta.texto}</span>}
+                        {etiqueta && <span className={`shrink-0 rounded-md px-2.5 py-0.5 text-xs font-semibold ${etiqueta.clase}`}>{etiqueta.texto}</span>}
                       </div>
                       <div className="text-xs text-apagado">
                         {f.asignada > 0 ? `Llevabas ${l(f.asignada, p)} · entregaste ${l(f.entregado, p)}` : 'Sin carga asignada'}
@@ -87,7 +87,7 @@ export function Stock() {
                   </div>
                   {f.asignada > 0 && (
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-niebla">
-                      <div className={`h-full rounded-full ${f.nivel === 'ok' ? 'bg-tinta' : f.nivel === 'agotado' ? 'bg-rojo' : 'bg-ambar'}`} style={{ width: `${Math.min(100, (f.restante / f.asignada) * 100)}%` }} />
+                      <div className={`h-full rounded-md ${f.nivel === 'ok' ? 'bg-tinta' : f.nivel === 'agotado' ? 'bg-rojo' : 'bg-ambar'}`} style={{ width: `${Math.min(100, (f.restante / f.asignada) * 100)}%` }} />
                     </div>
                   )}
                   {(f.pendiente > 0 || f.devuelta > 0) && (

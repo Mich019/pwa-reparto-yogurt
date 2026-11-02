@@ -28,13 +28,13 @@ export function AdminSabores() {
         <button
           type="button"
           onClick={() => void ficha.editar()}
-          className="flex items-center gap-2 rounded-full bg-tinta px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
+          className="flex items-center gap-2 rounded-md bg-tinta px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
         >
           <Plus size={18} aria-hidden="true" /> Nuevo sabor
         </button>
       </header>
 
-      <section aria-label="Sabores" className="rounded-[28px] bg-niebla p-3 sm:p-5">
+      <section aria-label="Sabores" className="rounded-lg bg-niebla p-3 sm:p-5">
         {productos && !ordenados.length ? (
           <Vacio>Todavía no hay sabores. Agrega el primero con «Nuevo sabor».</Vacio>
         ) : (
@@ -49,7 +49,7 @@ export function AdminSabores() {
       </section>
 
       {/* Sin relleno: los botones de la copia son beige y se perderían sobre una tarjeta beige */}
-      <section className="mt-4 rounded-[28px] border border-linea p-5 sm:p-6" aria-labelledby="copia">
+      <section className="mt-4 rounded-lg border border-linea p-5 sm:p-6" aria-labelledby="copia">
         <h2 id="copia" className="text-xl font-semibold">Copia de seguridad</h2>
         <DatosYRespaldo equipo="equipo" />
       </section>

@@ -80,7 +80,7 @@ function Visor({ pdf, nombre, onCerrar }: Abierto & { onCerrar: () => void }) {
     try { await compartirPdf(pdf.bytes, nombre) } finally { setCompartiendo(false) }
   }
 
-  const boton = 'flex h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors disabled:opacity-40'
+  const boton = 'flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-40'
   return (
     <div className="fixed inset-0 z-[55] flex flex-col bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="visor-pdf-titulo">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-linea bg-papel px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-5">
@@ -88,9 +88,9 @@ function Visor({ pdf, nombre, onCerrar }: Abierto & { onCerrar: () => void }) {
           <h2 id="visor-pdf-titulo" className="truncate text-base font-semibold">Vista previa · {pdf.titulo}</h2>
           <p className="text-xs text-apagado">{n} {n === 1 ? 'página' : 'páginas'} · {Math.round(ancho)} × {Math.round(alto)} mm</p>
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-niebla p-1" role="group" aria-label="Zoom">
+        <div className="flex items-center gap-1 rounded-md bg-niebla p-1" role="group" aria-label="Zoom">
           <button type="button" onClick={() => setZoom((z) => Math.max(ZOOM.min, z - ZOOM.paso))} disabled={zoom <= ZOOM.min} aria-label="Alejar" className="grid h-8 w-8 place-items-center rounded-full hover:bg-papel disabled:opacity-40"><Minus size={16} /></button>
-          <button type="button" onClick={() => setZoom(1)} className="min-w-12 rounded-full px-1 text-xs font-semibold tabular-nums hover:bg-papel" title="Tamaño normal">{Math.round(zoom * 100)} %</button>
+          <button type="button" onClick={() => setZoom(1)} className="min-w-12 rounded-md px-1 text-xs font-semibold tabular-nums hover:bg-papel" title="Tamaño normal">{Math.round(zoom * 100)} %</button>
           <button type="button" onClick={() => setZoom((z) => Math.min(ZOOM.max, z + ZOOM.paso))} disabled={zoom >= ZOOM.max} aria-label="Acercar" className="grid h-8 w-8 place-items-center rounded-full hover:bg-papel disabled:opacity-40"><Plus size={16} /></button>
         </div>
         <button ref={cerrar} type="button" onClick={onCerrar} aria-label="Cerrar vista previa" className="grid h-10 w-10 place-items-center rounded-full bg-niebla transition-colors hover:bg-linea"><X size={18} /></button>

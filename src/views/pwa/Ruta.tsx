@@ -58,7 +58,7 @@ function useUbicacion() {
 }
 
 const Urgente = ({ className = '' }: { className?: string }) => (
-  <span className={`inline-flex items-center gap-1 rounded-full bg-rojo px-2 py-0.5 text-[11px] font-bold tracking-wide text-white ${className}`}><Flame size={11} />URGENTE</span>
+  <span className={`inline-flex items-center gap-1 rounded-md bg-rojo px-2 py-0.5 text-[11px] font-bold tracking-wide text-white ${className}`}><Flame size={11} />URGENTE</span>
 )
 
 export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irAStock?: () => void }) {
@@ -256,7 +256,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
             <BotonRedondo onClick={() => setVerRecordatorios(true)} etiqueta="Recordatorios">
               <Bell size={20} />
               {recordatorios.length > 0 && (
-                <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-tinta px-1 text-[11px] font-bold text-white ring-2 ring-papel">{recordatorios.length}</span>
+                <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-md bg-tinta px-1 text-[11px] font-bold text-white ring-2 ring-papel">{recordatorios.length}</span>
               )}
             </BotonRedondo>
           </div>
@@ -265,7 +265,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               <ScanLine size={20} />
             </BotonRedondo>
           </div>
-          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-papel px-5 py-2.5 shadow-tarjeta">
+          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md bg-papel px-5 py-2.5 shadow-tarjeta">
             <span className="text-lg leading-none font-semibold tabular-nums">{dinero(totalDia)}</span>
             {enLinea ? (
               <span className="text-xs font-medium text-apagado">cobrado hoy</span>
@@ -276,7 +276,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
         </div>
 
         {activo && clienteActivo && (
-          <div className="pointer-events-auto mt-3 flex items-center gap-3 rounded-2xl bg-papel p-3 shadow-tarjeta">
+          <div className="pointer-events-auto mt-3 flex items-center gap-3 rounded-lg bg-papel p-3 shadow-tarjeta">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-niebla"><span className="h-3.5 w-3.5 bg-tinta" /></span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-xs font-semibold text-apagado">Parada {orden.indexOf(activo.id) + 1} de {orden.length}{activo.urgente && <Urgente />}</div>
@@ -288,7 +288,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
         <AlertasRuta irAStock={irAStock} />
 
         {ruta && !ruta.porCalles && orden.length > 0 && (
-          <div className="pointer-events-auto mt-2 rounded-xl bg-ambar px-3 py-2 text-xs font-semibold text-tinta">
+          <div className="pointer-events-auto mt-2 rounded-md bg-ambar px-3 py-2 text-xs font-semibold text-tinta">
             Sin conexión al ruteador: orden aproximado en línea recta. Toca ↻ al tener señal.
           </div>
         )}
@@ -331,7 +331,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                   {activo.items.map((i) => {
                     const p = prodPorId.get(i.productoId)
                     return (
-                      <span key={i.productoId} className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
+                      <span key={i.productoId} className="flex items-center gap-2 rounded-md bg-niebla py-1.5 pr-3.5 pl-2 text-sm font-medium">
                         <PuntoSabor color={p?.color_hex} />
                         {textoCantidad(i.litros, p)} {p?.sabor ?? '¿?'}
                       </span>
@@ -358,7 +358,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                       ]}
                     />
                     {clienteActivo.notas && (
-                      <div className="mt-4 flex gap-2.5 rounded-xl bg-niebla p-3 text-sm">
+                      <div className="mt-4 flex gap-2.5 rounded-md bg-niebla p-3 text-sm">
                         <StickyNote size={18} className="mt-0.5 shrink-0 text-apagado" />
                         {clienteActivo.notas}
                       </div>
@@ -393,7 +393,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                 <button
                   onClick={() => setExpandida(!expandida)}
                   aria-label={expandida ? 'Ver menos' : 'Ver más'}
-                  className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-niebla active:bg-linea"
+                  className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-niebla active:bg-linea"
                 >
                   <ChevronUp size={24} className={`transition-transform ${expandida ? 'rotate-180' : ''}`} />
                 </button>
@@ -416,7 +416,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               <div className="mt-1 text-sm text-apagado">
                 {MODO_SERVIDOR ? 'Agenda pedidos desde Clientes.' : 'Agenda pedidos desde Clientes, o prueba la app con datos de ejemplo.'}
               </div>
-              <button onClick={irAClientes} className="mt-4 flex w-full items-center gap-3 rounded-xl bg-niebla px-4 py-4 text-left text-lg font-semibold text-apagado active:bg-linea">
+              <button onClick={irAClientes} className="mt-4 flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-4 text-left text-lg font-semibold text-apagado active:bg-linea">
                 <ArrowRight size={20} className="text-tinta" /> ¿A quién le llevamos?
               </button>
               {/* Sólo sin servidor: con servidor los clientes de ejemplo se subirían como clientes reales. */}
@@ -439,7 +439,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
           {totalPedidos > 0 && (
             <div className="border-t border-linea px-5 pt-3.5 pb-3.5">
               <div className="h-1 overflow-hidden rounded-full bg-linea">
-                <div className="h-full rounded-full bg-tinta transition-all duration-500" style={{ width: `${avance}%` }} />
+                <div className="h-full rounded-md bg-tinta transition-all duration-500" style={{ width: `${avance}%` }} />
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3">
                 <Dato valor={`${entregados.length} de ${totalPedidos}`} etiqueta="entregas" />
@@ -467,10 +467,10 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
         {clientePost && paso === 'opciones' && (
           <div className="space-y-2.5 pb-3">
             {nuevaUbicacion?.clienteId === clientePost.id && (
-              <div className="flex items-center gap-3 rounded-2xl bg-ambar/25 p-3 text-sm">
+              <div className="flex items-center gap-3 rounded-lg bg-ambar/25 p-3 text-sm">
                 <MapPin size={20} className="shrink-0" />
                 <span className="min-w-0 flex-1">¿Estás en su domicilio? Su ubicación guardada está a {Math.round(nuevaUbicacion.metros)} m de aquí.</span>
-                <button onClick={() => void guardarUbicacion()} className="shrink-0 rounded-full bg-papel px-3 py-2 font-semibold active:bg-linea">Guardar aquí</button>
+                <button onClick={() => void guardarUbicacion()} className="shrink-0 rounded-md bg-papel px-3 py-2 font-semibold active:bg-linea">Guardar aquí</button>
               </div>
             )}
             <div className="pb-1 text-apagado">¿Qué sigue con <b className="text-tinta">{clientePost.nombre}</b>?</div>
@@ -542,13 +542,13 @@ function Recordatorios({ abierta, onCerrar, porId, onPedido }: {
           if (!c) return null
           const msg = encodeURIComponent(`Hola ${c.nombre}, ¿qué sabores de yogurt te llevo en la próxima visita? 🍓`)
           return (
-            <div key={r.id} className="rounded-2xl bg-niebla p-4">
+            <div key={r.id} className="rounded-lg bg-niebla p-4">
               <div className="text-lg font-semibold">{c.nombre}</div>
               <div className="text-sm text-apagado">Desde {textoFecha(iso(new Date(r.creado))).toLowerCase()}</div>
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <a href={`https://wa.me/${telLimpio(c.telefono)}?text=${msg}`} target="_blank" className="rounded-xl bg-verde py-3 text-center text-sm font-semibold text-white">WhatsApp</a>
-                <button onClick={() => onPedido(c)} className="rounded-xl bg-tinta py-3 text-sm font-semibold text-white">Pedido</button>
-                <button onClick={() => guardar('recordatorios', { ...r, hecho: true })} className="rounded-xl bg-linea py-3 text-sm font-semibold">Listo</button>
+                <a href={`https://wa.me/${telLimpio(c.telefono)}?text=${msg}`} target="_blank" className="rounded-md bg-verde py-3 text-center text-sm font-semibold text-white">WhatsApp</a>
+                <button onClick={() => onPedido(c)} className="rounded-md bg-tinta py-3 text-sm font-semibold text-white">Pedido</button>
+                <button onClick={() => guardar('recordatorios', { ...r, hecho: true })} className="rounded-md bg-linea py-3 text-sm font-semibold">Listo</button>
               </div>
             </div>
           )
@@ -577,7 +577,7 @@ function Dato({ valor, etiqueta }: { valor: string; etiqueta: string }) {
 
 function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: ReactNode; titulo: string; sub: string; destacada?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-2xl bg-niebla p-4 text-left transition-colors active:bg-linea">
+    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-lg bg-niebla p-4 text-left transition-colors active:bg-linea">
       <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${destacada ? 'bg-tinta text-white' : 'bg-papel'}`}>{icono}</div>
       <div className="min-w-0 flex-1">
         <div className="text-lg font-semibold">{titulo}</div>

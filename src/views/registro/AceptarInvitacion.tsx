@@ -65,7 +65,7 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
         <span className="grid h-16 w-16 place-items-center rounded-full bg-niebla text-apagado"><AlertCircle size={32} /></span>
         <h1 className="mt-6 text-[1.9rem] font-semibold leading-tight">Esta invitación ya no sirve</h1>
         <p className="mt-2 max-w-sm text-apagado">{error || 'Ya se usó o venció. Pide a quien te invitó que te mande otra.'}</p>
-        <button type="button" onClick={onListo} className="mt-8 rounded-full bg-niebla px-8 py-4 font-semibold text-tinta hover:bg-linea">
+        <button type="button" onClick={onListo} className="mt-8 rounded-md bg-niebla px-8 py-4 font-semibold text-tinta hover:bg-linea">
           Ir a iniciar sesión
         </button>
       </div>
@@ -77,8 +77,8 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
     <form onSubmit={crear} noValidate className="mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-4 py-10">
       <div className="flex items-center gap-3">
         {inv.empresa.logo
-          ? <img src={inv.empresa.logo} alt="" className="h-14 w-14 rounded-2xl bg-papel object-contain p-1.5 ring-1 ring-linea" />
-          : <span className="grid h-14 w-14 place-items-center rounded-2xl bg-tinta text-2xl font-bold text-white" style={{ background: color }}>{inv.empresa.nombre.slice(0, 1).toUpperCase()}</span>}
+          ? <img src={inv.empresa.logo} alt="" className="h-14 w-14 rounded-lg bg-papel object-contain p-1.5 ring-1 ring-linea" />
+          : <span className="grid h-14 w-14 place-items-center rounded-lg bg-tinta text-2xl font-bold text-white" style={{ background: color }}>{inv.empresa.nombre.slice(0, 1).toUpperCase()}</span>}
         <span className="text-lg font-semibold">{inv.empresa.nombre}</span>
       </div>
       <h1 className="mt-8 text-[1.9rem] font-semibold leading-[1.15]">Te invitaron a repartir</h1>
@@ -112,7 +112,7 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
       <button
         type="submit"
         disabled={estado === 'enviando'}
-        className={`mt-8 flex items-center justify-center gap-2 rounded-full bg-tinta py-4 text-base font-semibold text-white transition-opacity hover:bg-marca-oscuro disabled:opacity-40 ${falta ? 'opacity-50' : ''}`}
+        className={`mt-8 flex items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white transition-opacity hover:bg-marca-oscuro disabled:opacity-40 ${falta ? 'opacity-50' : ''}`}
       >
         {estado === 'enviando' ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Creando…</> : <>Crear mi cuenta <ArrowRight size={18} /></>}
       </button>
