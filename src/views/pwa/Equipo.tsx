@@ -11,6 +11,7 @@ import { hace } from '../../lib/fechas'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
+import { BuscadorDesplegable, Encabezado, botonPanel, botonPanelSuave } from '../admin/piezas'
 
 // M07 · Alta y baja de vendedores y reasignación de clientes (RF-038 a RF-041). Sólo para el administrador.
 
@@ -28,7 +29,8 @@ function Etiqueta({ m }: { m: Miembro }) {
   return texto ? <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${clase}`}>{texto}</span> : null
 }
 
-export function Equipo() {
+// `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
+export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const yo = useSesion()?.usuario
   const equipo = useEquipo()
   const [error, setError] = useState('')
@@ -38,6 +40,8 @@ export function Equipo() {
   const [clave, setClave] = useState<DatosClave | null>(null)
   const [cartera, setCartera] = useState<{ desde: string } | null>(null)
   const [invitando, setInvitando] = useState(false)
+  const [q, setQ] = useState('')
+  const [verBaja, setVerBaja] = useState(false)
 
   async function cargar() {
     setCargando(true)
@@ -55,9 +59,12 @@ export function Equipo() {
   const ficha = equipo?.usuarios.find((u) => u.id === fichaId)
   const activos = equipo?.usuarios.filter((u) => u.activo) ?? []
   const deBaja = equipo?.usuarios.filter((u) => !u.activo) ?? []
+  // Panel: como Clientes, busca por nombre o correo y muestra una lista a la vez (activas o dadas de baja).
+  const t = q.trim().toLowerCase()
+  const lista = (verBaja ? deBaja : activos).filter((m) => !t || `${m.nombre} ${m.correo}`.toLowerCase().includes(t))
 
-  const fila = (m: Miembro) => (
-    <button key={m.id} onClick={() => setFichaId(m.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left active:bg-niebla">
+  const fila =(m: Miembro) => (
+    <button key={m.id} onClick={() => setFichaId(m.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left transition-colors hover:bg-niebla/40 active:bg-niebla">
       <Avatar nombre={m.nombre} foto={m.foto} className={`h-12 w-12 text-lg bg-niebla ${m.activo ? '' : 'text-apagado opacity-60'}`} />
       <div className="min-w-0 flex-1">
         <div className={`truncate text-base leading-5 font-semibold ${m.activo ? '' : 'text-apagado'}`}>
@@ -66,6 +73,7 @@ export function Equipo() {
         <div className="mt-0.5 flex items-center gap-1 truncate text-sm text-apagado">
           {m.rol === 'administrador' && <ShieldCheck size={14} className="shrink-0" />}
           {m.rol === 'administrador' ? ROL_TEXTO.administrador : plural(m.clientes, 'cliente', 'clientes')}
+          {panel && <span className="truncate"> · {m.correo}</span>}
         </div>
       </div>
       <Etiqueta m={m} />
@@ -73,23 +81,40 @@ export function Equipo() {
     </button>
   )
 
+  const botones = (
+    <>
+      <button onClick={() => setInvitando(true)} className={panel ? botonPanelSuave : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+        <Mail size={18} /> Invitar
+      </button>
+      <button onClick={() => setForm('nuevo')} className={panel ? botonPanel : 'flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700'}>
+        <UserPlus size={18} /> Nueva cuenta
+      </button>
+    </>
+  )
+  const columnas = panel ? 'grid gap-x-10 lg:grid-cols-2' : ''
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-4 pt-safe">
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Equipo</h1>
-          <div className="flex gap-2">
-            <button onClick={() => setInvitando(true)} className="flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
-              <Mail size={18} /> Invitar
-            </button>
-            <button onClick={() => setForm('nuevo')} aria-label="Nueva cuenta" className="flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700">
-              <UserPlus size={18} /> Nueva cuenta
-            </button>
+    <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'flex h-full flex-col'}>
+      {panel ? (
+        <Encabezado titulo="Equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : 'Cargando…'}>
+          <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" />
+          <div className="flex gap-1" role="group" aria-label="Mostrar">
+            <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activas</button>
+            <button onClick={() => setVerBaja(true)} aria-pressed={verBaja} className={verBaja ? botonPanel : botonPanelSuave}>Dadas de baja</button>
+          </div>
+          <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+          {botones}
+        </Encabezado>
+      ) : (
+        <div className="px-4 pt-safe">
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">Equipo</h1>
+            <div className="flex gap-2">{botones}</div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28">
+      <div className={panel ? '' : 'flex-1 overflow-y-auto px-4 pt-2 pb-28'}>
         {error && (
           <div className="mt-3 rounded-lg bg-rojo/10 p-4">
             <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
@@ -109,12 +134,19 @@ export function Equipo() {
           </button>
         )}
 
-        {activos.map(fila)}
+        {panel ? (
+          <div className={columnas}>
+            {equipo && lista.map(fila)}
+            {equipo && !lista.length && (
+              <div className="py-12 text-center text-apagado lg:col-span-2">{t ? 'Sin resultados' : verBaja ? 'Nadie dado de baja.' : 'Todavía no hay cuentas activas.'}</div>
+            )}
+          </div>
+        ) : <div className={columnas}>{activos.map(fila)}</div>}
 
-        {deBaja.length > 0 && (
+        {!panel && deBaja.length > 0 && (
           <>
             <div className="mt-5 mb-1 text-sm font-semibold text-apagado">Dados de baja</div>
-            {deBaja.map(fila)}
+            <div className={columnas}>{deBaja.map(fila)}</div>
           </>
         )}
       </div>

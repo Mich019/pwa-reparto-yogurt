@@ -10,7 +10,7 @@ import type { SeccionAdmin } from './AdminLayout'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { useFichaSabor } from './PanelSabor'
 import { textoPorUnidad } from '../../lib/unidades'
-import { ChipEstado, Delta, TarjetaSabor, Vacio } from './piezas'
+import { ChipEstado, Delta, Subrayado, TarjetaSabor, Vacio } from './piezas'
 
 export interface DashboardStats {
   fecha: string
@@ -168,12 +168,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           <h1 className="text-[2.5rem] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-5xl xl:text-[3.5rem]">
             {saludo()},
             <br />
-            <span className="relative isolate inline-block">
-              {nombre || 'equipo'}
-              <svg aria-hidden="true" viewBox="0 0 200 14" preserveAspectRatio="none" className="absolute -bottom-[0.02em] -left-[0.04em] -z-10 h-[0.3em] w-[calc(100%+0.1em)]">
-                <path d="M3 9 C 45 3, 95 11, 135 6 S 190 5, 197 8" stroke="#f9dc07" strokeWidth="9" strokeLinecap="round" fill="none" />
-              </svg>
-            </span>
+            <Subrayado>{nombre || 'equipo'}</Subrayado>
           </h1>
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-apagado">
             <span className="first-letter:uppercase">{fechaTexto || 'Cargando…'}</span>

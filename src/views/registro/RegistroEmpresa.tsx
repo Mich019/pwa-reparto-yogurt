@@ -579,8 +579,8 @@ function Agregar({ placeholder, onAgregar, tipo = 'text', enfocar = false }: { p
         placeholder={placeholder}
         className={`${claseInput} flex-1`}
       />
-      <button type="button" onClick={agregar} disabled={!v.trim()} className="grid w-14 shrink-0 place-items-center rounded-md bg-tinta text-white disabled:opacity-30" aria-label="Agregar">
-        <Plus size={22} />
+      <button type="button" onClick={agregar} disabled={!v.trim()} className="shrink-0 rounded-md bg-tinta px-5 font-semibold text-white disabled:opacity-30">
+        Agregar
       </button>
     </div>
   )

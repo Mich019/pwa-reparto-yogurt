@@ -70,3 +70,9 @@ body {
 
 /* Cada paso del registro (views/registro) y lo que se revela dentro entra deslizándose un poco. */
 @keyframes paso-entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* El trazo amarillo (Subrayado en views/admin/piezas.tsx) se dibuja de izquierda a derecha al aparecer. Sólo anima
+   stroke-dashoffset de un path corto (pathLength=1), sin tocar el layout; sin animación si el sistema pide menos movimiento. */
+@keyframes trazo-dibujar { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.trazo-dibujar { stroke-dasharray: 1; animation: trazo-dibujar 0.55s cubic-bezier(0.65, 0, 0.35, 1) 0.05s both; }
+@media (prefers-reduced-motion: reduce) { .trazo-dibujar { animation: none; } }

@@ -9,7 +9,7 @@ import { formato, sumaPorUnidad, unidadDe } from '../../lib/unidades'
 
 const PERIODOS = { hoy: 'Hoy', semana: '7 días', mes: '30 días' } as const
 
-export function Pronostico({ selector }: { selector?: ReactNode }) {
+export function Pronostico({ selector, conVentas = true }: { selector?: ReactNode; conVentas?: boolean }) {
   const clientes = useLiveQuery(() => db.clientes.toArray(), []) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
@@ -34,7 +34,7 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
 
   return (
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">Producción y ventas</h1>
+      <h1 className="mt-3 text-3xl font-bold tracking-tight">{conVentas ? 'Producción y ventas' : 'Producción'}</h1>
       {selector && <div className="mt-3">{selector}</div>}
 
       <section className="mt-4">
@@ -71,6 +71,7 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
         )}
       </section>
 
+      {conVentas && <>
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight">Ventas</h2>
         <Segmentado
@@ -116,6 +117,7 @@ export function Pronostico({ selector }: { selector?: ReactNode }) {
           </div>
         </>
       )}
+      </>}
     </div>
   )
 }

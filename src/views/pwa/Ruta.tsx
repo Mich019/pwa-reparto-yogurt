@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Flame, MapPin, Navigation, Pencil, Phone, PlusCircle, RefreshCw, ScanLine, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
+  Flame, MapPin, Navigation, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
@@ -474,7 +474,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               </div>
             )}
             <div className="pb-1 text-apagado">¿Qué sigue con <b className="text-tinta">{clientePost.nombre}</b>?</div>
-            <OpcionGrande destacada icono={<PlusCircle size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
+            <OpcionGrande destacada icono={<ShoppingBag size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
             <OpcionGrande icono={<Clock size={26} />} titulo="Recordar más tarde" sub="Te aviso para escribirle o llamarle" onClick={recordarMasTarde} />
             <OpcionGrande icono={<X size={26} />} titulo="Cerrar" sub="Ir a la siguiente parada" onClick={() => siguiente()} />
           </div>
@@ -488,7 +488,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               sub={postEntrega!.items.map((i) => `${textoCantidad(i.litros, prodPorId.get(i.productoId))} ${prodPorId.get(i.productoId)?.sabor ?? ''}`).join(' · ')}
               onClick={() => { setEditor({ cliente: clientePost, base: baseAnterior }); setPostEntrega(null) }}
             />
-            <OpcionGrande icono={<PlusCircle size={26} />} titulo="Desde cero" sub="Todos los sabores en 0" onClick={() => { setEditor({ cliente: clientePost, base: {} }); setPostEntrega(null) }} />
+            <OpcionGrande icono={<CircleDashed size={26} />} titulo="Desde cero" sub="Todos los sabores en 0" onClick={() => { setEditor({ cliente: clientePost, base: {} }); setPostEntrega(null) }} />
             <button onClick={() => setPaso('opciones')} className="w-full py-3 text-sm font-semibold text-apagado">← Volver</button>
           </div>
         )}

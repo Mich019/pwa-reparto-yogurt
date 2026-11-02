@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, Plus, Trash2, Upload } from 'lucide-react'
+import { Download, IceCreamBowl, Trash2, Upload } from 'lucide-react'
 import { borrar, db, guardar, guardarVarios, uid, type Producto } from '../../lib/db'
 import { dinero, hoy } from '../../lib/fechas'
 import { borrarTodo } from '../../lib/demo'
@@ -34,7 +34,7 @@ export function Ajustes() {
             <div className="text-sm font-semibold text-verde">+{dinero(p.precio_litro - p.costo_litro)}</div>
           </button>
         ))}
-        <Boton variante="secundario" className="w-full" onClick={() => setEditando('nuevo')}><Plus size={18} /> Nuevo sabor</Boton>
+        <Boton variante="secundario" className="w-full" onClick={() => setEditando('nuevo')}><IceCreamBowl size={18} /> Nuevo sabor</Boton>
       </div>
 
       <h2 className="mt-8 text-2xl font-semibold tracking-tight">Tus datos</h2>
@@ -53,7 +53,8 @@ export function Ajustes() {
 
 // Respaldo, restauración y (sin servidor) borrado de datos. `equipo` es el aparato donde se guarda: el teléfono, o la
 // computadora en el panel de administración.
-export function DatosYRespaldo({ equipo = 'teléfono' }: { equipo?: string }) {
+// `compacto` (panel): una sola línea con el texto a la izquierda y los botones chicos a la derecha.
+export function DatosYRespaldo({ equipo = 'teléfono', compacto = false }: { equipo?: string; compacto?: boolean }) {
   const cola = useLiveQuery(() => db.cola.count(), []) ?? 0
   const [confirmarBorrado, setConfirmarBorrado] = useState(false)
 
@@ -89,21 +90,42 @@ export function DatosYRespaldo({ equipo = 'teléfono' }: { equipo?: string }) {
     }
   }
 
+  const texto = (
+    <>
+      Todo se guarda en este {equipo} y funciona sin internet.
+      {MODO_SERVIDOR
+        ? cola > 0 ? <> Hay {cola} cambios por enviar al servidor; salen solos cuando haya señal.</> : <> Se sincroniza solo con el servidor.</>
+        : <> Mientras no haya servidor, descarga un respaldo seguido.{cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}</>}
+    </>
+  )
+  const restaurar = (clase: string) => (
+    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-md bg-niebla font-semibold hover:bg-linea active:bg-linea focus-within:outline-2 focus-within:outline-marca ${clase}`}>
+      <Upload size={compacto ? 16 : 18} /> Restaurar
+      <input type="file" accept="application/json" className="sr-only" onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])} />
+    </label>
+  )
+
   return (
     <>
-      <p className="mt-1 text-sm text-apagado">
-        Todo se guarda en este {equipo} y funciona sin internet.
-        {MODO_SERVIDOR
-          ? cola > 0 ? <> Hay {cola} cambios por enviar al servidor; salen solos cuando haya señal.</> : <> Se sincroniza solo con el servidor.</>
-          : <> Mientras no haya servidor, descarga un respaldo seguido.{cola > 0 && <> Hay {cola} cambios listos para subir cuando se conecte el servidor.</>}</>}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Boton variante="secundario" onClick={exportar}><Download size={18} /> Respaldo</Boton>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md bg-niebla px-4 py-4 font-semibold active:bg-linea">
-          <Upload size={18} /> Restaurar
-          <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])} />
-        </label>
-      </div>
+      {compacto ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-linea pt-4">
+          <p className="min-w-0 flex-1 text-sm text-apagado"><span className="font-semibold text-tinta">Copia de seguridad.</span> {texto}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void exportar()} className="flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold hover:bg-linea">
+              <Download size={16} /> Respaldo
+            </button>
+            {restaurar('px-4 py-2.5 text-sm')}
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-apagado">{texto}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Boton variante="secundario" onClick={exportar}><Download size={18} /> Respaldo</Boton>
+            {restaurar('px-4 py-4')}
+          </div>
+        </>
+      )}
       {/* Con servidor los clientes y pedidos son de toda la empresa: borrarlos aquí los quitaría también del servidor. */}
       {!MODO_SERVIDOR && (
         <Boton variante="peligro" className="mt-2 w-full" onClick={() => setConfirmarBorrado(true)}><Trash2 size={18} /> Borrar clientes y pedidos</Boton>

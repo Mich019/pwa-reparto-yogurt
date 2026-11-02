@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
+import { ArrowDownRight, ArrowUpRight, Minus, Search } from 'lucide-react'
 import type { EstadoPedido, Producto } from '../../lib/db'
 import { litrosTxt, type VentaSabor } from '../../lib/admin-datos'
 import { cambio } from '../../lib/reportes'
@@ -17,6 +17,70 @@ export function Delta({ valor, className = 'text-xs' }: { valor: number | null; 
     <span className={`inline-flex items-center gap-0.5 font-semibold tabular-nums ${igual ? 'text-apagado' : sube ? 'text-verde' : 'text-rojo'} ${className}`}>
       <Icono size={14} strokeWidth={2.4} aria-hidden="true" />
       {igual ? '0%' : `${sube ? '+' : '−'}${Math.abs(valor).toLocaleString('es-MX', { maximumFractionDigits: 1 })}%`}
+    </span>
+  )
+}
+
+// Encabezado de una sección del panel: título grande, una línea de detalle y, a la derecha, sus acciones. Las acciones
+// siempre llevan texto (Nuevo cliente, Invitar…), nunca un «+» suelto.
+export function Encabezado({ titulo, detalle, children }: { titulo: string; detalle?: ReactNode; children?: ReactNode }) {
+  return (
+    // Las acciones se centran con el título (no con el título y el detalle juntos); el detalle va debajo.
+    <header className="pb-6 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">{titulo}</h1>
+        {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+      </div>
+      {detalle && <p className="mt-3 text-sm text-apagado">{detalle}</p>}
+    </header>
+  )
+}
+
+const anilloFoco = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
+const baseBoton = `flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-40 ${anilloFoco}`
+export const botonPanel = `${baseBoton} bg-tinta text-white hover:bg-marca-oscuro`
+export const botonPanelSuave = `${baseBoton} bg-niebla text-tinta hover:bg-linea`
+
+// Buscador del encabezado: sólo la lupa, del alto de los botones; al tocarla se despliega el campo (anima el ancho de
+// un solo input). Desde 1280 px crece hacia la izquierda por encima del hueco junto al título, sin empujar los
+// botones; en pantalla chica, donde las acciones ya van en su propia fila, ocupa su lugar. Se queda abierto mientras
+// haya texto; Escape lo borra y lo cierra.
+export function BuscadorDesplegable({ valor, onChange, placeholder }: { valor: string; onChange: (v: string) => void; placeholder: string }) {
+  const [abierto, setAbierto] = useState(false)
+  const campo = useRef<HTMLInputElement>(null)
+  const visible = abierto || valor !== ''
+  return (
+    <div className="relative h-10 xl:w-10">
+    <div className={`z-10 flex h-10 flex-row-reverse items-center rounded-md bg-niebla transition-colors xl:absolute xl:right-0 xl:top-0 ${visible ? '' : 'hover:bg-linea'}`}>
+      <button type="button" aria-label="Buscar" aria-expanded={visible} onClick={() => { setAbierto(true); campo.current?.focus() }}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${anilloFoco}`}>
+        <Search size={18} aria-hidden="true" />
+      </button>
+      <input
+        ref={campo}
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => { if (!valor) setAbierto(false) }}
+        onKeyDown={(e) => { if (e.key === 'Escape') { onChange(''); setAbierto(false); e.currentTarget.blur() } }}
+        tabIndex={visible ? 0 : -1}
+        aria-label={placeholder}
+        placeholder={placeholder}
+        className={`h-full min-w-0 bg-transparent text-sm outline-none transition-[width,padding] duration-200 ease-out placeholder:text-apagado motion-reduce:transition-none ${visible ? 'w-40 pl-4 xl:w-52 2xl:w-64' : 'w-0 p-0'}`}
+      />
+    </div>
+    </div>
+  )
+}
+
+// El trazo amarillo a mano bajo una palabra (el nombre del saludo, la sección activa del menú). Crece con la letra.
+// Con `dibujar` (el menú) se dibuja de izquierda a derecha al aparecer (.trazo-dibujar en index.css); el del saludo, quieto.
+export function Subrayado({ children, dibujar = false }: { children: ReactNode; dibujar?: boolean }) {
+  return (
+    <span className="relative isolate inline-block">
+      {children}
+      <svg aria-hidden="true" viewBox="0 0 200 14" preserveAspectRatio="none" className="absolute -bottom-[0.02em] -left-[0.04em] -z-10 h-[0.3em] w-[calc(100%+0.1em)]">
+        <path d="M3 9 C 45 3, 95 11, 135 6 S 190 5, 197 8" pathLength={1} className={dibujar ? 'trazo-dibujar' : undefined} stroke="#f9dc07" strokeWidth="9" strokeLinecap="round" fill="none" />
+      </svg>
     </span>
   )
 }

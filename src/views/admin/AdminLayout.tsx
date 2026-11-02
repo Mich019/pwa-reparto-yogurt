@@ -6,6 +6,7 @@ import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
 import { LogoEmpresa } from './marca'
+import { Subrayado } from './piezas'
 import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
@@ -146,7 +147,8 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           </button>
         </div>
 
-        <nav aria-label="Secciones del panel" className="hidden shrink-0 items-center gap-1.5 lg:flex">
+        {/* Sólo texto; la sección activa lleva el mismo trazo amarillo que el nombre del saludo. */}
+        <nav aria-label="Secciones del panel" className="hidden shrink-0 items-center gap-1 lg:flex">
           {PESTANAS.map(({ id, texto }) => {
             const activa = seccion === id
             return (
@@ -155,11 +157,11 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                 type="button"
                 onClick={() => setSeccion(id)}
                 aria-current={activa ? 'page' : undefined}
-                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${anillo} ${
-                  activa ? 'bg-tinta text-white' : `${pildora} text-tinta hover:bg-niebla`
+                className={`rounded-md px-3 py-2.5 text-[15px] font-semibold transition-colors xl:px-3.5 ${anillo} ${
+                  activa ? 'text-tinta' : 'text-tinta/65 hover:text-tinta'
                 }`}
               >
-                {texto}
+                {activa ? <Subrayado dibujar>{texto}</Subrayado> : texto}
               </button>
             )
           })}
@@ -208,11 +210,11 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
           {seccion === 'sabores' && <AdminSabores />}
           {seccion === 'configuracion' && <Configuracion key={apartado.vez} inicial={apartado.id} />}
-          {(seccion === 'equipo' || seccion === 'clientes' || seccion === 'produccion' || seccion === 'reportes') && (
-            // Estas cuatro son las pantallas de la app de reparto, que traen su propio margen interior de 16 px.
+          {seccion === 'equipo' && <Equipo panel />}
+          {seccion === 'clientes' && <Clientes panel />}
+          {(seccion === 'produccion' || seccion === 'reportes') && (
+            // Estas dos son las pantallas de la app de reparto, que traen su propio margen interior de 16 px.
             <div className="mx-auto max-w-[1100px] px-0 pt-2 sm:px-4">
-              {seccion === 'equipo' && <Equipo />}
-              {seccion === 'clientes' && <Clientes />}
               {seccion === 'produccion' && <Produccion />}
               {seccion === 'reportes' && <Reportes />}
             </div>

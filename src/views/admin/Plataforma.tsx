@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, Plus, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
@@ -100,7 +100,7 @@ export function Plataforma() {
   const menu: { de: Vista['de']; texto: string; icono: typeof Building2 }[] = [
     { de: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
     { de: 'empresas', texto: 'Empresas', icono: Building2 },
-    { de: 'nueva', texto: 'Nueva empresa', icono: Plus },
+    { de: 'nueva', texto: 'Nueva empresa', icono: Store },
     { de: 'avisos', texto: 'Avisos', icono: Megaphone },
     { de: 'cuentas', texto: 'Cuentas de la plataforma', icono: ShieldCheck },
     { de: 'config', texto: 'Configuración', icono: Settings },
@@ -259,7 +259,7 @@ function Resumen({ d, ir, recargar }: { d: Datos; ir: (v: Vista) => void; recarg
     <>
       <Encabezado titulo="Resumen" detalle={`${r.total} empresas en Delisy · ${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}`}>
         <button type="button" onClick={() => void recargar()} className={botonSuave}><RefreshCw size={16} aria-hidden="true" /> Actualizar</button>
-        <button type="button" onClick={() => ir({ de: 'nueva' })} className={botonPrimario}><Plus size={16} aria-hidden="true" /> Nueva empresa</button>
+        <button type="button" onClick={() => ir({ de: 'nueva' })} className={botonPrimario}><Building2 size={16} aria-hidden="true" /> Nueva empresa</button>
       </Encabezado>
 
       <Cifras cifras={[
@@ -361,7 +361,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
   return (
     <>
       <Encabezado titulo="Empresas" detalle={`${lista.length} de ${d.empresas.length}`}>
-        <button type="button" onClick={() => ir({ de: 'nueva' })} className={botonPrimario}><Plus size={16} aria-hidden="true" /> Nueva empresa</button>
+        <button type="button" onClick={() => ir({ de: 'nueva' })} className={botonPrimario}><Building2 size={16} aria-hidden="true" /> Nueva empresa</button>
       </Encabezado>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

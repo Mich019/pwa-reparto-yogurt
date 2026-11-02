@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Plus, Printer, QrCode, ScanLine, Search, Star, Sun, UserCheck, UserCog, UserX } from 'lucide-react'
+import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Printer, QrCode, ScanLine, Search, ShoppingBag, Star, Sun, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Producto, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
@@ -15,6 +15,7 @@ import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
+import { BuscadorDesplegable, Encabezado, botonPanel, botonPanelSuave } from '../admin/piezas'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -26,7 +27,8 @@ function textoBusqueda(c: Cliente) {
   return sinAcentos(`${c.nombre} ${c.telefono} ${c.telefono.replace(/\D/g, '')} ${c.direccion} ${textoFrecuencia(c.frecuencia)} ${dias} ${c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}`)
 }
 
-export function Clientes() {
+// `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
+export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), []) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
@@ -68,8 +70,33 @@ export function Clientes() {
   const lista = clientes.filter((c) => c.activo !== verInactivos && (!t || textoBusqueda(c).includes(t)))
   const perfil = clientes.find((c) => c.id === perfilId)
 
+  const archivados = clientes.filter((c) => !c.activo).length
+  const buscador = (
+    <div className="relative mt-4">
+      <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono, colonia o día" className={`${claseInput} pl-11`} />
+    </div>
+  )
+
   return (
-    <div className="flex h-full flex-col">
+    <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'flex h-full flex-col'}>
+      {panel ? (
+        <>
+          {/* Una sola fila a la altura del detalle: buscar y filtrar, y luego las acciones; todo de 40 px de alto. */}
+          <Encabezado titulo="Clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} archivados` : ''}`}>
+            <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" />
+            <div className="flex gap-1" role="group" aria-label="Mostrar">
+              <button onClick={() => setVerInactivos(false)} aria-pressed={!verInactivos} className={verInactivos ? botonPanelSuave : botonPanel}>Activos</button>
+              <button onClick={() => setVerInactivos(true)} aria-pressed={verInactivos} className={verInactivos ? botonPanel : botonPanelSuave}>Archivados</button>
+            </div>
+            <span aria-hidden="true" className="mx-1 h-6 w-px bg-linea" />
+            <button onClick={() => setEscaner(true)} className={botonPanelSuave}><ScanLine size={18} /> Escanear</button>
+            <button onClick={() => setImprimir(true)} className={botonPanelSuave}><Printer size={18} /> Imprimir QR</button>
+            {MODO_SERVIDOR && rol === 'administrador' && <button onClick={() => setLibreta(true)} className={botonPanelSuave}><BookUser size={18} /> Libreta</button>}
+            <button onClick={() => setForm('nuevo')} className={botonPanel}><UserPlus size={18} /> Nuevo cliente</button>
+          </Encabezado>
+        </>
+      ) : (
       <div className="px-4 pt-safe">
         <div className="mt-3 flex items-center justify-between gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
@@ -91,22 +118,20 @@ export function Clientes() {
             </button>
           </div>
         </div>
-        <div className="relative mt-4">
-          <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono, colonia o día" className={`${claseInput} pl-11`} />
-        </div>
+        {buscador}
       </div>
-      <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28">
+      )}
+      <div className={panel ? 'mt-2 grid gap-x-10 lg:grid-cols-2' : 'flex-1 overflow-y-auto px-4 pt-2 pb-28'}>
         {lista.length === 0 && (
-          <div className="py-12 text-center text-apagado">
-            {clientes.length ? 'Sin resultados' : 'Aún no hay clientes. Toca + para pasar el primero de tu libreta.'}
+          <div className="py-12 text-center text-apagado lg:col-span-2">
+            {clientes.length ? 'Sin resultados' : 'Aún no hay clientes. Agrega el primero con «Nuevo cliente».'}
           </div>
         )}
         {lista.map((c) => {
           const s = stats.get(c.id)
           const fav = favorito(c.id)
           return (
-            <button key={c.id} onClick={() => setPerfilId(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left active:bg-niebla">
+            <button key={c.id} onClick={() => setPerfilId(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left transition-colors hover:bg-niebla/40 active:bg-niebla">
               <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-niebla text-lg font-semibold">
                 {c.nombre.charAt(0)}
               </div>
@@ -124,9 +149,11 @@ export function Clientes() {
           )
         })}
       </div>
-      <button onClick={() => setForm('nuevo')} aria-label="Nuevo cliente" className="fixed right-5 bottom-24 z-20 grid h-16 w-16 place-items-center rounded-full bg-tinta text-white shadow-tarjeta active:bg-neutral-700">
-        <Plus size={30} />
-      </button>
+      {!panel && (
+        <button onClick={() => setForm('nuevo')} className="fixed right-4 bottom-24 z-20 flex items-center gap-2 rounded-md bg-tinta px-5 py-4 font-semibold text-white shadow-tarjeta active:bg-neutral-700">
+          <UserPlus size={20} /> Nuevo cliente
+        </button>
+      )}
 
       {imprimir && <ImpresionMasiva clientes={clientes} onCerrar={() => setImprimir(false)} />}
       <HojaLibreta abierta={libreta} onCerrar={() => setLibreta(false)} />
@@ -211,7 +238,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
             <ChevronRight size={18} className="shrink-0 text-apagado/60" />
           </button>
         )}
-        <Boton className="w-full" onClick={() => setEditor({})}><Plus size={20} /> Nuevo pedido</Boton>
+        <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
 
         {pendientes.length > 0 && (
           <Seccion titulo="Pedidos agendados">
