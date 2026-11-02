@@ -9,6 +9,7 @@ import {
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
 import { useSesion, type Rol } from '../../lib/sesion'
+import { Avatar } from '../../components/Avatar'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 
 // M07 · Alta y baja de vendedores y reasignación de clientes (RF-038 a RF-041). Sólo para el administrador.
@@ -57,7 +58,7 @@ export function Equipo() {
 
   const fila = (m: Miembro) => (
     <button key={m.id} onClick={() => setFichaId(m.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left active:bg-niebla">
-      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-semibold ${m.activo ? 'bg-niebla' : 'bg-niebla text-apagado'}`}>{m.nombre.charAt(0).toUpperCase()}</div>
+      <Avatar nombre={m.nombre} foto={m.foto} className={`h-12 w-12 text-lg bg-niebla ${m.activo ? '' : 'text-apagado opacity-60'}`} />
       <div className="min-w-0 flex-1">
         <div className={`truncate text-base leading-5 font-semibold ${m.activo ? '' : 'text-apagado'}`}>
           {m.nombre}{m.id === yo?.id && <span className="font-medium text-apagado"> (tú)</span>}

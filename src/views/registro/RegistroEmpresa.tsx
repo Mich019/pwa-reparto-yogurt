@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Eye, EyeOff, ImagePlus, Mail, Minus, Plus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, ErrorApi, ErrorRed } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
+import { prepararLogo } from '../../lib/logo'
 import { iniciarSesion } from '../../lib/sesion'
 import {
   alternarTamano, alternarTipo, aplicarGiros, borrarBorrador, COLORES_MARCA, colorPara, correoValido, cuerpoRegistro,
@@ -910,18 +911,20 @@ function Dinero({ etiqueta, valor, onChange, enfocar = false }: { etiqueta: stri
   )
 }
 
-const LOGO_MAXIMO = 500 * 1024
-
+// Recorta márgenes y lo reduce a 512 px (src/lib/logo.ts); quitarle el fondo y demás ajustes, en Configuración → Marca.
 function PasoLogo({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => Registro) => void }) {
   const [error, setError] = useState('')
-  function elegir(f: File | undefined) {
+  async function elegir(f: File | undefined) {
     setError('')
     if (!f) return
-    if (!f.type.startsWith('image/')) return setError('Elige una imagen (PNG, JPG o SVG)')
-    if (f.size > LOGO_MAXIMO) return setError('La imagen pesa más de 500 KB; prueba con una más chica')
-    const lector = new FileReader()
-    lector.onload = () => cambiar((x) => ({ ...x, marca: { ...x.marca, logo: String(lector.result) } }))
-    lector.readAsDataURL(f)
+    if (!/^image\/(png|jpeg|webp|gif|svg\+xml)$/.test(f.type)) return setError('Elige una imagen PNG, JPG, WEBP o SVG')
+    if (f.type === 'image/svg+xml' && f.size > 500 * 1024) return setError('El SVG pesa más de 500 KB; expórtalo simplificado')
+    try {
+      const logo = await prepararLogo(f)
+      cambiar((x) => ({ ...x, marca: { ...x.marca, logo } }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo leer esa imagen')
+    }
   }
   return (
     <div>
@@ -930,8 +933,8 @@ function PasoLogo({ r, cambiar }: { r: Registro; cambiar: (f: (x: Registro) => R
           {r.marca.logo ? <img src={r.marca.logo} alt="Tu logo" className="h-full w-full object-contain p-2" /> : <ImagePlus size={36} className="text-apagado" />}
         </div>
         <div className="text-lg font-semibold">{r.marca.logo ? 'Cambiar logo' : 'Subir mi logo'}</div>
-        <div className="text-sm text-apagado">PNG, JPG o SVG, hasta 500 KB</div>
-        <input type="file" accept="image/*" className="sr-only" onChange={(e) => elegir(e.target.files?.[0])} />
+        <div className="text-sm text-apagado">Mejor un PNG sin fondo o un SVG. Recortamos los márgenes solos.</div>
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" className="sr-only" onChange={(e) => { void elegir(e.target.files?.[0]); e.target.value = '' }} />
       </label>
       {error && <p role="alert" className="mt-3 text-sm font-medium text-rojo">{error}</p>}
       {r.marca.logo && (

@@ -17,8 +17,8 @@ const TENUE: Color = [0.42, 0.447, 0.502] // #6B7280
 const REGLA: Color = [0.82, 0.835, 0.859] // #D1D5DB
 const FINA: Color = [0.898, 0.906, 0.922] // #E5E7EB
 const FONDO: Color = [0.976, 0.98, 0.984] // #F9FAFB
-// Marca de la empresa (src/lib/marca.ts): su nombre arriba de cada página y su color como acento. Sin marca propia,
-// «Delisy» y el verde de Danelle.
+// Marca de la empresa (src/lib/marca.ts): su nombre y su lema arriba, su contacto en el pie y su color como acento.
+// Sin marca propia, «Delisy» y el verde de Danelle.
 const acento = (): Color => {
   const c = marcaActual()?.color
   if (!c) return [3 / 255, 93 / 255, 56 / 255]
@@ -83,6 +83,10 @@ class Informe {
     pdf.pagina(this.ancho, this.alto)
     pdf.rect(0, 0, this.ancho, 2.2, { relleno: acento() })
     pdf.texto(empresa().toUpperCase(), M, 15, { fuente: 'negrita', tam: 8, color: acento() })
+    const lema = marcaActual()?.lema
+    const xLema = M + anchoTexto(empresa().toUpperCase(), 'negrita', 8) + 3
+    // Sin pisar los datos de la derecha (periodo, fecha…).
+    if (lema) pdf.texto(ajustarTexto(lema, 'normal', 8, Math.max(20, this.util * 0.55 - xLema + M), 1)[0] ?? '', xLema, 15, { tam: 8, color: TENUE })
     pdf.texto(this.titulo, M, 26, { fuente: 'negrita', tam: 22, color: TINTA })
     pdf.texto(subtitulo, M, 33, { tam: 10.5, color: SECUNDARIO })
     const filas: [string, string][] = [...datos, ['Generado', fechaHora(ahora)]]
@@ -191,7 +195,9 @@ class Informe {
   listo(): PdfListo {
     this.pdf.enCadaPagina((n, total) => {
       this.pdf.linea(M, this.alto - 13, this.ancho - M, this.alto - 13, { color: REGLA, grosor: 0.2 })
-      this.pdf.texto(`${empresa()} · Documento interno y confidencial`, M, this.alto - 8.5, { tam: 7, color: TENUE })
+      const contacto = marcaActual()?.contacto
+      const pie = `${empresa()} · ${contacto || 'Documento interno y confidencial'}`
+      this.pdf.texto(ajustarTexto(pie, 'normal', 7, this.util - 30, 1)[0] ?? '', M, this.alto - 8.5, { tam: 7, color: TENUE })
       this.pdf.texto(`Página ${n} de ${total}`, this.ancho - M, this.alto - 8.5, { tam: 7, color: TENUE, alinear: 'der' })
     })
     return this.pdf.listo()

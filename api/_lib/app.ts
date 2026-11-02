@@ -142,7 +142,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   const enviador = ctx.enviador !== undefined ? ctx.enviador : crearEnviador(ctx.config)
   const despachador = crearDespachador(ctx.db, enviador, app.log)
 
-  await rutasAuth(app, ctx, { requiereSesionAunConPasswordPendiente })
+  await rutasAuth(app, ctx, { requiereSesion, requiereSesionAunConPasswordPendiente })
   await rutasDosPasos(app, ctx, { requiereSesion })
   await rutasRecuperacion(app, ctx)
   await rutasRegistro(app, ctx, { requiereAdmin })

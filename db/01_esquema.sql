@@ -48,6 +48,8 @@ CREATE TABLE empresas (
   zona_horaria   varchar(64) NOT NULL DEFAULT 'America/Mexico_City',
   color_marca    char(7),
   logo           text,
+  lema           varchar(80),                            -- marca: lema y contacto en los PDF (migración 013)
+  contacto       varchar(160),
   giros          text[] NOT NULL DEFAULT '{}',           -- qué vende, según el registro (/registro)
   control_retornables boolean NOT NULL DEFAULT false,    -- lleva la cuenta de envases prestados
   -- Cobro (api/_lib/suscripcion.ts): acceso si está exenta, en prueba o con la suscripción de Mercado Pago autorizada.
@@ -73,6 +75,7 @@ CREATE TABLE usuarios (
   nombre                varchar(100) NOT NULL,
   correo                varchar(150) NOT NULL,
   telefono              varchar(20),
+  foto                  text,                               -- foto de perfil (data URL de 256 px; 012_foto_perfil.sql)
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040

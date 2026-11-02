@@ -10,6 +10,7 @@ import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, use
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
+import { FotoPerfil } from '../../components/Avatar'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
 
@@ -272,7 +273,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Mi cuenta</h1>
 
       <div className="mt-4 flex items-center gap-3 rounded-2xl bg-niebla p-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-tinta text-lg font-bold text-white">{u.nombre.slice(0, 1).toUpperCase()}</span>
+        <FotoPerfil tamano="h-12 w-12 text-lg" compacto />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{u.nombre}</div>
           <div className="truncate text-sm text-apagado">{u.correo}</div>

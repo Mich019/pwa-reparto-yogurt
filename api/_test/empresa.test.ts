@@ -21,12 +21,22 @@ describe('marca de la empresa', () => {
 
     const r = await cambiar(admin, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO })
     assert.equal(r.status, 200)
-    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO })
+    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null })
     assert.deepEqual((await get(vend, '/empresa')).body, r.body)
-    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null })
+    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null })
 
     // Cambiar sólo una cosa deja las demás; null quita el logo.
-    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null })
+    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null })
+  })
+
+  it('lema y contacto: se guardan sin espacios de sobra y vacíos se quitan', async () => {
+    const admin = await sesion('administrador', 'panel', await crearEmpresa('Con lema'))
+    const r = await cambiar(admin, { lema: '  Frescura diaria ', contacto: 'Tel. 55 1234 5678 · Calle 5 #12' })
+    assert.equal(r.status, 200)
+    assert.equal(r.body.lema, 'Frescura diaria')
+    assert.equal(r.body.contacto, 'Tel. 55 1234 5678 · Calle 5 #12')
+    assert.equal((await cambiar(admin, { lema: '' })).body.lema, null)
+    assert.equal((await cambiar(admin, { lema: 'x'.repeat(81) })).status, 400)
   })
 
   it('sólo el administrador la cambia y con datos válidos', async () => {

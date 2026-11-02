@@ -12,7 +12,7 @@ import { MODO_SERVIDOR } from '../../lib/api'
 import { db } from '../../lib/db'
 import { useAlertasLocales } from '../../lib/alertas'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
-import { alCerrarSesion, useSesion } from '../../lib/sesion'
+import { alCerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica } from '../../lib/sync'
 
 type PestanaPwa = 'ruta' | 'clientes' | 'stock' | 'produccion' | 'sabores' | 'cuenta'
@@ -43,6 +43,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   const irA = (p: PestanaPwa) => { if (visibles.some((v) => v.id === p)) setPestana(p) }
 
   useEffect(() => iniciarSincronizacionAutomatica(), [])
+  useEffect(() => { if (sesion) void refrescarPerfil() }, [sesion?.usuario.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useAlertasLocales() // RF-055: stock por agotarse y ventas sin enviar
 
   // RF-054: este teléfono sigue recibiendo los avisos de la cuenta que entró, y deja de recibirlos al cerrar sesión.

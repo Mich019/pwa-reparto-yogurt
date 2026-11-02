@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownUp, ArrowLeft, Building2, Check, ChevronRight, Copy, LayoutDashboard, LogOut, Plus, RefreshCw, Search, ShieldCheck, UserCog } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { dinero } from '../../lib/fechas'
-import { cerrarSesion, llamarAutenticado, useSesion } from '../../lib/sesion'
+import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
+import { Avatar, FotoPerfil } from '../../components/Avatar'
 import { aviso, claseInput } from '../../components/ui'
 import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
@@ -89,7 +90,7 @@ export function Plataforma() {
       setError(mensaje(e))
     }
   }
-  useEffect(() => { void cargar() }, [])
+  useEffect(() => { void cargar(); void refrescarPerfil() }, [])
   useEffect(() => { window.scrollTo({ top: 0 }) }, [vista])
 
   const ir = (v: Vista) => setVista(v)
@@ -152,8 +153,13 @@ function PiePropio() {
   const u = useSesion()?.usuario
   return (
     <div className="hidden px-5 pb-6 lg:mt-auto lg:block">
-      <div className="text-sm font-semibold">{u?.nombre}</div>
-      <div className="truncate text-xs text-apagado">{u?.correo}</div>
+      <div className="flex items-center gap-3">
+        <Avatar nombre={u?.nombre ?? ''} foto={u?.foto} className="h-9 w-9 bg-[var(--plat)] text-sm text-white" />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">{u?.nombre}</div>
+          <div className="truncate text-xs text-apagado">{u?.correo}</div>
+        </div>
+      </div>
       <button type="button" onClick={() => void cerrarSesion()} className={`mt-3 flex items-center gap-2 rounded-lg text-sm font-semibold text-apagado hover:text-rojo ${anillo}`}>
         <LogOut size={16} aria-hidden="true" /> Cerrar sesión
       </button>
@@ -798,6 +804,10 @@ function MiCuenta() {
   return (
     <>
       <Encabezado titulo="Mi cuenta y seguridad" detalle={u ? `${u.nombre} · ${u.correo}` : undefined} />
+      <section className="mb-6 max-w-5xl rounded-[22px] bg-papel p-6">
+        <h2 className="mb-4 text-lg font-semibold">Foto de perfil</h2>
+        <FotoPerfil />
+      </section>
       <div className="grid max-w-5xl gap-6 lg:grid-cols-2">
         <section className="rounded-[22px] bg-papel p-6">
           <h2 className="text-lg font-semibold">Contraseña</h2>

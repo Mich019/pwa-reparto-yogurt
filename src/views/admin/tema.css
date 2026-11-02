@@ -116,6 +116,19 @@ html:has(.tema-admin.oscuro) #root {
   }
 }
 
+/* Configuración → Apariencia → «Menos movimiento» (src/lib/tema.ts): sin animaciones ni transiciones. Con !important
+ * dentro de la capa base gana a las utilidades `transition-*` / `animate-*`. */
+@layer base {
+  .menos-movimiento *,
+  .menos-movimiento *::before,
+  .menos-movimiento *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Cifras grandes: proporcionales, como pide la skill de gráficos; las columnas de tablas sí van tabulares. */
 @layer components {
   .tema-admin .cifra {

@@ -15,6 +15,7 @@ export interface UsuarioSesion {
   rol: Rol
   debeCambiarPassword: boolean
   plataforma?: boolean // administra el servicio: al entrar va a /plataforma (App.tsx)
+  foto?: string | null // foto de perfil; no viene al entrar, la trae refrescarPerfil()
 }
 // Con `cookie`, los tokens no están aquí: viven en cookies HttpOnly que el navegador manda solo (panel web, ver
 // api/_lib/cookies.ts). Lo que se guarda en el teléfono es sólo quién es y cuándo vence el acceso.
@@ -174,7 +175,7 @@ export async function tokenValido(): Promise<string | null> {
   renovando ??= (async () => {
     try {
       const r = await api<Sesion>('/auth/refresh', { cuerpo: s.cookie ? {} : { refreshToken: s.refreshToken } })
-      fijar({ ...s, ...r, usuario: r.usuario })
+      fijar({ ...s, ...r, usuario: { ...r.usuario, foto: s.usuario.foto } }) // la foto no viene al renovar: se queda la que había
       return r.accessToken ?? ''
     } catch (e) {
       if (e instanceof ErrorApi && e.status === 401) fijar(null) // el servidor revocó la sesión: hay que entrar de nuevo
@@ -231,6 +232,23 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
   await api('/auth/cambiar-password', { token, cuerpo: { actual: actualPassword.trim(), nueva: nueva.trim() } })
   limpiarUltimoPassword()
   marcarPasswordPendiente(false)
+}
+
+// El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null }) {
+  const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
+  if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
+  return r
+}
+
+// Trae el nombre y la foto de la cuenta (la foto no viaja al entrar, para que la sesión pese poco). Sin señal no pasa
+// nada: se queda lo guardado.
+export async function refrescarPerfil() {
+  if (!actual) return
+  try {
+    const r = await llamarAutenticado<{ nombre: string; foto: string | null }>('/me')
+    if (actual && (actual.usuario.nombre !== r.nombre || actual.usuario.foto !== r.foto)) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
+  } catch { /* sin conexión */ }
 }
 
 // Lo que hay que hacer mientras la sesión sigue abierta, antes de cerrarla (p. ej. dejar de recibir los avisos de la cuenta).

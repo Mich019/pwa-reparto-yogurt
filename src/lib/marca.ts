@@ -9,6 +9,8 @@ export interface Marca {
   nombre: string
   color: string | null
   logo: string | null
+  lema?: string | null // en los PDF; falta en la copia guardada antes de la migración 013
+  contacto?: string | null
 }
 
 const CLAVE = 'marca-empresa'

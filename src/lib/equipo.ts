@@ -9,6 +9,7 @@ export interface Miembro {
   nombre: string
   correo: string
   telefono: string
+  foto: string | null
   rol: Rol
   activo: boolean
   debeCambiarPassword: boolean // todavía no ha elegido su contraseña

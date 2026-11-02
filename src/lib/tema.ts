@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 
 // Tema del panel de administración (claro, oscuro o el del sistema). Es una preferencia de cada navegador: se guarda
 // aquí y no en el servidor. La app de reparto no la usa (views/admin/tema.css).
@@ -35,3 +35,39 @@ export const usePreferenciaTema = () => useSyncExternalStore(suscribir, () => pr
 // true si el panel debe verse oscuro ahora mismo (en «sistema», según el sistema operativo).
 export const useTemaOscuro = () =>
   useSyncExternalStore(suscribir, () => preferencia === 'oscuro' || (preferencia === 'sistema' && !!sistemaOscuro?.matches))
+
+// Más preferencias del panel, también de cada navegador: el tamaño del texto (todo va en rem, así que basta con el
+// tamaño de la raíz) y menos movimiento (tema.css).
+export type TamanoTexto = 'normal' | 'grande' | 'mas-grande'
+export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean }
+const CLAVE_PREF = 'preferencias-panel'
+const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false }
+export const TAMANOS: Record<TamanoTexto, string> = { normal: '100%', grande: '112.5%', 'mas-grande': '125%' }
+
+let preferencias: PreferenciasPanel = (() => {
+  try {
+    return { ...PREF_INICIAL, ...JSON.parse(localStorage.getItem(CLAVE_PREF) ?? '{}') }
+  } catch {
+    return PREF_INICIAL
+  }
+})()
+
+export function cambiarPreferencias(cambio: Partial<PreferenciasPanel>) {
+  preferencias = { ...preferencias, ...cambio }
+  try { localStorage.setItem(CLAVE_PREF, JSON.stringify(preferencias)) } catch { /* sin almacenamiento: vale mientras la página siga abierta */ }
+  avisar()
+}
+export const usePreferenciasPanel = () => useSyncExternalStore(suscribir, () => preferencias)
+
+// Pone el tamaño del texto y «menos movimiento» en la página mientras el panel está abierto; al salir los quita, para
+// que la app de reparto siga como estaba.
+export function useAplicarPreferencias() {
+  const p = usePreferenciasPanel()
+  useEffect(() => {
+    const raiz = document.documentElement
+    raiz.style.fontSize = TAMANOS[p.texto] ?? ''
+    raiz.classList.toggle('menos-movimiento', p.menosMovimiento)
+    return () => { raiz.style.fontSize = ''; raiz.classList.remove('menos-movimiento') }
+  }, [p.texto, p.menosMovimiento])
+}
+

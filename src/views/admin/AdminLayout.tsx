@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart3, ChartLine, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
 import { hace } from '../../lib/fechas'
-import { cerrarSesion, useSesion } from '../../lib/sesion'
+import { cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
@@ -10,7 +10,9 @@ import { Equipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
 import { Reportes } from '../pwa/Reportes'
-import { Configuracion } from './Configuracion'
+import { useAplicarPreferencias } from '../../lib/tema'
+import { Configuracion, type ApartadoConfig } from './Configuracion'
+import { Avatar } from '../../components/Avatar'
 import { AvisoPrueba, PantallaCobro } from './Suscripcion'
 import { useSuscripcion } from '../../lib/suscripcion'
 
@@ -67,12 +69,17 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const sesion = useSesion()
   const [seccion, setSeccionEstado] = useState<SeccionAdmin>(seccionGuardada)
   const [cerrando, setCerrando] = useState(false)
+  useAplicarPreferencias()
+  // Con qué apartado se abre Configuración: el aviso de la prueba lleva directo a la suscripción.
+  const [apartado, setApartado] = useState<{ id: ApartadoConfig; vez: number }>({ id: 'cuenta', vez: 0 })
+  const abrirConfiguracion = (id: ApartadoConfig) => { setApartado((a) => ({ id, vez: a.vez + 1 })); setSeccion('configuracion') }
   const esAdmin = sesion?.usuario.rol === 'administrador'
   const suscripcion = useSuscripcion(esAdmin ? sesion?.usuario.id : undefined)
 
   // Clientes, sabores y producción se leen de la copia local: sin esto el panel abierto directo en /admin se queda
   // vacío y lo que se edita aquí no llega al servidor hasta abrir la app de reparto.
   useEffect(() => (esAdmin ? iniciarSincronizacionAutomatica() : undefined), [esAdmin])
+  useEffect(() => { if (sesion) void refrescarPerfil() }, [sesion?.usuario.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setSeccion(s: SeccionAdmin) {
     setSeccionEstado(s)
@@ -172,12 +179,12 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           )}
           <button
             type="button"
-            onClick={() => setSeccion('configuracion')}
+            onClick={() => abrirConfiguracion('cuenta')}
             aria-label="Configuración de tu cuenta"
             title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : 'Mi cuenta'}
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro ${anillo}`}
+            className={`h-10 w-10 shrink-0 rounded-full transition-opacity hover:opacity-85 ${anillo}`}
           >
-            {sesion?.usuario.nombre.charAt(0).toUpperCase() ?? 'A'}
+            <Avatar nombre={sesion?.usuario.nombre ?? 'A'} foto={sesion?.usuario.foto} className="h-10 w-10 bg-tinta text-sm text-white" />
           </button>
           <button
             type="button"
@@ -192,14 +199,15 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
         </div>
       </header>
 
-      {suscripcion && <AvisoPrueba s={suscripcion} onVer={() => setSeccion('configuracion')} />}
+      {suscripcion && <AvisoPrueba s={suscripcion} onVer={() => abrirConfiguracion('suscripcion')} />}
 
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      {/* En la computadora, Configuración lleva su propio desplazamiento: el título y su menú quedan fijos. */}
+      <main className={`min-h-0 flex-1 overflow-y-auto ${seccion === 'configuracion' ? 'lg:overflow-hidden' : ''}`}>
         {/* Abajo queda sitio para la barra flotante del teléfono */}
-        <div className="pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-12">
+        <div className={`pb-[calc(7rem+env(safe-area-inset-bottom))] ${seccion === 'configuracion' ? 'lg:h-full lg:pb-0' : 'lg:pb-12'}`}>
           {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
           {seccion === 'sabores' && <AdminSabores />}
-          {seccion === 'configuracion' && <Configuracion />}
+          {seccion === 'configuracion' && <Configuracion key={apartado.vez} inicial={apartado.id} />}
           {(seccion === 'equipo' || seccion === 'clientes' || seccion === 'produccion' || seccion === 'reportes') && (
             // Estas cuatro son las pantallas de la app de reparto, que traen su propio margen interior de 16 px.
             <div className="mx-auto max-w-[1100px] px-0 pt-2 sm:px-4">

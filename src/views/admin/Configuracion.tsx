@@ -1,32 +1,57 @@
-import { useState, type ReactNode } from 'react'
-import { KeyRound, LogOut, Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
-import { cerrarSesion, useSesion } from '../../lib/sesion'
-import { cambiarTema, usePreferenciaTema, type PreferenciaTema } from '../../lib/tema'
-import { Hoja } from '../../components/ui'
+import { useEffect, useState, type ReactNode } from 'react'
+import { CreditCard, KeyRound, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { ErrorApi } from '../../lib/api'
+import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
+import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
+import { aviso, claseInput } from '../../components/ui'
+import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { SeccionSuscripcion } from './Suscripcion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 
-// Configuración del panel: apariencia (de este navegador), la marca de la empresa, la cuenta y su seguridad, la
-// suscripción y cerrar sesión.
+// Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
+// seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
+// navegador). En la computadora el título y el menú quedan fijos y sólo se desplaza el apartado (AdminLayout).
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
+const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Sin conexión con el servidor')
+const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')
+
+export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'apariencia'
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
   { valor: 'claro', texto: 'Claro', ayuda: 'Crema, el de siempre', icono: Sun },
   { valor: 'oscuro', texto: 'Oscuro', ayuda: 'Descansa la vista de noche', icono: Moon },
   { valor: 'sistema', texto: 'Automático', ayuda: 'Igual que tu computadora o teléfono', icono: Monitor },
 ]
+const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
+  { valor: 'normal', texto: 'Normal', muestra: 'text-base' },
+  { valor: 'grande', texto: 'Grande', muestra: 'text-lg' },
+  { valor: 'mas-grande', texto: 'Más grande', muestra: 'text-xl' },
+]
 
 function Seccion({ id, titulo, descripcion, children }: { id: string; titulo: string; descripcion?: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="rounded-[28px] border border-linea p-5 sm:p-6">
+    <section aria-labelledby={id} className="border-t border-linea pt-7 first:border-t-0 first:pt-0">
       <h2 id={id} className="text-xl font-semibold">{titulo}</h2>
       {descripcion && <p className="mt-1 text-sm text-apagado">{descripcion}</p>}
       <div className="mt-4">{children}</div>
     </section>
+  )
+}
+
+// Una opción con su explicación a la izquierda y el control a la derecha.
+function Fila({ titulo, ayuda, children }: { titulo: string; ayuda: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-linea py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <div className="min-w-0 max-w-md">
+        <div className="text-sm font-semibold">{titulo}</div>
+        <div className="mt-0.5 text-xs text-apagado">{ayuda}</div>
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -41,104 +66,291 @@ function Muestra({ valor }: { valor: PreferenciaTema }) {
   )
 }
 
-export function Configuracion() {
-  const sesion = useSesion()
-  const preferencia = usePreferenciaTema()
-  const [cambiando, setCambiando] = useState(false)
-  const [saliendo, setSaliendo] = useState(false)
-  const u = sesion?.usuario
+export function Configuracion({ inicial = 'cuenta' }: { inicial?: ApartadoConfig }) {
+  const u = useSesion()?.usuario
   const suscripcion = useSuscripcion(u?.id)
+  const [apartado, setApartado] = useState<ApartadoConfig>(inicial)
 
-  async function salir() {
-    setSaliendo(true)
-    try { await cerrarSesion() } finally { setSaliendo(false) }
+  const menu: { id: ApartadoConfig; texto: string; ayuda: string; icono: typeof Sun }[] = [
+    { id: 'cuenta', texto: 'Cuenta', ayuda: 'Tu perfil y tu actividad', icono: UserRound },
+    { id: 'seguridad', texto: 'Seguridad', ayuda: 'Contraseña y sesiones', icono: ShieldCheck },
+    { id: 'marca', texto: 'Marca', ayuda: 'Nombre, logo y color', icono: SwatchBook },
+    ...(suscripcion ? [{ id: 'suscripcion' as const, texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
+    { id: 'apariencia', texto: 'Apariencia', ayuda: 'Tema, texto y movimiento', icono: Palette },
+  ]
+  const visible = menu.some((m) => m.id === apartado) ? apartado : 'cuenta'
+  const elegir = (id: ApartadoConfig) => {
+    setApartado(id)
+    document.getElementById('apartado-config')?.scrollTo({ top: 0 })
   }
 
   return (
-    <div className="mx-auto max-w-[880px] px-4 pt-2 sm:px-8">
-      <header className="pb-6 pt-4">
+    <div className="mx-auto max-w-[1100px] px-4 pt-2 sm:px-8 lg:flex lg:h-full lg:flex-col">
+      <header className="pb-6 pt-4 lg:shrink-0">
         <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">Configuración</h1>
-        <p className="mt-3 text-sm text-apagado">Cómo se ve el panel, la marca de tu negocio, tu cuenta y su seguridad.</p>
+        <p className="mt-3 text-sm text-apagado">Tu cuenta y su seguridad, la marca de tu negocio, tu plan y cómo se ve el panel.</p>
       </header>
 
-      <div className="space-y-4">
-        <Seccion id="apariencia" titulo="Apariencia" descripcion="Se guarda en este navegador; cada computadora o teléfono puede tener la suya.">
-          <div role="radiogroup" aria-label="Tema del panel" className="grid gap-3 sm:grid-cols-3">
-            {TEMAS.map(({ valor, texto, ayuda, icono: Icono }) => {
-              const elegido = preferencia === valor
-              return (
-                <button
-                  key={valor}
-                  type="button"
-                  role="radio"
-                  aria-checked={elegido}
-                  onClick={() => cambiarTema(valor)}
-                  className={`flex flex-col gap-3 rounded-[22px] p-3 text-left transition-colors ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}
-                >
-                  <Muestra valor={valor} />
-                  <span className="flex items-center gap-2 px-1">
-                    <Icono size={18} aria-hidden="true" />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{texto}</span>
-                      <span className="block text-xs text-apagado">{ayuda}</span>
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </Seccion>
+      <div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+        <nav aria-label="Apartados de la configuración" className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible">
+          {menu.map(({ id, texto, ayuda, icono: Icono }) => {
+            const elegido = visible === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => elegir(id)}
+                aria-current={elegido ? 'page' : undefined}
+                className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors lg:py-3 ${anillo} ${elegido ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea/60 lg:bg-transparent lg:hover:bg-niebla'}`}
+              >
+                <Icono size={18} aria-hidden="true" className="shrink-0" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{texto}</span>
+                  <span className={`hidden text-xs lg:block ${elegido ? 'text-white/70' : 'text-apagado'}`}>{ayuda}</span>
+                </span>
+              </button>
+            )
+          })}
+        </nav>
 
-        <Seccion id="marca" titulo="Marca" descripcion="El nombre, el logo y el color de tu negocio. Los ven tú, tus repartidores en su app y tus clientes en los PDF.">
-          <MarcaEmpresa />
-        </Seccion>
-
-        {u && (
-          <Seccion id="cuenta" titulo="Cuenta">
-            <div className="flex items-center gap-3 rounded-2xl bg-niebla p-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-tinta text-lg font-semibold text-white" aria-hidden="true">{u.nombre.charAt(0).toUpperCase()}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{u.nombre}</div>
-                <div className="truncate text-sm text-apagado">{u.correo}</div>
-              </div>
-              <span className="flex items-center gap-1 rounded-full bg-papel px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} aria-hidden="true" />Administrador</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCambiando(true)}
-              className={`mt-3 flex items-center gap-2 rounded-full bg-niebla px-5 py-3 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}
-            >
-              <KeyRound size={16} aria-hidden="true" /> Cambiar contraseña
-            </button>
-          </Seccion>
-        )}
-
-        <Seccion id="seguridad" titulo="Seguridad" descripcion="Protege la cuenta aunque alguien conozca tu contraseña.">
-          {/* DosPasos trae su propia tarjeta; aquí sólo se le quita el margen de arriba. */}
-          <div className="-mt-3"><DosPasos /></div>
-        </Seccion>
-
-        {suscripcion && (
-          <Seccion id="suscripcion" titulo="Suscripción" descripcion="El plan de tu empresa. El pago y la tarjeta los maneja Mercado Pago.">
-            <SeccionSuscripcion s={suscripcion} />
-          </Seccion>
-        )}
-
-        <Seccion id="sesion" titulo="Sesión" descripcion="Cierra la sesión en este navegador. Para volver a entrar se piden tu contraseña y, si la activaste, la verificación en dos pasos.">
-          <button
-            type="button"
-            onClick={() => void salir()}
-            disabled={saliendo}
-            className={`flex items-center gap-2 rounded-full border border-rojo/40 px-5 py-3 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}
-          >
-            <LogOut size={16} aria-hidden="true" /> {saliendo ? 'Cerrando…' : 'Cerrar sesión'}
-          </button>
-        </Seccion>
+        {/* Lo único que se desplaza en la computadora; el margen deja ver completo el anillo de foco. */}
+        <div id="apartado-config" className="min-w-0 space-y-7 lg:-mx-2 lg:overflow-y-auto lg:px-2 lg:pb-12">
+          {visible === 'cuenta' && <Cuenta />}
+          {visible === 'seguridad' && <Seguridad />}
+          {visible === 'marca' && (
+            <Seccion id="marca" titulo="Marca" descripcion="El nombre, el lema, el logo, el color y el contacto de tu negocio. Los ven tú, tus repartidores en su app y quien reciba tus PDF.">
+              <MarcaEmpresa />
+            </Seccion>
+          )}
+          {visible === 'suscripcion' && suscripcion && (
+            <Seccion id="suscripcion" titulo="Suscripción" descripcion="El plan de tu empresa. El pago y la tarjeta los maneja Mercado Pago.">
+              <SeccionSuscripcion s={suscripcion} />
+            </Seccion>
+          )}
+          {visible === 'apariencia' && <Apariencia />}
+        </div>
       </div>
-
-      <Hoja abierta={cambiando} onCerrar={() => setCambiando(false)} titulo="Cambiar contraseña">
-        <div className="pb-4"><FormPassword onListo={() => setCambiando(false)} /></div>
-      </Hoja>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------------------- cuenta
+
+interface Yo { nombre: string; telefono: string; empresa: string; alta: string; ultimoAcceso: string | null }
+
+function Cuenta() {
+  const u = useSesion()?.usuario
+  const [yo, setYo] = useState<Yo | null>(null)
+  const [nombre, setNombre] = useState(u?.nombre ?? '')
+  const [telefono, setTelefono] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  // El teléfono y las fechas no viajan en la sesión: se piden al abrir.
+  useEffect(() => {
+    llamarAutenticado<Yo>('/me')
+      .then((r) => { setYo(r); setNombre(r.nombre); setTelefono(r.telefono) })
+      .catch(() => {})
+  }, [])
+
+  const cambios = !!yo && (nombre.trim() !== yo.nombre || telefono.trim() !== yo.telefono)
+  async function guardar() {
+    setGuardando(true)
+    setError('')
+    try {
+      const r = await guardarPerfil({ nombre: nombre.trim(), telefono: telefono.trim() })
+      setYo((y) => y && { ...y, ...r })
+      setNombre(r.nombre)
+      setTelefono(r.telefono)
+      aviso('Perfil guardado')
+    } catch (e) {
+      setError(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  if (!u) return null
+  return (
+    <>
+      <Seccion id="perfil" titulo="Perfil" descripcion="Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.">
+        <FotoPerfil />
+        <form onSubmit={(e) => { e.preventDefault(); if (cambios) void guardar() }} className="mt-6 grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-apagado">Nombre</span>
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={claseInput} maxLength={100} autoComplete="name" />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-apagado">Teléfono</span>
+            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} className={claseInput} maxLength={20} inputMode="tel" autoComplete="tel" placeholder="Opcional" />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1.5 block text-xs font-medium text-apagado">Correo</span>
+            <input value={u.correo} readOnly className={`${claseInput} cursor-default opacity-70`} />
+            <span className="mt-1.5 block text-xs text-apagado">Es con lo que entras. Si necesitas cambiarlo, otro administrador lo hace desde Vendedores.</span>
+          </label>
+          {error && <p role="alert" className="text-sm font-medium text-rojo sm:col-span-2">{error}</p>}
+          <div className="sm:col-span-2">
+            <button type="submit" disabled={!cambios || nombre.trim().length < 2 || guardando} className={`rounded-full bg-tinta px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
+              {guardando ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
+      </Seccion>
+
+      <Seccion id="actividad" titulo="Tu actividad">
+        <dl className="grid gap-4 text-sm sm:grid-cols-4">
+          <div><dt className="text-xs text-apagado">Rol</dt><dd className="mt-0.5 inline-flex items-center gap-1 font-semibold"><ShieldCheck size={14} aria-hidden="true" />{u.rol === 'administrador' ? 'Administrador' : 'Vendedor'}</dd></div>
+          <div><dt className="text-xs text-apagado">Empresa</dt><dd className="mt-0.5 font-semibold">{yo?.empresa ?? '—'}</dd></div>
+          <div><dt className="text-xs text-apagado">Miembro desde</dt><dd className="mt-0.5 font-semibold">{yo ? new Date(yo.alta).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</dd></div>
+          <div><dt className="text-xs text-apagado">Último acceso</dt><dd className="mt-0.5 font-semibold">{fechaHora(yo?.ultimoAcceso ?? null)}</dd></div>
+        </dl>
+      </Seccion>
+
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------------------- seguridad
+
+interface SesionAbierta { id: string; actual: boolean; ip: string | null; inicio: string; vence: string }
+
+function Seguridad() {
+  // El formulario de la contraseña sólo se abre al pedirlo, y se cierra (y se vacía) al terminar o cancelar.
+  const [cambiando, setCambiando] = useState(false)
+  const [cambiada, setCambiada] = useState<string | null>(null)
+  useEffect(() => { llamarAutenticado<{ passwordCambiado: string }>('/me').then((r) => setCambiada(r.passwordCambiado)).catch(() => {}) }, [])
+  const [sesiones, setSesiones] = useState<SesionAbierta[] | null>(null)
+  const [cerrando, setCerrando] = useState<string | null>(null)
+
+  const cargar = () => llamarAutenticado<SesionAbierta[]>('/me/sesiones').then(setSesiones).catch(() => setSesiones([]))
+  useEffect(() => { void cargar() }, [])
+
+  async function cerrar(id?: string) {
+    setCerrando(id ?? 'todas')
+    try {
+      const r = await llamarAutenticado<{ cerradas: number }>('/me/sesiones/cerrar', { metodo: 'POST', cuerpo: id ? { id } : {} })
+      aviso(r.cerradas === 1 ? 'Sesión cerrada' : `${r.cerradas} sesiones cerradas`)
+      await cargar()
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setCerrando(null)
+    }
+  }
+  const otras = sesiones?.filter((s) => !s.actual).length ?? 0
+
+  return (
+    <>
+      <Seccion id="contrasena" titulo="Contraseña" descripcion="Al cambiarla se cierran tus sesiones en los demás dispositivos.">
+        {cambiando ? (
+          <div className="max-w-md">
+            <FormPassword onListo={() => { aviso('Contraseña cambiada'); setCambiando(false); setCambiada(new Date().toISOString()); void cargar() }} />
+            <button type="button" onClick={() => setCambiando(false)} className={`mt-1 w-full rounded-full py-3 text-sm font-semibold text-apagado transition-colors hover:bg-niebla hover:text-tinta ${anillo}`}>Cancelar</button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-sm">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-niebla" aria-hidden="true"><KeyRound size={18} /></span>
+              <div>
+                <div className="font-semibold tracking-[0.3em]" aria-label="Contraseña oculta">••••••••••</div>
+                <div className="text-xs text-apagado">{cambiada ? `Último cambio: ${fechaHora(cambiada)}` : 'Protegida'}</div>
+              </div>
+            </div>
+            <button type="button" onClick={() => setCambiando(true)} className={`rounded-full bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}>Cambiar contraseña</button>
+          </div>
+        )}
+      </Seccion>
+      <Seccion id="dos-pasos" titulo="Inicio de sesión" descripcion="Protege la cuenta aunque alguien conozca tu contraseña.">
+        {/* DosPasos trae su propia tarjeta; aquí sólo se le quita el margen de arriba. */}
+        <div className="-mt-3"><DosPasos /></div>
+      </Seccion>
+      <Seccion id="sesiones" titulo="Sesiones abiertas" descripcion="Dónde está abierta tu cuenta ahora. Si no reconoces una, ciérrala y cambia tu contraseña.">
+        {!sesiones ? <p className="text-sm text-apagado">Cargando…</p> : (
+          <>
+            <ul className="divide-y divide-linea">
+              {sesiones.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
+                  <div className="min-w-0 text-sm">
+                    <div className="flex items-center gap-2 font-semibold">
+                      {s.actual ? 'Este navegador' : 'Otro dispositivo'}
+                      {s.actual && <span className="rounded-full bg-niebla px-2 py-0.5 text-[11px] font-semibold">Aquí estás</span>}
+                    </div>
+                    <div className="text-xs text-apagado">Desde el {fechaHora(s.inicio)}{s.ip ? ` · IP ${s.ip}` : ''}</div>
+                  </div>
+                  {!s.actual && (
+                    <button type="button" onClick={() => void cerrar(s.id)} disabled={!!cerrando} className={`rounded-full px-3 py-1.5 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
+                      {cerrando === s.id ? 'Cerrando…' : 'Cerrar'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {otras > 1 && (
+              <button type="button" onClick={() => void cerrar()} disabled={!!cerrando} className={`mt-4 rounded-full bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea disabled:opacity-40 ${anillo}`}>
+                {cerrando === 'todas' ? 'Cerrando…' : `Cerrar las otras ${otras}`}
+              </button>
+            )}
+          </>
+        )}
+      </Seccion>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------------------- apariencia
+
+function Apariencia() {
+  const tema = usePreferenciaTema()
+  const p = usePreferenciasPanel()
+  return (
+    <>
+      <Seccion id="tema" titulo="Tema" descripcion="Se guarda en este navegador, igual que lo de abajo: cada computadora o teléfono puede tener el suyo.">
+        <div role="radiogroup" aria-label="Tema del panel" className="grid gap-3 sm:grid-cols-3">
+          {TEMAS.map(({ valor, texto, ayuda, icono: Icono }) => {
+            const elegido = tema === valor
+            return (
+              <button
+                key={valor}
+                type="button"
+                role="radio"
+                aria-checked={elegido}
+                onClick={() => cambiarTema(valor)}
+                className={`flex flex-col gap-3 rounded-[22px] p-3 text-left transition-colors ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}
+              >
+                <Muestra valor={valor} />
+                <span className="flex items-center gap-2 px-1">
+                  <Icono size={18} aria-hidden="true" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{texto}</span>
+                    <span className="block text-xs text-apagado">{ayuda}</span>
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </Seccion>
+
+      <Seccion id="lectura" titulo="Lectura y movimiento">
+        <Fila titulo="Tamaño del texto" ayuda="Agranda letras, botones y tablas del panel.">
+          <div role="radiogroup" aria-label="Tamaño del texto" className="flex gap-1.5">
+            {TAMANOS.map(({ valor, texto, muestra }) => (
+              <button key={valor} type="button" role="radio" aria-checked={p.texto === valor} onClick={() => cambiarPreferencias({ texto: valor })}
+                className={`flex items-baseline gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${p.texto === valor ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea'}`}>
+                <span className={`${muestra} leading-none`} aria-hidden="true">A</span>{texto}
+              </button>
+            ))}
+          </div>
+        </Fila>
+        <Fila titulo="Menos movimiento" ayuda="Quita animaciones y transiciones al abrir y cambiar de pantalla.">
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input type="checkbox" role="switch" checked={p.menosMovimiento} onChange={(e) => cambiarPreferencias({ menosMovimiento: e.target.checked })} className="peer sr-only" aria-label="Menos movimiento" />
+            <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
+            <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
+          </label>
+        </Fila>
+      </Seccion>
+    </>
   )
 }

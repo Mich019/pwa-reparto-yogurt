@@ -44,7 +44,7 @@ const bloqueo = (config: Config) => {
                            AND e.ip IS NOT DISTINCT FROM i.ip AND e.creado_en > i.creado_en)
        GROUP BY i.ip HAVING count(*) >= ${max}) b) AS bloqueado_hasta`
 }
-const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefono, u.rol, u.activo, u.debe_cambiar_password, u.ultimo_acceso, u.creado_en,
+const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.activo, u.debe_cambiar_password, u.ultimo_acceso, u.creado_en,
   ${bloqueo(config)},
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario) AS clientes,
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario AND c.activo) AS clientes_activos`
@@ -52,7 +52,7 @@ const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefo
 function wire(r: any) {
   const bloqueada = r.bloqueado_hasta && new Date(r.bloqueado_hasta) > new Date()
   return {
-    id: r.id_usuario as string, nombre: r.nombre as string, correo: r.correo as string, telefono: (r.telefono ?? '') as string,
+    id: r.id_usuario as string, nombre: r.nombre as string, correo: r.correo as string, telefono: (r.telefono ?? '') as string, foto: (r.foto ?? null) as string | null,
     rol: r.rol as 'administrador' | 'vendedor', activo: r.activo as boolean, debeCambiarPassword: r.debe_cambiar_password as boolean,
     bloqueadoHasta: bloqueada ? new Date(r.bloqueado_hasta).toISOString() : null,
     ultimoAcceso: r.ultimo_acceso ? new Date(r.ultimo_acceso).toISOString() : null,

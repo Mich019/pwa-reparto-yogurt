@@ -27,6 +27,10 @@ const bodyCodigoLogin = z.object({
 })
 // Marca del token que entrega el login cuando falta el segundo paso: no sirve como sesión (ver autenticar en app.ts).
 export const DESAFIO = 'dos-pasos'
+// La foto llega ya recortada a 256 px por el navegador (src/lib/imagen.ts): unos 20 KB; el tope deja margen.
+const foto = z.string().max(200_000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/)
+const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional(), telefono: z.string().trim().max(20).optional(), foto: foto.nullable().optional() }).strict()
+const bodyCerrarSesion = z.object({ id: z.string().uuid().optional() }).strict()
 const bodyCambio = z.object({ actual: z.string().min(1).max(PASSWORD_MAX), nueva: z.string().max(1000) })
 
 const MENSAJE_CREDENCIALES = 'Correo o contraseña incorrectos'
@@ -68,10 +72,12 @@ function bloqueado(rep: FastifyReply, config: Config) {
   })
 }
 
+type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
+
 export async function rutasAuth(
   app: FastifyInstance,
   { db, config }: Contexto,
-  { requiereSesionAunConPasswordPendiente }: { requiereSesionAunConPasswordPendiente: (req: FastifyRequest, rep: FastifyReply) => Promise<unknown> },
+  { requiereSesion, requiereSesionAunConPasswordPendiente }: { requiereSesion: Guardia; requiereSesionAunConPasswordPendiente: Guardia },
 ) {
   // Con cookie, los tokens viajan sólo en Set-Cookie (HttpOnly): la respuesta no los trae y la página no los ve.
   // `refreshToken` sólo al abrir la sesión: al renovar, la cookie de la sesión ya está puesta.
@@ -207,11 +213,54 @@ export async function rutasAuth(
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.rol, u.debe_cambiar_password, u.es_plataforma, e.interna FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
+      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, e.interna, e.nombre AS empresa
+         FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [req.usuario.id],
     )
     const u = rows[0]
-    return { id: u.id_usuario, nombre: u.nombre, correo: u.correo, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password, plataforma: esPlataforma(u) }
+    return {
+      id: u.id_usuario, nombre: u.nombre, correo: u.correo, telefono: u.telefono ?? '', foto: u.foto ?? null, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password, plataforma: esPlataforma(u),
+      empresa: u.empresa, alta: u.creado_en, ultimoAcceso: u.ultimo_acceso, passwordCambiado: u.password_cambiado_en,
+    }
+  })
+
+  // El perfil propio: nombre, teléfono y foto. El correo no: es con lo que se entra y cambiarlo pediría confirmar el nuevo
+  // (un administrador lo cambia desde Equipo).
+  app.patch('/me', { preHandler: requiereSesion }, async (req, rep) => {
+    const b = bodyPerfil.safeParse(req.body ?? {})
+    if (!b.success) {
+      const enFoto = b.error.issues.some((i) => i.path[0] === 'foto')
+      return rep.code(400).send({ error: enFoto ? 'La foto debe ser una imagen JPG, PNG o WEBP' : 'Revisa el nombre (2 a 100 letras) y el teléfono (hasta 20)' })
+    }
+    const u = await tx(db, req.usuario.id, async (c) => (await c.query(
+      `UPDATE usuarios SET nombre = COALESCE($2, nombre), telefono = CASE WHEN $3::boolean THEN NULLIF($4, '') ELSE telefono END,
+              foto = CASE WHEN $5::boolean THEN $6 ELSE foto END
+        WHERE id_usuario = $1 RETURNING nombre, telefono, foto`,
+      [req.usuario.id, b.data.nombre ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.foto !== undefined, b.data.foto ?? null],
+    )).rows[0])
+    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null }
+  })
+
+  // Las sesiones abiertas de la cuenta (la de esta petición marcada) y cerrar una o todas las demás.
+  app.get('/me/sesiones', { preHandler: requiereSesion }, async (req) => {
+    const { rows } = await db.query(
+      `SELECT id_sesion, host(ip) AS ip, creado_en, expira_en FROM sesiones
+        WHERE id_usuario = $1 AND revocado_en IS NULL AND expira_en > now() ORDER BY creado_en DESC`,
+      [req.usuario.id],
+    )
+    return rows.map((r) => ({ id: r.id_sesion, actual: r.id_sesion === req.usuario.sid, ip: r.ip, inicio: r.creado_en, vence: r.expira_en }))
+  })
+
+  app.post('/me/sesiones/cerrar', { preHandler: requiereSesion, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, rep) => {
+    const b = bodyCerrarSesion.safeParse(req.body ?? {})
+    if (!b.success) return rep.code(400).send({ error: 'Sesión no válida' })
+    if (b.data.id === req.usuario.sid) return rep.code(400).send({ error: 'Para cerrar esta sesión usa «Cerrar sesión»' })
+    const r = await db.query(
+      `UPDATE sesiones SET revocado_en = now()
+        WHERE id_usuario = $1 AND id_sesion <> $2 AND revocado_en IS NULL AND ($3::uuid IS NULL OR id_sesion = $3)`,
+      [req.usuario.id, req.usuario.sid, b.data.id ?? null],
+    )
+    return { cerradas: r.rowCount }
   })
 
   // RF-039: quita la marca de "debe cambiar la contraseña". Cierra las demás sesiones. Probar la contraseña actual
