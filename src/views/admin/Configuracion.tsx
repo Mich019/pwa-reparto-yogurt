@@ -3,7 +3,7 @@ import { CreditCard, KeyRound, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchB
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
-import { aviso, claseInput } from '../../components/ui'
+import { aviso, claseInputRecto } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
@@ -35,10 +35,14 @@ const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
   { valor: 'mas-grande', texto: 'Más grande', muestra: 'text-xl' },
 ]
 
-export function Seccion({ id, titulo, descripcion, children }: { id: string; titulo: string; descripcion?: string; children: ReactNode }) {
+// `acciones` (Guardar, Deshacer…) van a la derecha del título, que se queda fijo arriba al desplazarse: siempre a mano.
+export function Seccion({ id, titulo, descripcion, acciones, children }: { id: string; titulo: string; descripcion?: string; acciones?: ReactNode; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="border-t border-linea pt-7 first:border-t-0 first:pt-0">
-      <h2 id={id} className="text-xl font-semibold">{titulo}</h2>
+      <div className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ${acciones ? 'sticky top-0 z-10 -mx-2 bg-[var(--color-lienzo)] px-2 py-2' : ''}`}>
+        <h2 id={id} className="text-xl font-semibold">{titulo}</h2>
+        {acciones && <div className="flex flex-wrap items-center gap-2">{acciones}</div>}
+      </div>
       {descripcion && <p className="mt-1 text-sm text-apagado">{descripcion}</p>}
       <div className="mt-4">{children}</div>
     </section>
@@ -63,7 +67,7 @@ function Muestra({ valor }: { valor: PreferenciaTema }) {
   const claro = <span className="flex h-full flex-1 flex-col gap-1.5 bg-[#f8f6ec] p-2"><span className="h-3 w-3/4 rounded bg-[#ecebd8]" /><span className="h-3 w-1/2 rounded-full bg-[#035d38]" /></span>
   const oscuro = <span className="flex h-full flex-1 flex-col gap-1.5 bg-[#0e1611] p-2"><span className="h-3 w-3/4 rounded bg-[#212c24]" /><span className="h-3 w-1/2 rounded-full bg-[#0f7a47]" /></span>
   return (
-    <span aria-hidden="true" className="flex h-16 w-full overflow-hidden rounded-xl border border-linea">
+    <span aria-hidden="true" className="flex h-16 w-full overflow-hidden rounded-md border border-linea">
       {valor === 'claro' ? claro : valor === 'oscuro' ? oscuro : <>{claro}{oscuro}</>}
     </span>
   )
@@ -89,7 +93,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
   }
 
   return (
-    <div className="mx-auto max-w-[1100px] px-4 pt-2 sm:px-8 lg:flex lg:h-full lg:flex-col">
+    <div className="mx-auto max-w-[1280px] 2xl:max-w-[1600px] px-4 pt-2 sm:px-8 lg:flex lg:h-full lg:flex-col">
       <header className="pb-6 pt-4 lg:shrink-0">
         <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">Configuración</h1>
         <p className="mt-3 text-sm text-apagado">{plataforma ? 'Tu cuenta y su seguridad, cómo está configurado el servicio y cómo se ve el panel.' : 'Tu cuenta y su seguridad, la marca de tu negocio, tu plan y cómo se ve el panel.'}</p>
@@ -105,7 +109,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
                 type="button"
                 onClick={() => elegir(id)}
                 aria-current={elegido ? 'page' : undefined}
-                className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors lg:py-3 ${anillo} ${elegido ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea/60 lg:bg-transparent lg:hover:bg-niebla'}`}
+                className={`flex shrink-0 items-center gap-3 rounded-lg px-4 py-2.5 text-left transition-colors lg:py-3 ${anillo} ${elegido ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea/60 lg:bg-transparent lg:hover:bg-niebla'}`}
               >
                 <Icono size={18} aria-hidden="true" className="shrink-0" />
                 <span className="min-w-0">
@@ -123,9 +127,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
           {visible === 'seguridad' && <Seguridad plataforma={plataforma} />}
           {extra.find((x) => x.id === visible)?.contenido}
           {visible === 'marca' && (
-            <Seccion id="marca" titulo="Marca" descripcion="El nombre, el lema, el logo, el color y el contacto de tu negocio. Los ven tú, tus repartidores en su app y quien reciba tus PDF.">
-              <MarcaEmpresa />
-            </Seccion>
+            <MarcaEmpresa />
           )}
           {visible === 'suscripcion' && suscripcion && (
             <Seccion id="suscripcion" titulo="Suscripción" descripcion="El plan de tu empresa. El pago y la tarjeta los maneja Mercado Pago.">
@@ -178,28 +180,27 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
   if (!u) return null
   return (
     <>
-      <Seccion id="perfil" titulo="Perfil" descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
+      <Seccion id="perfil" titulo="Perfil" acciones={
+        <button type="submit" form="form-perfil" disabled={!cambios || nombre.trim().length < 2 || guardando} className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
+          {guardando ? 'Guardando…' : 'Guardar cambios'}
+        </button>
+      } descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
         <FotoPerfil />
-        <form onSubmit={(e) => { e.preventDefault(); if (cambios) void guardar() }} className="mt-6 grid gap-4 sm:grid-cols-2">
+        <form id="form-perfil" onSubmit={(e) => { e.preventDefault(); if (cambios) void guardar() }} className="mt-6 grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-apagado">Nombre</span>
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={claseInput} maxLength={100} autoComplete="name" />
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={claseInputRecto} maxLength={100} autoComplete="name" />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-apagado">Teléfono</span>
-            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} className={claseInput} maxLength={20} inputMode="tel" autoComplete="tel" placeholder="Opcional" />
+            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} className={claseInputRecto} maxLength={20} inputMode="tel" autoComplete="tel" placeholder="Opcional" />
           </label>
           <label className="block sm:col-span-2">
             <span className="mb-1.5 block text-xs font-medium text-apagado">Correo</span>
-            <input value={u.correo} readOnly className={`${claseInput} cursor-default opacity-70`} />
+            <input value={u.correo} readOnly className={`${claseInputRecto} cursor-default opacity-70`} />
             <span className="mt-1.5 block text-xs text-apagado">{plataforma ? 'Es con lo que entras al panel de la plataforma.' : 'Es con lo que entras. Si necesitas cambiarlo, otro administrador lo hace desde Vendedores.'}</span>
           </label>
           {error && <p role="alert" className="text-sm font-medium text-rojo sm:col-span-2">{error}</p>}
-          <div className="sm:col-span-2">
-            <button type="submit" disabled={!cambios || nombre.trim().length < 2 || guardando} className={`rounded-full bg-tinta px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-              {guardando ? 'Guardando…' : 'Guardar cambios'}
-            </button>
-          </div>
         </form>
       </Seccion>
 
@@ -251,7 +252,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
         {cambiando ? (
           <div className="max-w-md">
             <FormPassword onListo={() => { aviso('Contraseña cambiada'); setCambiando(false); setCambiada(new Date().toISOString()); void cargar() }} />
-            <button type="button" onClick={() => setCambiando(false)} className={`mt-1 w-full rounded-full py-3 text-sm font-semibold text-apagado transition-colors hover:bg-niebla hover:text-tinta ${anillo}`}>Cancelar</button>
+            <button type="button" onClick={() => setCambiando(false)} className={`mt-1 w-full rounded-md py-3 text-sm font-semibold text-apagado transition-colors hover:bg-niebla hover:text-tinta ${anillo}`}>Cancelar</button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -262,7 +263,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
                 <div className="text-xs text-apagado">{cambiada ? `Último cambio: ${fechaHora(cambiada)}` : 'Protegida'}</div>
               </div>
             </div>
-            <button type="button" onClick={() => setCambiando(true)} className={`rounded-full bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}>Cambiar contraseña</button>
+            <button type="button" onClick={() => setCambiando(true)} className={`rounded-md bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}>Cambiar contraseña</button>
           </div>
         )}
       </Seccion>
@@ -284,7 +285,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
                     <div className="text-xs text-apagado">Desde el {fechaHora(s.inicio)}{s.ip ? ` · IP ${s.ip}` : ''}</div>
                   </div>
                   {!s.actual && (
-                    <button type="button" onClick={() => void cerrar(s.id)} disabled={!!cerrando} className={`rounded-full px-3 py-1.5 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
+                    <button type="button" onClick={() => void cerrar(s.id)} disabled={!!cerrando} className={`rounded-md px-3 py-1.5 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
                       {cerrando === s.id ? 'Cerrando…' : 'Cerrar'}
                     </button>
                   )}
@@ -292,7 +293,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
               ))}
             </ul>
             {otras > 1 && (
-              <button type="button" onClick={() => void cerrar()} disabled={!!cerrando} className={`mt-4 rounded-full bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea disabled:opacity-40 ${anillo}`}>
+              <button type="button" onClick={() => void cerrar()} disabled={!!cerrando} className={`mt-4 rounded-md bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea disabled:opacity-40 ${anillo}`}>
                 {cerrando === 'todas' ? 'Cerrando…' : `Cerrar las otras ${otras}`}
               </button>
             )}
@@ -321,7 +322,7 @@ function Apariencia() {
                 role="radio"
                 aria-checked={elegido}
                 onClick={() => cambiarTema(valor)}
-                className={`flex flex-col gap-3 rounded-[22px] p-3 text-left transition-colors ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}
+                className={`flex flex-col gap-3 rounded-lg p-3 text-left transition-colors ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}
               >
                 <Muestra valor={valor} />
                 <span className="flex items-center gap-2 px-1">
@@ -342,7 +343,7 @@ function Apariencia() {
           <div role="radiogroup" aria-label="Tamaño del texto" className="flex gap-1.5">
             {TAMANOS.map(({ valor, texto, muestra }) => (
               <button key={valor} type="button" role="radio" aria-checked={p.texto === valor} onClick={() => cambiarPreferencias({ texto: valor })}
-                className={`flex items-baseline gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${p.texto === valor ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea'}`}>
+                className={`flex items-baseline gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${p.texto === valor ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea'}`}>
                 <span className={`${muestra} leading-none`} aria-hidden="true">A</span>{texto}
               </button>
             ))}

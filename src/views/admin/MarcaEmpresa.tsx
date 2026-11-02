@@ -5,7 +5,8 @@ import { prepararLogo, revisarLogo, type RevisionLogo } from '../../lib/logo'
 import { COLORES_MARCA } from '../../lib/registro'
 import { hojaDeMuestra } from '../../lib/reportePdf'
 import { imagenParaPdf, type ImagenPdf } from '../../lib/pdf'
-import { aviso, claseInput } from '../../components/ui'
+import { aviso, claseInputRecto } from '../../components/ui'
+import { Seccion } from './Configuracion'
 
 // Configuración → Marca: nombre, lema, logo, color y contacto de la empresa (src/lib/marca.ts). Se ven en el panel, en
 // la app de reparto de todo el equipo y en los PDF. El logo se revisa y se arregla aquí mismo (src/lib/logo.ts).
@@ -114,17 +115,33 @@ export function MarcaEmpresa() {
   const iniciales = borrador.nombre.trim().charAt(0).toUpperCase()
   const fondoBoton = colorLegible(color)
 
+  // Guardar y Deshacer van junto al título del apartado, fijos arriba (Seccion).
+  const acciones = (
+    <>
+      {cambio && (
+        <button type="button" onClick={() => { setError(''); setOriginal(null); setBorrador(aBorrador(m)) }} className={`rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold hover:bg-linea ${anillo}`}>
+          Deshacer
+        </button>
+      )}
+      <button type="button" onClick={() => void guardar()} disabled={!cambio || guardando || procesando}
+        className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
+        {guardando ? 'Guardando…' : 'Guardar marca'}
+      </button>
+    </>
+  )
+
   return (
-    <div className="grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_21rem]">
+    <Seccion id="marca" titulo="Marca" acciones={acciones} descripcion="El nombre, el lema, el logo, el color y el contacto de tu negocio. Los ven tú, tus repartidores en su app y quien reciba tus PDF.">
+    <div className="grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:grid-cols-[minmax(0,1fr)_30rem] 2xl:gap-x-12">
     <div className="min-w-0 space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-apagado">Nombre del negocio</span>
-          <input value={borrador.nombre} onChange={(e) => poner({ nombre: e.target.value })} maxLength={120} className={claseInput} />
+          <input value={borrador.nombre} onChange={(e) => poner({ nombre: e.target.value })} maxLength={120} className={claseInputRecto} />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-apagado">Lema <span className="font-normal">(opcional)</span></span>
-          <input value={borrador.lema} onChange={(e) => poner({ lema: e.target.value })} maxLength={80} placeholder="Ej. Frescura que llega a tu puerta" className={claseInput} />
+          <input value={borrador.lema} onChange={(e) => poner({ lema: e.target.value })} maxLength={80} placeholder="Ej. Frescura que llega a tu puerta" className={claseInputRecto} />
         </label>
       </div>
 
@@ -134,7 +151,7 @@ export function MarcaEmpresa() {
           <label
             onDragOver={(e) => e.preventDefault()}
             onDrop={soltar}
-            className={`grid h-28 w-28 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-linea bg-niebla transition-colors hover:border-marca ${anillo} ${procesando ? 'animate-pulse' : ''}`}
+            className={`grid h-28 w-28 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-lg border-2 border-dashed border-linea bg-niebla transition-colors hover:border-marca ${anillo} ${procesando ? 'animate-pulse' : ''}`}
           >
             {borrador.logo
               ? <img src={borrador.logo} alt="Tu logo" className="h-full w-full object-contain p-2" />
@@ -144,10 +161,10 @@ export function MarcaEmpresa() {
           </label>
           {borrador.logo && (
             <div className="flex gap-3" aria-label="Así se ve sobre fondo claro y oscuro">
-              <div className="grid h-28 w-28 place-items-center rounded-2xl bg-white p-3 ring-1 ring-linea">
+              <div className="grid h-28 w-28 place-items-center rounded-lg bg-white p-3 ring-1 ring-linea">
                 <img src={borrador.logo} alt="" className="max-h-full max-w-full object-contain" />
               </div>
-              <div className="grid h-28 w-28 place-items-center rounded-2xl bg-neutral-900 p-3">
+              <div className="grid h-28 w-28 place-items-center rounded-lg bg-neutral-900 p-3">
                 <img src={borrador.logo} alt="" className="max-h-full max-w-full object-contain" />
               </div>
             </div>
@@ -209,7 +226,7 @@ export function MarcaEmpresa() {
         <span className="mb-1.5 block text-sm font-semibold text-apagado">Color</span>
         <div className="flex flex-wrap items-center gap-2.5">
           {COLORES_MARCA.map((c) => <BotonColor key={c} c={c} activo={borrador.color === c} onClick={() => poner({ color: c })} />)}
-          <label className="flex h-11 items-center gap-2 rounded-full bg-niebla pr-4 pl-1.5 text-sm font-semibold">
+          <label className="flex h-11 items-center gap-2 rounded-md bg-niebla pr-4 pl-1.5 text-sm font-semibold">
             <input type="color" value={color} onChange={(e) => poner({ color: e.target.value })} className="h-8 w-8 cursor-pointer rounded-full border-0 bg-transparent" />
             Otro
           </label>
@@ -228,13 +245,13 @@ export function MarcaEmpresa() {
       <label className="block">
         <span className="mb-1.5 block text-sm font-semibold text-apagado">Contacto en los documentos <span className="font-normal">(opcional)</span></span>
         <input value={borrador.contacto} onChange={(e) => poner({ contacto: e.target.value })} maxLength={160}
-          placeholder="Ej. Tel. 55 1234 5678 · Av. Juárez 12, Centro · tunegocio.mx" className={claseInput} />
+          placeholder="Ej. Tel. 55 1234 5678 · Av. Juárez 12, Centro · tunegocio.mx" className={claseInputRecto} />
         <span className="mt-1 block text-xs text-apagado">Sale al pie de los reportes y la libreta de clientes en PDF.</span>
       </label>
 
       <div>
         <span className="mb-1.5 block text-sm font-semibold text-apagado">Así se verá en la app</span>
-        <div className="max-w-sm overflow-hidden rounded-[22px] ring-1 ring-linea">
+        <div className="max-w-sm overflow-hidden rounded-lg ring-1 ring-linea">
           <div className="flex items-center gap-3 bg-papel px-4 py-3">
             {borrador.logo
               ? <img src={borrador.logo} alt="" className="h-10 max-w-[8rem] object-contain" />
@@ -247,25 +264,10 @@ export function MarcaEmpresa() {
         </div>
       </div>
       {error && <p role="alert" className="flex items-center gap-2 text-sm font-medium text-rojo"><AlertCircle size={15} className="shrink-0" /> {error}</p>}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => void guardar()}
-          disabled={!cambio || guardando || procesando}
-          className={`rounded-full bg-tinta px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}
-        >
-          {guardando ? 'Guardando…' : 'Guardar marca'}
-        </button>
-        {cambio && (
-          <button type="button" onClick={() => { setError(''); setOriginal(null); setBorrador(aBorrador(m)) }} className={`rounded-full bg-niebla px-5 py-3 text-sm font-semibold hover:bg-linea ${anillo}`}>
-            Deshacer
-          </button>
-        )}
-      </div>
     </div>
 
     {/* Así se verá, siempre a la vista (fija al desplazarse en la computadora). */}
-    <aside aria-label="Así se verá" className="space-y-5 xl:sticky xl:top-0 xl:self-start">
+    <aside aria-label="Así se verá" className="space-y-5 xl:sticky xl:top-16 xl:self-start">
       <div>
         <div className="mb-2 flex items-baseline justify-between gap-3">
           <span className="text-sm font-semibold text-apagado">Así se verán tus reportes</span>
@@ -283,6 +285,7 @@ export function MarcaEmpresa() {
       </div>
     </aside>
     </div>
+    </Seccion>
   )
 }
 

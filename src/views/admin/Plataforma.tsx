@@ -5,7 +5,7 @@ import { dinero } from '../../lib/fechas'
 import { cerrarSesion, llamarAutenticado, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { useAplicarPreferencias } from '../../lib/tema'
 import { Avatar } from '../../components/Avatar'
-import { aviso, claseInput } from '../../components/ui'
+import { aviso, claseInputRecto } from '../../components/ui'
 import { Configuracion, Fila, Seccion } from './Configuracion'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { LogoDelisy } from './marca'
@@ -227,7 +227,7 @@ function ChipEstado({ estado }: { estado: Estado }) {
   )
 }
 
-const boton = `inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40 ${anillo}`
+const boton = `inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40 ${anillo}`
 const botonPrimario = `${boton} bg-[var(--plat)] text-white hover:bg-[var(--plat-hover)]`
 const botonSuave = `${boton} bg-niebla text-tinta hover:bg-linea`
 
@@ -367,7 +367,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="relative min-w-[16rem] flex-1">
           <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-apagado" aria-hidden="true" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar empresa" className={`${claseInput} pl-11`} />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar empresa" className={`${claseInputRecto} pl-11`} />
         </label>
         <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-1.5">
           {FILTROS.map((f) => {
@@ -601,12 +601,12 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
     <div className="space-y-5">
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-apagado">Nombre</span>
-        <input value={nombre} onChange={(x) => setNombre(x.target.value)} className={claseInput} maxLength={120} />
+        <input value={nombre} onChange={(x) => setNombre(x.target.value)} className={claseInputRecto} maxLength={120} />
       </label>
       <div>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-apagado">Prueba gratis hasta</span>
-          <input type="date" value={prueba} onChange={(x) => setPrueba(x.target.value)} className={claseInput} disabled={exenta} />
+          <input type="date" value={prueba} onChange={(x) => setPrueba(x.target.value)} className={claseInputRecto} disabled={exenta} />
         </label>
         {!exenta && (
           <div className="mt-2 flex gap-1.5">
@@ -685,9 +685,9 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
         <section className="border-t border-linea pt-6">
           <h2 className="text-lg font-semibold">El negocio</h2>
           <div className="mt-5 space-y-4">
-            <Campo t="Nombre"><input value={f.nombre} onChange={(x) => poner({ nombre: x.target.value })} className={claseInput} placeholder="Ej. Agua La Fuente" maxLength={120} /></Campo>
+            <Campo t="Nombre"><input value={f.nombre} onChange={(x) => poner({ nombre: x.target.value })} className={claseInputRecto} placeholder="Ej. Agua La Fuente" maxLength={120} /></Campo>
             <Campo t="Zona horaria (define qué es «hoy» para sus rutas)">
-              <select value={f.zona} onChange={(x) => poner({ zona: x.target.value })} className={claseInput}>
+              <select value={f.zona} onChange={(x) => poner({ zona: x.target.value })} className={claseInputRecto}>
                 {ZONAS.map((z) => <option key={z} value={z}>{z.replace('America/', '').replace('_', ' ')}</option>)}
               </select>
             </Campo>
@@ -704,7 +704,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
               </div>
             </div>
             {f.plan === 'prueba' && (
-              <Campo t="Días de prueba"><input inputMode="numeric" value={f.dias} onChange={(x) => poner({ dias: x.target.value.replace(/\D/g, '').slice(0, 3) })} className={claseInput} /></Campo>
+              <Campo t="Días de prueba"><input inputMode="numeric" value={f.dias} onChange={(x) => poner({ dias: x.target.value.replace(/\D/g, '').slice(0, 3) })} className={claseInputRecto} /></Campo>
             )}
           </div>
         </section>
@@ -712,8 +712,8 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
           <h2 className="text-lg font-semibold">Su administrador</h2>
           <p className="mt-1 text-sm text-apagado">Le llega un enlace para crear su contraseña. Nadie más la ve.</p>
           <div className="mt-5 space-y-4">
-            <Campo t="Nombre"><input value={f.adminNombre} onChange={(x) => poner({ adminNombre: x.target.value })} className={claseInput} placeholder="Nombre y apellido" maxLength={100} /></Campo>
-            <Campo t="Correo"><input type="email" value={f.adminCorreo} onChange={(x) => poner({ adminCorreo: x.target.value })} className={claseInput} placeholder="correo@ejemplo.com" maxLength={150} /></Campo>
+            <Campo t="Nombre"><input value={f.adminNombre} onChange={(x) => poner({ adminNombre: x.target.value })} className={claseInputRecto} placeholder="Nombre y apellido" maxLength={100} /></Campo>
+            <Campo t="Correo"><input type="email" value={f.adminCorreo} onChange={(x) => poner({ adminCorreo: x.target.value })} className={claseInputRecto} placeholder="correo@ejemplo.com" maxLength={150} /></Campo>
           </div>
           {error && <p role="alert" className="mt-4 text-sm font-medium text-rojo">{error}</p>}
           <button type="submit" disabled={!listo || enviando} className={`${botonPrimario} mt-6 w-full lg:mt-auto`}>{enviando ? 'Creando…' : 'Crear empresa e invitar'}</button>
@@ -797,8 +797,8 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
             </div>
           ) : (
             <form onSubmit={(x) => { x.preventDefault(); void crear() }} className="mt-5 space-y-4">
-              <Campo t="Nombre"><input value={nombre} onChange={(x) => setNombre(x.target.value)} className={claseInput} autoComplete="off" /></Campo>
-              <Campo t="Correo"><input type="email" value={correo} onChange={(x) => setCorreo(x.target.value)} className={claseInput} autoComplete="off" placeholder="correo@ejemplo.com" /></Campo>
+              <Campo t="Nombre"><input value={nombre} onChange={(x) => setNombre(x.target.value)} className={claseInputRecto} autoComplete="off" /></Campo>
+              <Campo t="Correo"><input type="email" value={correo} onChange={(x) => setCorreo(x.target.value)} className={claseInputRecto} autoComplete="off" placeholder="correo@ejemplo.com" /></Campo>
               {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
               <button type="submit" disabled={enviando || nombre.trim().length < 2 || !correo.trim()} className={`${botonPrimario} w-full`}>{enviando ? 'Creando…' : 'Crear cuenta'}</button>
             </form>
@@ -848,7 +848,7 @@ function Opciones<T extends string>({ valor, opciones, alCambiar, etiqueta }: { 
     <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={etiqueta}>
       {opciones.map(([v, texto]) => (
         <button key={v} type="button" role="radio" aria-checked={valor === v} onClick={() => alCambiar(v)}
-          className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${valor === v ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>{texto}</button>
+          className={`rounded-md px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${valor === v ? 'bg-[var(--plat)] text-white' : 'bg-niebla hover:bg-linea'}`}>{texto}</button>
       ))}
     </div>
   )
@@ -972,16 +972,16 @@ function EditorAviso({ aviso: original, correoActivo, alTerminar }: { aviso: Avi
         <Campo t="Texto">
           <textarea value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={280} rows={3}
             placeholder="Ej. El domingo de 2 a 4 a.m. haremos mantenimiento; la app de reparto sigue funcionando sin conexión."
-            className={`${claseInput} resize-y`} />
+            className={`${claseInputRecto} resize-y`} />
           <span className="mt-1 block text-right text-xs tabular-nums text-apagado">{texto.length}/280</span>
         </Campo>
         <div className="grid gap-5 sm:grid-cols-2">
           <Campo t="Sale desde">
-            <input type="datetime-local" value={desde} onChange={(e) => setDesde(e.target.value)} className={claseInput} />
+            <input type="datetime-local" value={desde} onChange={(e) => setDesde(e.target.value)} className={claseInputRecto} />
             <span className="mt-1 block text-xs text-apagado">{desde ? <button type="button" onClick={() => setDesde('')} className="font-semibold hover:underline">Que salga ya</button> : 'Vacío: sale en cuanto lo publiques.'}</span>
           </Campo>
           <Campo t="Hasta">
-            <input type="datetime-local" value={hasta} onChange={(e) => setHasta(e.target.value)} className={claseInput} />
+            <input type="datetime-local" value={hasta} onChange={(e) => setHasta(e.target.value)} className={claseInputRecto} />
             <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-apagado">
               {hasta ? <button type="button" onClick={() => setHasta('')} className="font-semibold hover:underline">Sin fin</button> : <span>Vacío: hasta que lo quites.</span>}
               {([[24, '1 día'], [72, '3 días'], [168, '1 semana']] as const).map(([h, t]) => <button key={h} type="button" onClick={() => durante(h)} className="font-semibold hover:underline">{t}</button>)}
@@ -1039,7 +1039,7 @@ function AvisoAutomatico({ inicial, alGuardar }: { inicial: { dias: number; vend
         <label className="flex flex-wrap items-center gap-2 text-sm">
           Avisar
           <input inputMode="numeric" value={dias} onChange={(e) => setDias(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            aria-label="Días antes del fin de la prueba" className={`${claseInput} max-w-20 text-center tabular-nums`} />
+            aria-label="Días antes del fin de la prueba" className={`${claseInputRecto} max-w-20 text-center tabular-nums`} />
           días antes de que termine
         </label>
         {n > 60 && <p role="alert" className="text-sm font-medium text-rojo">Hasta 60 días antes.</p>}
@@ -1164,7 +1164,7 @@ function AjustesServicio() {
         <Fila titulo="Días de prueba gratis" ayuda={`Para cada empresa nueva, se registre sola o la des de alta tú. Vacío: ${s.pruebaDiasEntorno} días (PRUEBA_DIAS). Las que ya existen no cambian.`}>
           <label className="flex items-center gap-2 text-sm">
             <input inputMode="numeric" value={b.pruebaDias} onChange={(e) => poner({ pruebaDias: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-              placeholder={String(s.pruebaDiasEntorno)} aria-label="Días de prueba gratis" className={`${claseInput} max-w-24 text-center tabular-nums`} />
+              placeholder={String(s.pruebaDiasEntorno)} aria-label="Días de prueba gratis" className={`${claseInputRecto} max-w-24 text-center tabular-nums`} />
             días
           </label>
         </Fila>
@@ -1172,7 +1172,7 @@ function AjustesServicio() {
 
       <Seccion id="soporte" titulo="Soporte" descripcion="A dónde te escriben las empresas: sale en la pantalla de cobro y con el registro cerrado.">
         <input type="email" value={b.correoSoporte} onChange={(e) => poner({ correoSoporte: e.target.value })} maxLength={150}
-          placeholder="soporte@tudominio.com" aria-label="Correo de soporte" className={`${claseInput} max-w-md`} />
+          placeholder="soporte@tudominio.com" aria-label="Correo de soporte" className={`${claseInputRecto} max-w-md`} />
       </Seccion>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-6">

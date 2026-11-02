@@ -38,7 +38,7 @@ function BotonSuscribirse({ s, grande = false }: { s: Suscripcion; grande?: bool
         type="button"
         onClick={() => void ir()}
         disabled={yendo || !s.cobroDisponible}
-        className={`flex items-center justify-center gap-2 rounded-full bg-tinta font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${grande ? 'w-full py-4 text-base' : 'px-5 py-3 text-sm'} ${anillo}`}
+        className={`flex items-center justify-center gap-2 rounded-md bg-tinta font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${grande ? 'w-full py-4 text-base' : 'px-5 py-3 text-sm'} ${anillo}`}
       >
         <CreditCard size={grande ? 18 : 16} aria-hidden="true" /> {yendo ? 'Abriendo Mercado Pago…' : 'Suscribirme con Mercado Pago'}
       </button>
@@ -62,11 +62,11 @@ export function PantallaCobro({ s }: { s: Suscripcion }) {
       <p className="mt-3 max-w-md text-apagado">
         Tus clientes, pedidos y reportes siguen guardados. Suscríbete para que tú y tus repartidores sigan trabajando.
       </p>
-      <div className="mt-8 w-full max-w-sm rounded-[28px] border border-linea p-6 text-left">
+      <div className="mt-8 w-full max-w-sm rounded-lg border border-linea p-6 text-left">
         <div className="text-sm font-semibold text-apagado">Plan mensual</div>
         <div className="mt-1 text-3xl font-semibold">{precio(s)}</div>
         <p className="mt-1 text-sm text-apagado">Todo incluido: panel, app de reparto y reportes. Cancelas cuando quieras.</p>
-        {pendiente && <p className="mt-4 rounded-2xl bg-niebla px-4 py-3 text-sm">Empezaste a pagar pero Mercado Pago aún no lo confirma. Si ya pagaste, espera unos minutos y recarga.</p>}
+        {pendiente && <p className="mt-4 rounded-md bg-niebla px-4 py-3 text-sm">Empezaste a pagar pero Mercado Pago aún no lo confirma. Si ya pagaste, espera unos minutos y recarga.</p>}
         <div className="mt-5"><BotonSuscribirse s={s} grande /></div>
       </div>
       <button type="button" onClick={() => void cerrarSesion()} className={`mt-6 flex items-center gap-2 text-sm font-semibold text-apagado hover:text-tinta ${anillo}`}>
@@ -97,7 +97,7 @@ export function SeccionSuscripcion({ s }: { s: Suscripcion }) {
   const fin = new Date(s.pruebaHasta).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-niebla p-4">
+      <div className="rounded-lg bg-niebla p-4">
         <div className="font-semibold">
           {s.estado === 'activa' ? 'Suscripción activa'
             : s.estado === 'prueba' ? (s.suscripcion === 'pending' ? 'Prueba gratis · pago en proceso' : `Prueba gratis · ${s.diasPrueba ? `quedan ${dias(s.diasPrueba)}` : 'termina hoy'}`)
@@ -109,7 +109,7 @@ export function SeccionSuscripcion({ s }: { s: Suscripcion }) {
       </div>
       {s.estado !== 'activa' && <BotonSuscribirse s={s} />}
       {(s.suscripcion === 'authorized' || s.suscripcion === 'pending') && (
-        <button type="button" onClick={() => void cancelar()} disabled={cancelando} className={`rounded-full border border-rojo/40 px-5 py-3 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
+        <button type="button" onClick={() => void cancelar()} disabled={cancelando} className={`rounded-md border border-rojo/40 px-5 py-3 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
           {cancelando ? 'Cancelando…' : 'Cancelar suscripción'}
         </button>
       )}
