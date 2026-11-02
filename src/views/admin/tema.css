@@ -162,12 +162,6 @@ html:has(.tema-admin.oscuro) #root {
   :where(.tema-admin.oscuro) .border-white\/70 {
     border-color: var(--color-linea);
   }
-  /* El logo es verde y negro sobre transparente: en oscuro va sobre una placa crema para que se lea. */
-  :where(.tema-admin.oscuro) .logo-danelle {
-    background-color: #f8f6ec;
-    border-radius: 14px;
-    padding: 0.3rem 0.6rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

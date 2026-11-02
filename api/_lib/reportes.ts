@@ -149,26 +149,26 @@ const VENDIDO = `pe.estado = 'entregado' AND pe.fecha BETWEEN $1::date AND $2::d
 const DE_VENTAS = `FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)`
 
 async function resumen(db: Db, desde: string, hasta: string): Promise<Resumen> {
-  const { rows: u } = await db.query(`SELECT pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY pr.unidad`, [desde, hasta])
-  const { rows } = await db.query(
+  // Las consultas de cada parte van a la vez: dentro de la empresa cada una son tres viajes a la base.
+  const [{ rows: u }, { rows }] = await Promise.all([
+    db.query(`SELECT pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY pr.unidad`, [desde, hasta]),
+    db.query(
     `SELECT sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo, sum(${LITROS}) AS litros,
             count(DISTINCT pe.id_pedido) AS pedidos, count(DISTINCT pe.id_cliente) AS clientes,
             sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'efectivo') AS efectivo,
             sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'transferencia') AS transferencia
        ${DE_VENTAS} WHERE ${VENDIDO}`,
     [desde, hasta],
-  )
+  )])
   return resumenDe(rows[0], Object.fromEntries(u.map((f) => [f.unidad, num(f.n)])))
 }
 
 async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
   const u = UNIDAD[q.agrupar] // sale de una lista fija: es seguro ponerlo en el texto de la consulta
-  const { rows: pu } = await db.query(
+  const [{ rows: pu }, { rows }] = await Promise.all([db.query(
     `SELECT date_trunc('${u}', pe.fecha::timestamp)::date AS periodo, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`,
     [q.desde, q.hasta],
-  )
-  const porPeriodo = agruparUnidades(pu, 'periodo')
-  const { rows } = await db.query(
+  ), db.query(
     `WITH cortes AS (
        SELECT g::date AS periodo FROM generate_series(date_trunc('${u}', $1::date::timestamp), $2::date::timestamp, interval '1 ${u}') g
      ), ventas AS (
@@ -178,7 +178,8 @@ async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
      )
      SELECT c.periodo, v.ingreso, v.costo, v.litros, v.pedidos FROM cortes c LEFT JOIN ventas v USING (periodo) ORDER BY c.periodo`,
     [q.desde, q.hasta],
-  )
+  )])
+  const porPeriodo = agruparUnidades(pu, 'periodo')
   return rows.map((f) => {
     const inicio = f.periodo as string
     const finNatural = q.agrupar === 'dia' ? inicio : q.agrupar === 'semana' ? sumarDias(inicio, 6) : aIso(Date.UTC(+inicio.slice(0, 4), +inicio.slice(5, 7), 0))
@@ -232,7 +233,7 @@ async function sabores(db: Db, q: Consulta): Promise<Sabor[]> {
 }
 
 async function vendedores(db: Db, q: Consulta): Promise<Vendedor[]> {
-  const { rows: act } = await db.query(
+  const [{ rows: act }, { rows: vu }, { rows: gente }] = await Promise.all([db.query(
     `SELECT id_vendedor, sum(ingreso) AS ingreso, sum(costo) AS costo, sum(litros) AS litros, sum(pedidos) AS pedidos, sum(clientes) AS clientes, sum(omitidos) AS omitidos
        FROM (
          SELECT pe.id_vendedor, sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo, sum(${LITROS}) AS litros,
@@ -243,14 +244,16 @@ async function vendedores(db: Db, q: Consulta): Promise<Vendedor[]> {
            FROM pedidos pe WHERE pe.estado = 'omitido' AND pe.fecha BETWEEN $1::date AND $2::date GROUP BY pe.id_vendedor
        ) x GROUP BY id_vendedor`,
     [q.desde, q.hasta],
-  )
-  const { rows: vu } = await db.query(`SELECT pe.id_vendedor, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`, [q.desde, q.hasta])
+  ),
+  db.query(`SELECT pe.id_vendedor, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`, [q.desde, q.hasta]),
+  // Todo el equipo activo aparece, aunque no haya vendido (un cero también es un dato), y quien vendió aunque ya no esté.
+  db.query(
+    `SELECT id_usuario, nombre, activo FROM usuarios
+      WHERE (rol = 'vendedor' AND activo)
+         OR id_usuario IN (SELECT pe.id_vendedor FROM pedidos pe WHERE pe.estado IN ('entregado', 'omitido') AND pe.fecha BETWEEN $1::date AND $2::date)`,
+    [q.desde, q.hasta],
+  )])
   const porVendedor = agruparUnidades(vu, 'id_vendedor')
-  // Todo el equipo activo aparece, aunque no haya vendido: un cero también es un dato.
-  const { rows: gente } = await db.query(
-    `SELECT id_usuario, nombre, activo FROM usuarios WHERE (rol = 'vendedor' AND activo) OR id_usuario = ANY($1::uuid[])`,
-    [act.map((f) => f.id_vendedor).filter(Boolean)],
-  )
   const porId = new Map(act.map((f) => [f.id_vendedor as string | null, f]))
   const filas: Vendedor[] = gente.map((u) => ({ id: u.id_usuario, nombre: u.nombre, activo: u.activo, ...metricas(porId.get(u.id_usuario)), porUnidad: porVendedor.get(u.id_usuario) ?? {} }))
   if (porId.has(null)) filas.push({ id: null, nombre: 'Sin vendedor', activo: false, ...metricas(porId.get(null)), porUnidad: porVendedor.get(null) ?? {} })

@@ -22,75 +22,62 @@ export async function rutasAdmin(
     if (!q.success) return rep.code(400).send({ error: 'Fecha inválida (AAAA-MM-DD)' })
     const fecha = q.data.fecha ?? hoyEn(config.zonaHoraria)
 
-    // 1. Usuarios / Vendedores
-    const { rows: [u] } = await db.query(`
+    // Todo en una sola consulta: cada consulta dentro de la empresa son tres viajes a la base (abrir con la empresa,
+    // consultar, cerrar), y siete seguidas hacían esperar al resumen.
+    const { rows: [r] } = await db.query(`
       SELECT
-        count(*)::int AS total,
-        count(*) FILTER (WHERE activo)::int AS activos,
-        count(*) FILTER (WHERE rol = 'vendedor' AND activo)::int AS vendedores_activos,
-        count(*) FILTER (WHERE rol = 'vendedor')::int AS total_vendedores
-      FROM usuarios
-    `)
-
-    // 2. Clientes
-    const { rows: [c] } = await db.query(`
-      SELECT
-        count(*)::int AS total,
-        count(*) FILTER (WHERE activo)::int AS activos,
-        count(*) FILTER (WHERE id_vendedor IS NULL AND activo)::int AS sin_vendedor
-      FROM clientes
-    `)
-
-    // 3. Productos / Catálogo
-    const { rows: [pr] } = await db.query(`
-      SELECT
-        count(*)::int AS total,
-        count(*) FILTER (WHERE disponible)::int AS disponibles
-      FROM productos
-    `)
-
-    // 4. Pedidos del día de hoy
-    const { rows: [p] } = await db.query(`
-      SELECT
-        count(*)::int AS total,
-        count(*) FILTER (WHERE estado = 'pendiente')::int AS pendientes,
-        count(*) FILTER (WHERE estado = 'en_camino')::int AS en_camino,
-        count(*) FILTER (WHERE estado = 'entregado')::int AS entregados,
-        count(*) FILTER (WHERE estado = 'omitido')::int AS omitidos,
-        count(*) FILTER (WHERE estado = 'cancelado')::int AS cancelados,
-        coalesce(sum(total) FILTER (WHERE estado = 'entregado'), 0)::float8 AS total_cobrado,
-        coalesce(sum(total) FILTER (WHERE estado <> 'cancelado'), 0)::float8 AS total_esperado
-      FROM pedidos
-      WHERE fecha = $1
+        -- 1. Usuarios / Vendedores
+        (SELECT row_to_json(x) FROM (SELECT
+           count(*) FILTER (WHERE rol = 'vendedor' AND activo)::int AS vendedores_activos,
+           count(*) FILTER (WHERE rol = 'vendedor')::int AS total_vendedores
+         FROM usuarios) x) AS u,
+        -- 2. Clientes
+        (SELECT row_to_json(x) FROM (SELECT
+           count(*)::int AS total,
+           count(*) FILTER (WHERE activo)::int AS activos,
+           count(*) FILTER (WHERE id_vendedor IS NULL AND activo)::int AS sin_vendedor
+         FROM clientes) x) AS c,
+        -- 3. Productos / Catálogo
+        (SELECT row_to_json(x) FROM (SELECT
+           count(*)::int AS total,
+           count(*) FILTER (WHERE disponible)::int AS disponibles
+         FROM productos) x) AS pr,
+        -- 4. Pedidos del día de hoy
+        (SELECT row_to_json(x) FROM (SELECT
+           count(*)::int AS total,
+           count(*) FILTER (WHERE estado = 'pendiente')::int AS pendientes,
+           count(*) FILTER (WHERE estado = 'en_camino')::int AS en_camino,
+           count(*) FILTER (WHERE estado = 'entregado')::int AS entregados,
+           count(*) FILTER (WHERE estado = 'omitido')::int AS omitidos,
+           count(*) FILTER (WHERE estado = 'cancelado')::int AS cancelados,
+           coalesce(sum(total) FILTER (WHERE estado = 'entregado'), 0)::float8 AS total_cobrado,
+           coalesce(sum(total) FILTER (WHERE estado <> 'cancelado'), 0)::float8 AS total_esperado
+         FROM pedidos WHERE fecha = $1) x) AS p,
+        -- 5. Cantidad programada hoy por unidad (catálogo flexible): { L: 40, kg: 10 }, y las unidades del catálogo
+        (SELECT coalesce(json_agg(x), '[]') FROM (
+           SELECT prod.unidad, sum(d.cantidad * prod.presentacion_litros)::float8 AS n
+           FROM detalle_pedido d
+           JOIN pedidos ped ON d.id_pedido = ped.id_pedido
+           JOIN productos prod ON d.id_producto = prod.id_producto
+           WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
+           GROUP BY prod.unidad) x) AS por_unidad,
+        (SELECT coalesce(json_agg(DISTINCT unidad), '[]') FROM productos WHERE disponible) AS catalogo,
+        -- 6. Sabores con más demanda hoy
+        (SELECT coalesce(json_agg(x), '[]') FROM (
+           SELECT prod.sabor, prod.color_hex AS color, prod.unidad,
+                  coalesce(sum(d.cantidad * prod.presentacion_litros), 0)::float8 AS litros
+           FROM detalle_pedido d
+           JOIN pedidos ped ON d.id_pedido = ped.id_pedido
+           JOIN productos prod ON d.id_producto = prod.id_producto
+           WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
+           GROUP BY prod.sabor, prod.color_hex, prod.unidad
+           ORDER BY litros DESC
+           LIMIT 4) x) AS sabores_top
     `, [fecha])
-
-    // 5. Litros programados / vendidos hoy; por unidad (catálogo flexible): { L: 40, kg: 10 }
-    const { rows: porUnidad } = await db.query(`
-      SELECT prod.unidad, sum(d.cantidad * prod.presentacion_litros)::float8 AS n
-      FROM detalle_pedido d
-      JOIN pedidos ped ON d.id_pedido = ped.id_pedido
-      JOIN productos prod ON d.id_producto = prod.id_producto
-      WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
-      GROUP BY prod.unidad
-    `, [fecha])
+    const { u, c, pr, p } = r
+    const porUnidad: { unidad: string; n: number }[] = r.por_unidad
+    const saboresTop: { sabor: string; color: string; unidad: string; litros: number }[] = r.sabores_top
     const cantidadesHoy = Object.fromEntries(porUnidad.map((f) => [f.unidad as string, Math.round(Number(f.n) * 100) / 100]))
-    const { rows: catalogo } = await db.query(`SELECT DISTINCT unidad FROM productos WHERE disponible`)
-
-    // 6. Sabores con más demanda hoy
-    const { rows: saboresTop } = await db.query(`
-      SELECT
-        prod.sabor,
-        prod.color_hex AS color,
-        prod.unidad,
-        coalesce(sum(d.cantidad * prod.presentacion_litros), 0)::float8 AS litros
-      FROM detalle_pedido d
-      JOIN pedidos ped ON d.id_pedido = ped.id_pedido
-      JOIN productos prod ON d.id_producto = prod.id_producto
-      WHERE ped.fecha = $1 AND ped.estado <> 'cancelado'
-      GROUP BY prod.sabor, prod.color_hex, prod.unidad
-      ORDER BY litros DESC
-      LIMIT 4
-    `, [fecha])
 
     return {
       fecha,
@@ -118,7 +105,7 @@ export async function rutasAdmin(
         totalEsperado: p?.total_esperado ?? 0,
         litrosHoy: porUnidad.reduce((s, f) => s + Number(f.n), 0), // todas las unidades juntas: sólo sirve con una
         cantidadesHoy,
-        unidades: ordenarUnidades([...catalogo.map((f) => f.unidad as string), ...Object.keys(cantidadesHoy)]),
+        unidades: ordenarUnidades([...(r.catalogo as string[]), ...Object.keys(cantidadesHoy)]),
       },
       saboresTop: (saboresTop ?? []).map((s) => ({
         sabor: s.sabor as string,

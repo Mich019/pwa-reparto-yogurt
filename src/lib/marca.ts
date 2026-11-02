@@ -3,7 +3,7 @@ import { llamarAutenticado } from './sesion'
 
 // Marca de la empresa (api/_lib/empresa.ts): nombre, logo y color en el panel, la app de reparto y los PDF.
 // Se guarda una copia en este navegador: así se ve sin conexión y en la pantalla de entrada del próximo inicio de
-// sesión. Sin logo ni color, la empresa conserva la imagen de Danelle (las de antes de la marca por empresa).
+// sesión. Sin logo, la empresa se ve con su nombre y su inicial (views/admin/marca.tsx).
 
 export interface Marca {
   nombre: string
@@ -33,8 +33,6 @@ function fijar(m: Marca | null) {
 }
 
 export const marcaActual = () => actual
-// Danelle: la empresa no eligió marca propia.
-export const esDanelle = (m: Marca | null) => !m || (!m.logo && !m.color)
 
 export function useMarca() {
   return useSyncExternalStore(

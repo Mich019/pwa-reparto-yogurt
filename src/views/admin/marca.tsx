@@ -1,18 +1,6 @@
 import { useId } from 'react'
-import { esDanelle, useMarca } from '../../lib/marca'
-import logo from '../../assets/danelle-logo.png'
-import ave from '../../assets/danelle-ave.png'
+import { useMarca } from '../../lib/marca'
 import delisy from '../../assets/delisy-logo.svg'
-
-// Logo y ave de Danelle. Los SVG originales eran un mapa de bits dentro de un SVG de 380 KB; aquí van recortados y
-// reducidos a los tres colores de la marca (verde #035d38, amarillo #f9dc07, negro) con la transparencia como suavizado.
-export function LogoDanelle({ className = 'h-12' }: { className?: string }) {
-  return <img src={logo} alt="Danelle, yogurt 100% natural" className={`logo-danelle w-auto select-none ${className}`} draggable={false} />
-}
-
-export function AveDanelle({ className = 'h-10' }: { className?: string }) {
-  return <img src={ave} alt="" aria-hidden="true" className={`w-auto select-none ${className}`} draggable={false} />
-}
 
 // Delisy, la plataforma: su logo y su nombre. Donde todavía no hay empresa (el primer inicio de sesión en un equipo)
 // y en el panel de la plataforma.
@@ -31,12 +19,11 @@ export function AveDelisy({ className = 'h-10' }: { className?: string }) {
   return <img src={delisy} alt="" aria-hidden="true" className={`w-auto select-none ${className}`} draggable={false} />
 }
 
-// Marca por empresa (src/lib/marca.ts): su logo; sin logo, su nombre con la inicial en su color; sin marca propia, Danelle.
+// Marca por empresa (src/lib/marca.ts): su logo; sin logo, su nombre con la inicial en su color.
 // Sin ninguna empresa recordada en este equipo, Delisy.
 export function LogoEmpresa({ className = 'h-12' }: { className?: string }) {
   const m = useMarca()
   if (!m) return <LogoDelisy className={className} />
-  if (esDanelle(m)) return <LogoDanelle className={className} />
   if (m.logo) return <img src={m.logo} alt={m.nombre} className={`w-auto max-w-[16rem] select-none object-contain ${className}`} draggable={false} />
   return (
     <span className={`inline-flex max-w-[16rem] items-center gap-2.5 ${className}`}>
@@ -46,29 +33,25 @@ export function LogoEmpresa({ className = 'h-12' }: { className?: string }) {
   )
 }
 
-// El adorno de las pantallas vacías: el ave de Danelle, o el logo de la empresa apagado.
+// El adorno de las pantallas vacías: el logo de la empresa apagado (sin logo, nada).
 export function AveEmpresa({ className = 'h-10' }: { className?: string }) {
   const m = useMarca()
   if (!m) return <img src={delisy} alt="" aria-hidden="true" className={`w-auto select-none object-contain opacity-60 grayscale ${className}`} draggable={false} />
-  if (esDanelle(m)) return <AveDanelle className={className} />
   if (m.logo) return <img src={m.logo} alt="" aria-hidden="true" className={`w-auto select-none object-contain opacity-60 grayscale ${className}`} draggable={false} />
   return null
 }
 
 const HEX = /^#[0-9a-f]{6}$/i
 
-// Un envase de Danelle del color del sabor: tapa verde con la franja amarilla del logo y etiqueta crema con el logo.
+// Un envase del color del sabor: tapa del color de la empresa y etiqueta crema con su logo.
 // Hace de «foto del producto» en las tarjetas del panel; los sabores no traen imagen, sólo su color.
-// Lo que va en la etiqueta de los envases dibujados: el logo de la empresa (el de Danelle si es la marca de siempre).
+// Lo que va en la etiqueta de los envases dibujados: el logo de la empresa, si tiene.
 export function useLogoEtiqueta() {
-  const m = useMarca()
-  return !m || esDanelle(m) ? logo : m.logo ?? null
+  return useMarca()?.logo ?? null
 }
 
 export function Frasco({ color, className = 'h-28', apagado = false }: { color?: string; className?: string; apagado?: boolean }) {
   const id = useId().replace(/:/g, '')
-  const m = useMarca()
-  const danelle = !m || esDanelle(m)
   const etiqueta = useLogoEtiqueta()
   const c = color && HEX.test(color) ? color : '#d4d4d4'
   const cuerpo = 'M23 34 H97 L93 116 Q92.4 125 83 125 H37 Q27.6 125 27 116 Z'
@@ -92,10 +75,9 @@ export function Frasco({ color, className = 'h-28', apagado = false }: { color?:
       </g>
       <path d={cuerpo} fill="none" strokeWidth="1.5" style={{ stroke: 'color-mix(in oklab, var(--c) 62%, #002014)' }} />
       {etiqueta && <image href={etiqueta} x="33" y="64.5" width="54" height="37" preserveAspectRatio="xMidYMid meet" />}
-      <rect x="19" y="14" width="82" height="22" rx="7" style={{ fill: danelle ? '#035d38' : 'var(--color-marca)' }} />
+      <rect x="19" y="14" width="82" height="22" rx="7" style={{ fill: 'var(--color-marca)' }} />
       <g clipPath={`url(#tapa-${id})`}>
         <rect x="19" y="16.5" width="82" height="3" fill="#fff" opacity="0.2" />
-        {danelle && <rect x="19" y="30.5" width="82" height="3.5" fill="#f9dc07" />}
       </g>
     </svg>
   )

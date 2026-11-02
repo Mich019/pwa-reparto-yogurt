@@ -1,5 +1,5 @@
 import { ajustarTexto, anchoTexto, Documento, imagenParaPdf, type Color, type Fuente, type ImagenPdf, type PdfListo } from './pdf'
-import { colorLegible, esDanelle, marcaActual, type Marca } from './marca'
+import { colorLegible, marcaActual, type Marca } from './marca'
 import { textoPorUnidad, tituloUnidad } from './unidades'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
@@ -18,7 +18,7 @@ const REGLA: Color = [0.82, 0.835, 0.859] // #D1D5DB
 const FINA: Color = [0.898, 0.906, 0.922] // #E5E7EB
 const FONDO: Color = [0.976, 0.98, 0.984] // #F9FAFB
 // Marca de la empresa (src/lib/marca.ts): su nombre y su lema arriba, su contacto en el pie y su color como acento.
-// Sin marca propia, «Delisy» y el verde de Danelle. La hoja de muestra (hojaDeMuestra) dibuja con la marca que se está
+// Sin color propio, el verde de siempre; sin empresa, «Delisy». La hoja de muestra (hojaDeMuestra) dibuja con la marca que se está
 // editando, aún sin guardar.
 let marcaDeMuestra: Marca | null = null
 let logoDeMuestra: ImagenPdf | null = null
@@ -41,7 +41,7 @@ const acento = (): Color => {
 }
 const empresa = () => {
   const m = marca()
-  return m && !esDanelle(m) ? m.nombre : 'Delisy'
+  return m?.nombre || 'Delisy'
 }
 const POSITIVO: Color = [0.016, 0.471, 0.341] // #047857
 const NEGATIVO: Color = [0.725, 0.11, 0.11] // #B91C1C
