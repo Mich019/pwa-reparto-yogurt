@@ -148,37 +148,65 @@ const LITROS = `d.cantidad * pr.presentacion_litros`
 const VENDIDO = `pe.estado = 'entregado' AND pe.fecha BETWEEN $1::date AND $2::date`
 const DE_VENTAS = `FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)`
 
-async function resumen(db: Db, desde: string, hasta: string): Promise<Resumen> {
-  // Las consultas de cada parte van a la vez: dentro de la empresa cada una son tres viajes a la base.
-  const [{ rows: u }, { rows }] = await Promise.all([
-    db.query(`SELECT pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY pr.unidad`, [desde, hasta]),
-    db.query(
-    `SELECT sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo, sum(${LITROS}) AS litros,
-            count(DISTINCT pe.id_pedido) AS pedidos, count(DISTINCT pe.id_cliente) AS clientes,
-            sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'efectivo') AS efectivo,
-            sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'transferencia') AS transferencia
-       ${DE_VENTAS} WHERE ${VENDIDO}`,
-    [desde, hasta],
-  )])
-  return resumenDe(rows[0], Object.fromEntries(u.map((f) => [f.unidad, num(f.n)])))
+// Todo el reporte sale de una sola consulta: cada parte es una columna con sus filas en JSON. Dentro de la empresa cada
+// consulta son tres viajes a la base, y en Vercel sólo hay tres conexiones: once consultas hacían fila. Las ventas del
+// periodo ($1/$2) y las del anterior ($3/$4) se leen una vez (VENTAS) y todas las partes salen de ahí.
+const filas = (sql: string, orden?: string) => `(SELECT coalesce(json_agg(x${orden ? ` ORDER BY ${orden}` : ''}), '[]') FROM (${sql}) x)`
+const VENTAS = (desde: string, hasta: string) => `MATERIALIZED (
+    SELECT pe.id_pedido, pe.id_cliente, pe.id_vendedor, pe.fecha, pe.metodo_pago, d.id_producto, pr.unidad,
+           d.subtotal, d.cantidad * d.costo_unitario AS costo, d.costo_unitario, ${LITROS} AS litros
+      ${DE_VENTAS} WHERE pe.estado = 'entregado' AND pe.fecha BETWEEN ${desde}::date AND ${hasta}::date)`
+
+const resumenSql = (t: string) => `SELECT sum(subtotal) AS ingreso, sum(costo) AS costo, sum(litros) AS litros,
+         count(DISTINCT id_pedido) AS pedidos, count(DISTINCT id_cliente) AS clientes,
+         sum(subtotal) FILTER (WHERE metodo_pago = 'efectivo') AS efectivo,
+         sum(subtotal) FILTER (WHERE metodo_pago = 'transferencia') AS transferencia
+    FROM ${t}`
+const resumenUnidadesSql = (t: string) => `SELECT unidad, sum(litros) AS n FROM ${t} GROUP BY unidad`
+
+// `u` sale de una lista fija (UNIDAD): es seguro ponerlo en el texto de la consulta.
+const periodosSql = (u: string) => `WITH cortes AS (
+    SELECT g::date AS periodo FROM generate_series(date_trunc('${u}', $1::date::timestamp), $2::date::timestamp, interval '1 ${u}') g
+  )
+  SELECT c.periodo, v.ingreso, v.costo, v.litros, v.pedidos FROM cortes c LEFT JOIN (
+    SELECT date_trunc('${u}', fecha::timestamp)::date AS periodo, sum(subtotal) AS ingreso, sum(costo) AS costo,
+           sum(litros) AS litros, count(DISTINCT id_pedido) AS pedidos
+      FROM ventas GROUP BY 1
+  ) v USING (periodo)`
+const periodosUnidadesSql = (u: string) => `SELECT date_trunc('${u}', fecha::timestamp)::date AS periodo, unidad, sum(litros) AS n FROM ventas GROUP BY 1, 2`
+
+const SABORES = `SELECT pr.id_producto, pr.sabor, pr.color_hex, pr.disponible, pr.unidad,
+         coalesce(v.litros, 0) AS litros, coalesce(v.ingreso, 0) AS ingreso, coalesce(v.costo, 0) AS costo, coalesce(v.sin_costo, false) AS sin_costo
+    FROM productos pr
+    LEFT JOIN (
+      SELECT id_producto, sum(litros) AS litros, sum(subtotal) AS ingreso, sum(costo) AS costo,
+             bool_or(costo_unitario = 0 AND subtotal > 0) AS sin_costo
+        FROM ventas GROUP BY id_producto
+    ) v USING (id_producto)
+   WHERE pr.disponible OR v.litros IS NOT NULL`
+
+const VENDEDORES = `SELECT id_vendedor, sum(ingreso) AS ingreso, sum(costo) AS costo, sum(litros) AS litros, sum(pedidos) AS pedidos, sum(clientes) AS clientes, sum(omitidos) AS omitidos
+    FROM (
+      SELECT id_vendedor, sum(subtotal) AS ingreso, sum(costo) AS costo, sum(litros) AS litros,
+             count(DISTINCT id_pedido) AS pedidos, count(DISTINCT id_cliente) AS clientes, 0 AS omitidos
+        FROM ventas GROUP BY id_vendedor
+      UNION ALL
+      SELECT pe.id_vendedor, 0, 0, 0, 0, 0, count(*)
+        FROM pedidos pe WHERE pe.estado = 'omitido' AND pe.fecha BETWEEN $1::date AND $2::date GROUP BY pe.id_vendedor
+    ) x GROUP BY id_vendedor`
+const VENDEDORES_UNIDADES = `SELECT id_vendedor, unidad, sum(litros) AS n FROM ventas GROUP BY 1, 2`
+// Todo el equipo activo aparece, aunque no haya vendido (un cero también es un dato), y quien vendió aunque ya no esté.
+const GENTE = `SELECT id_usuario, nombre, activo FROM usuarios
+   WHERE (rol = 'vendedor' AND activo)
+      OR id_usuario IN (SELECT pe.id_vendedor FROM pedidos pe WHERE pe.estado IN ('entregado', 'omitido') AND pe.fecha BETWEEN $1::date AND $2::date)`
+
+type Filas = Record<string, any>[] // filas de pg, como las de db.query
+
+function resumen(f: Filas, u: Filas): Resumen {
+  return resumenDe(f[0] ?? {}, Object.fromEntries(u.map((x) => [x.unidad, num(x.n)])))
 }
 
-async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
-  const u = UNIDAD[q.agrupar] // sale de una lista fija: es seguro ponerlo en el texto de la consulta
-  const [{ rows: pu }, { rows }] = await Promise.all([db.query(
-    `SELECT date_trunc('${u}', pe.fecha::timestamp)::date AS periodo, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`,
-    [q.desde, q.hasta],
-  ), db.query(
-    `WITH cortes AS (
-       SELECT g::date AS periodo FROM generate_series(date_trunc('${u}', $1::date::timestamp), $2::date::timestamp, interval '1 ${u}') g
-     ), ventas AS (
-       SELECT date_trunc('${u}', pe.fecha::timestamp)::date AS periodo, sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo,
-              sum(${LITROS}) AS litros, count(DISTINCT pe.id_pedido) AS pedidos
-         ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1
-     )
-     SELECT c.periodo, v.ingreso, v.costo, v.litros, v.pedidos FROM cortes c LEFT JOIN ventas v USING (periodo) ORDER BY c.periodo`,
-    [q.desde, q.hasta],
-  )])
+function periodos(q: Consulta, rows: Filas, pu: Filas): Periodo[] {
   const porPeriodo = agruparUnidades(pu, 'periodo')
   return rows.map((f) => {
     const inicio = f.periodo as string
@@ -199,20 +227,7 @@ async function periodos(db: Db, q: Consulta): Promise<Periodo[]> {
   })
 }
 
-async function sabores(db: Db, q: Consulta): Promise<Sabor[]> {
-  const { rows } = await db.query(
-    `SELECT pr.id_producto, pr.sabor, pr.color_hex, pr.disponible, pr.unidad,
-            coalesce(v.litros, 0) AS litros, coalesce(v.ingreso, 0) AS ingreso, coalesce(v.costo, 0) AS costo, coalesce(v.sin_costo, false) AS sin_costo
-       FROM productos pr
-       LEFT JOIN (
-         SELECT d.id_producto, sum(${LITROS}) AS litros, sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo,
-                bool_or(d.costo_unitario = 0 AND d.subtotal > 0) AS sin_costo
-           ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY d.id_producto
-       ) v USING (id_producto)
-      WHERE pr.disponible OR v.litros IS NOT NULL
-      ORDER BY coalesce(v.litros, 0) DESC, coalesce(v.ingreso, 0) DESC, pr.sabor, pr.id_producto`,
-    [q.desde, q.hasta],
-  )
+function sabores(rows: Filas): Sabor[] {
   return rows.map((f) => {
     const ingreso = num(f.ingreso)
     const costo = num(f.costo)
@@ -232,27 +247,7 @@ async function sabores(db: Db, q: Consulta): Promise<Sabor[]> {
   })
 }
 
-async function vendedores(db: Db, q: Consulta): Promise<Vendedor[]> {
-  const [{ rows: act }, { rows: vu }, { rows: gente }] = await Promise.all([db.query(
-    `SELECT id_vendedor, sum(ingreso) AS ingreso, sum(costo) AS costo, sum(litros) AS litros, sum(pedidos) AS pedidos, sum(clientes) AS clientes, sum(omitidos) AS omitidos
-       FROM (
-         SELECT pe.id_vendedor, sum(d.subtotal) AS ingreso, sum(d.cantidad * d.costo_unitario) AS costo, sum(${LITROS}) AS litros,
-                count(DISTINCT pe.id_pedido) AS pedidos, count(DISTINCT pe.id_cliente) AS clientes, 0 AS omitidos
-           ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY pe.id_vendedor
-         UNION ALL
-         SELECT pe.id_vendedor, 0, 0, 0, 0, 0, count(*)
-           FROM pedidos pe WHERE pe.estado = 'omitido' AND pe.fecha BETWEEN $1::date AND $2::date GROUP BY pe.id_vendedor
-       ) x GROUP BY id_vendedor`,
-    [q.desde, q.hasta],
-  ),
-  db.query(`SELECT pe.id_vendedor, pr.unidad, sum(${LITROS}) AS n ${DE_VENTAS} WHERE ${VENDIDO} GROUP BY 1, 2`, [q.desde, q.hasta]),
-  // Todo el equipo activo aparece, aunque no haya vendido (un cero también es un dato), y quien vendió aunque ya no esté.
-  db.query(
-    `SELECT id_usuario, nombre, activo FROM usuarios
-      WHERE (rol = 'vendedor' AND activo)
-         OR id_usuario IN (SELECT pe.id_vendedor FROM pedidos pe WHERE pe.estado IN ('entregado', 'omitido') AND pe.fecha BETWEEN $1::date AND $2::date)`,
-    [q.desde, q.hasta],
-  )])
+function vendedores(act: Filas, vu: Filas, gente: Filas): Vendedor[] {
   const porVendedor = agruparUnidades(vu, 'id_vendedor')
   const porId = new Map(act.map((f) => [f.id_vendedor as string | null, f]))
   const filas: Vendedor[] = gente.map((u) => ({ id: u.id_usuario, nombre: u.nombre, activo: u.activo, ...metricas(porId.get(u.id_usuario)), porUnidad: porVendedor.get(u.id_usuario) ?? {} }))
@@ -277,11 +272,23 @@ function metricas(f?: Record<string, unknown>) {
 export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
   const dias = diasEntre(q.desde, q.hasta)
   const antes = q.compararDesde && q.compararHasta ? { desde: q.compararDesde, hasta: q.compararHasta } : { desde: sumarDias(q.desde, -dias), hasta: sumarDias(q.desde, -1) }
-  const [r, ant, per, sab, ven, uni] = await Promise.all([
-    resumen(db, q.desde, q.hasta), resumen(db, antes.desde, antes.hasta), periodos(db, q), sabores(db, q), vendedores(db, q),
-    db.query(`SELECT DISTINCT unidad FROM productos WHERE disponible`),
-  ])
-  const unidades = ordenarUnidades([...uni.rows.map((f) => f.unidad as string), ...Object.keys(r.porUnidad)])
+  const u = UNIDAD[q.agrupar]
+  const { rows: [f] } = await db.query(
+    `WITH ventas AS ${VENTAS('$1', '$2')}, anteriores AS ${VENTAS('$3', '$4')}
+     SELECT ${filas(resumenSql('ventas'))} AS resumen, ${filas(resumenUnidadesSql('ventas'))} AS resumen_u,
+            ${filas(resumenSql('anteriores'))} AS anterior, ${filas(resumenUnidadesSql('anteriores'))} AS anterior_u,
+            ${filas(periodosSql(u), 'x.periodo')} AS periodos, ${filas(periodosUnidadesSql(u))} AS periodos_u,
+            ${filas(SABORES, 'x.litros DESC, x.ingreso DESC, x.sabor, x.id_producto')} AS sabores,
+            ${filas(VENDEDORES)} AS vendedores, ${filas(VENDEDORES_UNIDADES)} AS vendedores_u, ${filas(GENTE)} AS gente`,
+    [q.desde, q.hasta, antes.desde, antes.hasta],
+  )
+  const r = resumen(f.resumen, f.resumen_u)
+  const ant = resumen(f.anterior, f.anterior_u)
+  const per = periodos(q, f.periodos, f.periodos_u)
+  const sab = sabores(f.sabores)
+  const ven = vendedores(f.vendedores, f.vendedores_u, f.gente)
+  // Las unidades del catálogo: las de los sabores disponibles (la lista de sabores ya los trae todos).
+  const unidades = ordenarUnidades([...sab.filter((x) => x.disponible).map((x) => x.unidad), ...Object.keys(r.porUnidad)])
   return {
     desde: q.desde,
     hasta: q.hasta,
