@@ -1,4 +1,5 @@
-// Escritor mínimo de PDF, sin librerías: texto con las fuentes estándar, rectángulos, líneas y cuadrículas de QR.
+// Escritor mínimo de PDF, sin librerías: texto con las fuentes estándar, rectángulos, líneas, cuadrículas de QR e
+// imágenes JPEG (el logo de la empresa).
 // Las medidas van en milímetros con el origen arriba a la izquierda, como se dibuja en pantalla.
 
 const PT = 72 / 25.4
@@ -56,6 +57,31 @@ export async function compartirPdf(bytes: Bytes, nombre: string): Promise<'compa
     descargarArchivo(bytes, nombre)
     return 'descargado'
   }
+}
+
+// Una imagen lista para el PDF: JPEG (el PDF lo guarda tal cual, sin decodificarlo) como texto binario, su tamaño en
+// píxeles y la misma imagen como data URL para la vista previa en SVG.
+export interface ImagenPdf { jpeg: string; ancho: number; alto: number; url: string }
+
+// Cualquier imagen que el navegador sepa dibujar (PNG, WEBP, SVG…) pasada a JPEG sobre fondo blanco, de `maximo` px
+// por lado como mucho. Lo transparente queda blanco, como la hoja.
+export async function imagenParaPdf(fuente: string, maximo = 600): Promise<ImagenPdf> {
+  const img = new Image()
+  img.src = fuente
+  await img.decode()
+  const w0 = img.naturalWidth || maximo
+  const h0 = img.naturalHeight || maximo
+  // Los SVG se dibujan al tamaño máximo; las fotos, nunca más grandes que su original.
+  const k = Math.min(fuente.startsWith('data:image/svg') ? Infinity : 1, maximo / Math.max(w0, h0))
+  const lienzo = document.createElement('canvas')
+  lienzo.width = Math.max(1, Math.round(w0 * k))
+  lienzo.height = Math.max(1, Math.round(h0 * k))
+  const ctx = lienzo.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height)
+  ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height)
+  const url = lienzo.toDataURL('image/jpeg', 0.92)
+  return { jpeg: atob(url.slice(url.indexOf(',') + 1)), ancho: lienzo.width, alto: lienzo.height, url }
 }
 
 export type Fuente = 'normal' | 'negrita' | 'mono'
@@ -146,6 +172,7 @@ export interface PdfListo {
 export class Documento {
   private paginas: Pagina[] = []
   private actual!: Pagina
+  private imagenes: ImagenPdf[] = [] // cada una se guarda una vez y las páginas la reusan (/Im1, /Im2…)
 
   constructor(private titulo = '') {}
 
@@ -204,6 +231,14 @@ export class Documento {
     )
   }
 
+  // Una imagen estirada a la caja dada (quien llama respeta la proporción).
+  imagen(img: ImagenPdf, x: number, y: number, ancho: number, alto: number) {
+    let i = this.imagenes.indexOf(img)
+    if (i < 0) i = this.imagenes.push(img) - 1
+    this.actual.ops.push('q', `${num(ancho * PT)} 0 0 ${num(alto * PT)} ${this.x(x)} ${this.y(y + alto)} cm`, `/Im${i + 1} Do`, 'Q')
+    this.actual.svg.push(`<image href="${img.url}" x="${mm(x)}" y="${mm(y)}" width="${mm(ancho)}" height="${mm(alto)}" preserveAspectRatio="none"/>`)
+  }
+
   // Dibuja una matriz de módulos (QR) dentro de un cuadrado de `lado` mm. Une los módulos contiguos de cada fila
   // en un solo rectángulo para que el archivo pese poco y no queden costuras entre módulos.
   modulos(x: number, y: number, lado: number, n: number, oscuro: (fila: number, col: number) => boolean) {
@@ -247,8 +282,10 @@ export class Documento {
       salida += `${n} 0 obj\n${cuerpo}\nendobj\n`
     }
     salida += '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'
-    const total = 6 + this.paginas.length * 2
     const ids = this.paginas.map((_, i) => 7 + i * 2)
+    const idsImagen = this.imagenes.map((_, i) => 7 + this.paginas.length * 2 + i)
+    const total = 6 + this.paginas.length * 2 + this.imagenes.length
+    const xobjetos = idsImagen.length ? ` /XObject << ${idsImagen.map((id, i) => `/Im${i + 1} ${id} 0 R`).join(' ')} >>` : ''
     objeto(1, '<< /Type /Catalog /Pages 2 0 R >>')
     objeto(2, `<< /Type /Pages /Count ${this.paginas.length} /Kids [${ids.map((i) => `${i} 0 R`).join(' ')}] >>`)
     ;(['normal', 'negrita', 'mono'] as Fuente[]).forEach((f, i) =>
@@ -256,9 +293,11 @@ export class Documento {
     objeto(6, `<< /Title (${escapar(paraPdf(this.titulo))}) /Producer (Delisy) >>`)
     this.paginas.forEach((p, i) => {
       const contenido = p.ops.join('\n')
-      objeto(ids[i], `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(p.ancho * PT)} ${num(p.alto * PT)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${ids[i] + 1} 0 R >>`)
+      objeto(ids[i], `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(p.ancho * PT)} ${num(p.alto * PT)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >>${xobjetos} >> /Contents ${ids[i] + 1} 0 R >>`)
       objeto(ids[i] + 1, `<< /Length ${contenido.length} >>\nstream\n${contenido}\nendstream`)
     })
+    this.imagenes.forEach((img, i) => objeto(idsImagen[i],
+      `<< /Type /XObject /Subtype /Image /Width ${img.ancho} /Height ${img.alto} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.jpeg.length} >>\nstream\n${img.jpeg}\nendstream`))
     const xref = salida.length
     salida += `xref\n0 ${total + 1}\n0000000000 65535 f \n`
     for (let n = 1; n <= total; n++) salida += `${String(offsets[n]).padStart(10, '0')} 00000 n \n`

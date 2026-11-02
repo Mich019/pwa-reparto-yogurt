@@ -1,5 +1,5 @@
-import { ajustarTexto, anchoTexto, Documento, type Color, type Fuente, type PdfListo } from './pdf'
-import { colorLegible, esDanelle, marcaActual } from './marca'
+import { ajustarTexto, anchoTexto, Documento, imagenParaPdf, type Color, type Fuente, type ImagenPdf, type PdfListo } from './pdf'
+import { colorLegible, esDanelle, marcaActual, type Marca } from './marca'
 import { textoPorUnidad, tituloUnidad } from './unidades'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
@@ -18,15 +18,29 @@ const REGLA: Color = [0.82, 0.835, 0.859] // #D1D5DB
 const FINA: Color = [0.898, 0.906, 0.922] // #E5E7EB
 const FONDO: Color = [0.976, 0.98, 0.984] // #F9FAFB
 // Marca de la empresa (src/lib/marca.ts): su nombre y su lema arriba, su contacto en el pie y su color como acento.
-// Sin marca propia, «Delisy» y el verde de Danelle.
+// Sin marca propia, «Delisy» y el verde de Danelle. La hoja de muestra (hojaDeMuestra) dibuja con la marca que se está
+// editando, aún sin guardar.
+let marcaDeMuestra: Marca | null = null
+let logoDeMuestra: ImagenPdf | null = null
+const marca = () => marcaDeMuestra ?? marcaActual()
+// El logo va como JPEG (pdf.ts imagenParaPdf), que se prepara antes de armar el PDF: prepararLogoPdf.
+let logoListo: { fuente: string; img: ImagenPdf } | null = null
+const logo = () => (marcaDeMuestra ? logoDeMuestra : logoListo && logoListo.fuente === marcaActual()?.logo ? logoListo.img : null)
+export async function prepararLogoPdf() {
+  const fuente = marcaActual()?.logo
+  if (!fuente || logoListo?.fuente === fuente) return
+  try {
+    logoListo = { fuente, img: await imagenParaPdf(fuente) }
+  } catch { /* una imagen que el navegador no sabe dibujar: el PDF sale sin logo */ }
+}
 const acento = (): Color => {
-  const c = marcaActual()?.color
+  const c = marca()?.color
   if (!c) return [3 / 255, 93 / 255, 56 / 255]
   const h = colorLegible(c)
   return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number]
 }
 const empresa = () => {
-  const m = marcaActual()
+  const m = marca()
   return m && !esDanelle(m) ? m.nombre : 'Delisy'
 }
 const POSITIVO: Color = [0.016, 0.471, 0.341] // #047857
@@ -77,18 +91,27 @@ class Informe {
 
   get limite() { return this.alto - 20 }
 
-  // Primera página: nombre del documento a la izquierda y sus datos (periodo, fecha…) a la derecha.
+  // Primera página: el logo (si hay), el nombre del documento a su lado y sus datos (periodo, fecha…) a la derecha.
   portada(subtitulo: string, datos: [string, string][], ahora: Date) {
     const { pdf } = this
     pdf.pagina(this.ancho, this.alto)
     pdf.rect(0, 0, this.ancho, 2.2, { relleno: acento() })
-    pdf.texto(empresa().toUpperCase(), M, 15, { fuente: 'negrita', tam: 8, color: acento() })
-    const lema = marcaActual()?.lema
-    const xLema = M + anchoTexto(empresa().toUpperCase(), 'negrita', 8) + 3
+    let x = M
+    const img = logo()
+    if (img) {
+      // En una caja de 36 × 22 mm, centrado a la altura del bloque de títulos.
+      const k = Math.min(36 / img.ancho, 22 / img.alto)
+      const [w, h] = [img.ancho * k, img.alto * k]
+      pdf.imagen(img, M, 11 + (22 - h) / 2, w, h)
+      x = M + w + 5
+    }
+    pdf.texto(empresa().toUpperCase(), x, 15, { fuente: 'negrita', tam: 8, color: acento() })
+    const lema = marca()?.lema
+    const xLema = x + anchoTexto(empresa().toUpperCase(), 'negrita', 8) + 3
     // Sin pisar los datos de la derecha (periodo, fecha…).
     if (lema) pdf.texto(ajustarTexto(lema, 'normal', 8, Math.max(20, this.util * 0.55 - xLema + M), 1)[0] ?? '', xLema, 15, { tam: 8, color: TENUE })
-    pdf.texto(this.titulo, M, 26, { fuente: 'negrita', tam: 22, color: TINTA })
-    pdf.texto(subtitulo, M, 33, { tam: 10.5, color: SECUNDARIO })
+    pdf.texto(this.titulo, x, 26, { fuente: 'negrita', tam: 22, color: TINTA })
+    pdf.texto(subtitulo, x, 33, { tam: 10.5, color: SECUNDARIO })
     const filas: [string, string][] = [...datos, ['Generado', fechaHora(ahora)]]
     const xEtiqueta = this.ancho - M - Math.max(...filas.map(([, v]) => anchoTexto(v, 'normal', 8.5))) - Math.max(...filas.map(([e]) => anchoTexto(e.toUpperCase(), 'negrita', 6.5))) - 6
     filas.forEach(([etiqueta, valor], i) => {
@@ -183,6 +206,46 @@ class Informe {
     this.y += 10
   }
 
+  // La hoja de muestra de Configuración → Marca: secciones con su título y, en vez de datos, bloques grises con la forma
+  // de cada cosa (cifras, gráfica, tablas). El acento va donde lo pone el reporte de verdad.
+  esqueleto() {
+    const { pdf, util } = this
+    const gris = (x: number, y: number, ancho: number, alto: number, c: Color = FINA) => pdf.rect(x, y, ancho, alto, { relleno: c })
+    this.tituloSeccion('Resumen', 'contra el mes anterior')
+    for (let i = 0; i < 4; i++) {
+      const x = M + (i * util) / 4
+      gris(x, this.y, 16, 1.6)
+      gris(x, this.y + 4, 24 - i * 2, 4.4, REGLA)
+      gris(x, this.y + 11, 12, 1.4, i % 2 ? FINA : acento())
+    }
+    this.y += 22
+    this.tituloSeccion('Ventas por día')
+    const alturas = [12, 18, 15, 22, 9, 16, 24, 19, 14, 26, 21, 17, 28, 23]
+    const paso = util / alturas.length
+    const base = this.y + 30
+    alturas.forEach((h, i) => gris(M + i * paso + paso * 0.18, base - h, paso * 0.64, h, i === alturas.length - 1 ? acento() : REGLA))
+    pdf.linea(M, base, M + util, base, { color: TINTA, grosor: 0.35 })
+    this.y = base + 10
+    const tabla = (titulo: string, filas: number, cuadro: boolean) => {
+      this.tituloSeccion(titulo)
+      const anchos = [0.4, 0.2, 0.2, 0.2]
+      const xs = anchos.reduce<number[]>((a, f) => [...a, a[a.length - 1] + f * util], [M])
+      anchos.forEach((f, i) => gris(i ? xs[i + 1] - 1.75 - f * util * 0.4 : xs[i] + 1.75, this.y + 2, f * util * 0.4, 1.4))
+      this.y += 6
+      pdf.linea(M, this.y, M + util, this.y, { color: TINTA, grosor: 0.35 })
+      for (let f = 0; f < filas; f++) {
+        if (cuadro) pdf.rect(M + 1.75, this.y + 2.1, 2.2, 2.2, { relleno: f === 0 ? acento() : REGLA })
+        gris(M + (cuadro ? 5.2 : 1.75), this.y + 2.3, util * (0.16 + ((f * 7) % 5) * 0.025), 1.8, REGLA)
+        anchos.slice(1).forEach((a, i) => gris(xs[i + 2] - 1.75 - a * util * (0.3 + ((f + i) % 3) * 0.08), this.y + 2.3, a * util * (0.3 + ((f + i) % 3) * 0.08), 1.8))
+        this.y += RENGLON
+        pdf.linea(M, this.y, M + util, this.y, { color: FINA, grosor: 0.15 })
+      }
+      this.y += 10
+    }
+    tabla('Por sabor', 6, true)
+    tabla('Por vendedor', 3, false)
+  }
+
   nota(texto: string) {
     this.asegurar(8)
     for (const r of ajustarTexto(texto, 'normal', 7.5, this.util, 3)) {
@@ -195,12 +258,31 @@ class Informe {
   listo(): PdfListo {
     this.pdf.enCadaPagina((n, total) => {
       this.pdf.linea(M, this.alto - 13, this.ancho - M, this.alto - 13, { color: REGLA, grosor: 0.2 })
-      const contacto = marcaActual()?.contacto
+      const contacto = marca()?.contacto
       const pie = `${empresa()} · ${contacto || 'Documento interno y confidencial'}`
       this.pdf.texto(ajustarTexto(pie, 'normal', 7, this.util - 30, 1)[0] ?? '', M, this.alto - 8.5, { tam: 7, color: TENUE })
       this.pdf.texto(`Página ${n} de ${total}`, this.ancho - M, this.alto - 8.5, { tam: 7, color: TENUE, alinear: 'der' })
     })
     return this.pdf.listo()
+  }
+}
+
+// ---------------------------------------------------------------------------------------------- hoja de muestra
+
+// La primera hoja de un reporte de ventas con la marca que se está editando (aún sin guardar) y sin datos: cómo se verá
+// el PDF. Devuelve su SVG, el mismo que dibuja el visor de PDF. El logo llega ya preparado (imagenParaPdf).
+export function hojaDeMuestra(m: Marca, logoPdf: ImagenPdf | null, ahora = new Date()): string {
+  marcaDeMuestra = m
+  logoDeMuestra = logoPdf
+  try {
+    const mes = ahora.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+    const inf = new Informe('Reporte de ventas', mes)
+    inf.portada(`Las ventas de ${mes}`, [['Periodo', mes.charAt(0).toUpperCase() + mes.slice(1)]], ahora)
+    inf.esqueleto()
+    return inf.listo().paginas[0].svg
+  } finally {
+    marcaDeMuestra = null
+    logoDeMuestra = null
   }
 }
 

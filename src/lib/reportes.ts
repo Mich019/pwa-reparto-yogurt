@@ -180,7 +180,9 @@ export async function exportarReporte(reporte: Reporte, formato: Formato, tabla:
   const { desde, hasta, agrupar } = reporte
   const nombre = `reporte-${formato === 'csv' ? tabla : 'ventas'}-${desde}_${hasta}.${formato}`
   if (formato === 'pdf') {
-    mostrarPdf((await import('./reportePdf')).reportePdf(reporte), nombre)
+    const pdf = await import('./reportePdf')
+    await pdf.prepararLogoPdf()
+    mostrarPdf(pdf.reportePdf(reporte), nombre)
     return null
   }
   return descargarArchivo(await descargarAutenticado(`/reportes/exportar?desde=${desde}&hasta=${hasta}&agrupar=${agrupar}&formato=${formato}&tabla=${tabla}`), nombre)
@@ -191,7 +193,9 @@ export async function exportarLibreta(formato: Formato): Promise<string | null> 
   const nombre = `libreta-clientes-${hoy()}.${formato}`
   if (formato === 'pdf') {
     const { clientes } = await llamarAutenticado<{ clientes: ClienteLibreta[] }>('/reportes/clientes')
-    mostrarPdf((await import('./reportePdf')).libretaPdf(clientes), nombre)
+    const pdf = await import('./reportePdf')
+    await pdf.prepararLogoPdf()
+    mostrarPdf(pdf.libretaPdf(clientes), nombre)
     return null
   }
   return descargarArchivo(await descargarAutenticado(`/reportes/clientes?formato=${formato}`), nombre)

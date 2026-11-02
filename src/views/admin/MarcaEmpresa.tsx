@@ -1,12 +1,16 @@
-import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react'
 import { AlertCircle, AlertTriangle, Check, CheckCircle2, ChevronDown, ImagePlus, Sparkles } from 'lucide-react'
 import { colorLegible, guardarMarca, useMarca, type Marca } from '../../lib/marca'
 import { prepararLogo, revisarLogo, type RevisionLogo } from '../../lib/logo'
 import { COLORES_MARCA } from '../../lib/registro'
+import { hojaDeMuestra } from '../../lib/reportePdf'
+import { imagenParaPdf, type ImagenPdf } from '../../lib/pdf'
 import { aviso, claseInput } from '../../components/ui'
 
 // Configuración → Marca: nombre, lema, logo, color y contacto de la empresa (src/lib/marca.ts). Se ven en el panel, en
 // la app de reparto de todo el equipo y en los PDF. El logo se revisa y se arregla aquí mismo (src/lib/logo.ts).
+// A la derecha, mientras se edita, la primera hoja de un reporte en PDF con esa marca (sin datos: bloques grises) y el
+// encabezado de la app: sin guardar ni tocar nada.
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
 const SVG_MAXIMO = 500 * 1024
@@ -24,7 +28,21 @@ export function MarcaEmpresa() {
   const [revision, setRevision] = useState<RevisionLogo | null>(null)
   const [original, setOriginal] = useState<string | null>(null) // el logo antes de quitarle el fondo, para deshacerlo
   useEffect(() => { if (m && !borrador) setBorrador(aBorrador(m)) }, [m, borrador])
+  const { nombre = '', color: colorBorrador = null, lema = '', contacto = '' } = borrador ?? {}
   const logoActual = borrador?.logo ?? null
+  // El logo como irá en el PDF (JPEG sobre blanco) y la misma hoja que dibuja el PDF (src/lib/reportePdf.ts), como SVG.
+  const [logoPdf, setLogoPdf] = useState<ImagenPdf | null>(null)
+  useEffect(() => {
+    setLogoPdf(null)
+    if (!logoActual) return
+    let vigente = true
+    imagenParaPdf(logoActual).then((i) => { if (vigente) setLogoPdf(i) }).catch(() => {})
+    return () => { vigente = false }
+  }, [logoActual])
+  const hoja = useMemo(
+    () => hojaDeMuestra({ nombre: nombre.trim() || 'Tu negocio', color: colorBorrador, logo: logoActual, lema: lema.trim() || null, contacto: contacto.trim() || null }, logoPdf),
+    [nombre, colorBorrador, logoActual, lema, contacto, logoPdf],
+  )
   useEffect(() => {
     setRevision(null)
     if (!logoActual) return
@@ -97,7 +115,8 @@ export function MarcaEmpresa() {
   const fondoBoton = colorLegible(color)
 
   return (
-    <div className="space-y-6">
+    <div className="grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_21rem]">
+    <div className="min-w-0 space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-apagado">Nombre del negocio</span>
@@ -213,38 +232,20 @@ export function MarcaEmpresa() {
         <span className="mt-1 block text-xs text-apagado">Sale al pie de los reportes y la libreta de clientes en PDF.</span>
       </label>
 
-      {/* Cómo se verá: el encabezado de la app, un botón y la cabecera de un PDF. */}
       <div>
-        <span className="mb-1.5 block text-sm font-semibold text-apagado">Así se verá</span>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="overflow-hidden rounded-[22px] ring-1 ring-linea">
-            <div className="flex items-center gap-3 bg-papel px-4 py-3">
-              {borrador.logo
-                ? <img src={borrador.logo} alt="" className="h-10 max-w-[8rem] object-contain" />
-                : <span className="grid h-10 w-10 place-items-center rounded-xl text-lg font-bold text-white" style={{ background: fondoBoton }}>{iniciales}</span>}
-              <span className="truncate font-semibold">{borrador.nombre || 'Tu negocio'}</span>
-            </div>
-            <div className="bg-niebla p-4">
-              <div className="rounded-full py-3 text-center text-sm font-semibold text-white" style={{ background: fondoBoton }}>Nuevo pedido</div>
-            </div>
+        <span className="mb-1.5 block text-sm font-semibold text-apagado">Así se verá en la app</span>
+        <div className="max-w-sm overflow-hidden rounded-[22px] ring-1 ring-linea">
+          <div className="flex items-center gap-3 bg-papel px-4 py-3">
+            {borrador.logo
+              ? <img src={borrador.logo} alt="" className="h-10 max-w-[8rem] object-contain" />
+              : <span className="grid h-10 w-10 place-items-center rounded-xl text-lg font-bold text-white" style={{ background: fondoBoton }}>{iniciales}</span>}
+            <span className="truncate font-semibold">{borrador.nombre || 'Tu negocio'}</span>
           </div>
-          <div aria-label="Cabecera y pie de un PDF" className="flex min-h-36 flex-col overflow-hidden rounded-[22px] bg-white text-neutral-900 ring-1 ring-linea">
-            <div className="h-1.5" style={{ background: fondoBoton }} />
-            <div className="flex-1 px-4 pt-3">
-              <p className="truncate text-[10px] font-bold tracking-wide">
-                <span style={{ color: fondoBoton }}>{(borrador.nombre || 'Tu negocio').toUpperCase()}</span>
-                {borrador.lema.trim() && <span className="ml-1.5 font-normal tracking-normal text-neutral-500">{borrador.lema.trim()}</span>}
-              </p>
-              <p className="mt-1 text-lg font-bold">Reporte de ventas</p>
-              <p className="text-xs text-neutral-500">Octubre 2026</p>
-            </div>
-            <p className="truncate border-t border-neutral-200 px-4 py-2 text-[10px] text-neutral-500">
-              {borrador.nombre || 'Tu negocio'} · {borrador.contacto.trim() || 'Documento interno y confidencial'}
-            </p>
+          <div className="bg-niebla p-4">
+            <div className="rounded-full py-3 text-center text-sm font-semibold text-white" style={{ background: fondoBoton }}>Nuevo pedido</div>
           </div>
         </div>
       </div>
-
       {error && <p role="alert" className="flex items-center gap-2 text-sm font-medium text-rojo"><AlertCircle size={15} className="shrink-0" /> {error}</p>}
       <div className="flex gap-2">
         <button
@@ -262,7 +263,37 @@ export function MarcaEmpresa() {
         )}
       </div>
     </div>
+
+    {/* Así se verá, siempre a la vista (fija al desplazarse en la computadora). */}
+    <aside aria-label="Así se verá" className="space-y-5 xl:sticky xl:top-0 xl:self-start">
+      <div>
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <span className="text-sm font-semibold text-apagado">Así se verán tus reportes</span>
+          {cambio && <span className="text-xs font-semibold text-ambar">Sin guardar</span>}
+        </div>
+        <div role="img" aria-label="Primera hoja de un reporte de ventas en PDF con tu marca"
+          className="mx-auto max-w-sm overflow-hidden rounded-sm shadow-[0_2px_6px_rgba(0,0,0,0.08),0_12px_32px_rgba(0,0,0,0.10)] ring-1 ring-black/5 xl:max-w-none [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+          dangerouslySetInnerHTML={{ __html: hoja }} />
+        {/* De cerca: el principio del encabezado y del pie de la misma hoja, donde va la marca. */}
+        <div aria-hidden="true" className="mx-auto mt-3 max-w-sm divide-y divide-dashed divide-neutral-300 overflow-hidden rounded-sm bg-white ring-1 ring-black/5 xl:max-w-none [&_svg]:block [&_svg]:h-auto [&_svg]:w-full">
+          <div dangerouslySetInnerHTML={{ __html: recorte(hoja, 0, 0.6, 3, 38) }} />
+          <div dangerouslySetInnerHTML={{ __html: recorte(hoja, 0, 0.6, CARTA_ALTO - 15, CARTA_ALTO - 4) }} />
+        </div>
+        <p className="mt-2 text-xs text-apagado">Arriba el logo, el nombre y el lema; el color en los acentos y el contacto al pie. Igual en la libreta de clientes.</p>
+      </div>
+    </aside>
+    </div>
   )
+}
+
+// Un pedazo de la hoja, más grande: de `x0` a `x1` del ancho (fracciones) y de `y0` a `y1` mm desde arriba, cambiando
+// el viewBox del SVG.
+const CARTA_ALTO = 279.4
+function recorte(svg: string, x0: number, x1: number, y0: number, y1: number) {
+  return svg.replace(/viewBox="0 0 ([\d.]+) ([\d.]+)"[^>]*>/, (_, w: string, h: string) => {
+    const k = Number(h) / CARTA_ALTO
+    return `viewBox="${Number(w) * x0} ${y0 * k} ${Number(w) * (x1 - x0)} ${(y1 - y0) * k}" preserveAspectRatio="xMinYMin meet">`
+  })
 }
 
 function Consejo({ ok = false, children }: { ok?: boolean; children: ReactNode }) {
