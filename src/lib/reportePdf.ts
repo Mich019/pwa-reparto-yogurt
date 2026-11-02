@@ -73,6 +73,17 @@ export interface Columna<T> {
   muestra?: (f: T) => Color // cuadrito de color antes del texto (el color del sabor)
 }
 
+// Cantidades: con una unidad, la columna de siempre («Litros», «12.5 L»); con varias, una columna por unidad («Litros»,
+// «Kilos», «Piezas») con la cifra sola, porque «73,179 L + 5,301 kg + 48,058 pz» no cabe en una casilla. Las columnas
+// de más le quitan ancho a las otras (la tabla reparte el ancho en proporción).
+const cifra = (n: number) => n.toLocaleString('es-MX', { maximumFractionDigits: 2 })
+function columnasCantidad<T>(unidades: string[], ancho: number, pu: (f: T) => Record<string, number> | undefined, litros: (f: T) => number): Columna<T>[] {
+  if (unidades.length < 2) return [{ titulo: tituloUnidad(unidades[0] ?? 'L'), ancho, der: true, valor: (f) => lit(litros(f), unidades[0]) }]
+  return unidades.map((u) => ({ titulo: tituloUnidad(u), ancho: ancho * 0.8, der: true, valor: (f) => cifra(pu(f)?.[u] ?? 0) }))
+}
+const totalCantidad = (unidades: string[], pu: Record<string, number> | undefined, litros: number) =>
+  unidades.length < 2 ? [lit(litros, unidades[0])] : unidades.map((u) => cifra(pu?.[u] ?? 0))
+
 // Documento con encabezado, pie «Página n de N», secciones numeradas y tablas que continúan en la página siguiente.
 class Informe {
   readonly pdf: Documento
@@ -158,13 +169,16 @@ class Informe {
   celda(texto: string, x: number, ancho: number, base: number, o: { fuente?: Fuente; tam?: number; color?: Color; der?: boolean }) {
     // Las cifras (columnas a la derecha) no se cortan: con varias unidades se achican hasta 6 pt para caber enteras.
     const tamNormal = o.tam ?? 8.3
-    const tam = o.der ? Math.max(6, Math.min(tamNormal, (tamNormal * (ancho - 3.5)) / anchoTexto(texto, o.fuente ?? 'normal', tamNormal))) : tamNormal
+    const tam = o.der ? Math.max(6, Math.min(tamNormal, Math.floor((100 * tamNormal * (ancho - 3.5)) / anchoTexto(texto, o.fuente ?? 'normal', tamNormal)) / 100)) : tamNormal // hacia abajo: justo al límite, el redondeo lo cortaba
     const [t = ''] = ajustarTexto(texto, o.fuente ?? 'normal', tam, ancho - 3.5, 1)
     this.pdf.texto(t, o.der ? x + ancho - 1.75 : x + 1.75, base, { fuente: o.fuente, tam, color: o.color ?? TINTA, alinear: o.der ? 'der' : 'izq' })
   }
 
   tabla<T>(columnas: Columna<T>[], filas: T[], total?: string[]) {
     const { pdf } = this
+    // Los anchos son proporciones: si suman más de 1 (columnas por unidad), se reparten en el ancho útil.
+    const suma = columnas.reduce((s, c) => s + c.ancho, 0)
+    columnas = columnas.map((c) => ({ ...c, ancho: c.ancho / suma }))
     const xs = columnas.reduce<number[]>((a, c) => [...a, a[a.length - 1] + c.ancho * this.util], [M])
     const doble = columnas.some((c) => c.detalle)
     const alto = doble ? 9.6 : RENGLON
@@ -300,6 +314,7 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   const unidades = r.unidades?.length ? r.unidades : ['L']
   const varias = unidades.length > 1
   const cant = (pu: Record<string, number> | undefined, n: number) => (varias ? textoPorUnidad(pu, unidades, n) : lit(n, unidades[0]))
+  const total = totalCantidad.bind(null, unidades)
   const tituloCant = varias ? 'Cantidad' : tituloUnidad(unidades[0])
 
   inf.portada(`Resultados del ${periodo}`, [
@@ -385,31 +400,31 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
     { titulo: 'Utilidad', ancho: 0.13, der: true, valor: (s) => din(s.utilidad), color: (s) => signo(s.utilidad) },
     { titulo: 'Margen', ancho: 0.09, der: true, valor: (s) => pct(s.margenPct) },
     { titulo: 'Observación', ancho: 0.16, valor: nota, color: (s) => (s.sinCosto ? NEGATIVO : TENUE) },
-  ], r.sabores, ['Total', cant(x.porUnidad, x.litros), !varias && x.litros ? '100.0%' : '-', din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct), ''])
+  ], r.sabores, ['Total', varias ? '' : lit(x.litros, unidades[0]), !varias && x.litros ? '100.0%' : '-', din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct), ''])
 
   inf.tituloSeccion('Desempeño por vendedor', 'Ordenado por ingresos')
   inf.tabla<VendedorRendimiento>([
     { titulo: 'Vendedor', ancho: 0.22, valor: (v) => v.nombre, detalle: (v) => (v.activo || v.id === null ? null : 'Cuenta dada de baja') },
     { titulo: 'Pedidos', ancho: 0.09, der: true, valor: (v) => ent(v.pedidos) },
     { titulo: 'Clientes', ancho: 0.09, der: true, valor: (v) => ent(v.clientes) },
-    { titulo: tituloCant, ancho: 0.1, der: true, valor: (v) => cant(v.porUnidad, v.litros) },
+    ...columnasCantidad<VendedorRendimiento>(unidades, 0.1, (v) => v.porUnidad, (v) => v.litros),
     { titulo: 'Ingresos', ancho: 0.14, der: true, valor: (v) => din(v.ingreso) },
     { titulo: 'Utilidad', ancho: 0.13, der: true, valor: (v) => din(v.utilidad), color: (v) => signo(v.utilidad) },
     { titulo: 'Ticket prom.', ancho: 0.12, der: true, valor: (v) => din(v.ticketPromedio) },
     { titulo: 'Sin venta', ancho: 0.11, der: true, valor: (v) => ent(v.omitidos) },
-  ], r.vendedores, ['Total', ent(x.pedidos), ent(x.clientes), cant(x.porUnidad, x.litros), din(x.ingreso), din(x.utilidad), din(x.ticketPromedio), ent(r.vendedores.reduce((s, v) => s + v.omitidos, 0))])
+  ], r.vendedores, ['Total', ent(x.pedidos), ent(x.clientes), ...total(x.porUnidad, x.litros), din(x.ingreso), din(x.utilidad), din(x.ticketPromedio), ent(r.vendedores.reduce((s, v) => s + v.omitidos, 0))])
 
   const nombrePeriodo = (p: Periodo) => (r.agrupar === 'semana' ? (p.inicio === p.fin ? fechaMx(p.inicio) : `${fechaMx(p.inicio)} al ${fechaMx(p.fin)}`) : textoPeriodo(p, r.agrupar, true))
   inf.tituloSeccion(`Detalle por ${UNIDAD}`)
   inf.tabla<Periodo>([
     { titulo: UNIDAD.charAt(0).toUpperCase() + UNIDAD.slice(1), ancho: 0.26, valor: nombrePeriodo },
     { titulo: 'Pedidos', ancho: 0.1, der: true, valor: (p) => ent(p.pedidos) },
-    { titulo: tituloCant, ancho: 0.11, der: true, valor: (p) => cant(p.porUnidad, p.litros) },
+    ...columnasCantidad<Periodo>(unidades, 0.11, (p) => p.porUnidad, (p) => p.litros),
     { titulo: 'Ingresos', ancho: 0.14, der: true, valor: (p) => din(p.ingreso) },
     { titulo: 'Costos', ancho: 0.14, der: true, valor: (p) => din(p.costo) },
     { titulo: 'Utilidad', ancho: 0.14, der: true, valor: (p) => din(p.utilidad), color: (p) => signo(p.utilidad) },
     { titulo: 'Margen', ancho: 0.11, der: true, valor: (p) => pct(p.ingreso > 0 ? Math.round((p.utilidad / p.ingreso) * 1000) / 10 : null) },
-  ], r.periodos, ['Total', ent(x.pedidos), cant(x.porUnidad, x.litros), din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct)])
+  ], r.periodos, ['Total', ent(x.pedidos), ...total(x.porUnidad, x.litros), din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct)])
 
   inf.nota('Notas: se consideran los pedidos entregados, por su fecha de entrega, con el precio y el costo vigentes al momento de la venta. '
     + '"Sin venta" son visitas registradas en las que el cliente no compró.')
@@ -445,16 +460,14 @@ export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): PdfL
   const grupos = new Map<string, ClienteLibreta[]>()
   for (const c of clientes) grupos.set(c.vendedor, [...(grupos.get(c.vendedor) ?? []), c])
   const suma = (cs: ClienteLibreta[], k: 'pedidos' | 'litros' | 'comprado') => cs.reduce((s, c) => s + c[k], 0)
-  // Lo comprado por unidad («60 L + 10 kg»); sin desglose (servidor anterior), los litros de siempre.
-  const cant = (cs: ClienteLibreta[]) => {
-    if (cs.some((c) => !c.porUnidad)) return lit(suma(cs, 'litros'))
+  // Lo comprado por unidad ({ L: 60, kg: 10 }); sin desglose (servidor anterior), los litros de siempre.
+  const porUnidad = (cs: ClienteLibreta[]) => {
     const pu: Record<string, number> = {}
-    for (const c of cs) for (const [u, n] of Object.entries(c.porUnidad!)) pu[u] = (pu[u] ?? 0) + n
-    return textoPorUnidad(pu, ['L'])
+    for (const c of cs) for (const [u, n] of Object.entries(c.porUnidad ?? {})) pu[u] = (pu[u] ?? 0) + n
+    return pu
   }
-  // Con una sola unidad la columna se llama como siempre («Litros»).
-  const unidades = [...new Set(clientes.flatMap((c) => Object.keys(c.porUnidad ?? {})))]
-  const tituloCant = unidades.length > 1 ? 'Cantidad' : tituloUnidad(unidades[0] ?? 'L')
+  // L primero; una empresa que sólo vende en kilos dice «Kilos» y «0 kg», no litros.
+  const unidades = [...new Set(clientes.flatMap((c) => Object.keys(c.porUnidad ?? {})))].sort((a, b) => (a === 'L' ? -1 : b === 'L' ? 1 : a.localeCompare(b)))
 
   inf.portada('Directorio de la cartera activa', [
     ['Clientes activos', ent(clientes.length)],
@@ -468,24 +481,24 @@ export function libretaPdf(clientes: ClienteLibreta[], ahora = new Date()): PdfL
     { titulo: 'Clientes', ancho: 0.13, der: true, valor: ([, cs]) => ent(cs.length) },
     { titulo: 'Mañana / tarde', ancho: 0.13, der: true, valor: ([, cs]) => `${ent(cs.filter((c) => c.horario === 'Mañana').length)} / ${ent(cs.filter((c) => c.horario === 'Tarde').length)}` },
     { titulo: 'Pedidos', ancho: 0.12, der: true, valor: ([, cs]) => ent(suma(cs, 'pedidos')) },
-    { titulo: tituloCant, ancho: 0.13, der: true, valor: ([, cs]) => cant(cs) },
+    ...columnasCantidad<[string, ClienteLibreta[]]>(unidades, 0.13, ([, cs]) => porUnidad(cs), ([, cs]) => suma(cs, 'litros')),
     { titulo: 'Compras', ancho: 0.15, der: true, valor: ([, cs]) => din(suma(cs, 'comprado')) },
-  ], [...grupos], ['Total', ent(clientes.length), `${ent(clientes.filter((c) => c.horario === 'Mañana').length)} / ${ent(clientes.filter((c) => c.horario === 'Tarde').length)}`, ent(suma(clientes, 'pedidos')), cant(clientes), din(suma(clientes, 'comprado'))])
+  ], [...grupos], ['Total', ent(clientes.length), `${ent(clientes.filter((c) => c.horario === 'Mañana').length)} / ${ent(clientes.filter((c) => c.horario === 'Tarde').length)}`, ent(suma(clientes, 'pedidos')), ...totalCantidad(unidades, porUnidad(clientes), suma(clientes, 'litros')), din(suma(clientes, 'comprado'))])
 
   inf.tituloSeccion('Directorio de clientes', 'Historial: pedidos entregados desde el alta')
   for (const [vendedor, cs] of grupos) {
     inf.subtitulo(vendedor, `${ent(cs.length)} ${cs.length === 1 ? 'cliente' : 'clientes'}`)
     inf.tabla<ClienteLibreta>([
       { titulo: 'Cliente', ancho: 0.17, negrita: true, valor: (c) => c.nombre, detalle: (c) => `Desde ${fechaMx(c.alta)}` },
-      { titulo: 'Teléfono', ancho: 0.09, valor: (c) => c.telefono ?? '-' },
-      { titulo: 'Dirección', ancho: 0.2, valor: (c) => c.direccion, detalle: (c) => [c.colonia, c.referencias].filter(Boolean).join(' · ') },
+      { titulo: 'Teléfono', ancho: 0.1, valor: (c) => c.telefono ?? '-' },
+      { titulo: 'Dirección', ancho: 0.19, valor: (c) => c.direccion, detalle: (c) => [c.colonia, c.referencias].filter(Boolean).join(' · ') },
       { titulo: 'Visita', ancho: 0.11, valor: (c) => c.visita, detalle: (c) => c.horario },
       { titulo: 'Última compra', ancho: 0.11, der: true, valor: (c) => fechaMx(c.ultimaCompra), detalle: (c) => (c.proximaEntrega ? `Próx. ${fechaMx(c.proximaEntrega)}` : null) },
       { titulo: 'Pedidos', ancho: 0.06, der: true, valor: (c) => ent(c.pedidos) },
-      { titulo: tituloCant, ancho: 0.07, der: true, valor: (c) => cant([c]) },
+      ...columnasCantidad<ClienteLibreta>(unidades, 0.07, (c) => c.porUnidad, (c) => c.litros),
       { titulo: 'Compras', ancho: 0.09, der: true, valor: (c) => din(c.comprado) },
       { titulo: 'Favorito', ancho: 0.1, valor: (c) => c.saborFavorito ?? '-' },
-    ], cs, ['Subtotal', '', '', '', '', ent(suma(cs, 'pedidos')), cant(cs), din(suma(cs, 'comprado')), ''])
+    ], cs, ['Subtotal', '', '', '', '', ent(suma(cs, 'pedidos')), ...totalCantidad(unidades, porUnidad(cs), suma(cs, 'litros')), din(suma(cs, 'comprado')), ''])
   }
   if (!clientes.length) inf.nota('No hay clientes activos.')
   return inf.listo()
