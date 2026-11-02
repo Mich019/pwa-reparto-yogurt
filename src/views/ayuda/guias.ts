@@ -1,6 +1,8 @@
 import {
-  BookUser, CalendarDays, CircleSlash, Download, Factory, IceCreamBowl, LineChart, Mail, MapPin, Package,
-  Printer, QrCode, ScanLine, ShoppingBag, Smartphone, SwatchBook, TrendingUp, UserPlus, WifiOff, type LucideIcon,
+  ArrowRightLeft, Bell, BellRing, BookUser, Camera, CalendarDays, CircleSlash, CreditCard, Download, Factory, Flame, History,
+  IceCreamBowl, KeyRound, LayoutDashboard, LineChart, LogOut, Mail, MapPin, MapPinned, Moon, Package, Pencil, Printer, QrCode,
+  RefreshCw, ScanLine, ShieldCheck, ShoppingBag, Smartphone, SwatchBook, TrendingUp, UserCog, UserPlus, UserX, WifiOff,
+  Archive, type LucideIcon,
 } from 'lucide-react'
 
 // El manual de la sección Ayuda: cada guía son unos pasos cortos, y cada paso trae su «captura»: una pantalla de
@@ -10,6 +12,15 @@ import {
 
 export type Donde = 'panel' | 'app'
 export type Para = 'todos' | 'administrador' | 'vendedor'
+export type Tema = 'clientes' | 'pedidos' | 'equipo' | 'produccion' | 'reportes' | 'cuenta'
+export const TEMAS: { id: Tema; texto: string }[] = [
+  { id: 'pedidos', texto: 'Pedidos y ruta' },
+  { id: 'clientes', texto: 'Clientes' },
+  { id: 'equipo', texto: 'Equipo' },
+  { id: 'produccion', texto: 'Producción y sabores' },
+  { id: 'reportes', texto: 'Ventas y reportes' },
+  { id: 'cuenta', texto: 'Tu cuenta' },
+]
 
 export interface BotonEsc { texto?: string; icono?: LucideIcon; primario?: boolean; foco?: boolean }
 export type Pieza =
@@ -46,6 +57,7 @@ export interface Escena {
 export interface Paso { texto: string; escena: Escena }
 export interface Guia {
   id: string
+  tema: Tema
   titulo: string
   resumen: string
   icono: LucideIcon
@@ -78,7 +90,7 @@ const formCliente = (foco: number): Pieza => ({
 export const GUIAS: Guia[] = [
   // ------------------------------------------------------------------------------------------------ panel
   {
-    id: 'cliente-panel', titulo: 'Agregar un cliente', icono: UserPlus, donde: 'panel', para: 'administrador', ir: 'clientes',
+    id: 'cliente-panel', tema: 'clientes', titulo: 'Agregar un cliente', icono: UserPlus, donde: 'panel', para: 'administrador', ir: 'clientes',
     resumen: 'Dalo de alta con su dirección y su punto en el mapa para que entre a la ruta.',
     palabras: 'alta nuevo cliente direccion mapa ubicacion telefono whatsapp',
     pasos: [
@@ -89,7 +101,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'invitar', titulo: 'Invitar a un vendedor', icono: Mail, donde: 'panel', para: 'administrador', ir: 'equipo',
+    id: 'invitar', tema: 'equipo', titulo: 'Invitar a un vendedor', icono: Mail, donde: 'panel', para: 'administrador', ir: 'equipo',
     resumen: 'Le llega un correo, crea su contraseña y entra a la app de reparto con su cartera.',
     palabras: 'equipo vendedor repartidor cuenta correo invitacion alta usuario',
     pasos: [
@@ -99,7 +111,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'sabor', titulo: 'Agregar un sabor', icono: IceCreamBowl, donde: 'panel', para: 'administrador', ir: 'sabores',
+    id: 'sabor', tema: 'produccion', titulo: 'Agregar un sabor', icono: IceCreamBowl, donde: 'panel', para: 'administrador', ir: 'sabores',
     resumen: 'Cada sabor con su envase, su precio y su color; el color lo reconoce el equipo en toda la app.',
     palabras: 'producto catalogo precio costo envase color presentacion',
     pasos: [
@@ -109,7 +121,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'produccion', titulo: 'Registrar la producción y repartir la carga', icono: Factory, donde: 'panel', para: 'administrador', ir: 'produccion',
+    id: 'produccion', tema: 'produccion', titulo: 'Registrar la producción y repartir la carga', icono: Factory, donde: 'panel', para: 'administrador', ir: 'produccion',
     resumen: 'Anota lo que produjiste hoy y cuánto se lleva cada vendedor.',
     palabras: 'stock inventario carga asignar produccion dia vendedores',
     pasos: [
@@ -119,7 +131,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'pronostico', titulo: 'Saber cuánto producir', icono: TrendingUp, donde: 'panel', para: 'administrador', ir: 'produccion',
+    id: 'pronostico', tema: 'produccion', titulo: 'Saber cuánto producir', icono: TrendingUp, donde: 'panel', para: 'administrador', ir: 'produccion',
     resumen: 'El pronóstico suma los pedidos agendados y lo que se suele vender para la próxima semana.',
     palabras: 'pronostico prediccion semana cuanto producir planear',
     pasos: [
@@ -128,7 +140,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'reportes', titulo: 'Ver ventas y exportar un reporte', icono: LineChart, donde: 'panel', para: 'administrador', ir: 'reportes',
+    id: 'reportes', tema: 'reportes', titulo: 'Ver ventas y exportar un reporte', icono: LineChart, donde: 'panel', para: 'administrador', ir: 'reportes',
     resumen: 'Ventas, utilidad y lo entregado por día, semana, mes o el rango que quieras; en PDF o Excel.',
     palabras: 'reporte ventas utilidad ganancia pdf excel exportar imprimir semana mes rango',
     pasos: [
@@ -138,7 +150,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'qr', titulo: 'Imprimir los QR de tus clientes', icono: QrCode, donde: 'panel', para: 'administrador', ir: 'clientes',
+    id: 'qr', tema: 'clientes', titulo: 'Imprimir los QR de tus clientes', icono: QrCode, donde: 'panel', para: 'administrador', ir: 'clientes',
     resumen: 'Una etiqueta por cliente: el vendedor la escanea y le abre su ficha al instante.',
     palabras: 'qr codigo etiqueta imprimir escanear tarjeta',
     pasos: [
@@ -148,7 +160,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'marca', titulo: 'Poner tu logo y tus colores', icono: SwatchBook, donde: 'panel', para: 'administrador', ir: 'marca',
+    id: 'marca', tema: 'cuenta', titulo: 'Poner tu logo y tus colores', icono: SwatchBook, donde: 'panel', para: 'administrador', ir: 'marca',
     resumen: 'Tu logo y tu color salen en el panel, en la app de tu equipo y en los reportes PDF.',
     palabras: 'marca logo color nombre empresa personalizar pdf lema',
     pasos: [
@@ -158,9 +170,112 @@ export const GUIAS: Guia[] = [
     ],
   },
 
+  {
+    id: 'resumen', tema: 'reportes', titulo: 'Leer el Resumen', icono: LayoutDashboard, donde: 'panel', para: 'administrador', ir: 'resumen',
+    resumen: 'Lo primero que ves al entrar: cuánto se cobró hoy, cómo van las ventas y los últimos pedidos.',
+    palabras: 'inicio tablero dashboard cobrado hoy ventas avance pedidos recientes sabores mas vendidos',
+    pasos: [
+      { texto: 'Arriba: lo cobrado hoy, las ventas de 30 días (contra los 30 anteriores), los pedidos y la cantidad de hoy.', escena: panel('Resumen', [{ t: 'titulo', texto: 'Buenas tardes' }, { t: 'tarjetas', n: 4, alto: 'bajo', foco: 0 }, { t: 'tarjetas', n: 1, alto: 'alto', cols: 1 }]) },
+      { texto: '«Avance de hoy» dice cuántas entregas van; «Ventas por día» dibuja el último mes.', escena: panel('Resumen', [{ t: 'tarjetas', n: 4, alto: 'bajo' }, { t: 'caja', titulo: 'Avance de hoy', texto: '12 de 20 entregas', foco: true }, { t: 'tarjetas', n: 1, alto: 'alto', cols: 1 }]) },
+      { texto: 'Más abajo: los sabores más vendidos y los pedidos recientes. «Ver reportes» abre el detalle.', escena: panel('Resumen', [{ t: 'caja', titulo: 'Sabores más vendidos' }, { t: 'filas', n: 3, avatar: true }, { t: 'botones', items: [{ texto: 'Ver reportes', foco: true }] }]) },
+    ],
+  },
+  {
+    id: 'nueva-cuenta', tema: 'equipo', titulo: 'Crear una cuenta sin invitación', icono: KeyRound, donde: 'panel', para: 'administrador', ir: 'equipo',
+    resumen: 'Para quien no revisa su correo: tú creas la cuenta y le pasas una contraseña temporal.',
+    palabras: 'nueva cuenta usuario vendedor contraseña temporal clave whatsapp compartir crear',
+    pasos: [
+      { texto: 'En Vendedores, toca «Nueva cuenta».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'botones', items: [{ texto: 'Activas', primario: true }, { texto: 'Dadas de baja' }, { icono: Mail, texto: 'Invitar' }, { icono: UserPlus, texto: 'Nueva cuenta', primario: true, foco: true }] }, { t: 'filas', n: 3, avatar: true }]) },
+      { texto: 'Escribe su nombre y el correo con el que va a entrar, y toca «Crear cuenta».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }], { titulo: 'Nueva cuenta', piezas: [{ t: 'campos', items: [{ etiqueta: 'Nombre', valor: 'Ej. Rosa Hernández' }, { etiqueta: 'Correo (con él entra)', valor: 'rosa@correo.com' }, { etiqueta: 'Teléfono / WhatsApp', valor: '10 dígitos (opcional)' }] }, { t: 'boton', texto: 'Crear cuenta', foco: true }] }) },
+      { texto: 'La contraseña temporal sólo se muestra esa vez: mándasela por WhatsApp o cópiala. Al entrar, la cambia por la suya.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }], { titulo: 'Sólo se muestra ahora', piezas: [{ t: 'caja', titulo: 'Contraseña temporal', texto: '••••••••••', icono: KeyRound }, { t: 'acciones', items: ['WhatsApp', 'Compartir', 'Copiar mensaje', 'Sólo la clave'], foco: 0 }] }) },
+    ],
+  },
+  {
+    id: 'cartera', tema: 'equipo', titulo: 'Pasar la cartera de un vendedor a otro', icono: ArrowRightLeft, donde: 'panel', para: 'administrador', ir: 'equipo',
+    resumen: 'Cuando alguien cambia de zona o se va: sus clientes pasan con sus pedidos agendados.',
+    palabras: 'cartera clientes pasar mover reasignar vendedor zona',
+    pasos: [
+      { texto: 'En Vendedores, toca a la persona y luego «Pasar cartera».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Rosa Hernández', piezas: [{ t: 'acciones', items: ['Editar', 'Contraseña', 'Pasar cartera', 'Dar de baja'], foco: 2 }] }) },
+      { texto: 'Elige a quién pasan y cuáles (todos o sólo algunos) y confirma.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }], { titulo: 'Pasar cartera', piezas: [{ t: 'campos', items: [{ etiqueta: 'A quién', valor: 'Juan Pérez', foco: true }] }, { t: 'filas', n: 3 }, { t: 'boton', texto: 'Pasar 12 clientes a Juan' }] }) },
+    ],
+  },
+  {
+    id: 'baja', tema: 'equipo', titulo: 'Dar de baja a un vendedor', icono: UserX, donde: 'panel', para: 'administrador', ir: 'equipo',
+    resumen: 'Deja de entrar al instante en todos sus teléfonos; su historial se queda y puedes reactivarlo.',
+    palabras: 'baja quitar desactivar vendedor despedir reactivar acceso',
+    pasos: [
+      { texto: 'En Vendedores, toca a la persona y luego «Dar de baja».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Rosa Hernández', piezas: [{ t: 'acciones', items: ['Editar', 'Contraseña', 'Pasar cartera', 'Dar de baja'], foco: 3 }] }) },
+      { texto: 'Decide qué pasa con sus clientes: pasarlos a otra persona, dejarlos sin vendedor o decidir después. Confirma.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }], { titulo: 'Rosa Hernández', piezas: [{ t: 'caja', titulo: '¿Dar de baja a Rosa?', texto: 'Sus clientes y su historial se conservan' }, { t: 'campos', items: [{ etiqueta: '¿Qué hacemos con sus 12 clientes?', valor: 'Pasarlos a Juan Pérez', foco: true }] }, { t: 'botones', items: [{ texto: 'Cancelar' }, { texto: 'Dar de baja', primario: true }] }] }) },
+      { texto: 'Para que vuelva, búscala en «Dadas de baja» y toca «Reactivar».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'botones', items: [{ texto: 'Activas' }, { texto: 'Dadas de baja', primario: true, foco: true }] }, { t: 'filas', n: 2, avatar: true }]) },
+    ],
+  },
+  {
+    id: 'cambiar-vendedor', tema: 'clientes', titulo: 'Cambiar el vendedor de un cliente', icono: UserCog, donde: 'panel', para: 'administrador', ir: 'clientes',
+    resumen: 'Mueve a un solo cliente (con sus pedidos agendados) a otra persona del equipo.',
+    palabras: 'vendedor cliente asignar mover cambiar repartidor sin vendedor',
+    pasos: [
+      { texto: 'En Clientes, abre al cliente y toca el renglón «Vendedor».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar'] }, { t: 'caja', titulo: 'Rosa Hernández', texto: 'Vendedor', icono: UserCog, foco: true }] }) },
+      { texto: 'Elige a quién pasa. «Sin vendedor» lo deja sólo a la vista del administrador.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Cambiar de vendedor', piezas: [{ t: 'opciones', items: [{ titulo: 'Juan Pérez', sub: '24 clientes' }, { titulo: 'Rosa Hernández', sub: '12 clientes' }, { titulo: 'Sin vendedor', sub: 'Sólo el administrador lo ve' }], foco: 0 }] }) },
+    ],
+  },
+  {
+    id: 'archivar', tema: 'clientes', titulo: 'Archivar a un cliente', icono: Archive, donde: 'panel', para: 'administrador', ir: 'clientes',
+    resumen: 'Sale de la lista y de la ruta sin perder su historial; lo puedes volver a activar.',
+    palabras: 'archivar quitar borrar cliente inactivo activar archivados',
+    pasos: [
+      { texto: 'En Clientes, abre al cliente y toca «Archivar».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar', 'Archivar'], foco: 4 }] }) },
+      { texto: 'Para verlo otra vez, cambia a «Archivados», ábrelo y toca «Activar».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'botones', items: [{ texto: 'Activos' }, { texto: 'Archivados', primario: true, foco: true }] }, { t: 'filas', n: 2, avatar: true }]) },
+    ],
+  },
+  {
+    id: 'libreta', tema: 'clientes', titulo: 'Descargar la libreta de clientes', icono: BookUser, donde: 'panel', para: 'administrador', ir: 'clientes',
+    resumen: 'Todos tus clientes con su dirección, teléfono y lo que consumen, en PDF, Excel o CSV.',
+    palabras: 'libreta lista clientes directorio pdf excel csv descargar imprimir respaldo',
+    pasos: [
+      { texto: 'En Clientes, toca «Libreta».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'botones', items: [{ icono: ScanLine, texto: 'Escanear' }, { icono: Printer, texto: 'Imprimir QR' }, { icono: BookUser, texto: 'Libreta', foco: true }, { icono: UserPlus, texto: 'Nuevo cliente', primario: true }] }, { t: 'filas', n: 4, avatar: true }]) },
+      { texto: 'Elige el formato: PDF para imprimir, Excel o CSV para trabajar los datos.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Libreta de clientes', piezas: [{ t: 'chips', items: ['PDF', 'Excel', 'CSV'], elegido: 0, foco: 0 }, { t: 'texto', lineas: 2 }, { t: 'boton', texto: 'Ver vista previa' }] }) },
+    ],
+  },
+  {
+    id: 'suscripcion', tema: 'cuenta', titulo: 'Pagar tu suscripción', icono: CreditCard, donde: 'panel', para: 'administrador', ir: 'suscripcion',
+    resumen: 'Al terminar la prueba gratis, el plan mensual se paga con Mercado Pago.',
+    palabras: 'pago pagar suscripcion plan mercado pago tarjeta prueba gratis vencida cobro',
+    pasos: [
+      { texto: 'En Configuración, abre «Suscripción».', escena: panel('Configuración', [{ t: 'titulo', texto: 'Configuración' }, { t: 'chips', items: ['Cuenta', 'Seguridad', 'Marca', 'Suscripción', 'Apariencia'], foco: 3 }, { t: 'texto', lineas: 3 }]) },
+      { texto: 'Toca «Suscribirme con Mercado Pago», paga con tu tarjeta y regresa al panel: el plan queda activo.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Suscripción' }, { t: 'caja', titulo: 'Plan mensual', texto: 'Tu prueba gratis termina pronto' }, { t: 'boton', texto: 'Suscribirme con Mercado Pago', icono: CreditCard, foco: true }]) },
+    ],
+  },
+  {
+    id: 'sesiones', tema: 'cuenta', titulo: 'Cerrar tu sesión en otros equipos', icono: LogOut, donde: 'panel', para: 'administrador', ir: 'seguridad',
+    resumen: 'Si entraste en una computadora ajena o perdiste el teléfono.',
+    palabras: 'sesion cerrar dispositivo perdi telefono robo seguridad otros equipos',
+    pasos: [
+      { texto: 'En Configuración, abre «Seguridad» y baja a «Sesiones abiertas».', escena: panel('Configuración', [{ t: 'titulo', texto: 'Sesiones abiertas' }, { t: 'caja', titulo: 'Este equipo', texto: 'Aquí estás' }, { t: 'filas', n: 2, avatar: true }]) },
+      { texto: 'Toca «Cerrar» en la que no reconozcas, o cierra todas las demás de una vez.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Sesiones abiertas' }, { t: 'caja', titulo: 'Este equipo', texto: 'Aquí estás' }, { t: 'filas', n: 2, avatar: true, foco: 0 }, { t: 'botones', items: [{ texto: 'Cerrar las otras 2', foco: true }] }]) },
+    ],
+  },
+  {
+    id: 'apariencia', tema: 'cuenta', titulo: 'Modo oscuro y letra más grande', icono: Moon, donde: 'panel', para: 'administrador', ir: 'apariencia',
+    resumen: 'El tema, el tamaño del texto y menos animaciones, a tu gusto en esta computadora.',
+    palabras: 'oscuro claro tema noche letra grande tamaño texto animaciones movimiento apariencia',
+    pasos: [
+      { texto: 'En Configuración, abre «Apariencia» y elige Claro, Oscuro o Automático.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Apariencia' }, { t: 'tarjetas', n: 3, alto: 'bajo', foco: 1 }]) },
+      { texto: 'En «Tamaño del texto» agrandas letras, botones y tablas; «Menos movimiento» quita animaciones.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Lectura y movimiento' }, { t: 'chips', items: ['Normal', 'Grande', 'Más grande'], elegido: 1, foco: 1 }, { t: 'caja', titulo: 'Menos movimiento', texto: 'Quita animaciones y transiciones' }]) },
+    ],
+  },
+  {
+    id: 'foto', tema: 'cuenta', titulo: 'Poner tu foto de perfil', icono: Camera, donde: 'panel', para: 'administrador', ir: 'cuenta',
+    resumen: 'Así te reconoce tu equipo en la app y en los avisos.',
+    palabras: 'foto perfil imagen avatar cara',
+    pasos: [
+      { texto: 'En Configuración → Cuenta, toca tu foto (o «Poner foto») y elige una imagen.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Cuenta' }, { t: 'logo', foco: true }, { t: 'campos', items: [{ etiqueta: 'Nombre', valor: 'Tu nombre' }] }]) },
+      { texto: 'Arrástrala para encuadrarla, acércala si quieres y toca «Guardar foto».', escena: panel('Configuración', [{ t: 'titulo', texto: 'Cuenta' }], { titulo: 'Encuadra tu foto', piezas: [{ t: 'tarjetas', n: 1, alto: 'alto', cols: 1 }, { t: 'boton', texto: 'Guardar foto', foco: true }] }) },
+    ],
+  },
+
   // -------------------------------------------------------------------------------------------- app de reparto
   {
-    id: 'entregar', titulo: 'Entregar un pedido en la ruta', icono: MapPin, donde: 'app', para: 'todos',
+    id: 'entregar', tema: 'pedidos', titulo: 'Entregar un pedido en la ruta', icono: MapPin, donde: 'app', para: 'todos',
     resumen: 'La ruta ya viene ordenada: llega, cobra y marca el pedido como realizado.',
     palabras: 'ruta entregar entrega cobrar efectivo transferencia navegar mapa parada',
     pasos: [
@@ -171,7 +286,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'pedido', titulo: 'Tomar un pedido', icono: ShoppingBag, donde: 'app', para: 'todos',
+    id: 'pedido', tema: 'pedidos', titulo: 'Tomar un pedido', icono: ShoppingBag, donde: 'app', para: 'todos',
     resumen: 'Elige al cliente, suma sabores y agéndalo para hoy, mañana u otro día.',
     palabras: 'pedido nuevo agendar sabores fecha urgente vender',
     pasos: [
@@ -181,7 +296,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'omitir', titulo: 'Si el cliente no estaba', icono: CircleSlash, donde: 'app', para: 'todos',
+    id: 'omitir', tema: 'pedidos', titulo: 'Si el cliente no estaba', icono: CircleSlash, donde: 'app', para: 'todos',
     resumen: 'Omite la visita y, si quieres, se reprograma sola.',
     palabras: 'omitir no estaba no quiso reprogramar cancelar visita',
     pasos: [
@@ -190,7 +305,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'cliente-app', titulo: 'Dar de alta un cliente desde el teléfono', icono: UserPlus, donde: 'app', para: 'todos',
+    id: 'cliente-app', tema: 'clientes', titulo: 'Dar de alta un cliente desde el teléfono', icono: UserPlus, donde: 'app', para: 'todos',
     resumen: 'Estando en su casa: el mapa toma tu ubicación para el punto exacto.',
     palabras: 'alta nuevo cliente direccion mapa ubicacion telefono',
     pasos: [
@@ -200,7 +315,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'escanear', titulo: 'Escanear el QR de un cliente', icono: ScanLine, donde: 'app', para: 'todos',
+    id: 'escanear', tema: 'clientes', titulo: 'Escanear el QR de un cliente', icono: ScanLine, donde: 'app', para: 'todos',
     resumen: 'Abre su ficha y su pedido sin buscarlo en la lista.',
     palabras: 'qr escanear codigo camara tarjeta nfc',
     pasos: [
@@ -209,7 +324,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'carga', titulo: 'Ver tu carga del día', icono: Package, donde: 'app', para: 'vendedor',
+    id: 'carga', tema: 'produccion', titulo: 'Ver tu carga del día', icono: Package, donde: 'app', para: 'vendedor',
     resumen: 'Lo que te asignaron hoy y cuánto te queda de cada sabor mientras entregas.',
     palabras: 'stock carga inventario quedan sabores asignado',
     pasos: [
@@ -217,7 +332,7 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'sin-senal', titulo: 'Trabajar sin señal', icono: WifiOff, donde: 'app', para: 'todos',
+    id: 'sin-senal', tema: 'pedidos', titulo: 'Trabajar sin señal', icono: WifiOff, donde: 'app', para: 'todos',
     resumen: 'Todo se guarda en el teléfono y se envía solo cuando vuelve la señal.',
     palabras: 'sin señal internet datos offline sincronizar pendiente enviar',
     pasos: [
@@ -225,12 +340,86 @@ export const GUIAS: Guia[] = [
       { texto: 'En Cuenta ves lo que falta por enviar; con señal, «Sincronizar ahora» lo manda de una vez.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Sincronización', texto: '{pendientes}' }, { t: 'boton', texto: 'Sincronizar ahora', secundario: true, foco: true }]) },
     ],
   },
+  {
+    id: 'editar-pedido', tema: 'pedidos', titulo: 'Cambiar un pedido', icono: Pencil, donde: 'app', para: 'todos',
+    resumen: 'Si el cliente pide otra cosa al llegar: cambia sabores o cantidades antes de entregarlo.',
+    palabras: 'editar cambiar pedido modificar sabores cantidad corregir',
+    pasos: [
+      { texto: 'En Ruta, sube la tarjeta de la parada y toca «Editar».', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'acciones', items: ['Navegar', 'Llamar', 'WhatsApp', 'Editar'], foco: 3 }, { t: 'filas', n: 2 }]) },
+      { texto: 'Ajusta los sabores y toca «Guardar cambios».', escena: tel('Ruta', [{ t: 'mapa' }], { titulo: 'Editar pedido', piezas: [{ t: 'sabores', n: 3, foco: 1 }, { t: 'boton', texto: 'Guardar cambios' }] }) },
+    ],
+  },
+  {
+    id: 'recordatorios', tema: 'pedidos', titulo: 'Recordar a un cliente más tarde', icono: Bell, donde: 'app', para: 'todos',
+    resumen: 'Para quien «te avisa»: la app te lo recuerda para escribirle o llamarle.',
+    palabras: 'recordar recordatorio despues llamar escribir pendiente por confirmar campana',
+    pasos: [
+      { texto: 'Al entregar, elige «Recordar más tarde».', escena: tel('Ruta', [{ t: 'mapa' }], { titulo: 'Entregado · $240', piezas: [{ t: 'opciones', items: [{ titulo: 'Realizar nuevo pedido', sub: 'Agendar su siguiente visita' }, { titulo: 'Recordar más tarde', sub: 'Te aviso para escribirle o llamarle' }, { titulo: 'Cerrar', sub: 'Ir a la siguiente parada' }], foco: 1 }] }) },
+      { texto: 'Después, en Ruta, toca la campana de arriba para ver a quién le falta confirmar.', escena: tel('Ruta', [{ t: 'botones', items: [{ icono: Bell, foco: true }, { icono: ScanLine }] }, { t: 'mapa', alto: true }]) },
+      { texto: 'Escríbele por WhatsApp o tómale el pedido ahí mismo.', escena: tel('Ruta', [{ t: 'mapa' }], { titulo: 'Por confirmar', piezas: [{ t: 'filas', n: 3, avatar: true }, { t: 'botones', items: [{ texto: 'WhatsApp' }, { texto: 'Pedido', primario: true, foco: true }] }] }) },
+    ],
+  },
+  {
+    id: 'urgente', tema: 'pedidos', titulo: 'Mandar un pedido urgente', icono: Flame, donde: 'app', para: 'administrador',
+    resumen: 'Para hoy: va primero en la ruta del vendedor y le llega un aviso al instante.',
+    palabras: 'urgente rapido hoy prioridad aviso vendedor ya',
+    pasos: [
+      { texto: 'Toma el pedido como siempre y marca «Urgente» arriba.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Nuevo pedido', piezas: [{ t: 'caja', titulo: 'Urgente', texto: 'Para hoy, va primero en la ruta', icono: Flame, foco: true }, { t: 'sabores', n: 2 }] }) },
+      { texto: 'Toca «Agendar como urgente»: al vendedor le llega la notificación.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Nuevo pedido', piezas: [{ t: 'sabores', n: 3 }, { t: 'boton', texto: 'Agendar como urgente', foco: true }] }) },
+    ],
+  },
+  {
+    id: 'ubicacion', tema: 'clientes', titulo: 'Corregir la ubicación de un cliente', icono: MapPinned, donde: 'app', para: 'todos',
+    resumen: 'Si el punto del mapa quedó lejos de su casa, la ruta se arma mal.',
+    palabras: 'ubicacion mapa punto direccion casa gps corregir lejos',
+    pasos: [
+      { texto: 'Al entregar lejos del punto guardado, la app te pregunta: si estás en su domicilio, toca «Guardar aquí».', escena: tel('Ruta', [{ t: 'mapa' }], { titulo: 'Entregado · $240', piezas: [{ t: 'caja', titulo: '¿Estás en su domicilio?', texto: 'Su ubicación está a 350 m de aquí', icono: MapPin }, { t: 'botones', items: [{ texto: 'Guardar aquí', foco: true }] }, { t: 'opciones', items: [{ titulo: 'Realizar nuevo pedido', sub: 'Agendar su siguiente visita' }] }] }) },
+      { texto: 'También puedes abrir al cliente, tocar «Editar» y mover el punto en el mapa.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Editar cliente', piezas: [{ t: 'mapa', foco: true }, { t: 'boton', texto: 'Guardar cliente' }] }) },
+    ],
+  },
+  {
+    id: 'historial', tema: 'clientes', titulo: 'Ver el historial de un cliente', icono: History, donde: 'app', para: 'todos',
+    resumen: 'Qué compra, cada cuándo y sus pedidos agendados, para ofrecerle lo de siempre.',
+    palabras: 'historial compras consumo favorito ultima visita pedidos agendados cliente',
+    pasos: [
+      { texto: 'En Clientes, toca al cliente: arriba ves su sabor favorito, lo que ha consumido y su última visita.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Doña Lupita', piezas: [{ t: 'tarjetas', n: 3, alto: 'bajo', cols: 3, foco: 0 }, { t: 'acciones', items: ['Llamar', 'WhatsApp', 'Editar'] }] }) },
+      { texto: 'Más abajo, «Pedidos agendados» y el «Historial» de entregas.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Doña Lupita', piezas: [{ t: 'caja', titulo: 'Pedidos agendados', texto: 'Mañana · $240' }, { t: 'caja', titulo: 'Historial', texto: '8 entregas', icono: History, foco: true }, { t: 'filas', n: 2 }] }) },
+    ],
+  },
+  {
+    id: 'ruta', tema: 'pedidos', titulo: 'Reordenar la ruta', icono: RefreshCw, donde: 'app', para: 'todos',
+    resumen: 'Si cambian los pedidos o te desvías, la ruta se vuelve a calcular desde donde estás.',
+    palabras: 'ruta orden recalcular optimizar mapa 3d 2d camino',
+    pasos: [
+      { texto: 'En Ruta, toca «Recalcular ruta» (las flechas en círculo) a la derecha del mapa.', escena: tel('Ruta', [{ t: 'botones', items: [{ icono: Bell }, { icono: ScanLine }, { icono: RefreshCw, foco: true }] }, { t: 'mapa', alto: true }]) },
+      { texto: 'El orden de las paradas se actualiza solo; la tarjeta de abajo siempre es la siguiente.', escena: tel('Ruta', [{ t: 'mapa', alto: true, foco: true }, { t: 'caja', titulo: 'Siguiente: Don Pepe', texto: '$180 · 3 L' }]) },
+    ],
+  },
+  {
+    id: 'notificaciones', tema: 'cuenta', titulo: 'Activar las notificaciones', icono: BellRing, donde: 'app', para: 'todos',
+    resumen: 'Para que te lleguen los pedidos urgentes y los cambios de ruta aunque la app esté cerrada.',
+    palabras: 'notificaciones avisos push alertas sonido permiso',
+    pasos: [
+      { texto: 'En Cuenta, en «Notificaciones en este teléfono», toca «Activar avisos» y acepta el permiso.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Notificaciones en este teléfono', icono: BellRing }, { t: 'boton', texto: 'Activar avisos', foco: true }]) },
+      { texto: 'Con «Enviar prueba» confirmas que llegan. También puedes pedir que te avise si te quedan ventas sin enviar en la tarde.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Notificaciones en este teléfono', icono: BellRing }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
+    ],
+  },
+  {
+    id: 'dos-pasos', tema: 'cuenta', titulo: 'Proteger tu cuenta con dos pasos', icono: ShieldCheck, donde: 'app', para: 'todos',
+    resumen: 'Además de tu contraseña, un código de una app de autenticación. En el panel está en Configuración → Seguridad.',
+    palabras: 'seguridad dos pasos verificacion codigo autenticador 2fa contraseña proteger',
+    pasos: [
+      { texto: 'En Cuenta, en la verificación en dos pasos, toca «Activar».', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Verificación en dos pasos', icono: ShieldCheck }, { t: 'boton', texto: 'Activar', icono: ShieldCheck, foco: true }]) },
+      { texto: 'Escanea el código con una app de autenticación (Google Authenticator, por ejemplo) y escribe el código que te muestra.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }], { titulo: 'Activar verificación en dos pasos', piezas: [{ t: 'qr', n: 1 }, { t: 'campos', items: [{ etiqueta: 'Código', valor: '123 456', foco: true }] }, { t: 'boton', texto: 'Verificar y activar' }] }) },
+      { texto: 'Guarda los códigos de respaldo: sirven si pierdes el teléfono, y no se vuelven a mostrar.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }], { titulo: 'Guarda tus códigos de respaldo', piezas: [{ t: 'filas', n: 4 }, { t: 'botones', items: [{ texto: 'Copiar' }, { texto: 'Descargar', foco: true }] }, { t: 'boton', texto: 'Ya los guardé' }] }) },
+    ],
+  },
 ]
 
 // La de instalar cambia según el teléfono: se arma al abrirla (Ayuda.tsx).
 export function guiaInstalar(sistema: 'ios' | 'android' | 'otro'): Guia {
   const base = {
-    id: 'instalar', titulo: 'Instalar la app en el teléfono', icono: Smartphone, donde: 'app' as const, para: 'todos' as const,
+    id: 'instalar', tema: 'cuenta' as const, titulo: 'Instalar la app en el teléfono', icono: Smartphone, donde: 'app' as const, para: 'todos' as const,
     resumen: 'Queda en tu pantalla de inicio como cualquier app, y abre aunque no haya señal.',
     palabras: 'instalar app telefono celular pantalla inicio icono descargar',
   }

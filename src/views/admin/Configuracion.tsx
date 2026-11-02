@@ -22,6 +22,9 @@ const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-vis
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Sin conexión con el servidor')
 const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')
 
+// Secciones del panel a las que puede llevar el «Ir a…» de una guía (las demás son apartados de aquí).
+const SECCIONES_PANEL = ['resumen', 'equipo', 'clientes', 'produccion', 'sabores', 'reportes']
+
 export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'apariencia' | 'ayuda'
 export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
@@ -140,7 +143,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
           {visible === 'apariencia' && <Apariencia />}
           {visible === 'ayuda' && (
             <Seccion id="ayuda" titulo="Ayuda" descripcion="Guías cortas de lo que más se hace, con lo que hay que tocar resaltado. Sólo ves lo que tu cuenta puede hacer.">
-              <Ayuda donde="panel" ir={(d) => (menu.some((m) => m.id === d) ? elegir(d) : irA?.(d))} />
+              <Ayuda donde="panel" ir={(d) => (menu.some((m) => m.id === d) ? elegir(d) : SECCIONES_PANEL.includes(d) && irA?.(d))} />
             </Seccion>
           )}
         </div>

@@ -5,7 +5,8 @@ import { db } from '../../lib/db'
 import { useSesion } from '../../lib/sesion'
 import { useMarca } from '../../lib/marca'
 import { useLogoEtiqueta } from '../admin/marca'
-import { GUIAS, guiaInstalar, type Donde, type Guia } from './guias'
+import { useSuscripcion } from '../../lib/suscripcion'
+import { GUIAS, TEMAS, guiaInstalar, type Donde, type Guia, type Tema } from './guias'
 import { Escena, type Valores } from './Escena'
 
 // Ayuda: un manual corto que se adapta a quien lo abre. Muestra sólo lo que esa cuenta puede hacer (administrador o
@@ -23,10 +24,13 @@ function sistema(): 'ios' | 'android' | 'otro' {
 }
 const instalada = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
 
-const DESTINOS: Record<string, string> = { clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', reportes: 'Reportes', marca: 'Marca' }
+const DESTINOS: Record<string, string> = { resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', reportes: 'Reportes', marca: 'Marca' }
 
 export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => void }) {
-  const rol = useSesion()?.usuario.rol ?? 'administrador' // sin servidor, quien usa la app es el dueño
+  const usuario = useSesion()?.usuario
+  const rol = usuario?.rol ?? 'administrador' // sin servidor, quien usa la app es el dueño
+  const suscripcion = useSuscripcion(donde === 'panel' ? usuario?.id : undefined) // null: la empresa no paga
+  const [tema, setTema] = useState<Tema | null>(null)
   const marca = useMarca()
   const logo = useLogoEtiqueta()
   const [q, setQ] = useState('')
@@ -49,8 +53,8 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
   const guias = useMemo(() => {
     const puede = (g: Guia) => g.para === 'todos' || g.para === rol
     const todas = [...GUIAS, guiaInstalar(sistema())]
-    return todas.filter((g) => puede(g) && (donde === 'panel' || g.donde === 'app'))
-  }, [rol, donde])
+    return todas.filter((g) => puede(g) && (donde === 'panel' || g.donde === 'app') && (g.id !== 'suscripcion' || !!suscripcion))
+  }, [rol, donde, suscripcion])
 
   // Lo que ya está hecho en este negocio; cada renglón abre su guía.
   const ya = instalada()
@@ -72,9 +76,11 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
 
   const buscadas = useMemo(() => {
     const t = sinAcentos(q.trim())
-    if (!t) return guias
-    return guias.filter((g) => t.split(/\s+/).every((p) => sinAcentos([g.titulo, g.resumen, g.palabras, ...g.pasos.map((x) => x.texto)].join(' ')).includes(p)))
-  }, [guias, q])
+    const delTema = tema ? guias.filter((g) => g.tema === tema) : guias
+    if (!t) return delTema
+    return delTema.filter((g) => t.split(/\s+/).every((p) => sinAcentos([g.titulo, g.resumen, g.palabras, ...g.pasos.map((x) => x.texto)].join(' ')).includes(p)))
+  }, [guias, q, tema])
+  const temas = TEMAS.filter((t) => guias.some((g) => g.tema === t.id))
 
   const guia = guias.find((g) => g.id === abierta)
   if (guia) return <Visor guia={guia} valores={valores} donde={donde} ir={ir} onVolver={() => setAbierta(null)} resumenExtra={guia.id === 'instalar' && ya ? 'Ya la tienes instalada en este teléfono.' : undefined} />
@@ -92,7 +98,17 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
         {q && <button type="button" onClick={() => setQ('')} aria-label="Borrar búsqueda" className={`grid h-7 w-7 place-items-center rounded-full hover:bg-linea ${anillo}`}><X size={16} /></button>}
       </label>
 
-      {!q && pendientes.length > 0 && hechos < pendientes.length && (
+      {/* Temas: se reparten en filas en la computadora y se desplazan de lado en el teléfono. */}
+      <div role="group" aria-label="Temas" className="-mx-4 -mt-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+        {[{ id: null, texto: 'Todas' }, ...temas].map((t) => (
+          <button key={t.id ?? 'todas'} type="button" onClick={() => setTema(t.id)} aria-pressed={tema === t.id}
+            className={`h-9 shrink-0 rounded-md px-3.5 text-sm font-semibold transition-colors ${anillo} ${tema === t.id ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea'}`}>
+            {t.texto}
+          </button>
+        ))}
+      </div>
+
+      {!q && !tema && pendientes.length > 0 && hechos < pendientes.length && (
         <section aria-labelledby="para-empezar">
           <div className="flex items-baseline justify-between gap-3">
             <h3 id="para-empezar" className="text-base font-semibold">Para empezar</h3>
@@ -138,6 +154,7 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
         </section>
       ))}
 
+      {!q && tema && !buscadas.length && <p className="py-6 text-center text-sm text-apagado">No hay guías de este tema aquí.</p>}
       {q && !buscadas.length && <p className="py-6 text-center text-sm text-apagado">No hay guías sobre «{q.trim()}». Prueba con otra palabra, como «pedido» o «reporte».</p>}
     </div>
   )
