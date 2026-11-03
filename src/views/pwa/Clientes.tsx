@@ -14,6 +14,7 @@ import { EditorPedido } from './EditorPedido'
 import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { usePaginas } from '../../components/Paginas'
+import { CuentaDelCliente } from '../../components/CuentaDelCliente'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, Separador, TextoBoton, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
@@ -243,6 +244,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
           </button>
         )}
         <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
+        {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} />}
 
         {pendientes.length > 0 && (
           <Seccion titulo="Pedidos agendados">
