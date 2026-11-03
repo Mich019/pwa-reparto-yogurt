@@ -1,6 +1,7 @@
 import { ajustarTexto, anchoTexto, Documento, imagenParaPdf, type Color, type Fuente, type ImagenPdf, type PdfListo } from './pdf'
 import { colorLegible, marcaActual, type Marca } from './marca'
 import { textoPorUnidad, tituloUnidad } from './unidades'
+import type { InformeMes } from './cobranza'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
 // Informes en PDF para leer o imprimir (RF-048): el reporte de ventas y la libreta de clientes. Estilo sobrio de
@@ -356,10 +357,11 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   })
   pdf.linea(M + 4, inf.y + 20.5, M + inf.util - 4, inf.y + 20.5, { color: REGLA, grosor: 0.2 })
   inf.y += 50
-  const cobrado = x.efectivo + x.transferencia
+  const credito = x.credito ?? 0
+  const cobrado = x.efectivo + x.transferencia + credito
   if (cobrado > 0) {
     const parte = (n: number) => `${din(n)} (${n2((n / cobrado) * 100, 0)}%)`
-    inf.nota(`Forma de cobro: efectivo ${parte(x.efectivo)} y transferencia ${parte(x.transferencia)}.`)
+    inf.nota(`Forma de cobro: efectivo ${parte(x.efectivo)}, transferencia ${parte(x.transferencia)}${credito > 0 ? ` y fiado ${parte(credito)}` : ''}.`)
   }
 
   // ---------------------------------------------------------------- 02 evolución de ingresos
@@ -434,6 +436,76 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
     + '"Sin venta" son visitas registradas en las que el cliente no compró.')
   return inf.listo()
 }
+
+// ---------------------------------------------------------------------------------------------- informe mensual
+
+// Ventas y utilidad del mes, cobranza y comisión por vendedor y las diferencias de los cortes. Si el mes está cerrado
+// son las cifras congeladas al cerrarlo (api/_lib/cortes.ts).
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+export function informeMensualPdf(i: InformeMes, ahora = new Date()): PdfListo {
+  const c = i.cifras
+  const [anio, mesNum] = i.mes.split('-').map(Number)
+  const nombreMes = `${MESES[mesNum - 1]} de ${anio}`
+  const inf = new Informe('Informe mensual', i.mes)
+  const { pdf } = inf
+  const estado = i.estado === 'cerrado' ? `Cerrado el ${fechaMx((i.cerradoEn ?? '').slice(0, 10))}` : i.estado === 'reabierto' ? 'Reabierto: cifras al momento de generarlo' : 'Abierto: cifras al momento de generarlo'
+  inf.portada(`Resultados de ${nombreMes}`, [['Mes', nombreMes], ['Estado', estado]], ahora)
+
+  inf.tituloSeccion('Resumen del mes', i.estado === 'cerrado' ? 'Cifras congeladas al cierre' : undefined)
+  const unidades = Object.entries(c.ventas.porUnidad).map(([u, n]) => lit(n, u)).join(' + ') || '0'
+  const indicadores: { titulo: string; valor: string; pie: { texto: string; color: Color } }[] = [
+    { titulo: 'Ventas', valor: din(c.ventas.ingreso), pie: { texto: `${ent(c.ventas.pedidos)} pedidos · ${ent(c.ventas.clientes)} clientes`, color: TENUE } },
+    { titulo: 'Utilidad neta', valor: din(c.ventas.utilidad), pie: { texto: c.ventas.margenPct === null ? 'Sin ventas en el mes' : `Margen ${pct(c.ventas.margenPct)}`, color: c.ventas.utilidad < 0 ? NEGATIVO : TENUE } },
+    { titulo: 'Entregado', valor: unidades, pie: { texto: 'Por unidad', color: TENUE } },
+    { titulo: 'Cobrado (efectivo y transf.)', valor: din(c.cobro.efectivo + c.cobro.transferencia), pie: { texto: `Efectivo ${dinCorto(c.cobro.efectivo)} · Transf. ${dinCorto(c.cobro.transferencia)}`, color: TENUE } },
+    { titulo: 'Vendido a crédito', valor: din(c.cobro.credito), pie: { texto: `Abonos recibidos ${din(c.abonos.total)}`, color: TENUE } },
+    { titulo: 'Por cobrar al cierre', valor: din(c.porCobrar.saldo), pie: { texto: `${ent(c.porCobrar.clientes)} ${c.porCobrar.clientes === 1 ? 'cliente' : 'clientes'} con saldo`, color: c.porCobrar.saldo > 0 ? NEGATIVO : TENUE } },
+  ]
+  const col = inf.util / 3
+  pdf.rect(M, inf.y - 2, inf.util, 46, { relleno: FONDO })
+  indicadores.forEach((t, k) => {
+    const tx = M + (k % 3) * col + 5
+    const ty = inf.y + Math.floor(k / 3) * 22
+    if (k % 3) pdf.linea(M + (k % 3) * col, ty + 1, M + (k % 3) * col, ty + 17, { color: REGLA, grosor: 0.2 })
+    pdf.texto(t.titulo.toUpperCase(), tx, ty + 4.5, { fuente: 'negrita', tam: 6.5, color: TENUE })
+    const tam = Math.max(8, Math.min(15, (15 * (col - 10)) / anchoTexto(t.valor, 'negrita', 15)))
+    pdf.texto(t.valor, tx, ty + 12, { fuente: 'negrita', tam, color: TINTA })
+    pdf.texto(ajustarTexto(t.pie.texto, 'normal', 7, col - 8, 1)[0] ?? '', tx, ty + 17, { tam: 7, color: t.pie.color })
+  })
+  pdf.linea(M + 4, inf.y + 20.5, M + inf.util - 4, inf.y + 20.5, { color: REGLA, grosor: 0.2 })
+  inf.y += 50
+  if (c.envases.prestados > 0) inf.nota(`Envases retornables prestados al cierre: ${ent(c.envases.prestados)} en ${ent(c.envases.clientes)} ${c.envases.clientes === 1 ? 'cliente' : 'clientes'}.`)
+
+  inf.tituloSeccion('Cobranza y comisión por vendedor', 'Ordenado por ventas')
+  const suma = (k: 'ventas' | 'utilidad' | 'efectivo' | 'transferencia' | 'credito' | 'abonos' | 'comision') => din(c.vendedores.reduce((s, v) => s + v[k], 0))
+  inf.tabla<CifrasMes_Vendedor>([
+    { titulo: 'Vendedor', ancho: 0.19, valor: (v) => v.nombre, detalle: (v) => (v.activo ? null : 'Cuenta dada de baja') },
+    { titulo: 'Ventas', ancho: 0.11, der: true, valor: (v) => din(v.ventas) },
+    { titulo: 'Utilidad', ancho: 0.11, der: true, valor: (v) => din(v.utilidad), color: (v) => (v.utilidad < 0 ? NEGATIVO : undefined) },
+    { titulo: 'Efectivo', ancho: 0.1, der: true, valor: (v) => din(v.efectivo) },
+    { titulo: 'Transf.', ancho: 0.1, der: true, valor: (v) => din(v.transferencia) },
+    { titulo: 'Fiado', ancho: 0.09, der: true, valor: (v) => din(v.credito) },
+    { titulo: 'Abonos', ancho: 0.09, der: true, valor: (v) => din(v.abonos) },
+    { titulo: 'Meta', ancho: 0.1, der: true, valor: (v) => (v.cumplimientoPct === null ? '-' : `${n2(v.cumplimientoPct, 0)}%`), detalle: (v) => (v.meta === null ? null : `de ${dinCorto(v.meta)}`) },
+    { titulo: 'Comisión', ancho: 0.11, der: true, valor: (v) => din(v.comision), detalle: (v) => (v.comisionPct ? `${n2(v.comisionPct, 1)}%` : null) },
+  ], c.vendedores, ['Total', suma('ventas'), suma('utilidad'), suma('efectivo'), suma('transferencia'), suma('credito'), suma('abonos'), '', suma('comision')])
+
+  inf.tituloSeccion('Diferencias de los cortes', `${ent(c.cortes.dias)} ${c.cortes.dias === 1 ? 'corte' : 'cortes'} · diferencia total ${din(c.cortes.diferencia)}`)
+  inf.tabla<CifrasMes_Corte>([
+    { titulo: 'Fecha', ancho: 0.14, valor: (k) => fechaMx(k.fecha) },
+    { titulo: 'Vendedor', ancho: 0.3, valor: (k) => k.vendedor },
+    { titulo: 'Esperado', ancho: 0.15, der: true, valor: (k) => din(k.esperado) },
+    { titulo: 'Entregado', ancho: 0.15, der: true, valor: (k) => din(k.entregado) },
+    { titulo: 'Diferencia', ancho: 0.14, der: true, valor: (k) => din(k.diferencia), color: (k) => (k.diferencia < 0 ? NEGATIVO : k.diferencia > 0 ? POSITIVO : undefined) },
+    { titulo: 'Estado', ancho: 0.12, valor: (k) => (k.estado === 'confirmado' ? 'Confirmado' : 'Pendiente') },
+  ], c.cortes.detalle, c.cortes.detalle.length ? ['Total', '', din(c.cortes.detalle.reduce((s, k) => s + k.esperado, 0)), din(c.cortes.detalle.reduce((s, k) => s + k.entregado, 0)), din(c.cortes.diferencia), ''] : undefined)
+  if (c.cortes.sinCorte > 0) inf.nota(`${ent(c.cortes.sinCorte)} ${c.cortes.sinCorte === 1 ? 'día con cobro en efectivo no tiene' : 'días con cobro en efectivo no tienen'} corte.`)
+  inf.nota('Notas: se consideran los pedidos entregados por su fecha de entrega. La comisión es el porcentaje de cada vendedor sobre lo vendido en el mes. '
+    + '"Por cobrar" es lo vendido a crédito menos los abonos, al último día del mes. Una diferencia negativa es efectivo que faltó.')
+  return inf.listo()
+}
+type CifrasMes_Vendedor = InformeMes['cifras']['vendedores'][number]
+type CifrasMes_Corte = InformeMes['cifras']['cortes']['detalle'][number]
 
 // ---------------------------------------------------------------------------------------------- libreta de clientes
 

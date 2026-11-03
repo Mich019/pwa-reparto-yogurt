@@ -4,6 +4,7 @@ import type { Contexto } from './app.js'
 import type { Db } from './db.js'
 import { ordenarUnidades, tipoCantidad, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla, type Tipo, type Valor } from './exportar.js'
+import { zonaDeEmpresa } from './fechas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
@@ -57,6 +58,7 @@ export interface Resumen {
   ticketPromedio: number | null
   efectivo: number
   transferencia: number
+  credito: number // vendido a crédito (fiado): cuenta como venta, todavía no como cobrado
 }
 
 // Catálogo flexible: cuánto se entregó de cada unidad ({ L: 60, kg: 10 }); no se suman litros con kilos.
@@ -89,6 +91,7 @@ function resumenDe(f: Record<string, unknown>, porUnidad: PorUnidad = {}): Resum
     ticketPromedio: pedidos ? r2(ingreso / pedidos) : null,
     efectivo: num(f.efectivo),
     transferencia: num(f.transferencia),
+    credito: num(f.credito),
   }
 }
 
@@ -160,7 +163,8 @@ const VENTAS = (desde: string, hasta: string) => `MATERIALIZED (
 const resumenSql = (t: string) => `SELECT sum(subtotal) AS ingreso, sum(costo) AS costo, sum(litros) AS litros,
          count(DISTINCT id_pedido) AS pedidos, count(DISTINCT id_cliente) AS clientes,
          sum(subtotal) FILTER (WHERE metodo_pago = 'efectivo') AS efectivo,
-         sum(subtotal) FILTER (WHERE metodo_pago = 'transferencia') AS transferencia
+         sum(subtotal) FILTER (WHERE metodo_pago = 'transferencia') AS transferencia,
+         sum(subtotal) FILTER (WHERE metodo_pago = 'credito') AS credito
     FROM ${t}`
 const resumenUnidadesSql = (t: string) => `SELECT unidad, sum(litros) AS n FROM ${t} GROUP BY unidad`
 
@@ -425,6 +429,7 @@ const tablaResumen = (r: Reporte): Tabla => {
     ['Ticket promedio', 'ticketPromedio', 'dinero'],
     ['Cobrado en efectivo', 'efectivo', 'dinero'],
     ['Cobrado por transferencia', 'transferencia', 'dinero'],
+    ['Vendido a crédito (fiado)', 'credito', 'dinero'],
   ]
   // El margen ya es un %: su cambio va en puntos ("+2.5 pts"), no en % del %.
   const cambio = (k: Numerico, ahora: number | null, antes: number | null | undefined): Valor => {
@@ -491,7 +496,7 @@ export async function rutasReportes(app: FastifyInstance, { db, config }: Contex
     if (ventas === null) return rep.code(413).send({ error: 'Son demasiadas ventas para un solo archivo. Elige un periodo más corto.' })
 
     let datos: Buffer
-    const generado = new Date().toLocaleString('es-MX', { timeZone: config.zonaHoraria, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const generado = new Date().toLocaleString('es-MX', { timeZone: await zonaDeEmpresa(db, config.zonaHoraria), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const encabezado = { titulo: 'Reporte de ventas', subtitulo: `Del ${fechaMx(q.desde)} al ${fechaMx(q.hasta)} · Generado el ${generado}` }
     if (formato === 'xlsx') datos = aXlsx([tablaResumen(r), tablaPeriodos(r), tablaSabores(r), tablaVendedores(r), ventas!], encabezado)
     else datos = aCsv({ ventas: ventas!, periodos: tablaPeriodos(r), sabores: tablaSabores(r), vendedores: tablaVendedores(r) }[tabla]!)

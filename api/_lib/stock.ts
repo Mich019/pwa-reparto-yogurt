@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { tx, type Db } from './db.js'
-import { hoyEn } from './fechas.js'
+import { hoyEn, zonaDeEmpresa } from './fechas.js'
 import { totalPorUnidad } from './unidades.js'
 import type { AvisoPendiente, Despachador } from './notificaciones.js'
 
@@ -146,7 +146,7 @@ export async function rutasStock(app: FastifyInstance, { db, config }: Contexto,
     const b = bodyCarga.safeParse(req.body)
     if (!p.success || !b.success) return rep.code(400).send({ error: 'Indica la fecha y los litros de cada sabor' })
     const { fecha, lineas } = b.data
-    const hoy = hoyEn(config.zonaHoraria)
+    const hoy = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
     let avisos: AvisoPendiente[] = []
     try {
       await tx(db, req.usuario.id, async (c) => {
@@ -200,7 +200,7 @@ export async function rutasStock(app: FastifyInstance, { db, config }: Contexto,
     const b = bodyCopiar.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: 'Indica de qué día a qué día copiar' })
     if (b.data.desde === b.data.hacia) return rep.code(400).send({ error: 'Elige dos días distintos' })
-    const hoy = hoyEn(config.zonaHoraria)
+    const hoy = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
     const avisos: AvisoPendiente[] = []
     const copiadas = await tx(db, req.usuario.id, async (c) => {
       const { rows } = await c.query(

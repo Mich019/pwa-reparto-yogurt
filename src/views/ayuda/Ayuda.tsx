@@ -24,7 +24,7 @@ function sistema(): 'ios' | 'android' | 'otro' {
 }
 const instalada = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
 
-const DESTINOS: Record<string, string> = { resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', reportes: 'Reportes', marca: 'Marca' }
+const DESTINOS: Record<string, string> = { resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', cobranza: 'Cobranza', reportes: 'Reportes', marca: 'Marca' }
 
 export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => void }) {
   const usuario = useSesion()?.usuario

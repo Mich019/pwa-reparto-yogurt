@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, ChartLine, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
+import { BarChart3, ChartLine, HandCoins, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
 import { hace } from '../../lib/fechas'
 import { cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
+import { Cobranza } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { Subrayado } from './piezas'
 import { Equipo } from '../pwa/Equipo'
@@ -18,7 +19,7 @@ import { PantallaCobro } from './Suscripcion'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
-export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes' | 'configuracion'
+export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'cobranza' | 'reportes' | 'configuracion'
 
 const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
   { id: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
@@ -26,6 +27,7 @@ const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
   { id: 'clientes', texto: 'Clientes', icono: MapPin },
   { id: 'produccion', texto: 'Producción', icono: BarChart3 },
   { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl },
+  { id: 'cobranza', texto: 'Cobranza', icono: HandCoins },
   { id: 'reportes', texto: 'Reportes', icono: ChartLine },
   { id: 'configuracion', texto: 'Configuración', icono: Settings },
 ]
@@ -135,20 +137,20 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   return (
     <div className="flex h-dvh flex-col text-tinta antialiased">
       <AnuncioPlataforma onVerSuscripcion={() => abrirConfiguracion('suscripcion')} />
-      <header className="z-20 flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8 lg:pb-4 lg:pt-4">
-        <div className="flex flex-1 items-center">
+      <header className="z-20 flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8 xl:pb-4 xl:pt-4">
+        <div className="flex min-w-0 flex-1 items-center">
           <button
             type="button"
             onClick={() => setSeccion('resumen')}
             aria-label="Ir al resumen"
-            className={`rounded-xl ${anillo}`}
+            className={`flex min-w-0 rounded-xl ${anillo}`}
           >
-            <LogoEmpresa className="h-11 lg:h-14" />
+            <LogoEmpresa className="h-11 xl:h-14" />
           </button>
         </div>
 
         {/* Sólo texto; la sección activa lleva el mismo trazo amarillo que el nombre del saludo. */}
-        <nav aria-label="Secciones del panel" className="hidden shrink-0 items-center gap-1 lg:flex">
+        <nav aria-label="Secciones del panel" className="hidden shrink-0 items-center gap-1 xl:flex">
           {PESTANAS.map(({ id, texto }) => {
             const activa = seccion === id
             return (
@@ -157,7 +159,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                 type="button"
                 onClick={() => setSeccion(id)}
                 aria-current={activa ? 'page' : undefined}
-                className={`rounded-md px-3 py-2.5 text-[15px] font-semibold transition-colors xl:px-3.5 ${anillo} ${
+                className={`rounded-md px-2.5 py-2.5 text-[15px] font-semibold transition-colors 2xl:px-3.5 ${id === 'configuracion' ? 'max-2xl:hidden' : ''} ${anillo} ${
                   activa ? 'text-tinta' : 'text-tinta/65 hover:text-tinta'
                 }`}
               >
@@ -167,7 +169,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           })}
         </nav>
 
-        <div className="flex flex-1 items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 max-xl:shrink-0 xl:flex-1">
           <EstadoDatos />
           {onIrAPwa && (
             <button
@@ -175,12 +177,21 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
               onClick={onIrAPwa}
               aria-label="Abrir la app de reparto"
               title="Abrir la app de reparto"
-              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm font-semibold text-tinta transition-colors hover:bg-niebla xl:px-4 ${pildora} ${anillo}`}
+              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm font-semibold text-tinta transition-colors hover:bg-niebla 2xl:px-4 ${pildora} ${anillo}`}
             >
               <Smartphone size={17} aria-hidden="true" />
-              <span className="hidden xl:inline">App de reparto</span>
+              <span className="hidden 2xl:inline">App de reparto</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setSeccion('configuracion')}
+            aria-label="Configuración"
+            title="Configuración"
+            className={`hidden h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:bg-niebla xl:grid 2xl:hidden ${pildora} ${anillo}`}
+          >
+            <Settings size={17} aria-hidden="true" />
+          </button>
           <button
             type="button"
             onClick={() => abrirConfiguracion('cuenta')}
@@ -206,25 +217,26 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
       {/* En la computadora, Configuración lleva su propio desplazamiento: el título y su menú quedan fijos. */}
       <main className={`min-h-0 flex-1 overflow-y-auto ${seccion === 'configuracion' ? 'lg:overflow-hidden' : ''}`}>
         {/* Abajo queda sitio para la barra flotante del teléfono */}
-        <div className={`pb-[calc(7rem+env(safe-area-inset-bottom))] ${seccion === 'configuracion' ? 'lg:h-full lg:pb-0' : 'lg:pb-12'}`}>
+        <div className={`pb-[calc(7rem+env(safe-area-inset-bottom))] ${seccion === 'configuracion' ? 'lg:h-full lg:pb-[calc(6rem+env(safe-area-inset-bottom))] xl:pb-0' : 'xl:pb-12'}`}>
           {seccion === 'resumen' && <AdminDashboard onNavegar={setSeccion} />}
           {seccion === 'sabores' && <AdminSabores />}
           {seccion === 'configuracion' && <Configuracion key={apartado.vez} inicial={apartado.id} irA={(s) => setSeccion(s as SeccionAdmin)} />}
           {seccion === 'equipo' && <Equipo panel />}
           {seccion === 'clientes' && <Clientes panel />}
           {seccion === 'produccion' && <Produccion panel />}
+          {seccion === 'cobranza' && <Cobranza />}
           {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>
 
       {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono.
           Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}
-      <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+      <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:hidden">
         <ul className="pointer-events-auto flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel/90 p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.16)] backdrop-blur-xl">
           {PESTANAS.filter((p) => p.id !== 'configuracion').map(({ id, texto, icono: Icono }) => {
             const activa = seccion === id
             return (
-              <li key={id} className={activa ? 'min-w-0 flex-1' : 'shrink-0'}>
+              <li key={id} className={activa ? 'shrink-0 min-[430px]:min-w-0 min-[430px]:flex-1' : 'shrink-0'}>
                 <button
                   type="button"
                   onClick={() => setSeccion(id)}
@@ -232,11 +244,12 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                   aria-current={activa ? 'page' : undefined}
                   title={texto}
                   className={`flex h-11 items-center justify-center gap-2 rounded-full transition-colors ${anillo} ${
-                    activa ? 'w-full bg-tinta px-3 text-white' : 'w-11 text-apagado hover:bg-niebla max-[380px]:w-10'
+                    activa ? 'bg-tinta text-white max-[429px]:w-11 min-[430px]:w-full min-[430px]:px-3' : 'w-11 text-apagado hover:bg-niebla max-[380px]:w-10'
                   }`}
                 >
                   <Icono size={20} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
-                  {activa && <span className="truncate text-[13px] font-semibold">{texto}</span>}
+                  {/* Con siete secciones, en el teléfono angosto sólo cabe el ícono (el título de la sección ya dice cuál es). */}
+                  {activa && <span className="truncate text-[13px] font-semibold max-[429px]:hidden">{texto}</span>}
                 </button>
               </li>
             )

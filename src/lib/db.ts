@@ -20,6 +20,7 @@ export interface Cliente {
   ventana: Ventana
   qr_uuid: string
   nfc_uid?: string
+  precios?: Record<string, number> // precio especial por producto (por unidad); lo pone el servidor, la app no lo edita
   activo: boolean
   creado: number
   actualizado: number
@@ -35,6 +36,7 @@ export interface Producto {
   presentacion?: number // contenido de cada envase en `unidad` (RF-032); sin dato, 1. Se fija al crear el sabor.
   unidad?: string // L (sin dato), kg, pz… (catálogo flexible, src/lib/unidades.ts). Se fija al crear el sabor.
   envase?: string // frasco, garrafon, bolsa… (TIPOS_ENVASE); sin dato, sin envase propio. Se fija al crear el sabor.
+  retornable?: boolean // el cliente devuelve el envase: la app lleva su saldo
   precio_litro: number
   costo_litro: number
   color_hex: string
@@ -55,7 +57,7 @@ export interface Pedido {
   estado: EstadoPedido
   items: DetallePedido[]
   total: number
-  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA'
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'CREDITO'
   orden_ruta?: number
   urgente?: boolean // el administrador lo marcó para entregarse ya (RF-054); sólo él lo cambia
   fecha_entregado_real?: number

@@ -10,6 +10,7 @@ import { DosPasos } from '../pwa/DosPasos'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { SeccionSuscripcion } from './Suscripcion'
 import { MarcaEmpresa } from './MarcaEmpresa'
+import { ZonaEmpresa } from './ZonaEmpresa'
 import { Ayuda } from '../ayuda/Ayuda'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
@@ -133,7 +134,10 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
           {visible === 'seguridad' && <Seguridad plataforma={plataforma} />}
           {extra.find((x) => x.id === visible)?.contenido}
           {visible === 'marca' && (
-            <MarcaEmpresa />
+            <>
+              <MarcaEmpresa />
+              <ZonaEmpresa />
+            </>
           )}
           {visible === 'suscripcion' && suscripcion && (
             <Seccion id="suscripcion" titulo="Suscripción" descripcion="El plan de tu empresa. El pago y la tarjeta los maneja Mercado Pago.">

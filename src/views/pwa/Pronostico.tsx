@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Factory, TrendingDown, TrendingUp } from 'lucide-react'
+import { Factory } from 'lucide-react'
 import { db } from '../../lib/db'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { PuntoSabor, Segmentado } from '../../components/ui'
@@ -70,16 +70,14 @@ export function Pronostico({ selector, conVentas = true, panel = false }: { sele
                   <div className="h-full bg-tinta" style={{ width: `${(f.confirmado / maxProdDe(f.producto)) * 100}%` }} />
                   <div className="h-full bg-tinta/30" style={{ width: `${(f.estimado / maxProdDe(f.producto)) * 100}%` }} />
                 </div>
-                <div className="mt-1 text-[11px] text-apagado">
-                  {l(f.confirmado, f.producto)} agendados{f.estimado > 0 && ` · ~${l(f.estimado, f.producto)} estimados por historial`}
-                </div>
+                {f.confirmado > 0 && <div className="mt-1 text-[11px] text-apagado">{l(f.confirmado, f.producto)} agendados</div>}
               </div>
             </div>
           ))}
         </div>
         {pron.clientesEstimados > 0 && (
           <div className="mt-2 text-xs text-apagado">
-            La parte gris es lo estimado para {pron.clientesEstimados} cliente{pron.clientesEstimados > 1 ? 's' : ''} que les toca visita pero aún no confirman pedido.
+            Lo gris es estimado por historial ({pron.clientesEstimados} cliente{pron.clientesEstimados > 1 ? 's' : ''} sin pedido confirmado).
           </div>
         )}
       </section>
@@ -102,16 +100,6 @@ export function Pronostico({ selector, conVentas = true, panel = false }: { sele
 
       {ventas.porSabor.length > 0 && (
         <>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-niebla p-3">
-              <div className="flex items-center gap-1 text-xs text-verde"><TrendingUp size={14} /> Más vendido</div>
-              <div className="mt-1 flex items-center gap-1.5 font-semibold"><PuntoSabor color={ventas.porSabor[0].producto.color_hex} className="h-3.5 w-3.5" />{ventas.porSabor[0].producto.sabor}</div>
-            </div>
-            <div className="rounded-lg bg-niebla p-3">
-              <div className="flex items-center gap-1 text-xs text-amber-600"><TrendingDown size={14} /> Menos vendido</div>
-              <div className="mt-1 flex items-center gap-1.5 font-semibold"><PuntoSabor color={ventas.porSabor[ventas.porSabor.length - 1].producto.color_hex} className="h-3.5 w-3.5" />{ventas.porSabor[ventas.porSabor.length - 1].producto.sabor}</div>
-            </div>
-          </div>
           <div className="mt-3 divide-y divide-linea">
             {ventas.porSabor.map((s) => (
               <div key={s.producto.id} className="flex items-center gap-3 py-3">

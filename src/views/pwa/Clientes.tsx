@@ -14,6 +14,9 @@ import { EditorPedido } from './EditorPedido'
 import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { usePaginas } from '../../components/Paginas'
+import { CuentaDelCliente } from '../../components/CuentaDelCliente'
+import { PreciosDelCliente } from '../../components/PreciosDelCliente'
+import { PorCobrar } from '../../components/PorCobrar'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, Separador, TextoBoton, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
@@ -124,6 +127,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
       </div>
       )}
       <div className={panel ? 'mt-2 grid gap-x-10 lg:grid-cols-2' : 'flex-1 overflow-y-auto px-4 pt-2 pb-28'}>
+        {!panel && MODO_SERVIDOR && <div className="col-span-full"><PorCobrar /></div>}
         <div ref={paginas.ancla} className="col-span-full scroll-mt-4" />
         {lista.length === 0 && (
           <div className="py-12 text-center text-apagado lg:col-span-2">
@@ -242,7 +246,9 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
             <ChevronRight size={18} className="shrink-0 text-apagado/60" />
           </button>
         )}
+        {gestiona && <PreciosDelCliente clienteId={cliente.id} nombre={cliente.nombre} />}
         <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
+        {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} />}
 
         {pendientes.length > 0 && (
           <Seccion titulo="Pedidos agendados">

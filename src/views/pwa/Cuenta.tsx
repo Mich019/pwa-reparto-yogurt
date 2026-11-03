@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
-import { ErrorApi, ErrorRed } from '../../lib/api'
+import { ErrorApi, ErrorRed, MODO_SERVIDOR } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
 import { hace } from '../../lib/fechas'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
@@ -10,6 +10,7 @@ import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, use
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
+import { MiDia } from './MiDia'
 import { FotoPerfil } from '../../components/Avatar'
 import { Ayuda } from '../ayuda/Ayuda'
 
@@ -282,6 +283,8 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
         </div>
         <span className="flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} />{ROL[u.rol]}</span>
       </div>
+
+      {MODO_SERVIDOR && u.rol === 'vendedor' && <MiDia />}
 
       <div className="mt-3 rounded-lg bg-niebla p-4">
         <div className="flex items-center gap-2 font-semibold">

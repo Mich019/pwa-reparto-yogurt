@@ -2,7 +2,7 @@ import {
   ArrowRightLeft, Bell, BellRing, BookUser, Camera, CalendarDays, CircleSlash, CreditCard, Download, Factory, Flame, History,
   IceCreamBowl, KeyRound, LayoutDashboard, LineChart, LogOut, Mail, MapPin, MapPinned, Moon, Package, Pencil, Printer, QrCode,
   RefreshCw, ScanLine, ShieldCheck, ShoppingBag, Smartphone, SwatchBook, TrendingUp, UserCog, UserPlus, UserX, WifiOff,
-  Archive, type LucideIcon,
+  Archive, BadgePercent, Boxes, HandCoins, Lock, Wallet, type LucideIcon,
 } from 'lucide-react'
 
 // El manual de la sección Ayuda: cada guía son unos pasos cortos, y cada paso trae su «captura»: una pantalla de
@@ -171,6 +171,43 @@ export const GUIAS: Guia[] = [
   },
 
   {
+    id: 'cobranza', tema: 'reportes', titulo: 'Ver quién te debe y cobrar', icono: HandCoins, donde: 'panel', para: 'administrador', ir: 'cobranza',
+    resumen: 'Todos los saldos por cobrar, del adeudo más viejo al más nuevo, con su abono a un toque.',
+    palabras: 'cobranza fiado deuda debe saldo abono cobrar cuentas por cobrar envases prestados',
+    pasos: [
+      { texto: 'En Cobranza, «Por cobrar» lista a quien debe y desde cuándo. «Envases» muestra quién tiene prestados garrafones o botellas.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Por cobrar', primario: true, foco: true }, { texto: 'Envases' }, { texto: 'Cortes' }, { texto: 'Meses' }] }, { t: 'filas', n: 4 }]) },
+      { texto: 'Toca a un cliente para registrar su abono. Si te equivocas, anúlalo con un motivo: no se borra, queda a la vista.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
+    ],
+  },
+  {
+    id: 'cortes', tema: 'reportes', titulo: 'Confirmar el corte de cada vendedor', icono: Wallet, donde: 'panel', para: 'administrador', ir: 'cobranza',
+    resumen: 'Cada día, el efectivo que el vendedor dice que entregó contra el que debía entregar.',
+    palabras: 'corte caja efectivo vendedor confirmar diferencia faltante sobrante cuadrar dia',
+    pasos: [
+      { texto: 'En Cobranza, abre «Cortes» y elige el día. Cada vendedor muestra lo que debía entregar y lo que entregó.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Por cobrar' }, { texto: 'Envases' }, { texto: 'Cortes', primario: true, foco: true }, { texto: 'Meses' }] }, { t: 'filas', n: 3 }]) },
+      { texto: 'Si cuadra, toca «Confirmar». Si el vendedor no lo capturó, usa «Capturar» por él. Un corte confirmado ya no cambia.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'filas', n: 3 }, { t: 'botones', items: [{ texto: 'Confirmar', primario: true, foco: true }] }]) },
+    ],
+  },
+  {
+    id: 'cierre-mes', tema: 'reportes', titulo: 'Cerrar el mes y sacar el informe', icono: Lock, donde: 'panel', para: 'administrador', ir: 'cobranza',
+    resumen: 'Congela las cifras del mes, bloquea correcciones y te da el informe en PDF o Excel.',
+    palabras: 'cierre mes cerrar reabrir informe mensual pdf excel utilidad cobranza comisiones metas',
+    pasos: [
+      { texto: 'En Cobranza, abre «Meses» y elige el mes. Ves ventas, utilidad, por cobrar, envases, comisiones y cortes.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'chips', items: ['Octubre', 'Septiembre', 'Agosto'], elegido: 0, foco: 0 }, { t: 'tarjetas', n: 4, alto: 'bajo' }]) },
+      { texto: 'Toca «Cerrar mes». Ya no se podrán cambiar ventas, abonos ni cortes de esos días. Con «Reabrir» y un motivo se corrige y se vuelve a cerrar.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'PDF' }, { texto: 'Excel' }, { icono: Lock, texto: 'Cerrar mes', primario: true, foco: true }] }]) },
+      { texto: 'Descarga el informe con «PDF» o «Excel».', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'PDF', foco: true }, { texto: 'Excel', foco: true }, { texto: 'Reabrir' }] }]) },
+    ],
+  },
+  {
+    id: 'precio-especial', tema: 'clientes', titulo: 'Darle un precio especial a un cliente', icono: BadgePercent, donde: 'panel', para: 'administrador', ir: 'clientes',
+    resumen: 'Mayoreo: un precio distinto por sabor sólo para ese cliente. El teléfono lo usa solo al armar sus pedidos.',
+    palabras: 'precio especial mayoreo descuento cliente lista tarifa',
+    pasos: [
+      { texto: 'En Clientes, abre al cliente y toca «Precio especial».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'caja', titulo: 'Precio especial', texto: 'Precios', icono: BadgePercent, foco: true }] }) },
+      { texto: 'Escribe el precio sólo en los sabores que cambian; en blanco se cobra el de lista. Toca «Guardar».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Precio especial', piezas: [{ t: 'campos', items: [{ etiqueta: 'Fresa (lista $60)', valor: '52', foco: true }, { etiqueta: 'Mango (lista $62)' }] }, { t: 'boton', texto: 'Guardar' }] }) },
+    ],
+  },
+  {
     id: 'resumen', tema: 'reportes', titulo: 'Leer el Resumen', icono: LayoutDashboard, donde: 'panel', para: 'administrador', ir: 'resumen',
     resumen: 'Lo primero que ves al entrar: cuánto se cobró hoy, cómo van las ventas y los últimos pedidos.',
     palabras: 'inicio tablero dashboard cobrado hoy ventas avance pedidos recientes sabores mas vendidos',
@@ -281,8 +318,8 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Ruta ves el mapa con las paradas en orden; la tarjeta de abajo es la siguiente.', escena: tel('Ruta', [{ t: 'mapa', alto: true }, { t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L', foco: true }]) },
       { texto: 'Desliza la tarjeta hacia arriba: «Navegar» abre el GPS, y también puedes llamar o escribir por WhatsApp.', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'acciones', items: ['Navegar', 'Llamar', 'WhatsApp', 'Editar'], foco: 0 }, { t: 'filas', n: 2 }]) },
-      { texto: 'Elige Efectivo o Transfer y toca «Pedido Realizado».', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'chips', items: ['Efectivo', 'Transfer'], elegido: 0 }, { t: 'boton', texto: 'Pedido Realizado', foco: true }]) },
-      { texto: 'Luego decide: agendar su siguiente pedido, recordártelo más tarde o seguir a la siguiente parada.', escena: tel('Ruta', [{ t: 'mapa' }], { titulo: 'Entregado · $240', piezas: [{ t: 'opciones', items: [{ titulo: 'Realizar nuevo pedido', sub: 'Agendar su siguiente visita' }, { titulo: 'Recordar más tarde', sub: 'Te aviso para escribirle o llamarle' }, { titulo: 'Cerrar', sub: 'Ir a la siguiente parada' }], foco: 0 }] }) },
+      { texto: 'Elige Efectivo, Transfer o Fiado (si se lo llevó sin pagar) y toca «Pedido Realizado».', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'chips', items: ['Efectivo', 'Transfer', 'Fiado'], elegido: 0 }, { t: 'boton', texto: 'Pedido Realizado', foco: true }]) },
+      { texto: 'Luego decide: agendar su siguiente pedido, mandarle su comprobante por WhatsApp, recordártelo más tarde o seguir a la siguiente parada.', escena: tel('Ruta', [{ t: 'mapa' }], { titulo: 'Entregado · $240', piezas: [{ t: 'opciones', items: [{ titulo: 'Realizar nuevo pedido', sub: 'Agendar su siguiente visita' }, { titulo: 'Enviar comprobante', sub: 'Por WhatsApp' }, { titulo: 'Recordar más tarde', sub: 'Te aviso para escribirle o llamarle' }, { titulo: 'Cerrar', sub: 'Ir a la siguiente parada' }], foco: 0 }] }) },
     ],
   },
   {
@@ -329,6 +366,34 @@ export const GUIAS: Guia[] = [
     palabras: 'stock carga inventario quedan sabores asignado',
     pasos: [
       { texto: 'Abre la pestaña Stock: arriba, «Te quedan» se descuenta con cada entrega.', escena: tel('Stock', [{ t: 'titulo', texto: 'Mi carga de hoy' }, { t: 'caja', titulo: 'Te quedan', texto: '18 L', foco: true }, { t: 'sabores', n: 3 }]) },
+    ],
+  },
+  {
+    id: 'fiado', tema: 'pedidos', titulo: 'Vender a fiado y cobrar un abono', icono: HandCoins, donde: 'app', para: 'todos',
+    resumen: 'Lo que el cliente se lleva sin pagar queda como saldo; cada abono lo baja. Cobrar un abono necesita conexión.',
+    palabras: 'fiado credito deuda debe abono cobrar saldo cuenta por cobrar pagar despues',
+    pasos: [
+      { texto: 'Al entregar, elige «Fiado» en lugar de Efectivo o Transfer. No cuenta como cobrado hoy.', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'chips', items: ['Efectivo', 'Transfer', 'Fiado'], elegido: 2, foco: 2 }, { t: 'boton', texto: 'Pedido Realizado' }]) },
+      { texto: 'Cuando te pague, abre al cliente (o toca «Por cobrar», arriba de Clientes): dice cuánto debe. Toca ese renglón.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar'] }, { t: 'caja', titulo: '$420', texto: 'Debe desde el mié 28 de oct', icono: HandCoins, foco: true }] }) },
+      { texto: 'Escribe cuánto abona, elige Efectivo o Transferencia y toca «Registrar abono». Entra a tu corte del día.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
+    ],
+  },
+  {
+    id: 'envases', tema: 'clientes', titulo: 'Recoger envases retornables', icono: Boxes, donde: 'app', para: 'todos',
+    resumen: 'Los garrafones y botellas que se prestan quedan a cuenta del cliente hasta que los devuelve. Necesita conexión.',
+    palabras: 'envases retornables garrafon botella prestados recoger devolver saldo vacios',
+    pasos: [
+      { texto: 'Abre al cliente: si tiene envases prestados, lo dice arriba. Toca ese renglón.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Tienda La Esquina', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar'] }, { t: 'caja', titulo: '6', texto: 'Envases prestados', icono: Boxes, foco: true }] }) },
+      { texto: 'Elige el producto, cuántos te devuelve y toca «Registrar». No puede devolver más de los que tiene.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Recoger envases', piezas: [{ t: 'campos', items: [{ etiqueta: 'Producto', valor: 'Garrafón 20 L' }, { etiqueta: 'Cantidad', valor: '3', foco: true }] }, { t: 'boton', texto: 'Registrar' }] }) },
+    ],
+  },
+  {
+    id: 'corte-dia', tema: 'pedidos', titulo: 'Entregar tu corte del día', icono: Wallet, donde: 'app', para: 'vendedor',
+    resumen: 'Al terminar la ruta, escribes el efectivo que entregas; el administrador lo confirma y ve si cuadra.',
+    palabras: 'corte dia caja efectivo entregar cuadrar diferencia faltante sobrante cierre',
+    pasos: [
+      { texto: 'En Cuenta, toca «Corte de hoy»: te dice cuánto efectivo debes entregar (sin transferencias ni fiado).', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Corte de hoy', texto: 'Efectivo a entregar $1,240', icono: Wallet, foco: true }]) },
+      { texto: 'Escribe lo que entregas y toca «Entregar corte». Puedes corregirlo hasta que el administrador lo confirme.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }], { titulo: 'Corte de hoy', piezas: [{ t: 'campos', items: [{ etiqueta: 'Efectivo que entregas', valor: '1240', foco: true }] }, { t: 'boton', texto: 'Entregar corte' }] }) },
     ],
   },
   {

@@ -18,6 +18,8 @@ export interface Miembro {
   creadoEn: string
   clientes: number
   clientesActivos: number
+  comisionPct: number // % de comisión sobre lo vendido en el mes (0 = sin comisión)
+  metaMensual: number | null
 }
 export interface Equipo {
   usuarios: Miembro[]
@@ -46,7 +48,7 @@ export async function crearMiembro(d: { nombre: string; correo: string; telefono
 export const invitar = (correo: string) =>
   llamarAutenticado<{ correo: string; dias: number }>('/invitaciones', { metodo: 'POST', cuerpo: { correo } })
 
-export async function editarMiembro(id: string, d: Partial<{ nombre: string; correo: string; telefono: string; rol: Rol }>) {
+export async function editarMiembro(id: string, d: Partial<{ nombre: string; correo: string; telefono: string; rol: Rol; comisionPct: number; metaMensual: number | null }>) {
   const r = await llamarAutenticado<{ usuario: Miembro }>(`/usuarios/${id}`, { metodo: 'PATCH', cuerpo: d })
   refrescar()
   return r.usuario

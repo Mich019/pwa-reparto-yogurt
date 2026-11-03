@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, Flame } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
@@ -19,7 +19,9 @@ export function EditorPedido({ abierto, onCerrar, cliente, pedido, base, fechaIn
   fechaInicial?: string // para un pedido nuevo; si no, la siguiente visita según su frecuencia
   onGuardado?: (p: Pedido) => void
 }) {
-  const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
+  const catalogo = useLiveQuery(() => db.productos.toArray(), []) ?? []
+  // El precio especial del cliente gana al de lista (lo mismo que cobrará el servidor).
+  const productos = useMemo(() => catalogo.map((p) => (cliente.precios?.[p.id] != null ? { ...p, precio_litro: cliente.precios[p.id] } : p)), [catalogo, cliente.precios])
   const [cant, setCant] = useState<Cantidades>({})
   const [fecha, setFecha] = useState(hoy())
   const [urgente, setUrgente] = useState(false)

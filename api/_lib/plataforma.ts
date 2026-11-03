@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { leerAjustes } from './ajustes.js'
@@ -192,6 +193,18 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
   }
   const releer = async (id: string) => (await db.query<FilaAviso>(`SELECT * FROM avisos_plataforma WHERE id_aviso = $1`, [id])).rows[0]
   const correosPendientes = (log: FastifyRequest['log']) => mandarAvisosPorCorreo(log).catch((e) => log.error({ err: e }, 'plataforma: avisos por correo'))
+
+  // Despertador: manda los avisos programados que ya les tocó, sin esperar a que alguien abra la app. Lo llama un cron
+  // (vercel.json) con el secreto en la cabecera; sin CRON_SECRET configurado la ruta no existe.
+  app.get('/cron/avisos', async (req, rep) => {
+    const secreto = config.cronSecret
+    if (secreto.length < 24) return rep.code(404).send({ error: 'No encontrado' })
+    const dado = Buffer.from(String(req.headers.authorization ?? '').replace(/^Bearer /i, ''))
+    const bueno = Buffer.from(secreto)
+    if (dado.length !== bueno.length || !timingSafeEqual(dado, bueno)) return rep.code(401).send({ error: 'No autorizado' })
+    await mandarAvisosPorCorreo(req.log)
+    return { ok: true }
+  })
 
   // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.
   app.get('/plataforma/avisos', { preHandler: requierePlataforma }, async (req) => {

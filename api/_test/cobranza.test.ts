@@ -1,0 +1,95 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { after, describe, it } from 'node:test'
+import { hoyEn } from '../_lib/fechas.js'
+import { app, cliente, config, crearEmpresa, db, op, pedido, push, sesion } from './ayuda.js'
+
+// Fiado: lo vendido a crédito suma a lo que debe el cliente, los abonos lo bajan.
+
+after(async () => { await app.close(); await db.end() })
+
+type S = { token: string; id: string }
+async function llamar(s: S, method: 'GET' | 'POST', url: string, payload?: unknown) {
+  const r = await app.inject({ method, url, headers: { authorization: `Bearer ${s.token}` }, payload: payload as never })
+  return { status: r.statusCode, body: r.body ? r.json() : null }
+}
+const sabor = () => ({ id: randomUUID(), sabor: 'Fresa', descripcion: '', presentacion: 1, precio_litro: 60, costo_litro: 20, color_hex: '#f472b6', disponible: true })
+
+// Una empresa propia con su administrador, dos vendedores y un cliente de uno de ellos con ventas a crédito.
+async function escenario() {
+  const empresa = await crearEmpresa()
+  const admin = await sesion('administrador', 'tel-a', empresa)
+  const ana = await sesion('vendedor', 'tel-v1', empresa)
+  const beto = await sesion('vendedor', 'tel-v2', empresa)
+  const s = sabor()
+  assert.equal((await push(admin, [op('productos', s.id, s)])).body.resultados[0].estado, 'aplicada')
+  const c = cliente({ nombre: 'Tienda Fiada' })
+  assert.equal((await push(ana, [op('clientes', c.id, c)])).body.resultados[0].estado, 'aplicada')
+  const hoy = hoyEn(config.zonaHoraria)
+  const entrega = (metodo: string, litros: number, fecha = hoy) => {
+    const p = pedido(c.id, s.id, { fecha, estado: 'ENTREGADO', metodo_pago: metodo, fecha_entregado_real: Date.now(), items: [{ productoId: s.id, litros, precio_litro: 60 }] })
+    return push(ana, [op('pedidos', p.id, p)])
+  }
+  return { empresa, admin, ana, beto, c, s, hoy, entrega }
+}
+
+describe('fiado', () => {
+  it('lo vendido a crédito es deuda; lo pagado de contado no', async () => {
+    const x = await escenario()
+    assert.equal((await x.entrega('CREDITO', 3)).body.resultados[0].estado, 'aplicada') // $180 fiados
+    assert.equal((await x.entrega('EFECTIVO', 2)).body.resultados[0].estado, 'aplicada') // $120 de contado
+    const { body } = await llamar(x.ana, 'GET', '/cobranza')
+    assert.equal(body.total, 180)
+    assert.equal(body.deudores.length, 1)
+    assert.equal(body.deudores[0].nombre, 'Tienda Fiada')
+    assert.equal(body.deudores[0].saldo, 180)
+    assert.equal(body.deudores[0].desde, x.hoy)
+  })
+
+  it('los abonos bajan el saldo, no pasan de lo que se debe y el que paga todo sale de la lista', async () => {
+    const x = await escenario()
+    await x.entrega('CREDITO', 3)
+    const abonar = (monto: number, s: S = x.ana) => llamar(s, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto, metodo: 'efectivo' })
+    const a1 = await abonar(100)
+    assert.equal(a1.status, 201)
+    assert.equal(a1.body.saldo, 80)
+    assert.equal((await abonar(100)).status, 409) // sólo debe 80
+    assert.equal((await abonar(80)).body.saldo, 0)
+    assert.equal((await llamar(x.ana, 'GET', '/cobranza')).body.deudores.length, 0)
+    assert.equal((await abonar(1)).status, 409) // ya no debe nada
+    const cuenta = (await llamar(x.admin, 'GET', `/cobranza/clientes/${x.c.id}`)).body
+    assert.equal(cuenta.saldo, 0)
+    assert.equal(cuenta.movimientos.filter((m: { tipo: string }) => m.tipo === 'abono').length, 2)
+  })
+
+  it('cada vendedor ve y cobra sólo a los suyos; el administrador, a todos', async () => {
+    const x = await escenario()
+    await x.entrega('CREDITO', 1)
+    assert.equal((await llamar(x.beto, 'GET', '/cobranza')).body.deudores.length, 0)
+    assert.equal((await llamar(x.beto, 'GET', `/cobranza/clientes/${x.c.id}`)).status, 404)
+    assert.equal((await llamar(x.beto, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'efectivo' })).status, 404)
+    assert.equal((await llamar(x.admin, 'GET', '/cobranza')).body.deudores.length, 1)
+    assert.equal((await llamar(x.admin, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'transferencia' })).status, 201)
+  })
+
+  it('un abono se anula con motivo (sólo el administrador) y vuelve a deberse', async () => {
+    const x = await escenario()
+    await x.entrega('CREDITO', 2)
+    const { body: a } = await llamar(x.ana, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 120, metodo: 'efectivo' })
+    assert.equal((await llamar(x.ana, 'POST', `/cobranza/abonos/${a.id}/anular`, { motivo: 'Me equivoqué' })).status, 403)
+    assert.equal((await llamar(x.admin, 'POST', `/cobranza/abonos/${a.id}/anular`, { motivo: '' })).status, 400)
+    assert.equal((await llamar(x.admin, 'POST', `/cobranza/abonos/${a.id}/anular`, { motivo: 'Capturado dos veces' })).status, 200)
+    assert.equal((await llamar(x.admin, 'POST', `/cobranza/abonos/${a.id}/anular`, { motivo: 'Otra vez' })).status, 409)
+    assert.equal((await llamar(x.admin, 'GET', '/cobranza')).body.total, 120)
+  })
+
+  it('el reporte separa lo vendido a crédito de lo cobrado', async () => {
+    const x = await escenario()
+    await x.entrega('CREDITO', 3)
+    await x.entrega('EFECTIVO', 1)
+    const r = await llamar(x.admin, 'GET', `/reportes/ventas?desde=${x.hoy}&hasta=${x.hoy}`)
+    assert.equal(r.status, 200)
+    assert.equal(r.body.resumen.credito, 180)
+    assert.equal(r.body.resumen.efectivo, 60)
+  })
+})

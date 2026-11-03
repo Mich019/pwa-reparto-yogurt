@@ -1,0 +1,352 @@
+import { useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen } from 'lucide-react'
+import {
+  cerrarMes, confirmarCorte, entregarCorte, exportarInforme, reabrirMes, textoMes, useServidor,
+  type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
+} from '../../lib/cobranza'
+import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
+import { textoPorUnidad } from '../../lib/unidades'
+import { usePaginas } from '../../components/Paginas'
+import { CuentaAbierta } from '../../components/CuentaDelCliente'
+import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
+import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
+
+// Cobranza del panel: quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
+// informe. Todo viene del servidor y necesita conexión.
+
+type Parte = 'cobrar' | 'envases' | 'cortes' | 'meses'
+const PARTES: { id: Parte; texto: string }[] = [
+  { id: 'cobrar', texto: 'Por cobrar' },
+  { id: 'envases', texto: 'Envases' },
+  { id: 'cortes', texto: 'Cortes' },
+  { id: 'meses', texto: 'Meses' },
+]
+
+export function Cobranza() {
+  const [parte, setParte] = useState<Parte>('cobrar')
+  return (
+    <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
+      <Encabezado titulo="Cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">
+        <div className={grupoPanel} role="group" aria-label="Apartado">
+          {PARTES.map((p) => (
+            <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={`${parte === p.id ? botonPanel : botonPanelSuave} max-sm:px-3`}>{p.texto}</button>
+          ))}
+        </div>
+      </Encabezado>
+      {parte === 'cobrar' && <PorCobrar />}
+      {parte === 'envases' && <Envases />}
+      {parte === 'cortes' && <Cortes />}
+      {parte === 'meses' && <Meses />}
+    </div>
+  )
+}
+
+function Estado({ cargando, error, vacio, children }: { cargando: boolean; error: string; vacio?: string; children: ReactNode }) {
+  if (error) return <p role="alert" className="py-12 text-center text-sm font-medium text-rojo">{error}</p>
+  if (cargando) return <p className="py-12 text-center text-apagado">Cargando…</p>
+  if (vacio) return <p className="py-12 text-center text-apagado">{vacio}</p>
+  return <>{children}</>
+}
+
+const Fila = ({ onClick, children }: { onClick?: () => void; children: ReactNode }) => (
+  <button onClick={onClick} disabled={!onClick} className="flex w-full items-center gap-3 border-b border-linea px-1 py-3.5 text-left enabled:hover:bg-niebla/60">{children}</button>
+)
+
+// ---- Por cobrar
+function PorCobrar() {
+  const lista = useServidor<{ total: number; deudores: Deudor[] }>('/cobranza')
+  const [abierto, setAbierto] = useState<string | null>(null)
+  const deudores = lista.datos?.deudores ?? []
+  const vista = usePaginas(deudores, 30)
+  return (
+    <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !deudores.length ? 'Nadie te debe nada.' : undefined}>
+      {lista.datos && (
+        <>
+          <p className="pb-3 text-sm text-apagado">Total por cobrar <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{dinero(lista.datos.total)}</span> · {deudores.length} {deudores.length === 1 ? 'cliente' : 'clientes'}</p>
+          <div ref={vista.ancla} className="scroll-mt-4">
+            {vista.visibles.map((d) => (
+              <Fila key={d.id} onClick={() => setAbierto(d.id)}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{d.nombre}</span>
+                  <span className="block truncate text-sm text-apagado">{d.vendedor ?? 'Sin vendedor'}{d.desde && ` · desde el ${textoFecha(d.desde).toLowerCase()}`}</span>
+                </span>
+                <span className="font-semibold tabular-nums">{dinero(d.saldo)}</span>
+                <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+              </Fila>
+            ))}
+            {vista.control}
+          </div>
+        </>
+      )}
+      {abierto && <CuentaAbierta tipo="abono" clienteId={abierto} onCerrar={() => setAbierto(null)} onHecho={lista.recargar} />}
+    </Estado>
+  )
+}
+
+// ---- Envases
+function Envases() {
+  const lista = useServidor<EnvasesClientes>('/envases')
+  const [abierto, setAbierto] = useState<string | null>(null)
+  const clientes = lista.datos?.clientes ?? []
+  const vista = usePaginas(clientes, 30)
+  return (
+    <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !clientes.length ? 'Nadie tiene envases prestados.' : undefined}>
+      {lista.datos && (
+        <>
+          <p className="pb-3 text-sm text-apagado">
+            Prestados <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{lista.datos.total}</span>
+            {lista.datos.productos.length > 0 && ` · ${lista.datos.productos.map((p) => `${p.prestados} de ${p.sabor}`).join(', ')}`}
+          </p>
+          <div ref={vista.ancla} className="scroll-mt-4">
+            {vista.visibles.map((c) => (
+              <Fila key={c.id} onClick={() => setAbierto(c.id)}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{c.nombre}</span>
+                  <span className="block truncate text-sm text-apagado">{c.envases.map((e) => `${e.prestados} de ${e.sabor}`).join(', ')}</span>
+                </span>
+                <span className="font-semibold tabular-nums">{c.total}</span>
+                <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+              </Fila>
+            ))}
+            {vista.control}
+          </div>
+        </>
+      )}
+      {abierto && <CuentaAbierta tipo="envases" clienteId={abierto} onCerrar={() => setAbierto(null)} onHecho={lista.recargar} />}
+    </Estado>
+  )
+}
+
+// ---- Cortes
+const ETIQUETA_CORTE = { sin_corte: 'Sin entregar', pendiente: 'Por confirmar', confirmado: 'Confirmado' } as const
+
+function Cortes() {
+  const [fecha, setFecha] = useState(hoy)
+  const lista = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${fecha}`)
+  const [captura, setCaptura] = useState<FilaCorte | null>(null)
+  const filas = lista.datos?.filas ?? []
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  async function confirmar(f: FilaCorte) {
+    setConfirmando(f.id)
+    try {
+      const r = await confirmarCorte(f.id)
+      aviso(r.diferencia === 0 ? 'Corte confirmado' : `Corte confirmado con ${r.diferencia < 0 ? 'faltante' : 'sobrante'} de ${dinero(Math.abs(r.diferencia))}`)
+      lista.recargar()
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo confirmar')
+    } finally {
+      setConfirmando(null)
+    }
+  }
+  return (
+    <>
+      <div className="flex items-center gap-2 pb-3">
+        <button onClick={() => setFecha(sumarDias(fecha, -1))} aria-label="Día anterior" className={botonPanelIcono}><ChevronLeft size={18} /></button>
+        <span className="min-w-36 text-center font-semibold">{fecha === hoy() ? 'Hoy' : textoFecha(fecha)}</span>
+        <button onClick={() => setFecha(sumarDias(fecha, 1))} disabled={fecha >= hoy()} aria-label="Día siguiente" className={botonPanelIcono}><ChevronRight size={18} /></button>
+      </div>
+      <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !filas.length ? 'Nadie vendió este día.' : undefined}>
+        {filas.map((f) => (
+          <div key={f.vendedorId} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-linea px-1 py-3.5">
+            <span className="min-w-0 flex-1 basis-40">
+              <span className="block truncate font-semibold">{f.vendedor}</span>
+              <span className="block text-sm text-apagado">
+                Debe entregar {dinero(f.esperado)}
+                {f.entregado !== null && ` · entregó ${dinero(f.entregado)}`}
+                {f.diferencia !== null && f.diferencia !== 0 && <span className="font-semibold text-rojo"> · {f.diferencia < 0 ? 'faltan' : 'sobran'} {dinero(Math.abs(f.diferencia))}</span>}
+              </span>
+              {f.nota && <span className="block text-sm text-apagado">“{f.nota}”</span>}
+            </span>
+            <span className="text-sm text-apagado">{ETIQUETA_CORTE[f.estado]}</span>
+            {f.estado === 'pendiente' && <button onClick={() => confirmar(f)} disabled={confirmando === f.id} className={botonPanel}>Confirmar</button>}
+            {f.estado === 'sin_corte' && <button onClick={() => setCaptura(f)} className={botonPanelSuave}>Capturar</button>}
+          </div>
+        ))}
+      </Estado>
+      {captura && <HojaCaptura fila={captura} onCerrar={() => setCaptura(null)} onHecho={lista.recargar} />}
+    </>
+  )
+}
+
+function HojaCaptura({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: () => void; onHecho: () => void }) {
+  const [monto, setMonto] = useState(String(fila.esperado))
+  const [enviando, setEnviando] = useState(false)
+  const valor = Number(monto)
+  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor >= 0
+  async function guardar() {
+    setEnviando(true)
+    try {
+      await entregarCorte({ efectivoEntregado: valor, fecha: fila.fecha, vendedorId: fila.vendedorId })
+      aviso('Corte capturado')
+      onHecho()
+      onCerrar()
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo capturar')
+    } finally {
+      setEnviando(false)
+    }
+  }
+  return (
+    <Hoja abierta onCerrar={onCerrar} titulo={<div>Capturar corte<div className="text-base font-medium text-apagado">{fila.vendedor} · {textoFecha(fila.fecha)}</div></div>}
+      pie={<Boton onClick={guardar} disabled={!valido || enviando} className="w-full text-lg">Guardar</Boton>}>
+      <div className="pb-4">
+        <Campo etiqueta={`Efectivo entregado (debía ${dinero(fila.esperado)})`}>
+          <input inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value.replace(',', '.'))} className={claseInput} autoFocus />
+        </Campo>
+      </div>
+    </Hoja>
+  )
+}
+
+// ---- Meses
+const ETIQUETA_MES = { abierto: 'Abierto', cerrado: 'Cerrado', reabierto: 'Reabierto' } as const
+
+function Meses() {
+  const lista = useServidor<{ meses: MesCierre[] }>('/cierres')
+  const [mes, setMes] = useState<string | null>(null)
+  const meses = lista.datos?.meses ?? []
+  const elegido = mes ?? meses.find((m) => !m.actual)?.mes ?? meses[0]?.mes ?? null
+  return (
+    <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !meses.length ? 'Todavía no hay ventas.' : undefined}>
+      <div className="flex gap-2 overflow-x-auto pb-4" role="group" aria-label="Mes">
+        {meses.map((m) => (
+          <button key={m.mes} onClick={() => setMes(m.mes)} aria-pressed={elegido === m.mes} className={`${elegido === m.mes ? botonPanel : botonPanelSuave} shrink-0`}>
+            {textoMes(m.mes)}
+            {m.estado === 'cerrado' && <Lock size={14} aria-label="Cerrado" />}
+          </button>
+        ))}
+      </div>
+      {elegido && <DetalleMes key={elegido} mes={elegido} actual={!!meses.find((m) => m.mes === elegido)?.actual} onCambio={lista.recargar} />}
+    </Estado>
+  )
+}
+
+function Dato({ titulo, valor, detalle }: { titulo: string; valor: string; detalle?: string }) {
+  return (
+    <div className="rounded-lg bg-niebla p-4">
+      <div className="text-sm text-apagado">{titulo}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums">{valor}</div>
+      {detalle && <div className="mt-0.5 text-xs text-apagado">{detalle}</div>}
+    </div>
+  )
+}
+
+function DetalleMes({ mes, actual, onCambio }: { mes: string; actual: boolean; onCambio: () => void }) {
+  const informe = useServidor<InformeMes>(`/cierres/${mes}`)
+  const [hoja, setHoja] = useState<'cerrar' | 'reabrir' | null>(null)
+  const [exportando, setExportando] = useState<'pdf' | 'xlsx' | null>(null)
+  const i = informe.datos
+  async function exportar(formato: 'pdf' | 'xlsx') {
+    if (!i) return
+    setExportando(formato)
+    try { await exportarInforme(i, formato) } catch (e) { aviso(e instanceof Error ? e.message : 'No se pudo generar') } finally { setExportando(null) }
+  }
+  return (
+    <Estado cargando={informe.cargando && !i} error={informe.error}>
+      {i && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <div>
+              <h2 className="text-2xl font-semibold">{textoMes(mes)}</h2>
+              <p className="text-sm text-apagado">{i.estado === 'cerrado' ? `Cerrado el ${textoFecha((i.cerradoEn ?? '').slice(0, 10)).toLowerCase()}` : actual ? 'Mes en curso' : ETIQUETA_MES[i.estado]}</p>
+            </div>
+            <div className="flex gap-2 max-sm:w-full [&>*]:max-sm:grow">
+              <button onClick={() => exportar('pdf')} disabled={!!exportando} className={botonPanelSuave}><FileText size={16} aria-hidden="true" />PDF</button>
+              <button onClick={() => exportar('xlsx')} disabled={!!exportando} className={botonPanelSuave}><FileSpreadsheet size={16} aria-hidden="true" />Excel</button>
+              {i.estado === 'cerrado'
+                ? <button onClick={() => setHoja('reabrir')} className={botonPanelSuave}><LockOpen size={16} aria-hidden="true" />Reabrir</button>
+                : !actual && <button onClick={() => setHoja('cerrar')} className={botonPanel}><Lock size={16} aria-hidden="true" />Cerrar mes</button>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Dato titulo="Ventas" valor={dinero(i.cifras.ventas.ingreso)} detalle={`${i.cifras.ventas.pedidos} pedidos${textoPorUnidad(i.cifras.ventas.porUnidad) ? ` · ${textoPorUnidad(i.cifras.ventas.porUnidad)}` : ''}`} />
+            <Dato titulo="Utilidad" valor={dinero(i.cifras.ventas.utilidad)} detalle={i.cifras.ventas.margenPct === null ? undefined : `Margen ${i.cifras.ventas.margenPct.toLocaleString('es-MX', { maximumFractionDigits: 1 })}%`} />
+            <Dato titulo="Por cobrar" valor={dinero(i.cifras.porCobrar.saldo)} detalle={`${i.cifras.porCobrar.clientes} ${i.cifras.porCobrar.clientes === 1 ? 'cliente' : 'clientes'}`} />
+            <Dato titulo="Envases prestados" valor={String(i.cifras.envases.prestados)} detalle={`${i.cifras.envases.clientes} ${i.cifras.envases.clientes === 1 ? 'cliente' : 'clientes'}`} />
+          </div>
+
+          <section>
+            <h3 className="pb-2 font-semibold">Cobrado</h3>
+            <p className="text-sm text-apagado">
+              Efectivo {dinero(i.cifras.cobro.efectivo)} · transferencias {dinero(i.cifras.cobro.transferencia)} · a fiado {dinero(i.cifras.cobro.credito)} · abonos {dinero(i.cifras.abonos.total)}
+            </p>
+          </section>
+
+          <section>
+            <h3 className="pb-1 font-semibold">Vendedores</h3>
+            {i.cifras.vendedores.length === 0 && <p className="text-sm text-apagado">Sin ventas este mes.</p>}
+            {i.cifras.vendedores.map((v) => (
+              <div key={v.id} className="flex flex-wrap items-baseline gap-x-4 border-b border-linea px-1 py-3">
+                <span className="min-w-0 flex-1 basis-40 truncate font-semibold">{v.nombre}</span>
+                <span className="tabular-nums">{dinero(v.ventas)}</span>
+                <span className="text-sm text-apagado">
+                  {v.meta ? `${Math.round(v.cumplimientoPct ?? 0)}% de la meta` : 'Sin meta'}{v.comisionPct > 0 && ` · comisión ${dinero(v.comision)}`}
+                </span>
+              </div>
+            ))}
+          </section>
+
+          {i.cifras.cortes.dias > 0 && (
+            <section>
+              <h3 className="pb-2 font-semibold">Cortes</h3>
+              <p className="text-sm text-apagado">
+                {i.cifras.cortes.confirmados} confirmados
+                {i.cifras.cortes.pendientes + i.cifras.cortes.sinCorte > 0 && ` · ${i.cifras.cortes.pendientes + i.cifras.cortes.sinCorte} sin confirmar`}
+                {i.cifras.cortes.diferencia !== 0 && ` · diferencia ${i.cifras.cortes.diferencia < 0 ? 'de' : 'a favor'} ${dinero(Math.abs(i.cifras.cortes.diferencia))}`}
+              </p>
+            </section>
+          )}
+
+          {i.historial.length > 0 && (
+            <section>
+              <h3 className="pb-2 font-semibold">Historial</h3>
+              {i.historial.map((h, n) => (
+                <p key={n} className="text-sm text-apagado">{textoFecha(h.en.slice(0, 10))} · {h.accion === 'cerrado' ? 'Cerrado' : `Reabierto: ${h.motivo}`}</p>
+              ))}
+            </section>
+          )}
+          {i.estado === 'cerrado' && <p className="text-sm text-apagado">Con el mes cerrado no se pueden cambiar ventas, abonos ni cortes de esos días.</p>}
+        </div>
+      )}
+      {hoja === 'cerrar' && <HojaCierre mes={mes} reabrir={false} onCerrar={() => setHoja(null)} onHecho={() => { informe.recargar(); onCambio() }} />}
+      {hoja === 'reabrir' && <HojaCierre mes={mes} reabrir onCerrar={() => setHoja(null)} onHecho={() => { informe.recargar(); onCambio() }} />}
+    </Estado>
+  )
+}
+
+function HojaCierre({ mes, reabrir, onCerrar, onHecho }: { mes: string; reabrir: boolean; onCerrar: () => void; onHecho: () => void }) {
+  const [motivo, setMotivo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  async function enviar() {
+    setEnviando(true)
+    try {
+      if (reabrir) await reabrirMes(mes, motivo.trim())
+      else await cerrarMes(mes)
+      aviso(reabrir ? 'Mes reabierto' : 'Mes cerrado')
+      onHecho()
+      onCerrar()
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo completar')
+    } finally {
+      setEnviando(false)
+    }
+  }
+  return (
+    <Hoja abierta onCerrar={onCerrar} titulo={`${reabrir ? 'Reabrir' : 'Cerrar'} ${textoMes(mes).toLowerCase()}`}
+      pie={<Boton onClick={enviar} disabled={enviando || (reabrir && motivo.trim().length < 5)} className="w-full text-lg">{reabrir ? 'Reabrir mes' : 'Cerrar mes'}</Boton>}>
+      <div className="space-y-4 pb-4">
+        <p className="text-sm leading-relaxed text-apagado">
+          {reabrir
+            ? 'Mientras esté abierto se podrán corregir ventas, abonos y cortes de ese mes. Queda registrado quién lo reabrió y por qué.'
+            : 'Se guardan las cifras del mes tal como están y ya no se podrán cambiar ventas, abonos ni cortes de esos días. Puedes reabrirlo si hace falta.'}
+        </p>
+        {reabrir && (
+          <Campo etiqueta="Motivo">
+            <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} className={claseInput} autoFocus />
+          </Campo>
+        )}
+      </div>
+    </Hoja>
+  )
+}

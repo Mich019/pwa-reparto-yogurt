@@ -26,9 +26,9 @@ export function LogoEmpresa({ className = 'h-12' }: { className?: string }) {
   if (!m) return <LogoDelisy className={className} />
   if (m.logo) return <img src={m.logo} alt={m.nombre} className={`w-auto max-w-[16rem] select-none object-contain ${className}`} draggable={false} />
   return (
-    <span className={`inline-flex max-w-[16rem] items-center gap-2.5 ${className}`}>
+    <span className={`inline-flex min-w-0 max-w-[16rem] items-center gap-2.5 ${className}`}>
       <span aria-hidden="true" className="grid aspect-square h-full max-h-14 place-items-center rounded-2xl bg-marca text-xl font-bold text-white">{m.nombre.trim().charAt(0).toUpperCase()}</span>
-      <span className="max-w-[11rem] truncate font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-tinta">{m.nombre}</span>
+      <span className="min-w-0 max-w-[11rem] truncate font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-tinta">{m.nombre}</span>
     </span>
   )
 }

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { ordenarUnidades } from './unidades.js'
-import { hoyEn } from './fechas.js'
+import { hoyEn, zonaDeEmpresa } from './fechas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
@@ -20,7 +20,7 @@ export async function rutasAdmin(
   app.get('/admin/stats', pre, async (req, rep) => {
     const q = query.safeParse(req.query)
     if (!q.success) return rep.code(400).send({ error: 'Fecha inválida (AAAA-MM-DD)' })
-    const fecha = q.data.fecha ?? hoyEn(config.zonaHoraria)
+    const fecha = q.data.fecha ?? hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
 
     // Todo en una sola consulta: cada consulta dentro de la empresa son tres viajes a la base (abrir con la empresa,
     // consultar, cerrar), y siete seguidas hacían esperar al resumen.

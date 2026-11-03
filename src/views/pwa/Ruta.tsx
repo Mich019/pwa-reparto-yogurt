@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Flame, MapPin, Navigation, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
+  Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
@@ -10,6 +10,8 @@ import { calcularRuta, distancia, enlaceNavegar, posicionActual, ubicacionActual
 import { cargarDemo } from '../../lib/demo'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { baseDelUltimoPedido } from '../../lib/codigos'
+import { enlaceComprobante } from '../../lib/comprobante'
+import { marcaActual } from '../../lib/marca'
 import { AlertasRuta } from './AlertasRuta'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
@@ -166,6 +168,8 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
 
   const entregados = (pedidosHoy ?? []).filter((p) => p.estado === 'ENTREGADO')
   const totalDia = entregados.reduce((s, p) => s + p.total, 0)
+  // Lo que se quedó fiado todavía no se cobró: «cobrado hoy» no lo cuenta.
+  const cobradoDia = entregados.reduce((s, p) => s + (p.metodo_pago === 'CREDITO' ? 0 : p.total), 0)
   const totalPedidos = (pedidosHoy ?? []).filter((p) => p.estado !== 'RECORDAR_MAS_TARDE').length
 
   async function pedidoRealizado() {
@@ -266,7 +270,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
             </BotonRedondo>
           </div>
           <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md bg-papel px-5 py-2.5 shadow-tarjeta">
-            <span className="text-lg leading-none font-semibold tabular-nums">{dinero(totalDia)}</span>
+            <span className="text-lg leading-none font-semibold tabular-nums">{dinero(cobradoDia)}</span>
             {enLinea ? (
               <span className="text-xs font-medium text-apagado">cobrado hoy</span>
             ) : (
@@ -323,7 +327,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                   </div>
                   <div className="text-right">
                     <div className="text-2xl leading-8 font-semibold tracking-tight tabular-nums">{dinero(activo.total)}</div>
-                    <div className="mt-1 text-sm text-apagado">{litrosActivo} · {pago === 'EFECTIVO' ? 'efectivo' : 'transfer'}</div>
+                    <div className="mt-1 text-sm text-apagado">{litrosActivo} · {pago === 'EFECTIVO' ? 'efectivo' : pago === 'CREDITO' ? 'fiado' : 'transfer'}</div>
                   </div>
                 </button>
 
@@ -355,6 +359,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
                       opciones={[
                         { valor: 'EFECTIVO', texto: <><Banknote size={16} /> Efectivo</> },
                         { valor: 'TRANSFERENCIA', texto: <><Smartphone size={16} /> Transfer</> },
+                        { valor: 'CREDITO', texto: <><NotebookPen size={16} /> Fiado</> },
                       ]}
                     />
                     {clienteActivo.notas && (
@@ -475,6 +480,10 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
             )}
             <div className="pb-1 text-apagado">¿Qué sigue con <b className="text-tinta">{clientePost.nombre}</b>?</div>
             <OpcionGrande destacada icono={<ShoppingBag size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
+            {postEntrega && clientePost.telefono.trim() && (
+              <OpcionGrande icono={<MessageCircle size={26} />} titulo="Enviar comprobante" sub="Por WhatsApp"
+                onClick={() => window.open(enlaceComprobante(clientePost, postEntrega, productos, marcaActual()?.nombre), '_blank', 'noopener')} />
+            )}
             <OpcionGrande icono={<Clock size={26} />} titulo="Recordar más tarde" sub="Te aviso para escribirle o llamarle" onClick={recordarMasTarde} />
             <OpcionGrande icono={<X size={26} />} titulo="Cerrar" sub="Ir a la siguiente parada" onClick={() => siguiente()} />
           </div>

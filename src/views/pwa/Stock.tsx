@@ -104,7 +104,6 @@ export function Stock() {
               )
             })}
           </section>
-          <p className="mt-4 text-xs text-apagado">Se calcula con tus entregas de hoy, aun sin internet. Si algo no cuadra, avisa al administrador.</p>
         </>
       )}
     </div>

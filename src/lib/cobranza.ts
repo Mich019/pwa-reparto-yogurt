@@ -1,0 +1,101 @@
+import { useCallback, useEffect, useState } from 'react'
+import { descargarAutenticado, llamarAutenticado } from './sesion'
+import { descargarArchivo } from './pdf'
+import { mostrarPdf } from '../components/VisorPdf'
+
+// Cobranza, envases, cortes y cierre de mes (api/_lib/cobranza.ts, envases.ts, cortes.ts). Todo viene del servidor y
+// necesita conexión: no pasa por la cola de sincronización.
+
+export interface Deudor { id: string; nombre: string; telefono: string | null; vendedorId: string | null; vendedor: string | null; fiado: number; abonado: number; saldo: number; desde: string | null; ultimoAbono: string | null }
+export interface CuentaCliente {
+  cliente: { id: string; nombre: string }
+  fiado: number; abonado: number; saldo: number; desde: string | null
+  movimientos: { tipo: 'venta' | 'abono'; id: string; fecha: string; monto: number; anulado: boolean; nota: string | null; por: string | null; metodo?: string }[]
+}
+export interface EnvasesClientes {
+  total: number
+  clientes: { id: string; nombre: string; vendedorId: string | null; total: number; envases: { productoId: string; sabor: string; envase: string | null; prestados: number }[] }[]
+  productos: { productoId: string; sabor: string; envase: string | null; prestados: number }[]
+}
+export interface CuentaEnvases {
+  cliente: { id: string; nombre: string }
+  total: number
+  envases: { productoId: string; sabor: string; envase: string | null; entregados: number; recogidos: number; prestados: number }[]
+  recogidas: { id: string; fecha: string; cantidad: number; sabor: string; nota: string | null; anulada: boolean; por: string | null }[]
+}
+export interface FilaCorte {
+  id: string; fecha: string; vendedorId: string; vendedor: string
+  esperado: number; transferencias: number; credito: number
+  entregado: number | null; diferencia: number | null; nota: string | null
+  estado: 'sin_corte' | 'pendiente' | 'confirmado'
+  confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
+}
+export interface MiMeta { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null; comisionPct: number; comision: number }
+export interface MesCierre { mes: string; estado: 'abierto' | 'cerrado' | 'reabierto'; actual: boolean; cerradoEn: string | null }
+export interface CifrasMes {
+  mes: string; desde: string; hasta: string
+  ventas: { ingreso: number; costo: number; utilidad: number; margenPct: number | null; pedidos: number; clientes: number; porUnidad: Record<string, number> }
+  cobro: { efectivo: number; transferencia: number; credito: number }
+  abonos: { efectivo: number; transferencia: number; total: number }
+  porCobrar: { saldo: number; clientes: number }
+  envases: { prestados: number; clientes: number }
+  vendedores: { id: string; nombre: string; activo: boolean; ventas: number; utilidad: number; pedidos: number; efectivo: number; transferencia: number; credito: number; abonos: number; comisionPct: number; comision: number; meta: number | null; cumplimientoPct: number | null }[]
+  cortes: { dias: number; confirmados: number; pendientes: number; sinCorte: number; diferencia: number; detalle: { fecha: string; vendedor: string; esperado: number; entregado: number; diferencia: number; estado: string }[] }
+}
+export interface InformeMes {
+  mes: string
+  estado: 'abierto' | 'cerrado' | 'reabierto'
+  cerradoEn: string | null
+  historial: { accion: 'cerrado' | 'reabierto'; por: string; en: string; motivo?: string }[]
+  cifras: CifrasMes
+}
+
+// Una consulta al servidor que se puede repetir (después de registrar algo).
+export function useServidor<T>(ruta: string | null) {
+  const [datos, setDatos] = useState<T | null>(null)
+  const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(!!ruta)
+  const cargar = useCallback(() => {
+    if (!ruta) return
+    setCargando(true)
+    llamarAutenticado<T>(ruta)
+      .then((d) => { setDatos(d); setError('') })
+      .catch((e) => setError(e instanceof Error ? e.message : 'No se pudo cargar'))
+      .finally(() => setCargando(false))
+  }, [ruta])
+  useEffect(() => { setDatos(null); cargar() }, [cargar])
+  return { datos, error, cargando, recargar: cargar }
+}
+
+const enviar = <T>(ruta: string, cuerpo?: unknown) => llamarAutenticado<T>(ruta, { metodo: 'POST', cuerpo: cuerpo ?? {} })
+
+export const registrarAbono = (b: { clienteId: string; monto: number; metodo: 'efectivo' | 'transferencia'; nota?: string }) => enviar<{ id: string; saldo: number }>('/cobranza/abonos', b)
+export const anularAbono = (id: string, motivo: string) => enviar(`/cobranza/abonos/${id}/anular`, { motivo })
+export const registrarRecogida = (b: { clienteId: string; productoId: string; cantidad: number; nota?: string }) => enviar<{ id: string; prestados: number }>('/envases/recogidas', b)
+export const anularRecogida = (id: string) => enviar(`/envases/recogidas/${id}/anular`)
+export const entregarCorte = (b: { efectivoEntregado: number; nota?: string; fecha?: string; vendedorId?: string }) => enviar<{ id: string; esperado: number; entregado: number; diferencia: number }>('/cortes', b)
+export const confirmarCorte = (id: string, nota?: string) => enviar<{ ok: true; esperado: number; diferencia: number }>(`/cortes/${id}/confirmar`, { nota })
+export const cerrarMes = (mes: string) => enviar(`/cierres/${mes}/cerrar`)
+export const reabrirMes = (mes: string, motivo: string) => enviar(`/cierres/${mes}/reabrir`, { motivo })
+
+export interface PrecioCliente { productoId: string; sabor: string; unidad: string; lista: number; precioLitro: number | null }
+export const guardarPrecios = (clienteId: string, precios: { productoId: string; precioLitro: number | null }[]) =>
+  llamarAutenticado<{ precios: PrecioCliente[] }>(`/clientes/${clienteId}/precios`, { metodo: 'PUT', cuerpo: { precios } })
+
+// El informe mensual: el Excel lo arma el servidor; el PDF, este equipo con las mismas cifras (se abre en la vista previa).
+export async function exportarInforme(informe: InformeMes, formato: 'pdf' | 'xlsx'): Promise<void> {
+  const nombre = `informe-mensual-${informe.mes}.${formato}`
+  if (formato === 'xlsx') {
+    descargarArchivo(await descargarAutenticado(`/cierres/${informe.mes}/informe?formato=xlsx`), nombre)
+    return
+  }
+  const pdf = await import('./reportePdf')
+  await pdf.prepararLogoPdf()
+  mostrarPdf(pdf.informeMensualPdf(informe), nombre)
+}
+
+export const textoMes = (mes: string) => {
+  const [a, m] = mes.split('-').map(Number)
+  const t = new Date(a, m - 1, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}

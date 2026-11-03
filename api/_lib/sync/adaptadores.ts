@@ -66,7 +66,7 @@ const productos: Adaptador<ProductoWire> = {
       const pres = num(r.presentacion_litros)
       return {
         wire: {
-          id: r.id_producto, sabor: r.sabor, descripcion: r.descripcion ?? undefined, presentacion: pres, unidad: r.unidad, envase: r.envase ?? undefined,
+          id: r.id_producto, sabor: r.sabor, descripcion: r.descripcion ?? undefined, presentacion: pres, unidad: r.unidad, envase: r.envase ?? undefined, retornable: r.retornable,
           precio_litro: dinero(num(r.precio_unitario) / pres),
           costo_litro: dinero(num(r.costo_produccion) / pres), color_hex: r.color_hex, disponible: r.disponible, version: r.version,
         },
@@ -83,16 +83,17 @@ const productos: Adaptador<ProductoWire> = {
     const pres = ex ? (ex.extra?.presentacion as number) : dinero(w.presentacion ?? 1)
     if (!ex) {
       await c.query(
-        `INSERT INTO productos (id_producto, sabor, descripcion, presentacion_litros, precio_unitario, costo_produccion, color_hex, disponible, unidad, envase)
-         VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, $9, NULLIF($10, ''))`,
-        [w.id, w.sabor, w.descripcion ?? null, pres, dinero(w.precio_litro * pres), dinero(w.costo_litro * pres), w.color_hex, w.disponible, w.unidad ?? 'L', w.envase ?? null],
+        `INSERT INTO productos (id_producto, sabor, descripcion, presentacion_litros, precio_unitario, costo_produccion, color_hex, disponible, unidad, envase, retornable)
+         VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, $9, NULLIF($10, ''), $11)`,
+        [w.id, w.sabor, w.descripcion ?? null, pres, dinero(w.precio_litro * pres), dinero(w.costo_litro * pres), w.color_hex, w.disponible, w.unidad ?? 'L', w.envase ?? null, w.retornable ?? false],
       )
     } else {
       await c.query(
         `UPDATE productos SET sabor = $2, precio_unitario = $3, costo_produccion = $4, color_hex = $5, disponible = $6,
-                descripcion = CASE WHEN $7::boolean THEN NULLIF($8, '') ELSE descripcion END
+                descripcion = CASE WHEN $7::boolean THEN NULLIF($8, '') ELSE descripcion END,
+                retornable = coalesce($9::boolean, retornable)
           WHERE id_producto = $1`,
-        [w.id, w.sabor, dinero(w.precio_litro * pres), dinero(w.costo_litro * pres), w.color_hex, w.disponible, w.descripcion !== undefined, w.descripcion ?? null],
+        [w.id, w.sabor, dinero(w.precio_litro * pres), dinero(w.costo_litro * pres), w.color_hex, w.disponible, w.descripcion !== undefined, w.descripcion ?? null, w.retornable ?? null],
       )
     }
   },
@@ -114,13 +115,23 @@ const clientes: Adaptador<ClienteWire> = {
         ORDER BY c.actualizado_en, c.id_cliente ${f.bloquear ? 'FOR UPDATE' : ''}`,
       [f.id ?? null, f.desde ?? null, f.vendedor ?? null],
     )
+    // Sus precios especiales (precios_cliente), por unidad como el catálogo.
+    const { rows: esp } = rows.length
+      ? await c.query(
+          `SELECT pc.id_cliente, pc.id_producto, (pc.precio_unitario / pr.presentacion_litros)::float8 AS precio
+             FROM precios_cliente pc JOIN productos pr USING (id_producto) WHERE pc.id_cliente = ANY($1::uuid[])`,
+          [rows.map((r) => r.id_cliente)],
+        )
+      : { rows: [] }
+    const precios = new Map<string, Record<string, number>>()
+    for (const e of esp) (precios.get(e.id_cliente) ?? precios.set(e.id_cliente, {}).get(e.id_cliente)!)[e.id_producto] = dinero(e.precio)
     return rows.map((r) => ({
       wire: {
         id: r.id_cliente, nombre: r.nombre, direccion: r.direccion, notas: r.referencias ?? undefined,
         latitud: num(r.latitud), longitud: num(r.longitud), telefono: r.telefono ?? '',
         frecuencia: r.frecuencia_tipo === 'intervalo' ? { tipo: 'intervalo' as const, cada: r.cada_dias } : { tipo: 'semana' as const, dias: r.dias_semana },
         ventana: r.ventana_horario === 'tarde' ? ('TARDE' as const) : ('MAÑANA' as const),
-        qr_uuid: r.qr_uuid, nfc_uid: r.nfc_uid ?? undefined, activo: r.activo,
+        qr_uuid: r.qr_uuid, nfc_uid: r.nfc_uid ?? undefined, ...(precios.has(r.id_cliente) ? { precios: precios.get(r.id_cliente) } : {}), activo: r.activo,
         creado: r.creado_ms, actualizado: r.act_ms, vendedorId: r.id_vendedor ?? undefined, version: r.version,
       },
       version: r.version, actualizadoMs: r.act_ms, actualizadoUs: r.act_us, final: false, dueno: r.id_vendedor,
@@ -236,7 +247,7 @@ const pedidos: Adaptador<PedidoWire> = {
         id: r.id_pedido, clienteId: r.id_cliente, fecha: r.fecha,
         estado: r.estado === 'entregado' ? ('ENTREGADO' as const) : r.estado === 'pendiente' || r.estado === 'en_camino' ? ('PENDIENTE' as const) : ('OMITIDO' as const),
         items: porPedido.get(r.id_pedido) ?? [], total: num(r.total),
-        metodo_pago: r.metodo_pago ? (r.metodo_pago === 'efectivo' ? ('EFECTIVO' as const) : ('TRANSFERENCIA' as const)) : undefined,
+        metodo_pago: r.metodo_pago ? (({ efectivo: 'EFECTIVO', transferencia: 'TRANSFERENCIA', credito: 'CREDITO' }) as const)[r.metodo_pago as 'efectivo' | 'transferencia' | 'credito'] : undefined,
         orden_ruta: r.orden_ruta ?? undefined, urgente: r.urgente, fecha_entregado_real: r.entregado_ms ?? undefined,
         creado: r.creado_ms, actualizado: r.act_ms, vendedorId: r.id_vendedor ?? undefined, version: r.version,
       },

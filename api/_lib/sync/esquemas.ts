@@ -21,6 +21,7 @@ export const clienteWire = z.object({
   ventana: z.enum(['MAÑANA', 'TARDE']),
   qr_uuid: z.uuid(),
   nfc_uid: texto(64).optional(),
+  precios: z.record(z.uuid(), z.number()).optional(), // precio especial por producto (por unidad); sólo baja del servidor, lo que suba se ignora
   activo: z.boolean(),
   creado: ms,
   actualizado: ms,
@@ -35,6 +36,7 @@ export const productoWire = z.object({
   presentacion: z.number().min(0.01).max(999).optional(), // contenido de cada envase en `unidad` (RF-032); sólo cuenta al crearlo
   unidad: texto(10).min(1).optional(), // L (por omisión), kg, pz…; sólo cuenta al crearlo
   envase: texto(30).nullable().optional(), // frasco, garrafon, bolsa…; sólo cuenta al crearlo
+  retornable: z.boolean().optional(), // el cliente devuelve el envase: se lleva su saldo (sin dato, no cambia)
   precio_litro: z.number().positive().max(99999999),
   costo_litro: z.number().min(0).max(99999999),
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
@@ -51,7 +53,7 @@ export const pedidoWire = z.object({
     .array(z.object({ productoId: z.uuid(), litros: z.number().positive().max(100000), precio_litro: z.number().min(0).max(99999999) }))
     .max(100),
   total: z.number().min(0).optional(),
-  metodo_pago: z.enum(['EFECTIVO', 'TRANSFERENCIA']).optional(),
+  metodo_pago: z.enum(['EFECTIVO', 'TRANSFERENCIA', 'CREDITO']).optional(),
   orden_ruta: z.number().int().min(0).max(32000).optional(),
   urgente: z.boolean().optional(), // lo marca el administrador (RF-054); si no viene, se conserva el valor del servidor
   fecha_entregado_real: ms.optional(),

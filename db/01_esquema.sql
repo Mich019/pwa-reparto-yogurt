@@ -22,7 +22,7 @@ CREATE TYPE rol_usuario      AS ENUM ('administrador', 'vendedor');
 CREATE TYPE ventana_horario  AS ENUM ('manana', 'tarde');
 CREATE TYPE tipo_frecuencia  AS ENUM ('dias_semana', 'intervalo');
 CREATE TYPE estado_pedido    AS ENUM ('pendiente', 'en_camino', 'entregado', 'omitido', 'cancelado');
-CREATE TYPE metodo_pago      AS ENUM ('efectivo', 'transferencia');
+CREATE TYPE metodo_pago      AS ENUM ('efectivo', 'transferencia', 'credito');
 CREATE TYPE estado_recordatorio AS ENUM ('pendiente', 'atendido', 'descartado');
 CREATE TYPE estado_sync      AS ENUM ('aplicada', 'conflicto', 'rechazada');
 
@@ -81,6 +81,8 @@ CREATE TABLE usuarios (
   activo                boolean NOT NULL DEFAULT true,      -- RF-040
   debe_cambiar_password boolean NOT NULL DEFAULT false,     -- RF-039 restablecimiento manual
   es_plataforma         boolean NOT NULL DEFAULT false,     -- entra a /plataforma (con verificación en dos pasos)
+  comision_pct          numeric(5, 2) NOT NULL DEFAULT 0,   -- % de comisión sobre lo vendido (022_precios_y_metas.sql)
+  meta_mensual          numeric(12, 2),                     -- meta de venta del mes; null = sin meta
   password_cambiado_en  timestamptz NOT NULL DEFAULT now(), -- RF-003: los intentos fallidos de antes ya no cuentan
   ultimo_acceso         timestamptz,
   creado_en             timestamptz NOT NULL DEFAULT now(),
@@ -88,6 +90,8 @@ CREATE TABLE usuarios (
   version               integer NOT NULL DEFAULT 1,
   CONSTRAINT usuarios_correo_formato CHECK (correo ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%'),
+  CONSTRAINT usuarios_comision_rango CHECK (comision_pct BETWEEN 0 AND 100),
+  CONSTRAINT usuarios_meta_positiva CHECK (meta_mensual IS NULL OR meta_mensual > 0),
   CONSTRAINT usuarios_empresa_id UNIQUE (id_empresa, id_usuario)
 );
 -- Único en todo el sistema: el correo dice a qué empresa se entra (cada cuenta es de una sola empresa).
@@ -271,6 +275,7 @@ CREATE TABLE productos (
   presentacion_litros numeric(5, 2) NOT NULL DEFAULT 1,         -- RF-032: contenido de cada envase, en `unidad`
   unidad              varchar(10) NOT NULL DEFAULT 'L',         -- L, kg, pz… (catálogo flexible)
   envase              varchar(30),                              -- frasco, garrafon, bolsa…; vacío = sin envase propio
+  retornable          boolean NOT NULL DEFAULT false,           -- el cliente lo devuelve: se lleva su saldo de envases (021_envases.sql)
   precio_unitario     numeric(10, 2) NOT NULL,                  -- RF-033 precio por presentación
   costo_produccion    numeric(10, 2) NOT NULL DEFAULT 0,        -- RF-034
   color_hex           char(7) NOT NULL DEFAULT '#f472b6',       -- color de la tarjeta en la app
@@ -517,10 +522,14 @@ CREATE TRIGGER recordatorios_actualizacion   BEFORE UPDATE ON recordatorios   FO
 CREATE FUNCTION fn_detalle_precios() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-  SELECT coalesce(NEW.precio_unitario, p.precio_unitario),
+  -- El precio especial del cliente (precios_cliente) gana al del catálogo.
+  SELECT coalesce(NEW.precio_unitario, pc.precio_unitario, p.precio_unitario),
          coalesce(NEW.costo_unitario, p.costo_produccion)
     INTO NEW.precio_unitario, NEW.costo_unitario
-    FROM productos p WHERE p.id_producto = NEW.id_producto;
+    FROM productos p
+    LEFT JOIN pedidos pe ON pe.id_pedido = NEW.id_pedido
+    LEFT JOIN precios_cliente pc ON pc.id_cliente = pe.id_cliente AND pc.id_producto = p.id_producto
+   WHERE p.id_producto = NEW.id_producto;
   RETURN NEW;
 END $$;
 CREATE TRIGGER detalle_precios BEFORE INSERT ON detalle_pedido
@@ -605,6 +614,145 @@ CREATE TRIGGER pedidos_auditoria AFTER DELETE ON pedidos
   FOR EACH ROW EXECUTE FUNCTION fn_auditar('id_pedido');
 
 -- =============================================================================
+-- M11 · Cobranza, cortes, envases retornables y precios por cliente (018 a 022)
+-- =============================================================================
+-- Fiado: lo que un cliente abona a su cuenta (los pedidos entregados «a crédito» suman a lo que debe; los abonos lo bajan).
+-- No se borran: un abono mal capturado se anula con motivo y deja de contar.
+CREATE TABLE abonos (
+  id_abono         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  id_cliente       uuid NOT NULL REFERENCES clientes (id_cliente) ON DELETE RESTRICT,
+  id_vendedor      uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,   -- quién lo cobró
+  fecha            date NOT NULL,
+  monto            numeric(10, 2) NOT NULL,
+  metodo           varchar(15) NOT NULL,
+  nota             varchar(200),
+  anulado_en       timestamptz,
+  anulado_por      uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
+  motivo_anulacion varchar(200),
+  creado_en        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT abonos_monto_positivo CHECK (monto > 0),
+  CONSTRAINT abonos_metodo_valido CHECK (metodo IN ('efectivo', 'transferencia')),
+  CONSTRAINT abonos_cliente_misma_empresa FOREIGN KEY (id_empresa, id_cliente) REFERENCES clientes (id_empresa, id_cliente),
+  CONSTRAINT abonos_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
+);
+CREATE INDEX abonos_cliente ON abonos (id_cliente, fecha DESC);
+CREATE INDEX abonos_fecha ON abonos (id_empresa, fecha);
+CREATE INDEX pedidos_credito ON pedidos (id_cliente) WHERE metodo_pago = 'credito';
+-- Corte del día: cuánto efectivo debía entregar cada vendedor (lo cobrado en efectivo: ventas y abonos) contra lo que dice
+-- que entrega; el administrador lo confirma. La diferencia queda a la vista. Uno por vendedor y día; mientras esté
+-- pendiente el vendedor lo puede corregir.
+CREATE TABLE cortes_dia (
+  id_corte           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  fecha              date NOT NULL,
+  id_vendedor        uuid NOT NULL REFERENCES usuarios (id_usuario) ON DELETE RESTRICT,
+  efectivo_esperado  numeric(12, 2) NOT NULL,
+  transferencias     numeric(12, 2) NOT NULL DEFAULT 0,
+  credito            numeric(12, 2) NOT NULL DEFAULT 0,
+  efectivo_entregado numeric(12, 2) NOT NULL,
+  diferencia         numeric(12, 2) GENERATED ALWAYS AS (efectivo_entregado - efectivo_esperado) STORED,
+  nota               varchar(300),
+  estado             varchar(12) NOT NULL DEFAULT 'pendiente',
+  confirmado_por     uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
+  confirmado_en      timestamptz,
+  nota_admin         varchar(300),
+  creado_en          timestamptz NOT NULL DEFAULT now(),
+  actualizado_en     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT cortes_estado_valido CHECK (estado IN ('pendiente', 'confirmado')),
+  CONSTRAINT cortes_entregado_no_negativo CHECK (efectivo_entregado >= 0 AND efectivo_esperado >= 0),
+  CONSTRAINT cortes_unico_por_dia UNIQUE (id_empresa, fecha, id_vendedor),
+  CONSTRAINT cortes_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
+);
+CREATE INDEX cortes_dia_fecha ON cortes_dia (id_empresa, fecha);
+
+-- Cierre de mes: congela las cifras del mes (cifras = foto al cerrar) y bloquea sus correcciones. Reabrirlo exige un
+-- motivo; todo queda en historial. Una fila por mes (mes = primer día).
+CREATE TABLE cierres_mes (
+  id_cierre         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  mes               date NOT NULL,
+  estado            varchar(10) NOT NULL,
+  cifras            jsonb NOT NULL,
+  cerrado_por       uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
+  cerrado_en        timestamptz NOT NULL DEFAULT now(),
+  historial         jsonb NOT NULL DEFAULT '[]',
+  CONSTRAINT cierres_estado_valido CHECK (estado IN ('cerrado', 'reabierto')),
+  CONSTRAINT cierres_mes_primer_dia CHECK (mes = date_trunc('month', mes)::date),
+  CONSTRAINT cierres_unico_por_mes UNIQUE (id_empresa, mes)
+);
+
+-- Un mes cerrado no admite cambios a sus ventas ni a sus abonos (hasta reabrirlo). En los pedidos sólo cuentan los
+-- cambios que mueven cifras (cliente, fecha, estado, total, forma de pago): reasignar al vendedor no.
+CREATE FUNCTION fn_revisar_mes_cerrado(fechas date[]) RETURNS void
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+  f date;
+BEGIN
+  FOREACH f IN ARRAY fechas LOOP
+    IF EXISTS (SELECT 1 FROM cierres_mes WHERE estado = 'cerrado' AND mes = date_trunc('month', f)::date) THEN
+      RAISE EXCEPTION 'El mes de % ya está cerrado: reábrelo para corregirlo', to_char(f, 'YYYY-MM') USING ERRCODE = 'P0001';
+    END IF;
+  END LOOP;
+END $$;
+CREATE FUNCTION fn_pedidos_mes_cerrado() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND (OLD.fecha, OLD.estado, OLD.total, OLD.metodo_pago, OLD.id_cliente) IS NOT DISTINCT FROM (NEW.fecha, NEW.estado, NEW.total, NEW.metodo_pago, NEW.id_cliente) THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[OLD.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[NEW.fecha]); END IF;
+  RETURN coalesce(NEW, OLD);
+END $$;
+CREATE FUNCTION fn_abonos_mes_cerrado() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND (OLD.fecha, OLD.monto, OLD.id_cliente) IS NOT DISTINCT FROM (NEW.fecha, NEW.monto, NEW.id_cliente) THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[OLD.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[NEW.fecha]); END IF;
+  RETURN coalesce(NEW, OLD);
+END $$;
+CREATE TRIGGER pedidos_mes_cerrado BEFORE INSERT OR UPDATE OR DELETE ON pedidos FOR EACH ROW EXECUTE FUNCTION fn_pedidos_mes_cerrado();
+CREATE TRIGGER abonos_mes_cerrado BEFORE INSERT OR UPDATE OR DELETE ON abonos FOR EACH ROW EXECUTE FUNCTION fn_abonos_mes_cerrado();
+-- Envases retornables: cuáles productos lo son y los envases que el cliente devuelve. Lo que tiene prestado un cliente de
+-- un producto = lo entregado (pedidos entregados) − lo recogido (esta tabla, sin las anuladas).
+CREATE TABLE envases_recogidos (
+  id_recogida      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  id_cliente       uuid NOT NULL REFERENCES clientes (id_cliente) ON DELETE RESTRICT,
+  id_producto      uuid NOT NULL REFERENCES productos (id_producto) ON DELETE RESTRICT,
+  id_vendedor      uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
+  fecha            date NOT NULL,
+  cantidad         integer NOT NULL,
+  nota             varchar(200),
+  anulado_en       timestamptz,
+  creado_en        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT recogidos_cantidad_positiva CHECK (cantidad > 0),
+  CONSTRAINT recogidos_cliente_misma_empresa FOREIGN KEY (id_empresa, id_cliente) REFERENCES clientes (id_empresa, id_cliente),
+  CONSTRAINT recogidos_producto_misma_empresa FOREIGN KEY (id_empresa, id_producto) REFERENCES productos (id_empresa, id_producto),
+  CONSTRAINT recogidos_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
+);
+CREATE INDEX envases_recogidos_cliente ON envases_recogidos (id_cliente, id_producto);
+-- Precio especial por cliente (p. ej. mayoreo): reemplaza al del catálogo en sus pedidos nuevos. Por envase, igual que
+-- detalle_pedido.precio_unitario. Metas y comisión por vendedor: meta de venta del mes y % sobre lo vendido.
+CREATE TABLE precios_cliente (
+  id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
+  id_cliente      uuid NOT NULL REFERENCES clientes (id_cliente) ON DELETE CASCADE,
+  id_producto     uuid NOT NULL REFERENCES productos (id_producto) ON DELETE CASCADE,
+  precio_unitario numeric(10, 2) NOT NULL,
+  actualizado_en  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (id_cliente, id_producto),
+  CONSTRAINT precios_cliente_positivo CHECK (precio_unitario > 0),
+  CONSTRAINT precios_cliente_misma_empresa FOREIGN KEY (id_empresa, id_cliente) REFERENCES clientes (id_empresa, id_cliente),
+  CONSTRAINT precios_producto_misma_empresa FOREIGN KEY (id_empresa, id_producto) REFERENCES productos (id_empresa, id_producto)
+);
+CREATE INDEX precios_cliente_empresa ON precios_cliente (id_empresa);
+
+
+-- =============================================================================
 -- Multiempresa · Rol de la API y reglas por filas (RLS)
 -- =============================================================================
 -- La API corre cada petición con sesión con el rol reparto_app (SET LOCAL ROLE) y app.id_empresa fijado
@@ -642,7 +790,8 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY['empresas', 'usuarios', 'clientes', 'productos', 'stock_diario', 'produccion_diaria', 'pedidos',
                            'detalle_pedido', 'recordatorios', 'auditoria', 'operaciones_sync', 'eliminaciones',
-                           'retiros_vendedor', 'suscripciones_push', 'notificaciones', 'invitaciones'] LOOP
+                           'retiros_vendedor', 'suscripciones_push', 'notificaciones', 'invitaciones', 'abonos', 'cortes_dia',
+                           'cierres_mes', 'envases_recogidos', 'precios_cliente'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('CREATE POLICY por_empresa ON %I TO reparto_app USING (%s) WITH CHECK (%s)', t, regla, regla);
   END LOOP;

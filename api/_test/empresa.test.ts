@@ -21,12 +21,12 @@ describe('marca de la empresa', () => {
 
     const r = await cambiar(admin, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO })
     assert.equal(r.status, 200)
-    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null })
+    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City' })
     assert.deepEqual((await get(vend, '/empresa')).body, r.body)
-    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null })
+    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City' })
 
     // Cambiar sólo una cosa deja las demás; null quita el logo.
-    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null })
+    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City' })
   })
 
   it('lema y contacto: se guardan sin espacios de sobra y vacíos se quitan', async () => {

@@ -193,7 +193,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
       {comparar && <p className="mt-2 text-xs text-apagado">Los cambios son frente {ANTERIOR[vista]}.</p>}
       {!sinVentas && (
         <p className="mt-1 text-xs text-apagado">
-          Efectivo {dinero(r.efectivo)} · Transferencia {dinero(r.transferencia)}{r.ticketPromedio !== null && ` · Ticket promedio ${dinero(r.ticketPromedio)}`}
+          Efectivo {dinero(r.efectivo)} · Transferencia {dinero(r.transferencia)}{(r.credito ?? 0) > 0 && ` · Fiado ${dinero(r.credito ?? 0)}`}{r.ticketPromedio !== null && ` · Ticket promedio ${dinero(r.ticketPromedio)}`}
         </p>
       )}
 
@@ -239,7 +239,6 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
           <div className="mt-7 grid gap-x-8 lg:grid-cols-2">
             <section>
               <h2 className="text-2xl font-bold tracking-tight">Sabores</h2>
-              <p className="text-xs text-apagado">Del que más vendió al que menos. La utilidad usa el costo de cuando se vendió.</p>
               {estrella && menor && estrella.id !== menor.id && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-niebla p-3">
@@ -291,7 +290,6 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
 
             <section className="mt-7 lg:mt-0">
               <h2 className="text-2xl font-bold tracking-tight">Vendedores</h2>
-              <p className="text-xs text-apagado">Rendimiento en el periodo, de más a menos ingresos.</p>
               <div className="mt-2 divide-y divide-linea">
                 {reporte.vendedores.map((v) => (
                   <div key={v.id ?? 'sin'} className="flex items-center gap-3 py-3">
