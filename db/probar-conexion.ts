@@ -60,7 +60,13 @@ try {
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'empresas' AND column_name = 'lema') AS m013,
               to_regclass('public.plataforma_ajustes') IS NOT NULL AS m014,
               to_regclass('public.avisos_plataforma') IS NOT NULL AS m015,
-              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'avisos_plataforma' AND column_name = 'por_correo') AS m016`,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'avisos_plataforma' AND column_name = 'por_correo') AS m016,
+              to_regclass('public.limites_peticion') IS NOT NULL AS m017,
+              EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'metodo_pago' AND e.enumlabel = 'credito') AS m018,
+              to_regclass('public.abonos') IS NOT NULL AS m019,
+              to_regclass('public.cierres_mes') IS NOT NULL AS m020,
+              to_regclass('public.envases_recogidos') IS NOT NULL AS m021,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'comision_pct') AS m022`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')
