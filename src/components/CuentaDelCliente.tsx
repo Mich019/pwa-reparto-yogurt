@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Boxes, ChevronRight, HandCoins } from 'lucide-react'
 import { anularAbono, registrarAbono, registrarRecogida, useServidor, type CuentaCliente, type CuentaEnvases } from '../lib/cobranza'
 import { dinero, textoFecha } from '../lib/fechas'
@@ -144,4 +144,15 @@ export function HojaEnvases({ cuenta, onCerrar, onHecho }: { cuenta: CuentaEnvas
       </div>
     </Hoja>
   )
+}
+
+// Abre la hoja de un cliente con sus datos al día (los trae del servidor al abrirla).
+export function CuentaAbierta({ tipo, clienteId, onCerrar, onHecho }: { tipo: 'abono' | 'envases'; clienteId: string; onCerrar: () => void; onHecho: () => void }) {
+  const abono = useServidor<CuentaCliente>(tipo === 'abono' ? `/cobranza/clientes/${clienteId}` : null)
+  const envases = useServidor<CuentaEnvases>(tipo === 'envases' ? `/envases/clientes/${clienteId}` : null)
+  const error = abono.error || envases.error
+  useEffect(() => { if (error) { aviso(error); onCerrar() } }, [error]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (tipo === 'abono' && abono.datos) return <HojaAbono cuenta={abono.datos} onCerrar={onCerrar} onHecho={onHecho} />
+  if (tipo === 'envases' && envases.datos) return <HojaEnvases cuenta={envases.datos} onCerrar={onCerrar} onHecho={onHecho} />
+  return null
 }

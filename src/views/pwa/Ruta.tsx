@@ -481,7 +481,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
             <div className="pb-1 text-apagado">¿Qué sigue con <b className="text-tinta">{clientePost.nombre}</b>?</div>
             <OpcionGrande destacada icono={<ShoppingBag size={26} />} titulo="Realizar nuevo pedido" sub="Agendar su siguiente visita" onClick={() => setPaso('nuevo')} />
             {postEntrega && clientePost.telefono.trim() && (
-              <OpcionGrande icono={<MessageCircle size={26} />} titulo="Enviar comprobante" sub="Por WhatsApp, con lo que se le entregó"
+              <OpcionGrande icono={<MessageCircle size={26} />} titulo="Enviar comprobante" sub="Por WhatsApp"
                 onClick={() => window.open(enlaceComprobante(clientePost, postEntrega, productos, marcaActual()?.nombre), '_blank', 'noopener')} />
             )}
             <OpcionGrande icono={<Clock size={26} />} titulo="Recordar más tarde" sub="Te aviso para escribirle o llamarle" onClick={recordarMasTarde} />

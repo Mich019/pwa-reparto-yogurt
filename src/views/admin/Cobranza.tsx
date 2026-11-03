@@ -1,15 +1,15 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, entregarCorte, exportarInforme, reabrirMes, textoMes, useServidor,
-  type CuentaCliente, type CuentaEnvases, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
+  type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
 } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { textoPorUnidad } from '../../lib/unidades'
 import { usePaginas } from '../../components/Paginas'
-import { HojaAbono, HojaEnvases } from '../../components/CuentaDelCliente'
+import { CuentaAbierta } from '../../components/CuentaDelCliente'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
-import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
+import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
 
 // Cobranza del panel: quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
 // informe. Todo viene del servidor y necesita conexión.
@@ -29,7 +29,7 @@ export function Cobranza() {
       <Encabezado titulo="Cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">
         <div className={grupoPanel} role="group" aria-label="Apartado">
           {PARTES.map((p) => (
-            <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={parte === p.id ? botonPanel : botonPanelSuave}>{p.texto}</button>
+            <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={`${parte === p.id ? botonPanel : botonPanelSuave} max-sm:px-3`}>{p.texto}</button>
           ))}
         </div>
       </Encabezado>
@@ -81,17 +81,6 @@ function PorCobrar() {
       {abierto && <CuentaAbierta tipo="abono" clienteId={abierto} onCerrar={() => setAbierto(null)} onHecho={lista.recargar} />}
     </Estado>
   )
-}
-
-// Abre la hoja de un cliente con sus datos al día (los trae del servidor al abrirla).
-function CuentaAbierta({ tipo, clienteId, onCerrar, onHecho }: { tipo: 'abono' | 'envases'; clienteId: string; onCerrar: () => void; onHecho: () => void }) {
-  const abono = useServidor<CuentaCliente>(tipo === 'abono' ? `/cobranza/clientes/${clienteId}` : null)
-  const envases = useServidor<CuentaEnvases>(tipo === 'envases' ? `/envases/clientes/${clienteId}` : null)
-  const error = abono.error || envases.error
-  useEffect(() => { if (error) { aviso(error); onCerrar() } }, [error]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (tipo === 'abono' && abono.datos) return <HojaAbono cuenta={abono.datos} onCerrar={onCerrar} onHecho={onHecho} />
-  if (tipo === 'envases' && envases.datos) return <HojaEnvases cuenta={envases.datos} onCerrar={onCerrar} onHecho={onHecho} />
-  return null
 }
 
 // ---- Envases
@@ -256,22 +245,25 @@ function DetalleMes({ mes, actual, onCambio }: { mes: string; actual: boolean; o
     <Estado cargando={informe.cargando && !i} error={informe.error}>
       {i && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="mr-auto text-2xl font-semibold">{textoMes(mes)}</h2>
-            <span className="text-sm text-apagado">{i.estado === 'cerrado' ? `Cerrado el ${textoFecha((i.cerradoEn ?? '').slice(0, 10)).toLowerCase()}` : actual ? 'Mes en curso' : ETIQUETA_MES[i.estado]}</span>
-            <Separador />
-            <button onClick={() => exportar('pdf')} disabled={!!exportando} className={botonPanelSuave}><FileText size={16} aria-hidden="true" />PDF</button>
-            <button onClick={() => exportar('xlsx')} disabled={!!exportando} className={botonPanelSuave}><FileSpreadsheet size={16} aria-hidden="true" />Excel</button>
-            {i.estado === 'cerrado'
-              ? <button onClick={() => setHoja('reabrir')} className={botonPanelSuave}><LockOpen size={16} aria-hidden="true" />Reabrir</button>
-              : !actual && <button onClick={() => setHoja('cerrar')} className={botonPanel}><Lock size={16} aria-hidden="true" />Cerrar mes</button>}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <div>
+              <h2 className="text-2xl font-semibold">{textoMes(mes)}</h2>
+              <p className="text-sm text-apagado">{i.estado === 'cerrado' ? `Cerrado el ${textoFecha((i.cerradoEn ?? '').slice(0, 10)).toLowerCase()}` : actual ? 'Mes en curso' : ETIQUETA_MES[i.estado]}</p>
+            </div>
+            <div className="flex gap-2 max-sm:w-full [&>*]:max-sm:grow">
+              <button onClick={() => exportar('pdf')} disabled={!!exportando} className={botonPanelSuave}><FileText size={16} aria-hidden="true" />PDF</button>
+              <button onClick={() => exportar('xlsx')} disabled={!!exportando} className={botonPanelSuave}><FileSpreadsheet size={16} aria-hidden="true" />Excel</button>
+              {i.estado === 'cerrado'
+                ? <button onClick={() => setHoja('reabrir')} className={botonPanelSuave}><LockOpen size={16} aria-hidden="true" />Reabrir</button>
+                : !actual && <button onClick={() => setHoja('cerrar')} className={botonPanel}><Lock size={16} aria-hidden="true" />Cerrar mes</button>}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Dato titulo="Ventas" valor={dinero(i.cifras.ventas.ingreso)} detalle={`${i.cifras.ventas.pedidos} pedidos · ${i.cifras.ventas.clientes} clientes`} />
+            <Dato titulo="Ventas" valor={dinero(i.cifras.ventas.ingreso)} detalle={`${i.cifras.ventas.pedidos} pedidos${textoPorUnidad(i.cifras.ventas.porUnidad) ? ` · ${textoPorUnidad(i.cifras.ventas.porUnidad)}` : ''}`} />
             <Dato titulo="Utilidad" valor={dinero(i.cifras.ventas.utilidad)} detalle={i.cifras.ventas.margenPct === null ? undefined : `Margen ${i.cifras.ventas.margenPct.toLocaleString('es-MX', { maximumFractionDigits: 1 })}%`} />
             <Dato titulo="Por cobrar" valor={dinero(i.cifras.porCobrar.saldo)} detalle={`${i.cifras.porCobrar.clientes} ${i.cifras.porCobrar.clientes === 1 ? 'cliente' : 'clientes'}`} />
-            <Dato titulo="Envases prestados" valor={String(i.cifras.envases.prestados)} detalle={textoPorUnidad(i.cifras.ventas.porUnidad)} />
+            <Dato titulo="Envases prestados" valor={String(i.cifras.envases.prestados)} detalle={`${i.cifras.envases.clientes} ${i.cifras.envases.clientes === 1 ? 'cliente' : 'clientes'}`} />
           </div>
 
           <section>
