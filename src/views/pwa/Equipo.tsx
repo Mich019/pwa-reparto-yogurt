@@ -341,6 +341,8 @@ function FormMiembro({ miembro, esYo, onCerrar, onClave }: { miembro?: Miembro; 
   const [correo, setCorreo] = useState(miembro?.correo ?? '')
   const [telefono, setTelefono] = useState(miembro?.telefono ?? '')
   const [rol, setRol] = useState<Rol>(miembro?.rol ?? 'vendedor')
+  const [comision, setComision] = useState(miembro?.comisionPct ? String(miembro.comisionPct) : '')
+  const [meta, setMeta] = useState(miembro?.metaMensual ? String(miembro.metaMensual) : '')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
@@ -348,6 +350,10 @@ function FormMiembro({ miembro, esYo, onCerrar, onClave }: { miembro?: Miembro; 
     const n = nombre.trim(), c = correo.trim(), t = telefono.trim()
     if (n.length < 2) return setError('Escribe el nombre completo')
     if (!/^\S+@\S+\.\S+$/.test(c)) return setError('Escribe un correo válido')
+    const pct = comision.trim() === '' ? 0 : Number(comision.replace(',', '.'))
+    const objetivo = meta.trim() === '' ? null : Number(meta.replace(',', '.'))
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) return setError('La comisión va de 0 a 100 %')
+    if (objetivo !== null && !(objetivo > 0)) return setError('La meta debe ser un monto mayor a cero')
     setGuardando(true)
     setError('')
     try {
@@ -360,6 +366,8 @@ function FormMiembro({ miembro, esYo, onCerrar, onClave }: { miembro?: Miembro; 
         if (c !== miembro.correo) cambios.correo = c
         if (t !== miembro.telefono) cambios.telefono = t
         if (rol !== miembro.rol) cambios.rol = rol
+        if (rol === 'vendedor' && pct !== (miembro.comisionPct ?? 0)) cambios.comisionPct = pct
+        if (rol === 'vendedor' && objetivo !== (miembro.metaMensual ?? null)) cambios.metaMensual = objetivo
         if (Object.keys(cambios).length) await editarMiembro(miembro.id, cambios)
         aviso('Cuenta actualizada')
         onCerrar()
@@ -389,6 +397,12 @@ function FormMiembro({ miembro, esYo, onCerrar, onClave }: { miembro?: Miembro; 
           )}
           <p className="mt-2 text-xs text-apagado">El vendedor sólo ve su ruta y sus clientes. El administrador ve todo, incluidos costos y márgenes.</p>
         </div>
+        {miembro && rol === 'vendedor' && (
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta="Meta del mes ($)"><input className={claseInput} inputMode="decimal" value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="Sin meta" autoComplete="off" /></Campo>
+            <Campo etiqueta="Comisión (%)"><input className={claseInput} inputMode="decimal" value={comision} onChange={(e) => setComision(e.target.value)} placeholder="Sin comisión" autoComplete="off" /></Campo>
+          </div>
+        )}
         {!miembro && <p className="rounded-md bg-niebla px-4 py-3 text-sm text-apagado">Al crearla se genera una contraseña temporal. En su primer ingreso tendrá que elegir una propia.</p>}
         {error && <p role="alert" className="rounded-md bg-rojo/10 px-4 py-3 text-sm font-medium text-rojo">{error}</p>}
         <button type="submit" className="hidden" />

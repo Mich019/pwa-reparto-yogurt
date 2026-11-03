@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, ChartLine, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
+import { BarChart3, ChartLine, HandCoins, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
 import { hace } from '../../lib/fechas'
 import { cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
+import { Cobranza } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { Subrayado } from './piezas'
 import { Equipo } from '../pwa/Equipo'
@@ -18,7 +19,7 @@ import { PantallaCobro } from './Suscripcion'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
-export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'reportes' | 'configuracion'
+export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'cobranza' | 'reportes' | 'configuracion'
 
 const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
   { id: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
@@ -26,6 +27,7 @@ const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
   { id: 'clientes', texto: 'Clientes', icono: MapPin },
   { id: 'produccion', texto: 'Producción', icono: BarChart3 },
   { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl },
+  { id: 'cobranza', texto: 'Cobranza', icono: HandCoins },
   { id: 'reportes', texto: 'Reportes', icono: ChartLine },
   { id: 'configuracion', texto: 'Configuración', icono: Settings },
 ]
@@ -213,6 +215,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'equipo' && <Equipo panel />}
           {seccion === 'clientes' && <Clientes panel />}
           {seccion === 'produccion' && <Produccion panel />}
+          {seccion === 'cobranza' && <Cobranza />}
           {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>

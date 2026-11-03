@@ -15,6 +15,7 @@ import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { usePaginas } from '../../components/Paginas'
 import { CuentaDelCliente } from '../../components/CuentaDelCliente'
+import { PreciosDelCliente } from '../../components/PreciosDelCliente'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, Separador, TextoBoton, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
@@ -243,6 +244,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
             <ChevronRight size={18} className="shrink-0 text-apagado/60" />
           </button>
         )}
+        {gestiona && <PreciosDelCliente clienteId={cliente.id} nombre={cliente.nombre} />}
         <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
         {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} />}
 

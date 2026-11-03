@@ -28,6 +28,7 @@ import { rutasEmpresa } from './empresa.js'
 import { rutasPlataforma } from './plataforma.js'
 import { ipCliente } from './seguridad.js'
 import { almacenLimites } from './limites.js'
+import { reportarError } from './errores.js'
 
 export type Rol = 'administrador' | 'vendedor'
 export interface Usuario {
@@ -72,7 +73,11 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, req, rep) => {
     if (error.statusCode && error.statusCode < 500) return rep.send(error)
     req.log.error(error)
-    return rep.code(500).send({ error: 'Error interno del servidor' })
+    // Va a Sentry si hay DSN. `routeOptions.url` es la ruta con :parametros, nunca la dirección con datos.
+    const reportado = ctx.config.sentryDsn
+      ? reportarError(ctx.config.sentryDsn, error, { metodo: req.method, ruta: req.routeOptions?.url, entorno: ctx.config.despliegue.entorno, version: ctx.config.despliegue.commit })
+      : null
+    return Promise.resolve(reportado).then(() => rep.code(500).send({ error: 'Error interno del servidor' }))
   })
 
   // Cabeceras de seguridad en todas las respuestas: nada queda en cachés ni en el Referer, el navegador no adivina

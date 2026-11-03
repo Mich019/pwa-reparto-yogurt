@@ -151,6 +151,9 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
   const [costo, setCosto] = useState(String(producto?.costo_litro ?? ''))
   const [color, setColor] = useState(producto?.color_hex ?? COLORES[0])
   const [disponible, setDisponible] = useState(producto?.disponible ?? true)
+  // El cliente devuelve el envase: se lleva su saldo de envases prestados. Se puede cambiar cuando sea.
+  const [retornable, setRetornable] = useState(producto?.retornable ?? false)
+  const conEnvase = !!(producto ? producto.envase : tipoEnvase)
   // RF-032: contenido por envase. Se elige al crear el sabor y ya no cambia: lo vendido se guarda en envases de ese tamaño.
   const envase = producto ? (producto.presentacion ?? 1) : Math.round(Number(presentacion.replace(',', '.')) * 100) / 100
 
@@ -161,7 +164,7 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
     await guardar('productos', {
       id: producto?.id ?? uid(), sabor: sabor.trim(), descripcion: descripcion.trim(), presentacion: envase,
       ...(producto ? { unidad: producto.unidad, envase: producto.envase } : { unidad: unidad.trim(), envase: tipoEnvase || undefined }),
-      precio_litro: Number(precio), costo_litro: Number(costo) || 0, color_hex: color, disponible,
+      precio_litro: Number(precio), costo_litro: Number(costo) || 0, color_hex: color, disponible, retornable: conEnvase && retornable,
     })
     onCerrar()
   }
@@ -216,6 +219,15 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
             <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded-full bg-transparent" />
           </div>
         </div>
+        {conEnvase && (
+          <label className="flex items-center justify-between gap-3 rounded-md bg-niebla px-4 py-3">
+            <span>
+              <span className="block font-semibold">Envase retornable</span>
+              <span className="block text-xs text-apagado">El cliente lo devuelve; la app lleva cuántos tiene prestados.</span>
+            </span>
+            <input type="checkbox" checked={retornable} onChange={(e) => setRetornable(e.target.checked)} className="h-6 w-6 shrink-0 accent-black" />
+          </label>
+        )}
         <label className="flex items-center justify-between rounded-md bg-niebla px-4 py-3">
           <span className="font-semibold">Disponible</span>
           <input type="checkbox" checked={disponible} onChange={(e) => setDisponible(e.target.checked)} className="h-6 w-6 accent-black" />

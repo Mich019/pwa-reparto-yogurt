@@ -200,6 +200,8 @@ export function leerConfig() {
     // «Authorization: Bearer <CRON_SECRET>». Sin él esa ruta no existe y los avisos programados siguen saliendo al
     // pasar alguien por la app.
     cronSecret: process.env.CRON_SECRET?.trim() ?? '',
+    // SENTRY_DSN: errores internos del servidor a Sentry (o GlitchTip). Sin él no se reporta nada.
+    sentryDsn: process.env.SENTRY_DSN?.trim() ?? '',
     urlApp: (process.env.APP_URL?.trim() || corsOrigins[0]
       || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:5173')).replace(/\/+$/, ''),
     // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.
