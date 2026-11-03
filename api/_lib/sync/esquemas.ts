@@ -35,6 +35,7 @@ export const productoWire = z.object({
   presentacion: z.number().min(0.01).max(999).optional(), // contenido de cada envase en `unidad` (RF-032); sólo cuenta al crearlo
   unidad: texto(10).min(1).optional(), // L (por omisión), kg, pz…; sólo cuenta al crearlo
   envase: texto(30).nullable().optional(), // frasco, garrafon, bolsa…; sólo cuenta al crearlo
+  retornable: z.boolean().optional(), // el cliente devuelve el envase: se lleva su saldo (sin dato, no cambia)
   precio_litro: z.number().positive().max(99999999),
   costo_litro: z.number().min(0).max(99999999),
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),

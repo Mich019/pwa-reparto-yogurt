@@ -93,7 +93,7 @@ const SIN_ENVASE = ['pieza', 'granel']
 
 export function productosDelRegistro(b: Pick<z.infer<typeof bodyEmpresa>, 'envases' | 'productos'>) {
   const envases = new Map(b.envases.map((e) => [e.id, e]))
-  const filas: { nombre: string; sabor: string; presentacion: number; unidad: string; envase: string | null; precio: number; costo: number; color: string }[] = []
+  const filas: { nombre: string; sabor: string; presentacion: number; unidad: string; envase: string | null; retornable: boolean; precio: number; costo: number; color: string }[] = []
   const ya = new Set<string>()
   for (const p of b.productos) {
     const variantes = p.variantes.length ? p.variantes.map((v) => ({ ...v, nombre: `${p.nombre} ${v.nombre}`.slice(0, 100) })) : [{ nombre: p.nombre, color: p.color }]
@@ -107,7 +107,7 @@ export function productosDelRegistro(b: Pick<z.infer<typeof bodyEmpresa>, 'envas
         const clave = [p.nombre, v.nombre, presentacion, unidad, envase].join('|').toLowerCase()
         if (ya.has(clave)) continue
         ya.add(clave)
-        filas.push({ nombre: p.nombre, sabor: v.nombre, presentacion, unidad, envase, precio: pr.precio, costo: pr.costo ?? 0, color: v.color })
+        filas.push({ nombre: p.nombre, sabor: v.nombre, presentacion, unidad, envase, retornable: !!e.retornable && !!envase, precio: pr.precio, costo: pr.costo ?? 0, color: v.color })
       }
     }
   }
@@ -254,8 +254,8 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         await cx.query(`SELECT set_config('app.id_usuario', $1, true)`, [u.id_usuario])
         for (const p of productos) {
           await cx.query(
-            `INSERT INTO productos (nombre, sabor, presentacion_litros, unidad, envase, precio_unitario, costo_produccion, color_hex) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [p.nombre, p.sabor, p.presentacion, p.unidad, p.envase, p.precio, p.costo, p.color],
+            `INSERT INTO productos (nombre, sabor, presentacion_litros, unidad, envase, precio_unitario, costo_produccion, color_hex, retornable) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [p.nombre, p.sabor, p.presentacion, p.unidad, p.envase, p.precio, p.costo, p.color, p.retornable && e.controlRetornables],
           )
         }
         const enlaces = []

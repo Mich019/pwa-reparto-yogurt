@@ -14,6 +14,7 @@ import { rutasDosPasos } from './dosPasos.js'
 import { CABECERA_APP, leerCookie } from './cookies.js'
 import { rutasStock } from './stock.js'
 import { rutasCobranza } from './cobranza.js'
+import { rutasEnvases } from './envases.js'
 import { rutasUsuarios } from './usuarios.js'
 import { rutasAdmin } from './admin.js'
 import { rutasSync } from './sync/rutas.js'
@@ -164,6 +165,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasLibreta(app, ctx, { requiereAdmin })
   await rutasStock(app, ctx, { requiereAdmin }, despachador)
   await rutasCobranza(app, ctx, { requiereSesion, requiereAdmin })
+  await rutasEnvases(app, ctx, { requiereSesion, requiereAdmin })
   await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
 
   return app

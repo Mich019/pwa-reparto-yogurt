@@ -35,6 +35,7 @@ export interface Producto {
   presentacion?: number // contenido de cada envase en `unidad` (RF-032); sin dato, 1. Se fija al crear el sabor.
   unidad?: string // L (sin dato), kg, pz… (catálogo flexible, src/lib/unidades.ts). Se fija al crear el sabor.
   envase?: string // frasco, garrafon, bolsa… (TIPOS_ENVASE); sin dato, sin envase propio. Se fija al crear el sabor.
+  retornable?: boolean // el cliente devuelve el envase: la app lleva su saldo
   precio_litro: number
   costo_litro: number
   color_hex: string
