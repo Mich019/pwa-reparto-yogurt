@@ -196,6 +196,10 @@ export function leerConfig() {
     // MP_ACCESS_TOKEN y MP_PRECIO_MENSUAL no se puede suscribir nadie, pero la app funciona igual (desarrollo).
     pruebaDias: Number(process.env.PRUEBA_DIAS || 14),
     mercadoPago: leerMercadoPago(),
+    // CRON_SECRET: con él Vercel Cron (vercel.json) o cualquier despertador externo llama a GET /cron/avisos con
+    // «Authorization: Bearer <CRON_SECRET>». Sin él esa ruta no existe y los avisos programados siguen saliendo al
+    // pasar alguien por la app.
+    cronSecret: process.env.CRON_SECRET?.trim() ?? '',
     urlApp: (process.env.APP_URL?.trim() || corsOrigins[0]
       || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:5173')).replace(/\/+$/, ''),
     // RF-054: notificaciones push con claves VAPID (npm run push:claves). Sin ellas no hay push.
