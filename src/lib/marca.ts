@@ -11,6 +11,7 @@ export interface Marca {
   logo: string | null
   lema?: string | null // en los PDF; falta en la copia guardada antes de la migración 013
   contacto?: string | null
+  zonaHoraria?: string // define el «hoy» de la empresa (migración 007)
   de?: string // id de la cuenta con la que se guardó la copia
 }
 

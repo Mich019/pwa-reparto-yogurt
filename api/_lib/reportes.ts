@@ -4,6 +4,7 @@ import type { Contexto } from './app.js'
 import type { Db } from './db.js'
 import { ordenarUnidades, tipoCantidad, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla, type Tipo, type Valor } from './exportar.js'
+import { zonaDeEmpresa } from './fechas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
@@ -491,7 +492,7 @@ export async function rutasReportes(app: FastifyInstance, { db, config }: Contex
     if (ventas === null) return rep.code(413).send({ error: 'Son demasiadas ventas para un solo archivo. Elige un periodo más corto.' })
 
     let datos: Buffer
-    const generado = new Date().toLocaleString('es-MX', { timeZone: config.zonaHoraria, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const generado = new Date().toLocaleString('es-MX', { timeZone: await zonaDeEmpresa(db, config.zonaHoraria), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const encabezado = { titulo: 'Reporte de ventas', subtitulo: `Del ${fechaMx(q.desde)} al ${fechaMx(q.hasta)} · Generado el ${generado}` }
     if (formato === 'xlsx') datos = aXlsx([tablaResumen(r), tablaPeriodos(r), tablaSabores(r), tablaVendedores(r), ventas!], encabezado)
     else datos = aCsv({ ventas: ventas!, periodos: tablaPeriodos(r), sabores: tablaSabores(r), vendedores: tablaVendedores(r) }[tabla]!)

@@ -4,6 +4,7 @@ import type { Contexto } from './app.js'
 import type { Db } from './db.js'
 import { ordenarUnidades, tipoCantidad, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla } from './exportar.js'
+import { zonaDeEmpresa } from './fechas.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
@@ -126,8 +127,9 @@ export async function rutasLibreta(app: FastifyInstance, { db, config }: Context
     if (formato === 'json') return { clientes }
 
     const ahora = new Date()
-    const hoy = ahora.toLocaleDateString('en-CA', { timeZone: config.zonaHoraria })
-    const generado = ahora.toLocaleString('es-MX', { timeZone: config.zonaHoraria, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const zona = await zonaDeEmpresa(db, config.zonaHoraria)
+    const hoy = ahora.toLocaleDateString('en-CA', { timeZone: zona })
+    const generado = ahora.toLocaleString('es-MX', { timeZone: zona, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const datos = formato === 'xlsx'
       ? aXlsx([tablaLibreta(clientes)], { titulo: 'Libreta de clientes', subtitulo: `${clientes.length} clientes activos · Generado el ${generado}` })
       : aCsv(tablaLibreta(clientes))

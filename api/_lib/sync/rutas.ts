@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from '../app.js'
 import { tx } from '../db.js'
-import { hoyEn } from '../fechas.js'
+import { hoyEn, zonaDeEmpresa } from '../fechas.js'
 import { claveUsuario } from '../seguridad.js'
 import type { Despachador } from '../notificaciones.js'
 import { ADAPTADORES } from './adaptadores.js'
@@ -44,7 +44,7 @@ export async function rutasSync(
     const ahoraMs = Date.now()
     const reloj = { dispositivo: body.data.dispositivo, skewMs: ahoraMs - body.data.ahoraCliente, ahoraMs }
     const resultados: Resultado[] = []
-    const efectos: Efectos = { hoy: hoyEn(config.zonaHoraria), avisos: [] }
+    const efectos: Efectos = { hoy: hoyEn(await zonaDeEmpresa(db, config.zonaHoraria)), avisos: [] }
     try {
       for (const op of body.data.operaciones) resultados.push(await procesarOperacion(db, req.usuario, op, reloj, efectos))
     } finally {
@@ -87,7 +87,7 @@ export async function rutasSync(
         ? await c.query(
             `SELECT id_stock, fecha, id_producto, cantidad_asignada::float8 AS asignada, cantidad_devuelta::float8 AS devuelta, version
                FROM stock_diario
-              WHERE id_vendedor = $1 AND fecha >= (now() AT TIME ZONE 'UTC')::date - $2::int
+              WHERE id_vendedor = $1 AND fecha >= (now() AT TIME ZONE (SELECT zona_horaria FROM empresas))::date - $2::int
                 AND ($3::bigint IS NULL OR actualizado_en > to_timestamp(($3::bigint) / 1000.0))
               ORDER BY fecha, id_producto`,
             [vendedor, DIAS_DE_STOCK, desde ?? null],
