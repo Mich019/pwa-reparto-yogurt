@@ -115,13 +115,23 @@ const clientes: Adaptador<ClienteWire> = {
         ORDER BY c.actualizado_en, c.id_cliente ${f.bloquear ? 'FOR UPDATE' : ''}`,
       [f.id ?? null, f.desde ?? null, f.vendedor ?? null],
     )
+    // Sus precios especiales (precios_cliente), por unidad como el catálogo.
+    const { rows: esp } = rows.length
+      ? await c.query(
+          `SELECT pc.id_cliente, pc.id_producto, (pc.precio_unitario / pr.presentacion_litros)::float8 AS precio
+             FROM precios_cliente pc JOIN productos pr USING (id_producto) WHERE pc.id_cliente = ANY($1::uuid[])`,
+          [rows.map((r) => r.id_cliente)],
+        )
+      : { rows: [] }
+    const precios = new Map<string, Record<string, number>>()
+    for (const e of esp) (precios.get(e.id_cliente) ?? precios.set(e.id_cliente, {}).get(e.id_cliente)!)[e.id_producto] = dinero(e.precio)
     return rows.map((r) => ({
       wire: {
         id: r.id_cliente, nombre: r.nombre, direccion: r.direccion, notas: r.referencias ?? undefined,
         latitud: num(r.latitud), longitud: num(r.longitud), telefono: r.telefono ?? '',
         frecuencia: r.frecuencia_tipo === 'intervalo' ? { tipo: 'intervalo' as const, cada: r.cada_dias } : { tipo: 'semana' as const, dias: r.dias_semana },
         ventana: r.ventana_horario === 'tarde' ? ('TARDE' as const) : ('MAÑANA' as const),
-        qr_uuid: r.qr_uuid, nfc_uid: r.nfc_uid ?? undefined, activo: r.activo,
+        qr_uuid: r.qr_uuid, nfc_uid: r.nfc_uid ?? undefined, ...(precios.has(r.id_cliente) ? { precios: precios.get(r.id_cliente) } : {}), activo: r.activo,
         creado: r.creado_ms, actualizado: r.act_ms, vendedorId: r.id_vendedor ?? undefined, version: r.version,
       },
       version: r.version, actualizadoMs: r.act_ms, actualizadoUs: r.act_us, final: false, dueno: r.id_vendedor,

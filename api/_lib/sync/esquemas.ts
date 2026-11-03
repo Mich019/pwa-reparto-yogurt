@@ -21,6 +21,7 @@ export const clienteWire = z.object({
   ventana: z.enum(['MAÑANA', 'TARDE']),
   qr_uuid: z.uuid(),
   nfc_uid: texto(64).optional(),
+  precios: z.record(z.uuid(), z.number()).optional(), // precio especial por producto (por unidad); sólo baja del servidor, lo que suba se ignora
   activo: z.boolean(),
   creado: ms,
   actualizado: ms,
