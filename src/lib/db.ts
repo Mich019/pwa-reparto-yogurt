@@ -55,7 +55,7 @@ export interface Pedido {
   estado: EstadoPedido
   items: DetallePedido[]
   total: number
-  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA'
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'CREDITO'
   orden_ruta?: number
   urgente?: boolean // el administrador lo marcó para entregarse ya (RF-054); sólo él lo cambia
   fecha_entregado_real?: number

@@ -193,7 +193,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
       {comparar && <p className="mt-2 text-xs text-apagado">Los cambios son frente {ANTERIOR[vista]}.</p>}
       {!sinVentas && (
         <p className="mt-1 text-xs text-apagado">
-          Efectivo {dinero(r.efectivo)} · Transferencia {dinero(r.transferencia)}{r.ticketPromedio !== null && ` · Ticket promedio ${dinero(r.ticketPromedio)}`}
+          Efectivo {dinero(r.efectivo)} · Transferencia {dinero(r.transferencia)}{(r.credito ?? 0) > 0 && ` · Fiado ${dinero(r.credito ?? 0)}`}{r.ticketPromedio !== null && ` · Ticket promedio ${dinero(r.ticketPromedio)}`}
         </p>
       )}
 

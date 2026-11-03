@@ -51,7 +51,7 @@ export const pedidoWire = z.object({
     .array(z.object({ productoId: z.uuid(), litros: z.number().positive().max(100000), precio_litro: z.number().min(0).max(99999999) }))
     .max(100),
   total: z.number().min(0).optional(),
-  metodo_pago: z.enum(['EFECTIVO', 'TRANSFERENCIA']).optional(),
+  metodo_pago: z.enum(['EFECTIVO', 'TRANSFERENCIA', 'CREDITO']).optional(),
   orden_ruta: z.number().int().min(0).max(32000).optional(),
   urgente: z.boolean().optional(), // lo marca el administrador (RF-054); si no viene, se conserva el valor del servidor
   fecha_entregado_real: ms.optional(),

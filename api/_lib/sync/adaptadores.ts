@@ -236,7 +236,7 @@ const pedidos: Adaptador<PedidoWire> = {
         id: r.id_pedido, clienteId: r.id_cliente, fecha: r.fecha,
         estado: r.estado === 'entregado' ? ('ENTREGADO' as const) : r.estado === 'pendiente' || r.estado === 'en_camino' ? ('PENDIENTE' as const) : ('OMITIDO' as const),
         items: porPedido.get(r.id_pedido) ?? [], total: num(r.total),
-        metodo_pago: r.metodo_pago ? (r.metodo_pago === 'efectivo' ? ('EFECTIVO' as const) : ('TRANSFERENCIA' as const)) : undefined,
+        metodo_pago: r.metodo_pago ? (({ efectivo: 'EFECTIVO', transferencia: 'TRANSFERENCIA', credito: 'CREDITO' }) as const)[r.metodo_pago as 'efectivo' | 'transferencia' | 'credito'] : undefined,
         orden_ruta: r.orden_ruta ?? undefined, urgente: r.urgente, fecha_entregado_real: r.entregado_ms ?? undefined,
         creado: r.creado_ms, actualizado: r.act_ms, vendedorId: r.id_vendedor ?? undefined, version: r.version,
       },

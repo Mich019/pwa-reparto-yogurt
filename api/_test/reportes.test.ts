@@ -90,7 +90,7 @@ describe('reportes de ventas (RF-043 a RF-047)', () => {
       const r = await json(srv, admin, `/reportes/ventas?${OCTUBRE}`)
       assert.equal(r.status, 200)
       assert.deepEqual(r.body.resumen, {
-        ingreso: 1000, costo: 335, utilidad: 665, margenPct: 66.5, litros: 17, porUnidad: { L: 17 }, pedidos: 5, clientes: 3, ticketPromedio: 200, efectivo: 820, transferencia: 180,
+        ingreso: 1000, costo: 335, utilidad: 665, margenPct: 66.5, litros: 17, porUnidad: { L: 17 }, pedidos: 5, clientes: 3, ticketPromedio: 200, efectivo: 820, transferencia: 180, credito: 0,
       })
       assert.deepEqual(r.body.unidades, ['L'])
       // El corte de un solo día

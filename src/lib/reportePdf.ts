@@ -356,10 +356,11 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   })
   pdf.linea(M + 4, inf.y + 20.5, M + inf.util - 4, inf.y + 20.5, { color: REGLA, grosor: 0.2 })
   inf.y += 50
-  const cobrado = x.efectivo + x.transferencia
+  const credito = x.credito ?? 0
+  const cobrado = x.efectivo + x.transferencia + credito
   if (cobrado > 0) {
     const parte = (n: number) => `${din(n)} (${n2((n / cobrado) * 100, 0)}%)`
-    inf.nota(`Forma de cobro: efectivo ${parte(x.efectivo)} y transferencia ${parte(x.transferencia)}.`)
+    inf.nota(`Forma de cobro: efectivo ${parte(x.efectivo)}, transferencia ${parte(x.transferencia)}${credito > 0 ? ` y fiado ${parte(credito)}` : ''}.`)
   }
 
   // ---------------------------------------------------------------- 02 evolución de ingresos

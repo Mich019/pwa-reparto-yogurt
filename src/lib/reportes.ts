@@ -24,6 +24,7 @@ export interface Resumen {
   ticketPromedio: number | null
   efectivo: number
   transferencia: number
+  credito?: number // fiado; falta en respuestas de servidores anteriores
 }
 // Catálogo flexible: lo entregado de cada unidad ({ L: 60, kg: 10 }); no se suman litros con kilos.
 export type PorUnidad = Record<string, number>
