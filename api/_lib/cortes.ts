@@ -1,0 +1,446 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { z } from 'zod'
+import type { Contexto } from './app.js'
+import { comoFalla, Falla, redondear, saldos } from './cobranza.js'
+import { saldosEnvases } from './envases.js'
+import { tx, type Cx, type Db } from './db.js'
+import { aXlsx, type Tabla } from './exportar.js'
+import { hoyEn, zonaDeEmpresa } from './fechas.js'
+
+// Corte del día, cierre de mes e informe mensual.
+//  · Corte del día: cada vendedor dice cuánto efectivo entrega; el sistema sabe cuánto debía (lo cobrado en efectivo,
+//    ventas y abonos) y el administrador lo confirma. La diferencia queda a la vista.
+//  · Cierre de mes: guarda una foto de las cifras del mes y bloquea sus correcciones (trigger fn_*_mes_cerrado). Se
+//    puede reabrir anotando el motivo; todo queda en el historial.
+//  · Informe mensual: ventas y utilidad, cobranza y comisión por vendedor, y las diferencias de los cortes.
+// Estas cifras llevan costos y utilidad: las rutas del mes son del administrador. El vendedor sólo ve su propio corte y su meta.
+
+type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
+type Consulta = Pick<Db, 'query'> | Cx
+
+const fechaIso = z.iso.date()
+const mesTexto = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'El mes va como AAAA-MM')
+const dinero = z.number().finite().min(0).max(99_999_999)
+const idParam = z.object({ id: z.uuid() })
+const num = (x: unknown) => (x === null || x === undefined ? 0 : Number(x))
+
+// ------------------------------------------------------------------ corte del día
+
+export interface CifrasDia { esperado: number; efectivoVentas: number; efectivoAbonos: number; transferencias: number; credito: number }
+
+// Lo que un vendedor cobró ese día. El efectivo esperado = ventas pagadas en efectivo + abonos recibidos en efectivo.
+export async function cifrasDelDia(q: Consulta, fecha: string, idVendedor: string): Promise<CifrasDia> {
+  const { rows: [v] } = await q.query(
+    `SELECT coalesce(sum(total) FILTER (WHERE metodo_pago = 'efectivo'), 0)::float8 AS efectivo,
+            coalesce(sum(total) FILTER (WHERE metodo_pago = 'transferencia'), 0)::float8 AS transferencia,
+            coalesce(sum(total) FILTER (WHERE metodo_pago = 'credito'), 0)::float8 AS credito
+       FROM pedidos WHERE estado = 'entregado' AND fecha = $1 AND id_vendedor = $2`,
+    [fecha, idVendedor],
+  )
+  const { rows: [a] } = await q.query(
+    `SELECT coalesce(sum(monto) FILTER (WHERE metodo = 'efectivo'), 0)::float8 AS efectivo,
+            coalesce(sum(monto) FILTER (WHERE metodo = 'transferencia'), 0)::float8 AS transferencia
+       FROM abonos WHERE anulado_en IS NULL AND fecha = $1 AND id_vendedor = $2`,
+    [fecha, idVendedor],
+  )
+  return {
+    esperado: redondear(v.efectivo + a.efectivo), efectivoVentas: redondear(v.efectivo), efectivoAbonos: redondear(a.efectivo),
+    transferencias: redondear(v.transferencia + a.transferencia), credito: redondear(v.credito),
+  }
+}
+
+interface FilaCorte {
+  id: string; fecha: string; vendedorId: string; vendedor: string
+  esperado: number; transferencias: number; credito: number
+  entregado: number | null; diferencia: number | null; nota: string | null
+  estado: 'sin_corte' | 'pendiente' | 'confirmado'
+  confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
+}
+
+const bodyCorte = z.object({ fecha: fechaIso.optional(), efectivoEntregado: dinero, nota: z.string().trim().max(300).optional(), vendedorId: z.uuid().optional() })
+const bodyConfirmar = z.object({ nota: z.string().trim().max(300).optional() })
+
+// ------------------------------------------------------------------ cifras del mes
+
+export interface CifrasMes {
+  mes: string
+  desde: string
+  hasta: string
+  ventas: { ingreso: number; costo: number; utilidad: number; margenPct: number | null; pedidos: number; clientes: number; porUnidad: Record<string, number> }
+  cobro: { efectivo: number; transferencia: number; credito: number }
+  abonos: { efectivo: number; transferencia: number; total: number }
+  porCobrar: { saldo: number; clientes: number }
+  envases: { prestados: number; clientes: number }
+  vendedores: {
+    id: string; nombre: string; activo: boolean; ventas: number; utilidad: number; pedidos: number
+    efectivo: number; transferencia: number; credito: number; abonos: number
+    comisionPct: number; comision: number; meta: number | null; cumplimientoPct: number | null
+  }[]
+  cortes: {
+    dias: number; confirmados: number; pendientes: number; sinCorte: number; diferencia: number
+    detalle: { fecha: string; vendedor: string; esperado: number; entregado: number; diferencia: number; estado: string }[]
+  }
+}
+
+const primerDia = (mes: string) => `${mes}-01`
+const ultimoDia = (mes: string) => {
+  const [a, m] = mes.split('-').map(Number)
+  return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10)
+}
+
+export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes> {
+  const desde = primerDia(mes)
+  const hasta = ultimoDia(mes)
+  const [{ rows: [t] }, { rows: unidades }, { rows: porVend }, { rows: abonosVend }, { rows: gente }, { rows: cortes }] = await Promise.all([
+    q.query(
+      `SELECT coalesce(sum(d.subtotal), 0)::float8 AS ingreso, coalesce(sum(d.cantidad * d.costo_unitario), 0)::float8 AS costo,
+              count(DISTINCT pe.id_pedido)::int AS pedidos, count(DISTINCT pe.id_cliente)::int AS clientes,
+              coalesce(sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'efectivo'), 0)::float8 AS efectivo,
+              coalesce(sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'transferencia'), 0)::float8 AS transferencia,
+              coalesce(sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'credito'), 0)::float8 AS credito
+         FROM pedidos pe JOIN detalle_pedido d USING (id_pedido)
+        WHERE pe.estado = 'entregado' AND pe.fecha BETWEEN $1 AND $2`,
+      [desde, hasta],
+    ),
+    q.query(
+      `SELECT pr.unidad, sum(d.cantidad * pr.presentacion_litros)::float8 AS n
+         FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)
+        WHERE pe.estado = 'entregado' AND pe.fecha BETWEEN $1 AND $2 GROUP BY pr.unidad ORDER BY pr.unidad`,
+      [desde, hasta],
+    ),
+    q.query(
+      `SELECT pe.id_vendedor, sum(d.subtotal)::float8 AS ventas, sum(d.cantidad * d.costo_unitario)::float8 AS costo, count(DISTINCT pe.id_pedido)::int AS pedidos,
+              coalesce(sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'efectivo'), 0)::float8 AS efectivo,
+              coalesce(sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'transferencia'), 0)::float8 AS transferencia,
+              coalesce(sum(d.subtotal) FILTER (WHERE pe.metodo_pago = 'credito'), 0)::float8 AS credito
+         FROM pedidos pe JOIN detalle_pedido d USING (id_pedido)
+        WHERE pe.estado = 'entregado' AND pe.fecha BETWEEN $1 AND $2 GROUP BY pe.id_vendedor`,
+      [desde, hasta],
+    ),
+    q.query(
+      `SELECT id_vendedor, metodo, sum(monto)::float8 AS n FROM abonos WHERE anulado_en IS NULL AND fecha BETWEEN $1 AND $2 GROUP BY 1, 2`,
+      [desde, hasta],
+    ),
+    q.query(`SELECT id_usuario, nombre, activo, comision_pct::float8 AS pct, meta_mensual::float8 AS meta FROM usuarios WHERE rol = 'vendedor'`),
+    q.query(
+      `SELECT c.fecha::text, u.nombre, c.efectivo_esperado::float8 AS esperado, c.efectivo_entregado::float8 AS entregado, c.diferencia::float8 AS diferencia, c.estado
+         FROM cortes_dia c JOIN usuarios u ON u.id_usuario = c.id_vendedor WHERE c.fecha BETWEEN $1 AND $2 ORDER BY c.fecha, lower(u.nombre)`,
+      [desde, hasta],
+    ),
+  ])
+  const deuda = await saldos(q as Db, { hasta })
+  const prestados = (await saldosEnvases(q as Db, { hasta })).filter((e) => e.prestados > 0)
+  const ab = new Map<string, { efectivo: number; transferencia: number }>()
+  for (const a of abonosVend) {
+    const k = (a.id_vendedor ?? '') as string
+    const x = ab.get(k) ?? ab.set(k, { efectivo: 0, transferencia: 0 }).get(k)!
+    x[a.metodo as 'efectivo' | 'transferencia'] += a.n
+  }
+  const abonosTotales = { efectivo: 0, transferencia: 0 }
+  for (const x of ab.values()) { abonosTotales.efectivo += x.efectivo; abonosTotales.transferencia += x.transferencia }
+
+  const vend = new Map(porVend.map((r) => [r.id_vendedor as string | null, r]))
+  const vendedores = gente
+    .filter((g) => g.activo || vend.has(g.id_usuario) || ab.has(g.id_usuario))
+    .map((g) => {
+      const v = vend.get(g.id_usuario)
+      const a = ab.get(g.id_usuario) ?? { efectivo: 0, transferencia: 0 }
+      const ventas = num(v?.ventas)
+      return {
+        id: g.id_usuario as string, nombre: g.nombre as string, activo: g.activo as boolean,
+        ventas: redondear(ventas), utilidad: redondear(ventas - num(v?.costo)), pedidos: num(v?.pedidos),
+        efectivo: redondear(num(v?.efectivo)), transferencia: redondear(num(v?.transferencia)), credito: redondear(num(v?.credito)),
+        abonos: redondear(a.efectivo + a.transferencia),
+        comisionPct: g.pct as number, comision: redondear((ventas * g.pct) / 100),
+        meta: g.meta as number | null, cumplimientoPct: g.meta ? redondear((ventas / g.meta) * 100) : null,
+      }
+    })
+    .sort((x, y) => y.ventas - x.ventas || x.nombre.localeCompare(y.nombre))
+
+  const diasCorte = cortes.map((c) => ({ fecha: c.fecha as string, vendedor: c.nombre as string, esperado: redondear(c.esperado), entregado: redondear(c.entregado), diferencia: redondear(c.diferencia), estado: c.estado as string }))
+  // Días con efectivo por entregar que nadie cortó: vendedor y día con ventas en efectivo o abonos en efectivo sin corte.
+  const { rows: [{ n: sinCorte }] } = await q.query(
+    `SELECT count(*)::int AS n FROM (
+       SELECT id_vendedor, fecha FROM pedidos WHERE estado = 'entregado' AND metodo_pago = 'efectivo' AND fecha BETWEEN $1 AND $2 AND id_vendedor IS NOT NULL
+       UNION
+       SELECT id_vendedor, fecha FROM abonos WHERE anulado_en IS NULL AND metodo = 'efectivo' AND fecha BETWEEN $1 AND $2 AND id_vendedor IS NOT NULL
+     ) x WHERE NOT EXISTS (SELECT 1 FROM cortes_dia c WHERE c.fecha = x.fecha AND c.id_vendedor = x.id_vendedor)`,
+    [desde, hasta],
+  )
+  const ingreso = redondear(t.ingreso)
+  const utilidad = redondear(t.ingreso - t.costo)
+  return {
+    mes, desde, hasta,
+    ventas: { ingreso, costo: redondear(t.costo), utilidad, margenPct: ingreso > 0 ? redondear((utilidad / ingreso) * 100) : null, pedidos: t.pedidos, clientes: t.clientes, porUnidad: Object.fromEntries(unidades.map((u) => [u.unidad, redondear(u.n)])) },
+    cobro: { efectivo: redondear(t.efectivo), transferencia: redondear(t.transferencia), credito: redondear(t.credito) },
+    abonos: { efectivo: redondear(abonosTotales.efectivo), transferencia: redondear(abonosTotales.transferencia), total: redondear(abonosTotales.efectivo + abonosTotales.transferencia) },
+    porCobrar: { saldo: redondear(deuda.reduce((s, d) => s + d.saldo, 0)), clientes: deuda.length },
+    envases: { prestados: prestados.reduce((s, e) => s + e.prestados, 0), clientes: new Set(prestados.map((e) => e.clienteId)).size },
+    vendedores,
+    cortes: {
+      dias: diasCorte.length,
+      confirmados: diasCorte.filter((c) => c.estado === 'confirmado').length,
+      pendientes: diasCorte.filter((c) => c.estado === 'pendiente').length,
+      sinCorte,
+      diferencia: redondear(diasCorte.reduce((s, c) => s + c.diferencia, 0)),
+      detalle: diasCorte,
+    },
+  }
+}
+
+// El Excel del informe: una hoja con las cifras del mes, otra por vendedor y otra con los cortes.
+const pesos = (v: number | null) => ({ v, t: 'dinero' as const })
+function hojas(x: CifrasMes): Tabla[] {
+  const resumen: Tabla = {
+    nombre: 'Resumen',
+    columnas: [{ titulo: 'Concepto', tipo: 'texto', ancho: 34 }, { titulo: 'Cifra', tipo: 'dinero', ancho: 18 }],
+    filas: [
+      ['Ventas', pesos(x.ventas.ingreso)], ['Costo de producción', pesos(x.ventas.costo)], ['Utilidad', pesos(x.ventas.utilidad)],
+      ['Margen', { v: x.ventas.margenPct, t: 'porcentaje' }], ['Pedidos entregados', { v: x.ventas.pedidos, t: 'entero' }], ['Clientes atendidos', { v: x.ventas.clientes, t: 'entero' }],
+      ['Vendido en efectivo', pesos(x.cobro.efectivo)], ['Vendido por transferencia', pesos(x.cobro.transferencia)], ['Vendido a crédito (fiado)', pesos(x.cobro.credito)],
+      ['Abonos recibidos', pesos(x.abonos.total)], ['Por cobrar al cierre', pesos(x.porCobrar.saldo)],
+      ['Envases prestados al cierre', { v: x.envases.prestados, t: 'entero' }],
+      ['Diferencia total de los cortes', pesos(x.cortes.diferencia)],
+    ],
+  }
+  const vendedores: Tabla = {
+    nombre: 'Vendedores',
+    columnas: [
+      { titulo: 'Vendedor', tipo: 'texto', ancho: 26 }, { titulo: 'Pedidos', tipo: 'entero' }, { titulo: 'Ventas', tipo: 'dinero' }, { titulo: 'Utilidad', tipo: 'dinero' },
+      { titulo: 'Efectivo', tipo: 'dinero' }, { titulo: 'Transferencia', tipo: 'dinero' }, { titulo: 'Fiado', tipo: 'dinero' }, { titulo: 'Abonos', tipo: 'dinero' },
+      { titulo: 'Meta', tipo: 'dinero' }, { titulo: 'Cumplimiento', tipo: 'porcentaje' }, { titulo: '% comisión', tipo: 'porcentaje' }, { titulo: 'Comisión', tipo: 'dinero' },
+    ],
+    filas: x.vendedores.map((v) => [v.nombre + (v.activo ? '' : ' (baja)'), v.pedidos, v.ventas, v.utilidad, v.efectivo, v.transferencia, v.credito, v.abonos, v.meta, v.cumplimientoPct, v.comisionPct, v.comision]),
+    total: ['Total', x.vendedores.reduce((s, v) => s + v.pedidos, 0), ...(['ventas', 'utilidad', 'efectivo', 'transferencia', 'credito', 'abonos'] as const).map((k) => redondear(x.vendedores.reduce((s, v) => s + v[k], 0))), null, null, null, redondear(x.vendedores.reduce((s, v) => s + v.comision, 0))],
+  }
+  const cortes: Tabla = {
+    nombre: 'Cortes',
+    columnas: [{ titulo: 'Fecha', tipo: 'fecha' }, { titulo: 'Vendedor', tipo: 'texto', ancho: 26 }, { titulo: 'Esperado', tipo: 'dinero' }, { titulo: 'Entregado', tipo: 'dinero' }, { titulo: 'Diferencia', tipo: 'dinero' }, { titulo: 'Estado', tipo: 'texto' }],
+    filas: x.cortes.detalle.map((c) => [c.fecha, c.vendedor, c.esperado, c.entregado, c.diferencia, c.estado === 'confirmado' ? 'Confirmado' : 'Pendiente']),
+  }
+  return [resumen, vendedores, cortes]
+}
+
+type Historial = { accion: 'cerrado' | 'reabierto'; por: string; en: string; motivo?: string }[]
+
+export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto, { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia }) {
+  const hoyDe = async () => hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
+  const responder = (rep: FastifyReply, e: unknown) => {
+    const f = comoFalla(e)
+    if (f instanceof Falla) return rep.code(f.status).send({ error: f.message })
+    throw f
+  }
+
+  // ---- corte del día
+  // El administrador ve a todos los vendedores con movimiento ese día (y los activos); el vendedor, el suyo.
+  app.get('/cortes', { preHandler: requiereSesion }, async (req, rep) => {
+    const q = z.object({ fecha: fechaIso.optional() }).safeParse(req.query)
+    if (!q.success) return rep.code(400).send({ error: 'Fecha inválida (AAAA-MM-DD)' })
+    const fecha = q.data.fecha ?? (await hoyDe())
+    const esAdmin = req.usuario.rol === 'administrador'
+    const { rows: vend } = await db.query(
+      `SELECT u.id_usuario, u.nombre FROM usuarios u
+        WHERE u.rol = 'vendedor' AND ($2::uuid IS NULL OR u.id_usuario = $2)
+          AND (u.activo OR EXISTS (SELECT 1 FROM cortes_dia c WHERE c.id_vendedor = u.id_usuario AND c.fecha = $1)
+               OR EXISTS (SELECT 1 FROM pedidos p WHERE p.id_vendedor = u.id_usuario AND p.fecha = $1 AND p.estado = 'entregado'))
+        ORDER BY lower(u.nombre)`,
+      [fecha, esAdmin ? null : req.usuario.id],
+    )
+    const { rows: cortes } = await db.query(
+      `SELECT c.*, c.efectivo_esperado::float8 AS esp, c.efectivo_entregado::float8 AS ent, c.diferencia::float8 AS dif, c.transferencias::float8 AS tr, c.credito::float8 AS cr,
+              c.confirmado_en::text AS conf_en, uc.nombre AS conf_por
+         FROM cortes_dia c LEFT JOIN usuarios uc ON uc.id_usuario = c.confirmado_por WHERE c.fecha = $1`,
+      [fecha],
+    )
+    const porVendedor = new Map(cortes.map((c) => [c.id_vendedor as string, c]))
+    const filas: FilaCorte[] = []
+    for (const v of vend) {
+      const c = porVendedor.get(v.id_usuario)
+      const hoy = await cifrasDelDia(db, fecha, v.id_usuario)
+      filas.push({
+        id: c?.id_corte ?? '', fecha, vendedorId: v.id_usuario, vendedor: v.nombre,
+        esperado: c?.estado === 'confirmado' ? c.esp : hoy.esperado, transferencias: c?.estado === 'confirmado' ? c.tr : hoy.transferencias, credito: c?.estado === 'confirmado' ? c.cr : hoy.credito,
+        entregado: c ? c.ent : null, diferencia: c ? redondear(c.ent - (c.estado === 'confirmado' ? c.esp : hoy.esperado)) : null, nota: c?.nota ?? null,
+        estado: c ? c.estado : 'sin_corte', confirmadoPor: c?.conf_por ?? null, confirmadoEn: c?.conf_en ?? null, notaAdmin: c?.nota_admin ?? null,
+      })
+    }
+    return { fecha, filas }
+  })
+
+  // El vendedor entrega su corte (puede corregirlo mientras el administrador no lo confirme). El administrador también
+  // puede capturarlo por un vendedor (`vendedorId`).
+  app.post('/cortes', { preHandler: requiereSesion, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const b = bodyCorte.safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: 'Indica cuánto efectivo entregas' })
+    const esAdmin = req.usuario.rol === 'administrador'
+    if (b.data.vendedorId && !esAdmin) return rep.code(403).send({ error: 'Sólo el administrador captura el corte de otro vendedor', codigo: 'SIN_PERMISO' })
+    const vendedor = b.data.vendedorId ?? req.usuario.id
+    try {
+      const hoy = await hoyDe()
+      const fecha = b.data.fecha ?? hoy
+      if (fecha > hoy) throw new Falla(400, 'No puedes hacer el corte de un día que no ha pasado')
+      const r = await tx(db, req.usuario.id, async (c) => {
+        const { rows: [u] } = await c.query(`SELECT 1 AS ok FROM usuarios WHERE id_usuario = $1 AND rol = 'vendedor'`, [vendedor])
+        if (!u) throw new Falla(404, 'Ese vendedor no existe')
+        const x = await cifrasDelDia(c, fecha, vendedor)
+        const { rows: [ex] } = await c.query(`SELECT id_corte, estado FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 FOR UPDATE`, [fecha, vendedor])
+        if (ex?.estado === 'confirmado') throw new Falla(409, 'Ese corte ya está confirmado')
+        const { rows: [corte] } = ex
+          ? await c.query(
+              `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, efectivo_entregado = $5, nota = $6, actualizado_en = now()
+                WHERE id_corte = $1 RETURNING id_corte, diferencia::float8 AS dif`,
+              [ex.id_corte, x.esperado, x.transferencias, x.credito, b.data.efectivoEntregado, b.data.nota || null],
+            )
+          : await c.query(
+              `INSERT INTO cortes_dia (fecha, id_vendedor, efectivo_esperado, transferencias, credito, efectivo_entregado, nota)
+               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_corte, diferencia::float8 AS dif`,
+              [fecha, vendedor, x.esperado, x.transferencias, x.credito, b.data.efectivoEntregado, b.data.nota || null],
+            )
+        return { id: corte.id_corte as string, esperado: x.esperado, entregado: b.data.efectivoEntregado, diferencia: redondear(corte.dif) }
+      })
+      return rep.code(201).send(r)
+    } catch (e) {
+      return responder(rep, e)
+    }
+  })
+
+  // El administrador lo confirma: congela lo esperado con lo que hubo en ese momento.
+  app.post('/cortes/:id/confirmar', { preHandler: requiereAdmin }, async (req, rep) => {
+    const p = idParam.safeParse(req.params)
+    const b = bodyConfirmar.safeParse(req.body ?? {})
+    if (!p.success || !b.success) return rep.code(400).send({ error: 'Corte no válido' })
+    try {
+      const r = await tx(db, req.usuario.id, async (c) => {
+        const { rows: [k] } = await c.query(`SELECT fecha::text, id_vendedor, estado FROM cortes_dia WHERE id_corte = $1 FOR UPDATE`, [p.data.id])
+        if (!k) throw new Falla(404, 'Ese corte no existe')
+        if (k.estado === 'confirmado') throw new Falla(409, 'Ese corte ya está confirmado')
+        const x = await cifrasDelDia(c, k.fecha, k.id_vendedor)
+        const { rows: [corte] } = await c.query(
+          `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, estado = 'confirmado', confirmado_por = $5, confirmado_en = now(), nota_admin = $6, actualizado_en = now()
+            WHERE id_corte = $1 RETURNING diferencia::float8 AS dif`,
+          [p.data.id, x.esperado, x.transferencias, x.credito, req.usuario.id, b.data.nota || null],
+        )
+        return { ok: true, esperado: x.esperado, diferencia: redondear(corte.dif) }
+      })
+      return r
+    } catch (e) {
+      return responder(rep, e)
+    }
+  })
+
+  // ---- meta y comisión del propio vendedor (lo que él vende este mes; nunca costos ni utilidad)
+  app.get('/mi-meta', { preHandler: requiereSesion }, async (req) => {
+    const hoy = await hoyDe()
+    const mes = hoy.slice(0, 7)
+    const { rows: [r] } = await db.query(
+      `SELECT coalesce((SELECT sum(d.subtotal) FROM pedidos pe JOIN detalle_pedido d USING (id_pedido)
+                         WHERE pe.estado = 'entregado' AND pe.id_vendedor = u.id_usuario AND pe.fecha BETWEEN $2 AND $3), 0)::float8 AS ventas,
+              u.meta_mensual::float8 AS meta, u.comision_pct::float8 AS pct
+         FROM usuarios u WHERE u.id_usuario = $1`,
+      [req.usuario.id, primerDia(mes), ultimoDia(mes)],
+    )
+    return { mes, ventas: redondear(r.ventas), meta: r.meta, cumplimientoPct: r.meta ? redondear((r.ventas / r.meta) * 100) : null, comisionPct: r.pct, comision: redondear((r.ventas * r.pct) / 100) }
+  })
+
+  // ---- cierre de mes
+  const mesDeRuta = (req: FastifyRequest) => mesTexto.safeParse((req.params as { mes?: string }).mes)
+
+  // Los últimos meses con su estado (abierto, cerrado o reabierto), del más nuevo al más viejo.
+  app.get('/cierres', { preHandler: requiereAdmin }, async () => {
+    const hoy = await hoyDe()
+    const { rows: [p] } = await db.query(`SELECT to_char(min(fecha), 'YYYY-MM') AS primero FROM pedidos`)
+    const { rows } = await db.query(`SELECT to_char(mes, 'YYYY-MM') AS mes, estado, cerrado_en::text FROM cierres_mes`)
+    const cierres = new Map(rows.map((r) => [r.mes as string, r]))
+    const meses: { mes: string; estado: 'abierto' | 'cerrado' | 'reabierto'; actual: boolean; cerradoEn: string | null }[] = []
+    let [a, m] = hoy.slice(0, 7).split('-').map(Number)
+    const primero = (p?.primero as string | null) ?? hoy.slice(0, 7)
+    for (let i = 0; i < 24; i++) {
+      const mes = `${a}-${String(m).padStart(2, '0')}`
+      if (mes < primero) break
+      const c = cierres.get(mes)
+      meses.push({ mes, estado: c ? c.estado : 'abierto', actual: mes === hoy.slice(0, 7), cerradoEn: c?.cerrado_en ?? null })
+      if (--m === 0) { m = 12; a-- }
+    }
+    return { meses }
+  })
+
+  // Las cifras de un mes: la foto guardada si está cerrado; si no, las de ahora.
+  async function leerMes(mes: string) {
+    const { rows: [c] } = await db.query(`SELECT estado, cifras, cerrado_en::text AS en, historial FROM cierres_mes WHERE mes = $1`, [primerDia(mes)])
+    const cerrado = c?.estado === 'cerrado'
+    return {
+      mes, estado: (c ? c.estado : 'abierto') as 'abierto' | 'cerrado' | 'reabierto', cerradoEn: (c?.en as string | undefined) ?? null, historial: ((c?.historial as Historial | undefined) ?? []),
+      cifras: cerrado ? (c.cifras as CifrasMes) : await cifrasDelMes(db, mes),
+    }
+  }
+
+  app.get('/cierres/:mes', { preHandler: requiereAdmin }, async (req, rep) => {
+    const m = mesDeRuta(req)
+    if (!m.success) return rep.code(400).send({ error: 'El mes va como AAAA-MM' })
+    return leerMes(m.data)
+  })
+
+  app.post('/cierres/:mes/cerrar', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const m = mesDeRuta(req)
+    if (!m.success) return rep.code(400).send({ error: 'El mes va como AAAA-MM' })
+    try {
+      const hoy = await hoyDe()
+      if (m.data >= hoy.slice(0, 7)) throw new Falla(409, 'Ese mes todavía no termina')
+      const r = await tx(db, req.usuario.id, async (c) => {
+        await c.query(`SELECT pg_advisory_xact_lock(hashtext('cierre_mes'))`)
+        const { rows: [ex] } = await c.query(`SELECT estado FROM cierres_mes WHERE mes = $1 FOR UPDATE`, [primerDia(m.data)])
+        if (ex?.estado === 'cerrado') throw new Falla(409, 'Ese mes ya está cerrado')
+        const { rows: [{ n }] } = await c.query(`SELECT count(*)::int AS n FROM pedidos WHERE fecha BETWEEN $1 AND $2 AND estado IN ('pendiente', 'en_camino')`, [primerDia(m.data), ultimoDia(m.data)])
+        if (n > 0) throw new Falla(409, `Hay ${n} ${n === 1 ? 'pedido' : 'pedidos'} sin cerrar en ese mes: entrégalos, omítelos o cámbialos de día`)
+        const cifras = await cifrasDelMes(c, m.data)
+        const evento = { accion: 'cerrado', por: req.usuario.id, en: new Date().toISOString() }
+        await c.query(
+          `INSERT INTO cierres_mes (mes, estado, cifras, cerrado_por, cerrado_en, historial) VALUES ($1, 'cerrado', $2, $3, now(), $4::jsonb)
+           ON CONFLICT (id_empresa, mes) DO UPDATE SET estado = 'cerrado', cifras = EXCLUDED.cifras, cerrado_por = EXCLUDED.cerrado_por, cerrado_en = now(),
+                                                      historial = cierres_mes.historial || EXCLUDED.historial`,
+          [primerDia(m.data), JSON.stringify(cifras), req.usuario.id, JSON.stringify([evento])],
+        )
+        return cifras
+      })
+      return { ok: true, cifras: r }
+    } catch (e) {
+      return responder(rep, e)
+    }
+  })
+
+  // Reabrir exige el motivo; las correcciones vuelven a ser posibles hasta cerrarlo otra vez.
+  app.post('/cierres/:mes/reabrir', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const m = mesDeRuta(req)
+    const b = z.object({ motivo: z.string().trim().min(5, 'Escribe el motivo (al menos 5 letras)').max(300) }).safeParse(req.body)
+    if (!m.success) return rep.code(400).send({ error: 'El mes va como AAAA-MM' })
+    if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Escribe el motivo' })
+    try {
+      await tx(db, req.usuario.id, async (c) => {
+        const { rows: [ex] } = await c.query(`SELECT estado FROM cierres_mes WHERE mes = $1 FOR UPDATE`, [primerDia(m.data)])
+        if (ex?.estado !== 'cerrado') throw new Falla(409, 'Ese mes no está cerrado')
+        const evento = { accion: 'reabierto', por: req.usuario.id, en: new Date().toISOString(), motivo: b.data.motivo }
+        await c.query(`UPDATE cierres_mes SET estado = 'reabierto', historial = historial || $2::jsonb WHERE mes = $1`, [primerDia(m.data), JSON.stringify([evento])])
+      })
+      return { ok: true }
+    } catch (e) {
+      return responder(rep, e)
+    }
+  })
+
+  // El informe mensual: JSON (la app arma el PDF con él) o Excel.
+  app.get('/cierres/:mes/informe', { preHandler: requiereAdmin, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, rep) => {
+    const m = mesDeRuta(req)
+    const f = z.object({ formato: z.enum(['json', 'xlsx']).default('json') }).safeParse(req.query)
+    if (!m.success || !f.success) return rep.code(400).send({ error: 'El mes va como AAAA-MM y el formato json o xlsx' })
+    const mes = await leerMes(m.data)
+    if (f.data.formato === 'json') return mes
+    const generado = new Date().toLocaleString('es-MX', { timeZone: await zonaDeEmpresa(db, config.zonaHoraria), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const estado = mes.estado === 'cerrado' ? 'Mes cerrado' : mes.estado === 'reabierto' ? 'Mes reabierto (cifras al momento de generarlo)' : 'Mes abierto (cifras al momento de generarlo)'
+    const datos = aXlsx(hojas(mes.cifras), { titulo: `Informe mensual ${m.data}`, subtitulo: `${estado} · Generado el ${generado}` })
+    return rep
+      .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('content-disposition', `attachment; filename="informe-mensual-${m.data}.xlsx"`)
+      .header('cache-control', 'no-store')
+      .send(datos)
+  })
+}

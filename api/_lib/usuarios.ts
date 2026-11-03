@@ -24,7 +24,11 @@ const bodyCrear = z.object({
   password: z.string().max(1000).optional(), // si falta, el servidor genera una temporal
 })
 const bodyEditar = z
-  .object({ nombre: z.string().trim().min(2).max(100), correo, telefono, rol })
+  .object({
+    nombre: z.string().trim().min(2).max(100), correo, telefono, rol,
+    comisionPct: z.number().min(0).max(100), // % sobre lo vendido en el mes (informe mensual)
+    metaMensual: z.number().positive().max(999_999_999).nullable(), // meta de venta del mes; null la quita
+  })
   .partial()
   .refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
 const bodyPassword = z.object({ password: z.string().max(1000).optional() })
@@ -44,7 +48,7 @@ const bloqueo = (config: Config) => {
                            AND e.ip IS NOT DISTINCT FROM i.ip AND e.creado_en > i.creado_en)
        GROUP BY i.ip HAVING count(*) >= ${max}) b) AS bloqueado_hasta`
 }
-const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.activo, u.debe_cambiar_password, u.ultimo_acceso, u.creado_en,
+const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.comision_pct::float8 AS comision_pct, u.meta_mensual::float8 AS meta_mensual, u.rol, u.activo, u.debe_cambiar_password, u.ultimo_acceso, u.creado_en,
   ${bloqueo(config)},
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario) AS clientes,
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario AND c.activo) AS clientes_activos`
@@ -58,6 +62,7 @@ function wire(r: any) {
     ultimoAcceso: r.ultimo_acceso ? new Date(r.ultimo_acceso).toISOString() : null,
     creadoEn: new Date(r.creado_en).toISOString(),
     clientes: r.clientes as number, clientesActivos: r.clientes_activos as number,
+    comisionPct: r.comision_pct as number, metaMensual: (r.meta_mensual ?? null) as number | null,
   }
 }
 const otroAdminActivo = async (c: Cx, excepto: string) =>
@@ -124,9 +129,12 @@ export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contex
         }
         await c.query(
           `UPDATE usuarios SET nombre = COALESCE($2, nombre), correo = COALESCE($3, correo),
-                  telefono = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE telefono END, rol = COALESCE($6::rol_usuario, rol)
+                  telefono = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE telefono END, rol = COALESCE($6::rol_usuario, rol),
+                  comision_pct = COALESCE($7::numeric, comision_pct),
+                  meta_mensual = CASE WHEN $8::boolean THEN $9::numeric ELSE meta_mensual END
             WHERE id_usuario = $1`,
-          [p.data.id, b.data.nombre ?? null, b.data.correo ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.rol ?? null],
+          [p.data.id, b.data.nombre ?? null, b.data.correo ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.rol ?? null,
+            b.data.comisionPct ?? null, b.data.metaMensual !== undefined, b.data.metaMensual ?? null],
         )
         return { usuario: wire(await leer(c, p.data.id)) }
       })

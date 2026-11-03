@@ -16,6 +16,7 @@ import { rutasStock } from './stock.js'
 import { rutasCobranza } from './cobranza.js'
 import { rutasEnvases } from './envases.js'
 import { rutasPrecios } from './precios.js'
+import { rutasCortes } from './cortes.js'
 import { rutasUsuarios } from './usuarios.js'
 import { rutasAdmin } from './admin.js'
 import { rutasSync } from './sync/rutas.js'
@@ -168,6 +169,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasCobranza(app, ctx, { requiereSesion, requiereAdmin })
   await rutasEnvases(app, ctx, { requiereSesion, requiereAdmin })
   await rutasPrecios(app, ctx, { requiereAdmin })
+  await rutasCortes(app, ctx, { requiereSesion, requiereAdmin })
   await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
 
   return app
