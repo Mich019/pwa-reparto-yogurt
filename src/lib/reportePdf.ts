@@ -76,10 +76,11 @@ export interface Columna<T> {
 // Cantidades: con una unidad, la columna de siempre («Litros», «12.5 L»); con varias, una columna por unidad («Litros»,
 // «Kilos», «Piezas») con la cifra sola, porque «73,179 L + 5,301 kg + 48,058 pz» no cabe en una casilla. Las columnas
 // de más le quitan ancho a las otras (la tabla reparte el ancho en proporción).
-const cifra = (n: number) => n.toLocaleString('es-MX', { maximumFractionDigits: 2 })
+// Desde mil, sin decimales: «14,636» cabe en su columna con la letra de siempre («14,635.8» se achicaba).
+const cifra = (n: number) => n.toLocaleString('es-MX', { maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 })
 function columnasCantidad<T>(unidades: string[], ancho: number, pu: (f: T) => Record<string, number> | undefined, litros: (f: T) => number): Columna<T>[] {
   if (unidades.length < 2) return [{ titulo: tituloUnidad(unidades[0] ?? 'L'), ancho, der: true, valor: (f) => lit(litros(f), unidades[0]) }]
-  return unidades.map((u) => ({ titulo: tituloUnidad(u), ancho: ancho * 0.8, der: true, valor: (f) => cifra(pu(f)?.[u] ?? 0) }))
+  return unidades.map((u) => ({ titulo: tituloUnidad(u), ancho: ancho * 0.9, der: true, valor: (f) => cifra(pu(f)?.[u] ?? 0) }))
 }
 const totalCantidad = (unidades: string[], pu: Record<string, number> | undefined, litros: number) =>
   unidades.length < 2 ? [lit(litros, unidades[0])] : unidades.map((u) => cifra(pu?.[u] ?? 0))
@@ -160,7 +161,7 @@ class Informe {
   }
 
   subtitulo(texto: string, nota?: string) {
-    this.asegurar(22)
+    this.asegurar(30) // el subtítulo, el encabezado de su tabla, un renglón doble y el total
     this.pdf.texto(texto, M, this.y + 3, { fuente: 'negrita', tam: 9, color: SECUNDARIO })
     if (nota) this.pdf.texto(nota, this.ancho - M, this.y + 3, { tam: 7.5, color: TENUE, alinear: 'der' })
     this.y += 6
@@ -187,15 +188,18 @@ class Informe {
       this.y += 6
       pdf.linea(M, this.y, this.ancho - M, this.y, { color: TINTA, grosor: 0.35 })
     }
-    this.asegurar(6 + alto * Math.min(3, Math.max(1, filas.length)))
+    // Una tabla corta no empieza al pie de la hoja si su total no cabe ahí.
+    this.asegurar(6 + alto * Math.min(3, Math.max(1, filas.length)) + (total && filas.length <= 3 ? RENGLON + 1 : 0))
     encabezado()
     if (!filas.length) {
       pdf.texto('Sin registros.', M + 1.75, this.y + 4.6, { tam: 8.3, color: TENUE })
       this.y += RENGLON + 8
       return
     }
-    filas.forEach((f) => {
-      if (this.y + alto > this.limite) { this.nuevaPagina(); encabezado() }
+    filas.forEach((f, n) => {
+      // El último renglón se va con el total: un total solo al inicio de la hoja no dice de qué es.
+      const conTotal = total && n === filas.length - 1 ? RENGLON + 1 : 0
+      if (this.y + alto + conTotal > this.limite) { this.nuevaPagina(); encabezado() }
       columnas.forEach((c, i) => {
         let x = xs[i]
         let ancho = c.ancho * this.util

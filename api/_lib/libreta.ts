@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Db } from './db.js'
-import { ordenarUnidades, tituloUnidad } from './unidades.js'
+import { ordenarUnidades, tipoCantidad, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla } from './exportar.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -97,7 +97,7 @@ const tablaLibreta = (cs: ClienteLibreta[]): Tabla => {
     { titulo: 'Horario', tipo: 'texto' },
     { titulo: 'Cliente desde', tipo: 'fecha' },
     { titulo: 'Pedidos', tipo: 'entero' },
-    ...unidades.map((u) => ({ titulo: tituloUnidad(u), tipo: 'litros' as const })),
+    ...unidades.map((u) => ({ titulo: tituloUnidad(u), tipo: tipoCantidad(u) })),
     { titulo: 'Total comprado', tipo: 'dinero' },
     { titulo: 'Última compra', tipo: 'fecha' },
     { titulo: 'Próxima entrega', tipo: 'fecha' },

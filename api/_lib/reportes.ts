@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Db } from './db.js'
-import { ordenarUnidades, tituloUnidad } from './unidades.js'
+import { ordenarUnidades, tipoCantidad, tituloUnidad } from './unidades.js'
 import { aCsv, aXlsx, type Tabla, type Tipo, type Valor } from './exportar.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -311,7 +311,7 @@ export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
 // ------------------------------------------------------------------ exportar
 
 // Catálogo flexible: los totales llevan una columna por unidad («Litros», «Kilos»…); con una sola unidad, la de siempre.
-const columnasUnidad = (r: Reporte) => r.unidades.map((u) => ({ titulo: tituloUnidad(u), tipo: 'litros' as const }))
+const columnasUnidad = (r: Reporte) => r.unidades.map((u) => ({ titulo: tituloUnidad(u), tipo: tipoCantidad(u) }))
 const valoresUnidad = (r: Reporte, pu: PorUnidad) => r.unidades.map((u) => pu[u] ?? 0)
 
 async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
@@ -339,14 +339,14 @@ async function historial(db: Db, q: Consulta): Promise<Tabla | null> {
       { titulo: 'Vendedor', tipo: 'texto' },
       { titulo: 'Cliente', tipo: 'texto' },
       { titulo: 'Sabor', tipo: 'texto' },
-      { titulo: varias ? 'Cantidad' : tituloUnidad(unidades[0] ?? 'L'), tipo: 'litros' },
+      { titulo: varias ? 'Cantidad' : tituloUnidad(unidades[0] ?? 'L'), tipo: tipoCantidad(unidades[0]) },
       ...(varias ? [{ titulo: 'Unidad', tipo: 'texto' as const }] : []),
       { titulo: 'Importe', tipo: 'dinero' },
       { titulo: 'Costo', tipo: 'dinero' },
       { titulo: 'Utilidad', tipo: 'dinero' },
       { titulo: 'Pago', tipo: 'texto' },
     ],
-    filas: rows.map((f) => [f.fecha, f.vendedor, f.cliente, f.sabor, num(f.litros), ...(varias ? [f.unidad] : []), num(f.importe), num(f.costo), num(f.utilidad), f.metodo_pago]),
+    filas: rows.map((f) => [f.fecha, f.vendedor, f.cliente, f.sabor, { v: num(f.litros), t: tipoCantidad(f.unidad) }, ...(varias ? [f.unidad] : []), num(f.importe), num(f.costo), num(f.utilidad), f.metodo_pago]),
     total: ['Total', null, null, null, varias ? null : suma('litros'), ...(varias ? [null] : []), suma('importe'), suma('costo'), suma('utilidad'), null],
   }
 }
@@ -374,7 +374,7 @@ const tablaSabores = (r: Reporte): Tabla => {
   columnas: [
     { titulo: 'Lugar', tipo: 'entero' },
     { titulo: 'Sabor', tipo: 'texto' },
-    { titulo: varias ? 'Cantidad' : tituloUnidad(r.unidades[0]), tipo: 'litros' },
+    { titulo: varias ? 'Cantidad' : tituloUnidad(r.unidades[0]), tipo: tipoCantidad(r.unidades[0]) },
     ...(varias ? [{ titulo: 'Unidad', tipo: 'texto' as const }] : []),
     { titulo: 'Ingresos', tipo: 'dinero' },
     { titulo: 'Costos', tipo: 'dinero' },
@@ -383,7 +383,7 @@ const tablaSabores = (r: Reporte): Tabla => {
     { titulo: 'Nota', tipo: 'texto' },
   ],
   filas: r.sabores.map((s, i) => [
-    i + 1, s.sabor, s.litros, ...(varias ? [s.unidad] : []), s.ingreso, s.costo, s.utilidad, s.margenPct,
+    i + 1, s.sabor, { v: s.litros, t: tipoCantidad(s.unidad) }, ...(varias ? [s.unidad] : []), s.ingreso, s.costo, s.utilidad, s.margenPct,
     s.id === r.ranking.estrella ? 'Sabor estrella' : s.id === r.ranking.menorRotacion ? 'Menor rotación' : s.sinCosto ? 'Sin costo capturado' : null,
   ]),
   total: [null, 'Total', varias ? null : r.resumen.litros, ...(varias ? [null] : []), r.resumen.ingreso, r.resumen.costo, r.resumen.utilidad, r.resumen.margenPct, null],
@@ -447,7 +447,8 @@ const tablaResumen = (r: Reporte): Tabla => {
       if (k === 'litros') {
         return r.unidades.map((u) => {
           const ahora = x.porUnidad[u] ?? 0
-          return [`${tituloUnidad(u)} entregados`, { v: ahora, t }, ...(a ? [{ v: a.porUnidad[u] ?? 0, t }, cambio(k, ahora, a.porUnidad[u] ?? 0)] : [])]
+          const tu = tipoCantidad(u)
+          return [`${tituloUnidad(u)} entregados`, { v: ahora, t: tu }, ...(a ? [{ v: a.porUnidad[u] ?? 0, t: tu }, cambio(k, ahora, a.porUnidad[u] ?? 0)] : [])]
         })
       }
       return [[concepto, { v: x[k], t }, ...(a ? [{ v: a[k], t }, cambio(k, x[k], a[k])] : [])]]

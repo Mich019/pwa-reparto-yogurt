@@ -15,6 +15,9 @@ export function totalPorUnidad(filas: { unidad: string | null | undefined; canti
 // Encabezado de una columna de cantidad en Excel y PDF: «Litros», «Kilos», «Piezas» o «Cantidad (cajas)».
 export const tituloUnidad = (u: string) => ({ L: 'Litros', kg: 'Kilos', pz: 'Piezas' })[u] ?? `Cantidad (${u})`
 
+// Formato de una cantidad en Excel: las piezas van enteras («48,058», no «48,058.0»); litros y kilos con un decimal.
+export const tipoCantidad = (u: string | null | undefined) => (u === 'pz' ? 'entero' : 'litros') as 'entero' | 'litros'
+
 // Las unidades de la empresa para sus totales, L primero: las de los productos a la venta más las que tengan ventas
 // (un producto en kg dado de baja y sin ventas no agrega una columna de ceros).
 export const ordenarUnidades = (us: Iterable<string>) => [...new Set(us)].sort((a, b) => (a === 'L' ? -1 : b === 'L' ? 1 : a.localeCompare(b)))
