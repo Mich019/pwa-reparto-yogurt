@@ -6,6 +6,7 @@ import type { Contexto } from './app.js'
 import { hashPassword, revisarPassword } from './contrasenas.js'
 import { correoInvitacion, correoVerificacion, correoYaRegistrado, enviarCorreo } from './correo.js'
 import { tx, type Cx } from './db.js'
+import { VERSION_LEGAL } from './privacidad.js'
 import { ipCliente, tokenAleatorio } from './seguridad.js'
 
 // Alta de empresas por cuenta propia (Fase 2) e invitaciones a repartidores.
@@ -72,7 +73,11 @@ const bodyEmpresa = z.object({
   invitaciones: z.array(correo).max(50).default([]),
 })
 const bodyToken = z.object({ token: z.string().min(20).max(100) })
-const bodyAceptar = bodyToken.extend({ nombre: z.string().trim().min(2).max(100), password: z.string().max(1000) })
+const bodyAceptar = bodyToken.extend({
+  nombre: z.string().trim().min(2).max(100),
+  password: z.string().max(1000),
+  aceptaTerminos: z.literal(true, { message: 'Hay que aceptar los términos del servicio' }),
+})
 const bodyInvitar = z.object({ correo })
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -246,9 +251,9 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         )
         await cx.query(`SELECT set_config('app.id_empresa', $1, true)`, [emp.id_empresa])
         const { rows: [u] } = await cx.query(
-          `INSERT INTO usuarios (nombre, correo, password_hash, rol, debe_cambiar_password) VALUES ($1, $2, $3, 'administrador', false)
+          `INSERT INTO usuarios (nombre, correo, password_hash, rol, debe_cambiar_password, legal_version, legal_aceptado_en) VALUES ($1, $2, $3, 'administrador', false, $4, now())
            ON CONFLICT (lower(correo)) DO NOTHING RETURNING id_usuario`,
-          [a.nombre, a.correo, hash],
+          [a.nombre, a.correo, hash, VERSION_LEGAL],
         )
         if (!u) throw new CorreoRepetido()
         await cx.query(`SELECT set_config('app.id_usuario', $1, true)`, [u.id_usuario])
@@ -321,9 +326,9 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         if (!i) return null
         await cx.query(`SELECT set_config('app.id_empresa', $1, true)`, [i.id_empresa])
         const { rows: [u] } = await cx.query(
-          `INSERT INTO usuarios (nombre, correo, password_hash, rol, debe_cambiar_password) VALUES ($1, $2, $3, $4, false)
+          `INSERT INTO usuarios (nombre, correo, password_hash, rol, debe_cambiar_password, legal_version, legal_aceptado_en) VALUES ($1, $2, $3, $4, false, $5, now())
            ON CONFLICT (lower(correo)) DO NOTHING RETURNING id_usuario`,
-          [b.data.nombre, i.correo, hash, i.rol],
+          [b.data.nombre, i.correo, hash, i.rol, VERSION_LEGAL],
         )
         if (!u) throw new CorreoRepetido()
         await cx.query(`UPDATE invitaciones SET usado_en = now() WHERE id_invitacion = $1`, [i.id_invitacion])

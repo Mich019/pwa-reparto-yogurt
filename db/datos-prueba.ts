@@ -7,6 +7,7 @@
 import pg from 'pg'
 import { hashPassword } from '../api/_lib/contrasenas.js'
 import { leerConfig } from '../api/_lib/config.js'
+import { borrarEmpresa } from '../api/_lib/privacidad.js'
 import { passwordTemporal } from '../api/_lib/seguridad.js'
 
 const EMPRESA = 'Delisy Pruebas'
@@ -20,36 +21,8 @@ const config = leerConfig()
 const cx = new pg.Client(config.conexion)
 await cx.connect()
 
-async function borrar(idEmpresa: string) {
-  // Todas las tablas con id_empresa; se repite porque las llaves foráneas piden un orden y algunos triggers (bitácora,
-  // eliminaciones) agregan renglones al borrar.
-  const { rows: tablas } = await cx.query<{ t: string }>(
-    `SELECT c.table_name AS t FROM information_schema.columns c JOIN information_schema.tables x USING (table_schema, table_name)
-      WHERE c.table_schema = 'public' AND c.column_name = 'id_empresa' AND x.table_type = 'BASE TABLE' AND c.table_name <> 'empresas'`,
-  )
-  for (let vuelta = 0; vuelta < 20; vuelta++) {
-    let quedan = 0
-    for (const { t } of tablas) {
-      await cx.query('SAVEPOINT s')
-      try {
-        await cx.query(`DELETE FROM ${pg.escapeIdentifier(t)} WHERE id_empresa = $1`, [idEmpresa])
-        await cx.query('RELEASE SAVEPOINT s')
-      } catch {
-        await cx.query('ROLLBACK TO SAVEPOINT s')
-        quedan++
-      }
-    }
-    await cx.query('SAVEPOINT s')
-    try {
-      await cx.query(`DELETE FROM empresas WHERE id_empresa = $1`, [idEmpresa])
-      return
-    } catch (e) {
-      await cx.query('ROLLBACK TO SAVEPOINT s')
-      if (!quedan && vuelta > 2) throw e
-    }
-  }
-  throw new Error('No se pudo borrar la empresa de prueba')
-}
+// El mismo borrado que la baja de una empresa (api/_lib/privacidad.ts).
+const borrar = (idEmpresa: string) => borrarEmpresa(cx, idEmpresa)
 
 try {
   await cx.query('BEGIN')

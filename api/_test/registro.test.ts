@@ -47,7 +47,7 @@ function cuerpo(correo: string, comprobante: string, over: { invitaciones?: stri
 async function aceptar(correo: string, nombre = 'Pepe Reparto') {
   const token = `prueba-${randomUUID()}`
   await db.query(`UPDATE invitaciones SET token_hash = $2 WHERE correo = $1 AND usado_en IS NULL`, [correo, hmac('invitacion', token)])
-  return { token, r: await post('/invitacion/aceptar', { token, nombre, password: CLAVE }) }
+  return { token, r: await post('/invitacion/aceptar', { token, nombre, password: CLAVE, aceptaTerminos: true }) }
 }
 
 describe('registro de una empresa', () => {
@@ -109,13 +109,15 @@ describe('invitaciones', () => {
     assert.equal((await post('/registro/empresa', cuerpo(correo, await confirmar(correo), { invitaciones: [invitado] }))).statusCode, 201)
     const { token, r } = await aceptar(invitado)
     assert.equal(r.statusCode, 201)
+    // Aceptó el aviso de privacidad y los términos al crear su contraseña (privacidad.ts): no se le vuelven a pedir.
+    assert.ok((await db.query(`SELECT legal_aceptado_en FROM usuarios WHERE lower(correo) = $1`, [invitado])).rows[0].legal_aceptado_en)
 
     const l = await login(invitado, CLAVE)
     assert.equal(l.status, 200)
     assert.equal(l.body.usuario.rol, 'vendedor')
     const { body } = await pull({ token: l.body.accessToken, dispositivo: 'tel' })
     assert.equal(body.productos.length, 4) // el catálogo de su empresa, no el de otra
-    assert.equal((await post('/invitacion/aceptar', { token, nombre: 'Otra vez', password: CLAVE })).statusCode, 404)
+    assert.equal((await post('/invitacion/aceptar', { token, nombre: 'Otra vez', password: CLAVE, aceptaTerminos: true })).statusCode, 404)
     assert.equal((await post('/invitacion/consultar', { token })).statusCode, 404)
   })
 

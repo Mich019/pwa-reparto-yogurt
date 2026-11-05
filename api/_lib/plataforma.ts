@@ -6,6 +6,7 @@ import type { Config } from './config.js'
 import { hashPassword } from './contrasenas.js'
 import { correoAviso, correoInvitacion, enviarCorreo, enviarCorreos } from './correo.js'
 import type { Db } from './db.js'
+import { purgarBajas } from './privacidad.js'
 import { hashInvitacion } from './registro.js'
 import { passwordTemporal, tokenAleatorio } from './seguridad.js'
 import { CON_ACCESO } from './suscripcion.js'
@@ -203,7 +204,8 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     const bueno = Buffer.from(secreto)
     if (dado.length !== bueno.length || !timingSafeEqual(dado, bueno)) return rep.code(401).send({ error: 'No autorizado' })
     await mandarAvisosPorCorreo(req.log)
-    return { ok: true }
+    const borradas = await purgarBajas(db, req.log) // empresas cuya baja ya venció (privacidad.ts)
+    return { ok: true, borradas }
   })
 
   // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.
@@ -354,7 +356,13 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     if (!p.success) return rep.code(404).send({ error: 'Esa empresa no existe' })
     if (!b.success) return rep.code(400).send({ error: 'Indica si la empresa queda activa' })
     if (p.data.id === req.usuario.empresa && !b.data.activa) return rep.code(409).send({ error: 'No puedes suspender tu propia empresa', codigo: 'PROPIA_EMPRESA' })
-    const r = await db.query(`UPDATE empresas SET activa = $2, actualizado_en = now() WHERE id_empresa = $1`, [p.data.id, b.data.activa])
+    // Reactivar también cancela una baja pedida por la empresa: sus datos ya no se borran.
+    const r = await db.query(
+      `UPDATE empresas SET activa = $2, actualizado_en = now(),
+              baja_solicitada_en = CASE WHEN $2 THEN NULL ELSE baja_solicitada_en END, baja_borrar_en = CASE WHEN $2 THEN NULL ELSE baja_borrar_en END
+        WHERE id_empresa = $1`,
+      [p.data.id, b.data.activa],
+    )
     if (!r.rowCount) return rep.code(404).send({ error: 'Esa empresa no existe' })
     req.log.info({ empresa: p.data.id, activa: b.data.activa, por: req.usuario.id }, 'plataforma: cambio de estado de una empresa')
     return { ok: true, activa: b.data.activa }
@@ -441,6 +449,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
       exenta: e.exenta as boolean,
       pruebaHasta: e.prueba_hasta as Date,
       suscripcion: (e.suscripcion_estado as string | null) ?? null,
+      baja: e.baja_borrar_en ? { solicitada: e.baja_solicitada_en as Date, borrarEn: e.baja_borrar_en as Date, motivo: (e.baja_motivo as string | null) ?? null } : null,
       equipo: equipo.rows.map((u) => ({
         nombre: u.nombre as string, correo: u.correo as string, rol: u.rol as string, activo: u.activo as boolean,
         ultimoAcceso: (u.ultimo_acceso as Date | null) ?? null, alta: u.creado_en as Date, dosPasos: u.dos_pasos as boolean,

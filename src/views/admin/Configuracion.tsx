@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CreditCard, KeyRound, LifeBuoy, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { CreditCard, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
@@ -12,6 +12,7 @@ import { SeccionSuscripcion } from './Suscripcion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { ZonaEmpresa } from './ZonaEmpresa'
 import { Ayuda } from '../ayuda/Ayuda'
+import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -26,7 +27,7 @@ const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX',
 // Secciones del panel a las que puede llevar el «Ir a…» de una guía (las demás son apartados de aquí).
 const SECCIONES_PANEL = ['resumen', 'equipo', 'clientes', 'produccion', 'sabores', 'reportes']
 
-export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'apariencia' | 'ayuda'
+export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'privacidad' | 'apariencia' | 'ayuda'
 export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
@@ -90,6 +91,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     ...(plataforma ? [] : [{ id: 'marca', texto: 'Marca', ayuda: 'Nombre, logo y color', icono: SwatchBook }]),
     ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
     ...extra,
+    { id: 'privacidad', texto: 'Privacidad y datos', ayuda: 'Descargar, eliminar, avisos', icono: LockKeyhole },
     { id: 'apariencia', texto: 'Apariencia', ayuda: 'Tema, texto y movimiento', icono: Palette },
     ...(plataforma ? [] : [{ id: 'ayuda', texto: 'Ayuda', ayuda: 'Guías paso a paso', icono: LifeBuoy }]),
   ]
@@ -142,6 +144,11 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
           {visible === 'suscripcion' && suscripcion && (
             <Seccion id="suscripcion" titulo="Suscripción" descripcion="El plan de tu empresa. El pago y la tarjeta los maneja Mercado Pago.">
               <SeccionSuscripcion s={suscripcion} />
+            </Seccion>
+          )}
+          {visible === 'privacidad' && (
+            <Seccion id="privacidad" titulo="Privacidad y datos" descripcion={plataforma ? 'Tus datos de esta cuenta y los documentos del servicio.' : 'Tus derechos sobre tus datos (ARCO): verlos, descargarlos y eliminarlos, sin pedírselo a nadie.'}>
+              <PrivacidadYDatos plataforma={plataforma} />
             </Seccion>
           )}
           {visible === 'apariencia' && <Apariencia />}

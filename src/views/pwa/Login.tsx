@@ -7,6 +7,7 @@ import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInputRecto } from '../../components/ui'
 import { FormPassword } from './Cuenta'
+import { EnlacesLegales } from '../legal/PaginaLegal'
 
 export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
   const [correo, setCorreo] = useState('')
@@ -138,6 +139,7 @@ export function Login({ onIrAAdmin }: { onIrAAdmin?: () => void } = {}) {
                 </button>
               </div>
             )}
+            <EnlacesLegales className="pt-2 text-center" />
           </form>
         )}
       </div>

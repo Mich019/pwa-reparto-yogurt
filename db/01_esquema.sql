@@ -60,11 +60,16 @@ CREATE TABLE empresas (
   mp_preapproval_id  varchar(64),
   suscripcion_actualizada timestamptz,
   activa         boolean NOT NULL DEFAULT true,          -- false = suspendida: nadie de ella entra
+  -- Baja pedida por su administrador (023_privacidad.sql): queda suspendida y sus datos se borran en baja_borrar_en.
+  baja_solicitada_en timestamptz,
+  baja_borrar_en timestamptz,
+  baja_motivo    varchar(300),
   creado_en      timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT empresas_color_hex CHECK (color_marca IS NULL OR color_marca ~ '^#[0-9A-Fa-f]{6}$')
 );
 CREATE UNIQUE INDEX empresas_mp_preapproval ON empresas (mp_preapproval_id) WHERE mp_preapproval_id IS NOT NULL;
+CREATE INDEX empresas_baja ON empresas (baja_borrar_en) WHERE baja_borrar_en IS NOT NULL;
 
 -- =============================================================================
 -- M01 · Autenticación y seguridad
@@ -84,6 +89,9 @@ CREATE TABLE usuarios (
   comision_pct          numeric(5, 2) NOT NULL DEFAULT 0,   -- % de comisión sobre lo vendido (022_precios_y_metas.sql)
   meta_mensual          numeric(12, 2),                     -- meta de venta del mes; null = sin meta
   password_cambiado_en  timestamptz NOT NULL DEFAULT now(), -- RF-003: los intentos fallidos de antes ya no cuentan
+  legal_version         varchar(20),                        -- versión del aviso de privacidad y términos que aceptó (023)
+  legal_aceptado_en     timestamptz,
+  eliminado_en          timestamptz,                        -- la eliminó su dueño (ARCO): datos personales anonimizados
   ultimo_acceso         timestamptz,
   creado_en             timestamptz NOT NULL DEFAULT now(),
   actualizado_en        timestamptz NOT NULL DEFAULT now(),
@@ -684,13 +692,14 @@ CREATE TABLE cierres_mes (
 
 -- Un mes cerrado no admite cambios a sus ventas ni a sus abonos (hasta reabrirlo). En los pedidos sólo cuentan los
 -- cambios que mueven cifras (cliente, fecha, estado, total, forma de pago): reasignar al vendedor no.
-CREATE FUNCTION fn_revisar_mes_cerrado(fechas date[]) RETURNS void
+-- Sólo los meses cerrados de la empresa de la fila (quien corre como dueño de la base ve los de todas).
+CREATE FUNCTION fn_revisar_mes_cerrado(empresa uuid, fechas date[]) RETURNS void
 LANGUAGE plpgsql STABLE AS $$
 DECLARE
   f date;
 BEGIN
   FOREACH f IN ARRAY fechas LOOP
-    IF EXISTS (SELECT 1 FROM cierres_mes WHERE estado = 'cerrado' AND mes = date_trunc('month', f)::date) THEN
+    IF EXISTS (SELECT 1 FROM cierres_mes WHERE id_empresa = empresa AND estado = 'cerrado' AND mes = date_trunc('month', f)::date) THEN
       RAISE EXCEPTION 'El mes de % ya está cerrado: reábrelo para corregirlo', to_char(f, 'YYYY-MM') USING ERRCODE = 'P0001';
     END IF;
   END LOOP;
@@ -701,18 +710,18 @@ BEGIN
   IF TG_OP = 'UPDATE' AND (OLD.fecha, OLD.estado, OLD.total, OLD.metodo_pago, OLD.id_cliente) IS NOT DISTINCT FROM (NEW.fecha, NEW.estado, NEW.total, NEW.metodo_pago, NEW.id_cliente) THEN
     RETURN NEW;
   END IF;
-  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[OLD.fecha]); END IF;
-  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[NEW.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(OLD.id_empresa, ARRAY[OLD.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(NEW.id_empresa, ARRAY[NEW.fecha]); END IF;
   RETURN coalesce(NEW, OLD);
 END $$;
 CREATE FUNCTION fn_abonos_mes_cerrado() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-  IF TG_OP = 'UPDATE' AND (OLD.fecha, OLD.monto, OLD.id_cliente) IS NOT DISTINCT FROM (NEW.fecha, NEW.monto, NEW.id_cliente) THEN
+  IF TG_OP = 'UPDATE' AND (OLD.fecha, OLD.monto, OLD.id_cliente, OLD.anulado_en) IS NOT DISTINCT FROM (NEW.fecha, NEW.monto, NEW.id_cliente, NEW.anulado_en) THEN
     RETURN NEW;
   END IF;
-  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[OLD.fecha]); END IF;
-  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(ARRAY[NEW.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(OLD.id_empresa, ARRAY[OLD.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(NEW.id_empresa, ARRAY[NEW.fecha]); END IF;
   RETURN coalesce(NEW, OLD);
 END $$;
 CREATE TRIGGER pedidos_mes_cerrado BEFORE INSERT OR UPDATE OR DELETE ON pedidos FOR EACH ROW EXECUTE FUNCTION fn_pedidos_mes_cerrado();

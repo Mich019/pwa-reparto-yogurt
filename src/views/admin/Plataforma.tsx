@@ -55,6 +55,7 @@ interface Detalle {
   exenta: boolean
   pruebaHasta: string
   suscripcion: string | null
+  baja: { solicitada: string; borrarEn: string; motivo: string | null } | null // la empresa pidió su baja (privacidad.ts)
   equipo: { nombre: string; correo: string; rol: string; activo: boolean; ultimoAcceso: string | null; alta: string; dosPasos: boolean }[]
   invitaciones: { correo: string; rol: string; vence: string }[]
   conteos: { clientes: number; productos: number; entregados: number; pendientes: number; ultimoPedido: string | null }
@@ -481,6 +482,12 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
             Alta el {fecha(e.alta)} · {e.zonaHoraria.replace('America/', '').replace('_', ' ')}
             {e.estado === 'prueba' && ` · prueba hasta el ${fecha(e.pruebaHasta)}`}
           </p>
+          {e.baja && (
+            <p className="mt-2 rounded-md bg-rojo/10 px-3 py-2 text-sm">
+              Pidió su baja el {fecha(e.baja.solicitada)}: sus datos se borran el <strong>{fecha(e.baja.borrarEn)}</strong>. Reactivarla cancela la baja.
+              {e.baja.motivo && <> Motivo: «{e.baja.motivo}».</>}
+            </p>
+          )}
         </div>
         {confirmar ? (
           <div className="flex flex-wrap items-center gap-2 rounded-lg bg-rojo/10 px-4 py-3">

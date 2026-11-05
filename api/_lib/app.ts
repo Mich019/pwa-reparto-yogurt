@@ -26,6 +26,7 @@ import { crearClienteMp, type ClienteMp } from './mercadopago.js'
 import { CON_ACCESO, rutasSuscripcion, SUSCRIPCION_VENCIDA } from './suscripcion.js'
 import { rutasEmpresa } from './empresa.js'
 import { rutasPlataforma } from './plataforma.js'
+import { rutasPrivacidad } from './privacidad.js'
 import { ipCliente } from './seguridad.js'
 import { almacenLimites } from './limites.js'
 import { reportarError } from './errores.js'
@@ -163,7 +164,9 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasEmpresa(app, ctx, { requiereSesionAunConPasswordPendiente, requiereAdmin })
   // Cruza empresas: con la conexión sin envolver (dueño de la base), no la de la empresa de quien llama.
   await rutasPlataforma(app, { db: entrada.db, config: ctx.config }, { requiereSesionSinCobro })
-  await rutasSuscripcion(app, ctx, ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config), { requiereAdminSinCobro })
+  const mp = ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config)
+  await rutasSuscripcion(app, ctx, mp, { requiereAdminSinCobro })
+  await rutasPrivacidad(app, ctx, mp, { requiereSesionAunConPasswordPendiente, requiereSesionSinCobro, requiereAdminSinCobro })
   await rutasSync(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasUsuarios(app, ctx, { requiereAdmin })
   await rutasCartera(app, ctx, { requiereAdmin }, despachador)

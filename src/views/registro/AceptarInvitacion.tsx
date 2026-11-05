@@ -4,6 +4,7 @@ import { api, ErrorApi, ErrorRed } from '../../lib/api'
 import { reglasPassword } from '../../lib/registro'
 import { iniciarSesion } from '../../lib/sesion'
 import { claseInput } from '../../components/ui'
+import { RUTA_LEGAL } from '../legal/PaginaLegal'
 
 // El repartidor abre el enlace de su invitación (/invitacion#<enlace>, api/_lib/registro.ts), escribe su nombre y crea su
 // contraseña. Al terminar entra directo a la app de reparto.
@@ -24,6 +25,7 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
   const [nombre, setNombre] = useState('')
   const [password, setPassword] = useState('')
   const [ver, setVer] = useState(false)
+  const [acepta, setAcepta] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
   }, [token])
 
   const reglas = reglasPassword(password, inv?.correo ?? '')
-  const falta = nombre.trim().length < 2 ? 'Escribe tu nombre' : !reglas.every((x) => x.ok) ? 'La contraseña aún no cumple las reglas' : null
+  const falta = nombre.trim().length < 2 ? 'Escribe tu nombre' : !reglas.every((x) => x.ok) ? 'La contraseña aún no cumple las reglas' : !acepta ? 'Acepta el aviso de privacidad y los términos' : null
 
   async function crear(e: React.FormEvent) {
     e.preventDefault()
@@ -45,7 +47,7 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
     setEstado('enviando')
     setError('')
     try {
-      await api('/invitacion/aceptar', { cuerpo: { token, nombre: nombre.trim(), password: password.trim() } })
+      await api('/invitacion/aceptar', { cuerpo: { token, nombre: nombre.trim(), password: password.trim(), aceptaTerminos: true } })
       await iniciarSesion(inv.correo, password).catch(() => {}) // si falla, la app pide iniciar sesión
       onListo()
     } catch (x) {
@@ -107,6 +109,14 @@ export function AceptarInvitacion({ onListo }: { onListo: () => void }) {
           </li>
         ))}
       </ul>
+
+      <label className="mt-6 flex cursor-pointer items-start gap-3 text-[15px]">
+        <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0" />
+        <span>
+          Acepto el <a href={RUTA_LEGAL.privacidad} target="_blank" rel="noopener" className="font-semibold text-azul underline underline-offset-2">aviso de privacidad</a> y
+          los <a href={RUTA_LEGAL.terminos} target="_blank" rel="noopener" className="font-semibold text-azul underline underline-offset-2">términos del servicio</a>.
+        </span>
+      </label>
 
       {error && <p role="alert" className="mt-5 flex items-center gap-2 text-sm font-medium text-rojo"><AlertCircle size={16} className="shrink-0" /> {error}</p>}
       <button

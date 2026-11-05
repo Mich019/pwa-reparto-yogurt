@@ -13,6 +13,7 @@ import {
 } from '../../lib/registro'
 import { claseInput } from '../../components/ui'
 import { DibujoEnvase, type TipoEnvase } from './dibujos'
+import { RUTA_LEGAL } from '../legal/PaginaLegal'
 
 // Registro de una empresa nueva y su asistente de configuración, una pregunta por pantalla. Las pantallas se arman
 // según lo que se va contestando: una por cada envase elegido (sus tamaños) y dos por cada producto (variantes y
@@ -287,7 +288,7 @@ function armarPantallas(
         <label className={`flex cursor-pointer items-start gap-4 rounded-lg border-2 p-5 transition-colors ${r.terminos ? 'border-marca bg-marca/10' : 'border-linea bg-papel'}`}>
           <input type="checkbox" checked={r.terminos} onChange={(e) => cambiar((x) => ({ ...x, terminos: e.target.checked }))} className="mt-1 h-6 w-6 shrink-0" data-enfocar />
           <span className="text-base">
-            Acepto los <span className="font-semibold">términos del servicio</span> y el <span className="font-semibold">aviso de privacidad</span>, y me comprometo a usar los datos de mis clientes sólo para sus pedidos.
+            Acepto los <a href={RUTA_LEGAL.terminos} target="_blank" rel="noopener" className="font-semibold text-azul underline underline-offset-2">términos del servicio</a> y el <a href={RUTA_LEGAL.privacidad} target="_blank" rel="noopener" className="font-semibold text-azul underline underline-offset-2">aviso de privacidad</a>, y me comprometo a usar los datos de mis clientes sólo para sus pedidos y a darles a conocer mi propio aviso de privacidad.
           </span>
         </label>
       ),

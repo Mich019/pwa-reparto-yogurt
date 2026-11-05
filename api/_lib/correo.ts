@@ -113,3 +113,29 @@ export function correoAviso(nombre: string, texto: string, url: string) {
       + nota('Te escribimos porque tienes una cuenta en Delisy.')),
   }
 }
+
+// Constancia de que la cuenta se eliminó (derecho de cancelación): sale al correo que tenía antes de anonimizarla.
+export function correoCuentaEliminada(nombre: string, empresa: string) {
+  return {
+    asunto: 'Eliminamos tu cuenta de Delisy',
+    texto: `Hola ${nombre}:\n\nComo lo pediste, eliminamos tu cuenta de ${empresa} en Delisy: tu nombre, correo, teléfono y foto ya no están guardados y no puedes volver a entrar con ella. Las ventas que registraste siguen en los libros de ${empresa}, sin tus datos.\n\nSi no fuiste tú, avisa al administrador de tu negocio.`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)},`)
+      + parrafo(`Como lo pediste, eliminamos tu cuenta de <strong>${escapar(empresa)}</strong> en Delisy: tu nombre, correo, teléfono y foto ya no están guardados y no puedes volver a entrar con ella.`)
+      + parrafo(`Las ventas que registraste siguen en los libros de ${escapar(empresa)}, sin tus datos.`)
+      + nota('Si no fuiste tú, avisa al administrador de tu negocio.')),
+  }
+}
+
+// La empresa pidió su baja: hasta cuándo puede arrepentirse y a quién escribir.
+export function correoBajaEmpresa(nombre: string, empresa: string, borrarEn: Date, soporte: string | null) {
+  const dia = borrarEn.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Mexico_City' })
+  const contacto = soporte ? ` escribe a ${soporte}` : ' responde a este correo'
+  return {
+    asunto: `${empresa} se dio de baja de Delisy`,
+    texto: `Hola ${nombre}:\n\n${empresa} se dio de baja de Delisy: nadie de tu equipo puede entrar y la suscripción quedó cancelada. El ${dia} borraremos todos sus datos (clientes, pedidos, cobranza y cuentas) y ya no se podrán recuperar.\n\nSi fue un error o quieres volver antes de esa fecha,${contacto}.`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)},`)
+      + parrafo(`<strong>${escapar(empresa)}</strong> se dio de baja de Delisy: nadie de tu equipo puede entrar y la suscripción quedó cancelada.`)
+      + parrafo(`El <strong>${escapar(dia)}</strong> borraremos todos sus datos (clientes, pedidos, cobranza y cuentas) y ya no se podrán recuperar.`)
+      + nota(`Si fue un error o quieres volver antes de esa fecha,${escapar(contacto)}.`)),
+  }
+}

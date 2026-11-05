@@ -6,6 +6,7 @@ import { RecuperarPassword } from '../../components/RecuperarPassword'
 import { PasoCodigo } from '../../components/PasoCodigo'
 import { Campo, claseInputRecto } from '../../components/ui'
 import { AveDelisy, LogoDelisy } from './marca'
+import { EnlacesLegales } from '../legal/PaginaLegal'
 
 type Modo = 'login' | 'recuperar' | 'codigo'
 
@@ -195,6 +196,8 @@ export function LoginAdmin({ onLoginExitoso, onIrAPwa, onIrARegistro }: {
             </button>
           </div>
         )}
+
+        <EnlacesLegales className="mt-4 text-center" />
 
       </div>
     </div>

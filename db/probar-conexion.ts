@@ -66,7 +66,8 @@ try {
               to_regclass('public.abonos') IS NOT NULL AS m019,
               to_regclass('public.cierres_mes') IS NOT NULL AS m020,
               to_regclass('public.envases_recogidos') IS NOT NULL AS m021,
-              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'comision_pct') AS m022`,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'comision_pct') AS m022,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'legal_version') AS m023`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

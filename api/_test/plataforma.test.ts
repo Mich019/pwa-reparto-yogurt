@@ -253,7 +253,7 @@ describe('panel de la plataforma', () => {
     assert.equal((await pedir(dueno, 'POST', '/plataforma/empresas', { nombre: 'Otra', administrador: { nombre: 'Rosa', correo: dueno.correo } })).status, 409)
     // El administrador acepta el enlace y queda en esa empresa, con su rol.
     const token = r.body.enlace.split('#')[1]
-    const a = await srv.inject({ method: 'POST', url: '/invitacion/aceptar', payload: { token, nombre: 'Rosa Ruiz', password: 'Lacteos2026!x' } })
+    const a = await srv.inject({ method: 'POST', url: '/invitacion/aceptar', payload: { token, nombre: 'Rosa Ruiz', password: 'Lacteos2026!x', aceptaTerminos: true } })
     assert.equal(a.statusCode, 201)
     const { rows: [u] } = await db.query(`SELECT u.rol, u.id_empresa, e.nombre, e.prueba_hasta > now() + interval '29 days' AS treinta FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.correo = $1`, [correoAdmin])
     assert.deepEqual([u.rol, u.id_empresa, u.nombre, u.treinta], ['administrador', r.body.id, 'Hielo Nuevo', true])

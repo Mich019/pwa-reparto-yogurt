@@ -5,6 +5,7 @@ import { cerrarSesion } from '../../lib/sesion'
 import { cancelarSuscripcion, suscribirse, type Suscripcion } from '../../lib/suscripcion'
 import { usePlataformaPublica } from '../../lib/plataforma'
 import { LogoEmpresa } from './marca'
+import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
 
 // Cobro en el panel: la pantalla cuando la prueba o la suscripción se acaban, y la sección
 // de Configuración. El pago pasa en Mercado Pago (src/lib/suscripcion.ts).
@@ -72,6 +73,11 @@ export function PantallaCobro({ s }: { s: Suscripcion }) {
       <button type="button" onClick={() => void cerrarSesion()} className={`mt-6 flex items-center gap-2 text-sm font-semibold text-apagado hover:text-tinta ${anillo}`}>
         <LogOut size={15} aria-hidden="true" /> Cerrar sesión
       </button>
+      {/* Descargar los datos, eliminar la cuenta o dar de baja la empresa no dependen de pagar. */}
+      <details className="mt-8 w-full max-w-2xl text-left">
+        <summary className={`cursor-pointer text-center text-sm font-semibold text-apagado hover:text-tinta ${anillo}`}>Privacidad y datos</summary>
+        <div className="mt-4"><PrivacidadYDatos /></div>
+      </details>
     </div>
   )
 }

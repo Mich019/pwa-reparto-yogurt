@@ -7,6 +7,7 @@ import { tx, type Db } from './db.js'
 import { tieneDosPasos, usarCodigo } from './dosPasos.js'
 import { borrarCookiesSesion, fijarCookiesSesion, leerCookie } from './cookies.js'
 import { esPlataforma } from './plataforma.js'
+import { VERSION_LEGAL } from './privacidad.js'
 import { ipCliente, sha256, tokenAleatorio } from './seguridad.js'
 
 // modo 'cookie': el panel web recibe la sesión en cookies HttpOnly en lugar de en la respuesta (ver cookies.ts).
@@ -227,7 +228,7 @@ export async function rutasAuth(
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, e.interna, e.nombre AS empresa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, e.interna, e.nombre AS empresa
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [req.usuario.id],
     )
@@ -235,6 +236,8 @@ export async function rutasAuth(
     return {
       id: u.id_usuario, nombre: u.nombre, correo: u.correo, telefono: u.telefono ?? '', foto: u.foto ?? null, rol: u.rol, debeCambiarPassword: u.debe_cambiar_password, plataforma: esPlataforma(u),
       empresa: u.empresa, alta: u.creado_en, ultimoAcceso: u.ultimo_acceso, passwordCambiado: u.password_cambiado_en,
+      // Falta aceptar el aviso de privacidad y los términos vigentes (privacidad.ts): la app los muestra antes de seguir.
+      legalPendiente: u.legal_version !== VERSION_LEGAL, versionLegal: VERSION_LEGAL,
     }
   })
 

@@ -6,6 +6,8 @@ import { PwaLayout } from './views/pwa/PwaLayout'
 import { RegistroEmpresa } from './views/registro/RegistroEmpresa'
 import { AceptarInvitacion } from './views/registro/AceptarInvitacion'
 import { Plataforma } from './views/admin/Plataforma'
+import { PaginaLegal, documentoDeRuta } from './views/legal/PaginaLegal'
+import { AceptarLegal } from './views/legal/AceptarLegal'
 import { Avisos } from './components/ui'
 import { VisorPdf } from './components/VisorPdf'
 import { MODO_SERVIDOR } from './lib/api'
@@ -39,6 +41,7 @@ export default function App() {
   const [esRegistro, setEsRegistro] = useState(esRutaRegistro)
   const [esPlataforma, setEsPlataforma] = useState(esRutaPlataforma)
   const [esInvitacion, setEsInvitacion] = useState(esRutaInvitacion)
+  const [legal, setLegal] = useState(() => (typeof window === 'undefined' ? null : documentoDeRuta(window.location.pathname)))
 
   useEffect(() => {
     const alCambiar = () => {
@@ -46,6 +49,7 @@ export default function App() {
       setEsRegistro(esRutaRegistro())
       setEsPlataforma(esRutaPlataforma())
       setEsInvitacion(esRutaInvitacion())
+      setLegal(documentoDeRuta(window.location.pathname))
     }
     window.addEventListener('popstate', alCambiar)
     window.addEventListener('hashchange', alCambiar)
@@ -103,13 +107,24 @@ export default function App() {
   }
 
   // =========================================================================
+  // AVISO DE PRIVACIDAD Y TÉRMINOS (/legal/…): públicos, con o sin sesión
+  // =========================================================================
+  if (legal) {
+    return (
+      <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`} style={estiloDelisy}>
+        <PaginaLegal documento={legal} />
+      </div>
+    )
+  }
+
+  // =========================================================================
   // PANEL DE LA PLATAFORMA (/plataforma): para quienes administran el servicio (api/_lib/plataforma.ts)
   // =========================================================================
   if (esPlataforma && sesion?.usuario.plataforma && MODO_SERVIDOR) {
     return (
       <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`} style={estiloDelisy}>
         <Avisos />
-        {sesion.usuario.debeCambiarPassword ? <CambioObligatorio /> : <Plataforma />}
+        {sesion.usuario.debeCambiarPassword ? <CambioObligatorio /> : <><Plataforma /><AceptarLegal /></>}
       </div>
     )
   }
@@ -151,7 +166,7 @@ export default function App() {
         <VisorPdf />
         {!sesion ? <LoginAdmin onIrAPwa={irAPwa} onIrARegistro={irARegistro} />
           : sesion.usuario.debeCambiarPassword ? <CambioObligatorio />
-          : <AdminLayout onIrAPwa={irAPwa} />}
+          : <><AdminLayout onIrAPwa={irAPwa} /><AceptarLegal /></>}
       </div>
     )
   }
@@ -170,6 +185,7 @@ export default function App() {
           <>
             <VisorPdf />
             <PwaLayout onIrAAdmin={irAAdmin} />
+            {MODO_SERVIDOR && <AceptarLegal />}
           </>
         )}
     </div>
