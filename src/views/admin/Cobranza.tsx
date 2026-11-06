@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen } from 'lucide-react'
 import {
-  cerrarMes, confirmarCorte, entregarCorte, exportarInforme, reabrirMes, textoMes, useServidor,
+  cerrarMes, confirmarCorte, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
   type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
 } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
@@ -124,6 +124,7 @@ function Cortes() {
   const [fecha, setFecha] = useState(hoy)
   const lista = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${fecha}`)
   const [captura, setCaptura] = useState<FilaCorte | null>(null)
+  const [reabriendo, setReabriendo] = useState<FilaCorte | null>(null)
   const filas = lista.datos?.filas ?? []
   const [confirmando, setConfirmando] = useState<string | null>(null)
   async function confirmar(f: FilaCorte) {
@@ -156,15 +157,51 @@ function Cortes() {
                 {f.diferencia !== null && f.diferencia !== 0 && <span className="font-semibold text-rojo"> · {f.diferencia < 0 ? 'faltan' : 'sobran'} {dinero(Math.abs(f.diferencia))}</span>}
               </span>
               {f.nota && <span className="block text-sm text-apagado">“{f.nota}”</span>}
+              {f.reabierto && <span className="block text-sm text-apagado">Reabierto: {f.reabierto.motivo}</span>}
             </span>
             <span className="text-sm text-apagado">{ETIQUETA_CORTE[f.estado]}</span>
             {f.estado === 'pendiente' && <button onClick={() => confirmar(f)} disabled={confirmando === f.id} className={botonPanel}>Confirmar</button>}
             {f.estado === 'sin_corte' && <button onClick={() => setCaptura(f)} className={botonPanelSuave}>Capturar</button>}
+            {f.estado === 'confirmado' && <button onClick={() => setReabriendo(f)} className={botonPanelSuave}><LockOpen size={16} aria-hidden="true" />Reabrir</button>}
           </div>
         ))}
       </Estado>
       {captura && <HojaCaptura fila={captura} onCerrar={() => setCaptura(null)} onHecho={lista.recargar} />}
+      {reabriendo && <HojaReabrirCorte fila={reabriendo} onCerrar={() => setReabriendo(null)} onHecho={lista.recargar} />}
     </>
+  )
+}
+
+// Reabrir un corte confirmado: vuelve a «Por confirmar», lo que debe entregar se recalcula y el vendedor puede corregirlo.
+function HojaReabrirCorte({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: () => void; onHecho: () => void }) {
+  const [motivo, setMotivo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  async function enviar() {
+    setEnviando(true)
+    try {
+      await reabrirCorte(fila.id, motivo.trim())
+      aviso('Corte reabierto')
+      onHecho()
+      onCerrar()
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo reabrir')
+    } finally {
+      setEnviando(false)
+    }
+  }
+  return (
+    <Hoja abierta onCerrar={onCerrar} titulo={<div>Reabrir corte<div className="text-base font-medium text-apagado">{fila.vendedor} · {textoFecha(fila.fecha)}</div></div>}
+      pie={<Boton onClick={enviar} disabled={enviando || motivo.trim().length < 5} className="w-full text-lg">Reabrir corte</Boton>}>
+      <div className="space-y-4 pb-4">
+        <p className="text-sm leading-relaxed text-apagado">
+          Vuelve a quedar por confirmar: lo que debe entregar se calcula otra vez con las ventas y abonos de ese día, y el vendedor puede
+          corregir lo que entregó. Queda registrado quién lo reabrió y por qué.
+        </p>
+        <Campo etiqueta="Motivo">
+          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} className={claseInput} autoFocus placeholder="Ej. llegó tarde un cobro en efectivo" />
+        </Campo>
+      </div>
+    </Hoja>
   )
 }
 

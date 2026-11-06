@@ -68,7 +68,8 @@ try {
               to_regclass('public.envases_recogidos') IS NOT NULL AS m021,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'comision_pct') AS m022,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'legal_version') AS m023,
-              EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'cortes_mes_cerrado') AS m024`,
+              EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'cortes_mes_cerrado') AS m024,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cortes_dia' AND column_name = 'historial') AS m025`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

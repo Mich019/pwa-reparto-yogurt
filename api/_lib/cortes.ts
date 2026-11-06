@@ -71,6 +71,12 @@ interface FilaCorte {
   entregado: number | null; diferencia: number | null; nota: string | null
   estado: 'sin_corte' | 'pendiente' | 'confirmado'
   confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
+  reabierto: { motivo: string; en: string } | null // la última vez que el administrador lo reabrió, mientras siga pendiente
+}
+
+const ultimaReapertura = (h: { accion: string; en: string; motivo?: string }[] | null) => {
+  const r = (h ?? []).findLast((e) => e.accion === 'reabierto')
+  return r ? { motivo: r.motivo ?? '', en: r.en } : null
 }
 
 const bodyCorte = z.object({ fecha: fechaIso.optional(), efectivoEntregado: dinero, nota: z.string().trim().max(300).optional(), vendedorId: z.uuid().optional() })
@@ -279,6 +285,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         esperado: c?.estado === 'confirmado' ? c.esp : hoy.esperado, transferencias: c?.estado === 'confirmado' ? c.tr : hoy.transferencias, credito: c?.estado === 'confirmado' ? c.cr : hoy.credito,
         entregado: c ? c.ent : null, diferencia: c ? redondear(c.ent - (c.estado === 'confirmado' ? c.esp : hoy.esperado)) : null, nota: c?.nota ?? null,
         estado: c ? c.estado : 'sin_corte', confirmadoPor: c?.conf_por ?? null, confirmadoEn: c?.conf_en ?? null, notaAdmin: c?.nota_admin ?? null,
+        reabierto: c?.estado === 'pendiente' ? ultimaReapertura(c.historial) : null,
       })
     }
     return { fecha, filas }
@@ -333,13 +340,40 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         if (k.estado === 'confirmado') throw new Falla(409, 'Ese corte ya está confirmado')
         const x = await cifrasDelDia(c, k.fecha, k.id_vendedor)
         const { rows: [corte] } = await c.query(
-          `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, estado = 'confirmado', confirmado_por = $5, confirmado_en = now(), nota_admin = $6, actualizado_en = now()
+          `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, estado = 'confirmado', confirmado_por = $5, confirmado_en = now(), nota_admin = $6, actualizado_en = now(),
+                  historial = historial || $7::jsonb
             WHERE id_corte = $1 RETURNING diferencia::float8 AS dif`,
-          [p.data.id, x.esperado, x.transferencias, x.credito, req.usuario.id, b.data.nota || null],
+          [p.data.id, x.esperado, x.transferencias, x.credito, req.usuario.id, b.data.nota || null,
+            JSON.stringify([{ accion: 'confirmado', por: req.usuario.id, en: new Date().toISOString(), esperado: x.esperado }])],
         )
         return { ok: true, esperado: x.esperado, diferencia: redondear(corte.dif) }
       })
       return r
+    } catch (e) {
+      return responder(rep, e)
+    }
+  })
+
+  // Reabrir uno confirmado (con motivo): vuelve a pendiente, lo esperado se recalcula con lo que haya ese día y el
+  // vendedor puede corregir lo que entregó. Un mes cerrado no lo permite (trigger cortes_mes_cerrado).
+  app.post('/cortes/:id/reabrir', { preHandler: requiereAdmin, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const p = idParam.safeParse(req.params)
+    const b = z.object({ motivo: z.string().trim().min(5, 'Escribe el motivo (al menos 5 letras)').max(300) }).safeParse(req.body)
+    if (!p.success) return rep.code(400).send({ error: 'Corte no válido' })
+    if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Escribe el motivo' })
+    try {
+      await tx(db, req.usuario.id, async (c) => {
+        const { rows: [k] } = await c.query(`SELECT estado FROM cortes_dia WHERE id_corte = $1 FOR UPDATE`, [p.data.id])
+        if (!k) throw new Falla(404, 'Ese corte no existe')
+        if (k.estado !== 'confirmado') throw new Falla(409, 'Ese corte no está confirmado')
+        const evento = { accion: 'reabierto', por: req.usuario.id, en: new Date().toISOString(), motivo: b.data.motivo }
+        await c.query(
+          `UPDATE cortes_dia SET estado = 'pendiente', confirmado_por = NULL, confirmado_en = NULL, actualizado_en = now(), historial = historial || $2::jsonb
+            WHERE id_corte = $1`,
+          [p.data.id, JSON.stringify([evento])],
+        )
+      })
+      return { ok: true }
     } catch (e) {
       return responder(rep, e)
     }

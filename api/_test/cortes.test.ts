@@ -71,6 +71,21 @@ describe('corte del día', () => {
     assert.equal(tarde.status, 409)
     assert.match(tarde.body.error, /confirmado/)
     assert.equal((await llamar(x.ana, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'transferencia' })).status, 201)
+
+    // Reabrirlo pide motivo y es del administrador; vuelve a pendiente y entonces sí entra el efectivo tardío.
+    assert.equal((await llamar(x.ana, 'POST', `/cortes/${r.body.id}/reabrir`, { motivo: 'Cobro tardío' })).status, 403)
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${r.body.id}/reabrir`, { motivo: 'no' })).status, 400)
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${r.body.id}/reabrir`, { motivo: 'Llegó un cobro tardío' })).status, 200)
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${r.body.id}/reabrir`, { motivo: 'Llegó un cobro tardío' })).status, 409)
+    assert.equal((await llamar(x.ana, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'efectivo' })).status, 201)
+    const reabierto = (await llamar(x.ana, 'GET', '/cortes')).body.filas[0]
+    assert.equal(reabierto.estado, 'pendiente')
+    assert.equal(reabierto.esperado, 180)
+    assert.equal(reabierto.reabierto.motivo, 'Llegó un cobro tardío')
+    assert.equal((await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 180 })).body.diferencia, 0)
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${r.body.id}/confirmar`, {})).status, 200)
+    const { rows: [h] } = await db.query(`SELECT historial FROM cortes_dia WHERE id_corte = $1`, [r.body.id])
+    assert.deepEqual(h.historial.map((e: { accion: string }) => e.accion), ['confirmado', 'reabierto', 'confirmado'])
   })
 
   it('el administrador ve lo esperado de cada vendedor por separado', async () => {

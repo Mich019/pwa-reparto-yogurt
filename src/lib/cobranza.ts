@@ -29,6 +29,7 @@ export interface FilaCorte {
   entregado: number | null; diferencia: number | null; nota: string | null
   estado: 'sin_corte' | 'pendiente' | 'confirmado'
   confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
+  reabierto: { motivo: string; en: string } | null
 }
 export interface MiMeta { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null; comisionPct: number; comision: number }
 export interface MesCierre { mes: string; estado: 'abierto' | 'cerrado' | 'reabierto'; actual: boolean; cerradoEn: string | null }
@@ -76,6 +77,7 @@ export const anularRecogida = (id: string) => enviar(`/envases/recogidas/${id}/a
 export const entregarCorte = (b: { efectivoEntregado: number; nota?: string; fecha?: string; vendedorId?: string }) => enviar<{ id: string; esperado: number; entregado: number; diferencia: number }>('/cortes', b)
 export const confirmarCorte = (id: string, nota?: string) => enviar<{ ok: true; esperado: number; diferencia: number }>(`/cortes/${id}/confirmar`, { nota })
 export const cerrarMes = (mes: string) => enviar(`/cierres/${mes}/cerrar`)
+export const reabrirCorte = (id: string, motivo: string) => enviar<{ ok: true }>(`/cortes/${id}/reabrir`, { motivo })
 export const reabrirMes = (mes: string, motivo: string) => enviar(`/cierres/${mes}/reabrir`, { motivo })
 
 export interface PrecioCliente { productoId: string; sabor: string; unidad: string; lista: number; precioLitro: number | null }

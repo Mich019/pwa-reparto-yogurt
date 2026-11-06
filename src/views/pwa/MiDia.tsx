@@ -14,7 +14,7 @@ export function MiDia() {
   const fila = corte.datos?.filas[0]
   const m = meta.datos
   if (!fila && !(m && m.meta)) return null
-  const estado = !fila ? '' : fila.estado === 'confirmado' ? 'Confirmado' : fila.estado === 'pendiente' ? 'Entregado, falta que lo confirmen' : 'Sin entregar'
+  const estado = !fila ? '' : fila.estado === 'confirmado' ? 'Confirmado' : fila.estado === 'pendiente' ? (fila.reabierto ? `Reabierto: ${fila.reabierto.motivo}` : 'Entregado, falta que lo confirmen') : 'Sin entregar'
   return (
     <>
       {fila && (

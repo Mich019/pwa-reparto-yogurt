@@ -153,7 +153,7 @@ export async function rutasCobranza(app: FastifyInstance, { db, config }: Contex
             `SELECT 1 AS ok FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 AND estado = 'confirmado' FOR SHARE`,
             [fecha, req.usuario.id],
           )
-          if (k) throw new Falla(409, fecha === hoy ? 'Tu corte de hoy ya está confirmado: registra este abono mañana' : 'El corte de ese día ya está confirmado: registra el abono con la fecha de hoy')
+          if (k) throw new Falla(409, fecha === hoy ? 'Tu corte de hoy ya está confirmado: pide que lo reabran o registra este abono mañana' : 'El corte de ese día ya está confirmado: pide que lo reabran o registra el abono con la fecha de hoy')
         }
         const { rows: [a] } = await c.query(
           `INSERT INTO abonos (id_cliente, id_vendedor, fecha, monto, metodo, nota) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_abono`,

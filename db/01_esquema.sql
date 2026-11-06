@@ -649,7 +649,7 @@ CREATE INDEX abonos_fecha ON abonos (id_empresa, fecha);
 CREATE INDEX pedidos_credito ON pedidos (id_cliente) WHERE metodo_pago = 'credito';
 -- Corte del día: cuánto efectivo debía entregar cada vendedor (lo cobrado en efectivo: ventas y abonos) contra lo que dice
 -- que entrega; el administrador lo confirma. La diferencia queda a la vista. Uno por vendedor y día; mientras esté
--- pendiente el vendedor lo puede corregir.
+-- pendiente el vendedor lo puede corregir. El administrador puede reabrir uno confirmado anotando el motivo.
 CREATE TABLE cortes_dia (
   id_corte           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE RESTRICT,
@@ -665,6 +665,7 @@ CREATE TABLE cortes_dia (
   confirmado_por     uuid REFERENCES usuarios (id_usuario) ON DELETE SET NULL,
   confirmado_en      timestamptz,
   nota_admin         varchar(300),
+  historial          jsonb NOT NULL DEFAULT '[]', -- confirmaciones y reaperturas (con motivo)
   creado_en          timestamptz NOT NULL DEFAULT now(),
   actualizado_en     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT cortes_estado_valido CHECK (estado IN ('pendiente', 'confirmado')),
