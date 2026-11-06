@@ -30,7 +30,9 @@ export interface FilaCorte {
   estado: 'sin_corte' | 'pendiente' | 'confirmado'
   confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
   reabierto: { motivo: string; en: string } | null
+  cambioDespues: number | null // confirmado, pero el efectivo de ese día cambió después: conviene reabrirlo
 }
+export interface Descuadre { id: string; fecha: string; vendedorId: string; vendedor: string; confirmado: number; ahora: number; cambio: number }
 export interface MiMeta { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null; comisionPct: number; comision: number }
 export interface MesCierre { mes: string; estado: 'abierto' | 'cerrado' | 'reabierto'; actual: boolean; cerradoEn: string | null }
 export interface CifrasMes {

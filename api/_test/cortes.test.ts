@@ -85,6 +85,15 @@ describe('corte del día', () => {
     assert.equal((await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 180 })).body.diferencia, 0)
     assert.equal((await llamar(x.admin, 'POST', `/cortes/${r.body.id}/confirmar`, {})).status, 200)
     const { rows: [h] } = await db.query(`SELECT historial FROM cortes_dia WHERE id_corte = $1`, [r.body.id])
+
+    // Una venta en efectivo que sincroniza después de confirmar: el corte queda marcado para reabrirlo.
+    assert.deepEqual((await llamar(x.admin, 'GET', '/cortes/descuadres')).body.cortes, [])
+    await x.entrega('EFECTIVO', 1) // $60 tarde
+    const marcado = (await llamar(x.admin, 'GET', '/cortes')).body.filas.find((f: { vendedorId: string }) => f.vendedorId === x.ana.id)
+    assert.equal(marcado.cambioDespues, 60)
+    const d = (await llamar(x.admin, 'GET', '/cortes/descuadres')).body.cortes
+    assert.deepEqual(d.map((c: { id: string; cambio: number }) => [c.id, c.cambio]), [[r.body.id, 60]])
+    assert.equal((await llamar(x.ana, 'GET', '/cortes/descuadres')).status, 403)
     assert.deepEqual(h.historial.map((e: { accion: string }) => e.accion), ['confirmado', 'reabierto', 'confirmado'])
   })
 

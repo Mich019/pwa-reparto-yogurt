@@ -72,6 +72,9 @@ interface FilaCorte {
   estado: 'sin_corte' | 'pendiente' | 'confirmado'
   confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
   reabierto: { motivo: string; en: string } | null // la última vez que el administrador lo reabrió, mientras siga pendiente
+  // Confirmado, pero el efectivo de ese día cambió después (una venta que sincronizó tarde, un abono anulado): cuánto
+  // más (o menos, negativo) se debería entregar hoy contra lo que se confirmó. Es la señal para reabrirlo.
+  cambioDespues: number | null
 }
 
 const ultimaReapertura = (h: { accion: string; en: string; motivo?: string }[] | null) => {
@@ -286,9 +289,33 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         entregado: c ? c.ent : null, diferencia: c ? redondear(c.ent - (c.estado === 'confirmado' ? c.esp : hoy.esperado)) : null, nota: c?.nota ?? null,
         estado: c ? c.estado : 'sin_corte', confirmadoPor: c?.conf_por ?? null, confirmadoEn: c?.conf_en ?? null, notaAdmin: c?.nota_admin ?? null,
         reabierto: c?.estado === 'pendiente' ? ultimaReapertura(c.historial) : null,
+        cambioDespues: c?.estado === 'confirmado' && Math.abs(hoy.esperado - c.esp) >= 0.01 ? redondear(hoy.esperado - c.esp) : null,
       })
     }
     return { fecha, filas }
+  })
+
+  // Cortes confirmados de los últimos 90 días cuyo efectivo cambió después (ventas que sincronizaron tarde, abonos
+  // anulados…): para que el administrador sepa cuáles reabrir sin revisar día por día. Una sola consulta.
+  app.get('/cortes/descuadres', { preHandler: requiereAdmin }, async () => {
+    const desde = await hoyDe() // menos 90 días, en SQL
+    const { rows } = await db.query(
+      `WITH v AS (SELECT fecha, id_vendedor, sum(total) FILTER (WHERE metodo_pago = 'efectivo') AS e FROM pedidos
+                   WHERE estado = 'entregado' AND fecha >= $1::date - 90 GROUP BY 1, 2),
+            a AS (SELECT fecha, id_vendedor, sum(monto) FILTER (WHERE metodo = 'efectivo') AS e FROM abonos
+                   WHERE anulado_en IS NULL AND fecha >= $1::date - 90 GROUP BY 1, 2)
+       SELECT c.id_corte, c.fecha::text, c.id_vendedor, u.nombre, c.efectivo_esperado::float8 AS esp,
+              (coalesce(v.e, 0) + coalesce(a.e, 0))::float8 AS ahora
+         FROM cortes_dia c JOIN usuarios u ON u.id_usuario = c.id_vendedor
+         LEFT JOIN v ON v.fecha = c.fecha AND v.id_vendedor = c.id_vendedor
+         LEFT JOIN a ON a.fecha = c.fecha AND a.id_vendedor = c.id_vendedor
+        WHERE c.estado = 'confirmado' AND c.fecha >= $1::date - 90 AND abs(coalesce(v.e, 0) + coalesce(a.e, 0) - c.efectivo_esperado) >= 0.01
+        ORDER BY c.fecha DESC, lower(u.nombre) LIMIT 50`,
+      [desde],
+    )
+    return {
+      cortes: rows.map((r) => ({ id: r.id_corte as string, fecha: r.fecha as string, vendedorId: r.id_vendedor as string, vendedor: r.nombre as string, confirmado: r.esp as number, ahora: redondear(r.ahora), cambio: redondear(r.ahora - r.esp) })),
+    }
   })
 
   // El vendedor entrega su corte (puede corregirlo mientras el administrador no lo confirme). El administrador también

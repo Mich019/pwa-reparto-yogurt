@@ -185,7 +185,7 @@ export const GUIAS: Guia[] = [
     palabras: 'corte caja efectivo vendedor confirmar reabrir diferencia faltante sobrante cuadrar dia',
     pasos: [
       { texto: 'En Cobranza, abre «Cortes» y elige el día. Cada vendedor muestra lo que debía entregar y lo que entregó.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Por cobrar' }, { texto: 'Envases' }, { texto: 'Cortes', primario: true, foco: true }, { texto: 'Meses' }] }, { t: 'filas', n: 3 }]) },
-      { texto: 'Si cuadra, toca «Confirmar». Si el vendedor no lo capturó, usa «Capturar» por él. Si después llega un cobro de ese día, «Reabrir» con un motivo lo regresa a por confirmar.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'filas', n: 3 }, { t: 'botones', items: [{ texto: 'Confirmar', primario: true, foco: true }] }]) },
+      { texto: 'Si cuadra, toca «Confirmar». Si el vendedor no lo capturó, usa «Capturar» por él. Si después llega un cobro de ese día, «Reabrir» con un motivo lo regresa a por confirmar. Los que cambiaron después de confirmarlos salen marcados arriba.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'filas', n: 3 }, { t: 'botones', items: [{ texto: 'Confirmar', primario: true, foco: true }] }]) },
     ],
   },
   {

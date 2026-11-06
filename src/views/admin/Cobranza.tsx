@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
-  type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
+  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
 } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { textoPorUnidad } from '../../lib/unidades'
@@ -125,6 +125,9 @@ function Cortes() {
   const lista = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${fecha}`)
   const [captura, setCaptura] = useState<FilaCorte | null>(null)
   const [reabriendo, setReabriendo] = useState<FilaCorte | null>(null)
+  const descuadres = useServidor<{ cortes: Descuadre[] }>('/cortes/descuadres')
+  const otros = (descuadres.datos?.cortes ?? []).filter((d) => d.fecha !== fecha)
+  const recargar = () => { lista.recargar(); descuadres.recargar() }
   const filas = lista.datos?.filas ?? []
   const [confirmando, setConfirmando] = useState<string | null>(null)
   async function confirmar(f: FilaCorte) {
@@ -132,7 +135,7 @@ function Cortes() {
     try {
       const r = await confirmarCorte(f.id)
       aviso(r.diferencia === 0 ? 'Corte confirmado' : `Corte confirmado con ${r.diferencia < 0 ? 'faltante' : 'sobrante'} de ${dinero(Math.abs(r.diferencia))}`)
-      lista.recargar()
+      recargar()
     } catch (e) {
       aviso(e instanceof Error ? e.message : 'No se pudo confirmar')
     } finally {
@@ -141,6 +144,21 @@ function Cortes() {
   }
   return (
     <>
+      {otros.length > 0 && (
+        <div className="mb-4 border-b border-linea pb-4">
+          <p className="flex items-start gap-2 text-sm font-medium">
+            <TriangleAlert size={16} className="mt-0.5 shrink-0 text-ambar" aria-hidden="true" />
+            {otros.length === 1 ? 'Un corte confirmado cambió' : `${otros.length} cortes confirmados cambiaron`} después de confirmarlo (ventas que llegaron tarde o abonos anulados). Ábrelo y reábrelo para cuadrarlo.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {otros.map((d) => (
+              <button key={d.id} onClick={() => setFecha(d.fecha)} className={botonPanelSuave}>
+                {textoFecha(d.fecha)} · {d.vendedor} · {d.cambio > 0 ? '+' : '−'}{dinero(Math.abs(d.cambio))}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2 pb-3">
         <button onClick={() => setFecha(sumarDias(fecha, -1))} aria-label="Día anterior" className={botonPanelIcono}><ChevronLeft size={18} /></button>
         <span className="min-w-36 text-center font-semibold">{fecha === hoy() ? 'Hoy' : textoFecha(fecha)}</span>
@@ -158,16 +176,22 @@ function Cortes() {
               </span>
               {f.nota && <span className="block text-sm text-apagado">“{f.nota}”</span>}
               {f.reabierto && <span className="block text-sm text-apagado">Reabierto: {f.reabierto.motivo}</span>}
+              {f.cambioDespues !== null && (
+                <span className="mt-0.5 flex items-start gap-1.5 text-sm font-medium">
+                  <TriangleAlert size={15} className="mt-0.5 shrink-0 text-ambar" aria-hidden="true" />
+                  Cambió después de confirmarlo: ahora debía {dinero(f.esperado + f.cambioDespues)} ({f.cambioDespues > 0 ? '+' : '−'}{dinero(Math.abs(f.cambioDespues))}). Reábrelo para cuadrarlo.
+                </span>
+              )}
             </span>
             <span className="text-sm text-apagado">{ETIQUETA_CORTE[f.estado]}</span>
             {f.estado === 'pendiente' && <button onClick={() => confirmar(f)} disabled={confirmando === f.id} className={botonPanel}>Confirmar</button>}
             {f.estado === 'sin_corte' && <button onClick={() => setCaptura(f)} className={botonPanelSuave}>Capturar</button>}
-            {f.estado === 'confirmado' && <button onClick={() => setReabriendo(f)} className={botonPanelSuave}><LockOpen size={16} aria-hidden="true" />Reabrir</button>}
+            {f.estado === 'confirmado' && <button onClick={() => setReabriendo(f)} className={f.cambioDespues !== null ? botonPanel : botonPanelSuave}><LockOpen size={16} aria-hidden="true" />Reabrir</button>}
           </div>
         ))}
       </Estado>
-      {captura && <HojaCaptura fila={captura} onCerrar={() => setCaptura(null)} onHecho={lista.recargar} />}
-      {reabriendo && <HojaReabrirCorte fila={reabriendo} onCerrar={() => setReabriendo(null)} onHecho={lista.recargar} />}
+      {captura && <HojaCaptura fila={captura} onCerrar={() => setCaptura(null)} onHecho={recargar} />}
+      {reabriendo && <HojaReabrirCorte fila={reabriendo} onCerrar={() => setReabriendo(null)} onHecho={recargar} />}
     </>
   )
 }
