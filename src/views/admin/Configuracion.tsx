@@ -13,7 +13,7 @@ import { MarcaEmpresa } from './MarcaEmpresa'
 import { ZonaEmpresa } from './ZonaEmpresa'
 import { Ayuda } from '../ayuda/Ayuda'
 import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
-import { useMenu, type SeccionAdmin } from './menu'
+import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -399,7 +399,9 @@ function OrdenMenu() {
   // transform, la arrastrada siguiendo al puntero y las demás haciéndole hueco donde caería.
   const destino = arrastre ? Math.max(0, Math.min(ids.length - 1, arrastre.desde + Math.round(arrastre.dy / arrastre.alto))) : -1
   const orden = arrastre ? (() => { const o = ids.filter((x) => x !== arrastre.id); o.splice(destino, 0, arrastre.id); return o })() : ids
-  const guardar = (o: SeccionAdmin[]) => { if (o.join() !== ids.join()) cambiarPreferencias({ ordenMenu: o }) }
+  const guardar = (o: SeccionAdmin[]) => {
+    if (o.join() !== ids.join() || !o.length) guardarOrdenMenu(o).catch(() => aviso('No se guardó en tu cuenta: queda sólo en este navegador'))
+  }
 
   function empezar(e: React.PointerEvent<HTMLLIElement>, id: SeccionAdmin) {
     if (e.button !== 0) return
@@ -422,8 +424,8 @@ function OrdenMenu() {
   }
 
   return (
-    <Seccion id="orden-menu" titulo="Orden del menú" descripcion="Arrastra las secciones para poner primero lo que más usas. Configuración siempre va al final."
-      acciones={propio && <button type="button" onClick={() => cambiarPreferencias({ ordenMenu: [] })} className={`rounded-md bg-niebla px-4 py-2 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}>Restablecer</button>}>
+    <Seccion id="orden-menu" titulo="Orden del menú" descripcion="Arrastra las secciones para poner primero lo que más usas. Se guarda en tu cuenta: lo ves igual en cualquier computadora. Configuración siempre va al final."
+      acciones={propio && <button type="button" onClick={() => guardar([])} className={`rounded-md bg-niebla px-4 py-2 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}>Restablecer</button>}>
       <ol className="max-w-md select-none" aria-label="Orden del menú">
         {menu.map(({ id, texto, icono: Icono }, k) => {
           const i = orden.indexOf(id)

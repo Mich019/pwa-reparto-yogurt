@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { api, apiArchivo, COOKIES_POSIBLES, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
+import { cambiarPreferencias, preferenciasPanel } from './tema'
 import { CLAVE_REVOCAR, CLAVE_SESION_SW, REVOCAR_COOKIE, guardarRevocacion, olvidarRevocacionCookie, revocarPendientes, type SesionSegundoPlano } from './envio'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
@@ -235,7 +236,7 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
 }
 
 // El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
-export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null }) {
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[] }) {
   const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
   return r
@@ -246,8 +247,17 @@ export async function guardarPerfil(datos: { nombre?: string; telefono?: string;
 export async function refrescarPerfil() {
   if (!actual) return
   try {
-    const r = await llamarAutenticado<{ nombre: string; foto: string | null }>('/me')
+    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null }>('/me')
     if (actual && (actual.usuario.nombre !== r.nombre || actual.usuario.foto !== r.foto)) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
+    // El orden del menú del panel vive en la cuenta; el navegador guarda una copia para pintarlo sin esperar.
+    // Sin orden en la cuenta va el de fábrica; sólo la primera vez, este navegador le pasa el que ya tenía de antes de
+    // guardarse en la cuenta (una vez por navegador, para que otra cuenta que entre aquí no herede el de la primera).
+    if (r.ordenMenu === undefined) return
+    const local = preferenciasPanel().ordenMenu
+    let heredar = false
+    try { heredar = !r.ordenMenu && local.length > 0 && !localStorage.getItem('orden-menu-en-cuenta'); localStorage.setItem('orden-menu-en-cuenta', '1') } catch { /* sin almacenamiento */ }
+    if (heredar) void guardarPerfil({ ordenMenu: local }).catch(() => {})
+    else cambiarPreferencias({ ordenMenu: r.ordenMenu ?? [] })
   } catch { /* sin conexión */ }
 }
 

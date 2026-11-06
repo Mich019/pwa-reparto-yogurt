@@ -81,6 +81,7 @@ CREATE TABLE usuarios (
   correo                varchar(150) NOT NULL,
   telefono              varchar(20),
   foto                  text,                               -- foto de perfil (data URL de 256 px; 012_foto_perfil.sql)
+  orden_menu            text[],                             -- orden del menú del panel (null = de fábrica; 026_orden_menu.sql)
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040

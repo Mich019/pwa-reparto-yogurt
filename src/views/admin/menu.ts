@@ -1,8 +1,10 @@
 import { BarChart3, ChartLine, HandCoins, IceCreamBowl, LayoutDashboard, MapPin, Settings, Users } from 'lucide-react'
-import { usePreferenciasPanel } from '../../lib/tema'
+import { guardarPerfil } from '../../lib/sesion'
+import { cambiarPreferencias, usePreferenciasPanel } from '../../lib/tema'
 
 // Las secciones del panel. El orden de aquí es el de fábrica; cada quien puede cambiarlo en Configuración → Apariencia
-// (se guarda en este navegador, `ordenMenu`). Configuración no se mueve: siempre va al final.
+// (se guarda en la cuenta, usuarios.orden_menu, y una copia en el navegador para pintarlo al instante y sin señal).
+// Configuración no se mueve: siempre va al final.
 export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'cobranza' | 'reportes' | 'configuracion'
 
 export const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
@@ -24,3 +26,9 @@ export function ordenarMenu(orden: string[]) {
 }
 
 export const useMenu = () => ordenarMenu(usePreferenciasPanel().ordenMenu)
+
+// [] = el de fábrica. Se ve al momento; si no llega a la cuenta (sin señal), avisa y queda en este navegador.
+export async function guardarOrdenMenu(orden: SeccionAdmin[]) {
+  cambiarPreferencias({ ordenMenu: orden })
+  await guardarPerfil({ ordenMenu: orden })
+}

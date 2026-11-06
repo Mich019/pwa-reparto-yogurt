@@ -105,7 +105,7 @@ describe('login y sesiones (M01)', () => {
     const editar = (payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${s.token}` }, payload })
     const r = await editar({ nombre: '  Rosa Pérez ', telefono: '555 123 4567' })
     assert.equal(r.statusCode, 200)
-    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null })
+    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null })
     const yo = await get(s, '/me')
     assert.equal(yo.body.nombre, 'Rosa Pérez')
     assert.equal(yo.body.telefono, '555 123 4567')
@@ -123,6 +123,11 @@ describe('login y sesiones (M01)', () => {
     assert.equal((await editar({ foto: 'data:image/png;base64,' + 'A'.repeat(200_001) })).statusCode, 400)
     assert.equal((await get(s, '/me')).body.foto, png)
     assert.equal((await editar({ foto: null })).json().foto, null)
+    // El orden del menú del panel también es de la cuenta; [] vuelve al de fábrica.
+    assert.deepEqual((await editar({ ordenMenu: ['cobranza', 'clientes'] })).json().ordenMenu, ['cobranza', 'clientes'])
+    assert.deepEqual((await get(s, '/me')).body.ordenMenu, ['cobranza', 'clientes'])
+    assert.equal((await editar({ ordenMenu: ['<script>'] })).statusCode, 400)
+    assert.equal((await editar({ ordenMenu: [] })).json().ordenMenu, null)
   })
 
   it('lista sus sesiones abiertas y cierra una o todas las demás, nunca la propia ni las de otro', async () => {

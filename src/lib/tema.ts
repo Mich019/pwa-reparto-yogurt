@@ -59,6 +59,7 @@ export function cambiarPreferencias(cambio: Partial<PreferenciasPanel>) {
   avisar()
 }
 export const usePreferenciasPanel = () => useSyncExternalStore(suscribir, () => preferencias)
+export const preferenciasPanel = () => preferencias
 
 // Pone el tamaño del texto y «menos movimiento» en la página mientras el panel está abierto; al salir los quita, para
 // que la app de reparto siga como estaba.

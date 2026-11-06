@@ -30,7 +30,9 @@ const bodyCodigoLogin = z.object({
 export const DESAFIO = 'dos-pasos'
 // La foto llega ya recortada a 256 px por el navegador (src/lib/imagen.ts): unos 20 KB; el tope deja margen.
 const foto = z.string().max(200_000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/)
-const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional(), telefono: z.string().trim().max(20).optional(), foto: foto.nullable().optional() }).strict()
+const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional(), telefono: z.string().trim().max(20).optional(), foto: foto.nullable().optional(),
+  // El orden del menú del panel (views/admin/menu.ts); [] vuelve al de fábrica.
+  ordenMenu: z.array(z.string().regex(/^[a-z]{1,20}$/)).max(20).optional() }).strict()
 const bodyCerrarSesion = z.object({ id: z.string().uuid().optional() }).strict()
 const bodyCambio = z.object({ actual: z.string().min(1).max(PASSWORD_MAX), nueva: z.string().max(1000) })
 
@@ -228,7 +230,7 @@ export async function rutasAuth(
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, e.interna, e.nombre AS empresa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, e.interna, e.nombre AS empresa
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [req.usuario.id],
     )
@@ -238,6 +240,7 @@ export async function rutasAuth(
       empresa: u.empresa, alta: u.creado_en, ultimoAcceso: u.ultimo_acceso, passwordCambiado: u.password_cambiado_en,
       // Falta aceptar el aviso de privacidad y los términos vigentes (privacidad.ts): la app los muestra antes de seguir.
       legalPendiente: u.legal_version !== VERSION_LEGAL, versionLegal: VERSION_LEGAL,
+      ordenMenu: u.orden_menu ?? null,
     }
   })
 
@@ -251,11 +254,13 @@ export async function rutasAuth(
     }
     const u = await tx(db, req.usuario.id, async (c) => (await c.query(
       `UPDATE usuarios SET nombre = COALESCE($2, nombre), telefono = CASE WHEN $3::boolean THEN NULLIF($4, '') ELSE telefono END,
-              foto = CASE WHEN $5::boolean THEN $6 ELSE foto END
-        WHERE id_usuario = $1 RETURNING nombre, telefono, foto`,
-      [req.usuario.id, b.data.nombre ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.foto !== undefined, b.data.foto ?? null],
+              foto = CASE WHEN $5::boolean THEN $6 ELSE foto END,
+              orden_menu = CASE WHEN $7::boolean THEN $8::text[] ELSE orden_menu END
+        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu`,
+      [req.usuario.id, b.data.nombre ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.foto !== undefined, b.data.foto ?? null,
+        b.data.ordenMenu !== undefined, b.data.ordenMenu?.length ? b.data.ordenMenu : null],
     )).rows[0])
-    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null }
+    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null }
   })
 
   // Las sesiones abiertas de la cuenta (la de esta petición marcada) y cerrar una o todas las demás.
