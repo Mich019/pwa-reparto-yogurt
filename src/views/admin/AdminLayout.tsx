@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { CloudOff, LogOut, RefreshCw, Settings, ShieldAlert, Smartphone } from 'lucide-react'
 import { PESTANAS, useMenu, type SeccionAdmin } from './menu'
 import { hace } from '../../lib/fechas'
-import { cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
+import { alCerrarSesion, cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
+import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
@@ -75,6 +76,13 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   // Clientes, sabores y producción se leen de la copia local: sin esto el panel abierto directo en /admin se queda
   // vacío y lo que se edita aquí no llega al servidor hasta abrir la app de reparto.
   useEffect(() => (esAdmin ? iniciarSincronizacionAutomatica() : undefined), [esAdmin])
+  // Avisos push en esta computadora (Configuración → Cuenta): como en la app, al entrar se le recuerda al servidor de
+  // quién es la suscripción y al cerrar sesión deja de recibir los de la cuenta.
+  useEffect(() => {
+    if (!esAdmin) return
+    void renovarSuscripcion().catch(() => {})
+    return alCerrarSesion(quitarEsteTelefono)
+  }, [esAdmin, sesion?.usuario.id])
   useEffect(() => { if (sesion) void refrescarPerfil() }, [sesion?.usuario.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setSeccion(s: SeccionAdmin) {

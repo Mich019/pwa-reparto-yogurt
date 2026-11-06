@@ -180,6 +180,15 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
+    id: 'avisos-panel', tema: 'reportes', titulo: 'Recibir avisos en la computadora', icono: BellRing, donde: 'panel', para: 'administrador', ir: 'cuenta',
+    resumen: 'Te llega una notificación cuando un corte confirmado deja de cuadrar, aunque el panel esté cerrado.',
+    palabras: 'avisos notificaciones push alerta computadora corte cuadrar activar',
+    pasos: [
+      { texto: 'En Configuración, abre «Cuenta» y en «Avisos en este dispositivo» toca «Activar avisos». El navegador te pide permiso: acéptalo.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'texto', lineas: 2 }, { t: 'botones', items: [{ texto: 'Activar avisos', primario: true, foco: true }] }]) },
+      { texto: 'Con «Enviar prueba» compruebas que llegan. Al tocar un aviso de corte se abre Cobranza → Cortes para reabrirlo.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
+    ],
+  },
+  {
     id: 'cortes', tema: 'reportes', titulo: 'Confirmar el corte de cada vendedor', icono: Wallet, donde: 'panel', para: 'administrador', ir: 'cobranza',
     resumen: 'Cada día, el efectivo que el vendedor dice que entregó contra el que debía entregar.',
     palabras: 'corte caja efectivo vendedor confirmar reabrir diferencia faltante sobrante cuadrar dia',

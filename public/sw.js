@@ -60,8 +60,10 @@ self.addEventListener('push', (e) => {
     (async () => {
       const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       ventanas.forEach((v) => v.postMessage({ tipo: 'sincronizar' })) // trae el pedido o el cambio ya, sin esperar el minuto
-      // Con la app a la vista no hace falta la notificación del sistema: la propia app muestra el aviso al sincronizar.
-      if (ventanas.some((v) => v.visibilityState === 'visible')) return
+      // Con la app de reparto a la vista no hace falta la notificación del sistema: la propia app muestra el aviso al
+      // sincronizar. El panel (/admin, /plataforma) no muestra la lista de avisos, así que ahí sí sale.
+      const enPanel = (v) => /^/(admin|plataforma)/.test(new URL(v.url).pathname)
+      if (ventanas.some((v) => v.visibilityState === 'visible' && !enPanel(v))) return
       await self.registration.showNotification(aviso.titulo || 'Delisy', {
         body: aviso.cuerpo || '',
         tag: aviso.id || undefined,

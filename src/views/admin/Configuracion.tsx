@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { Bell, BellRing, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
@@ -13,6 +13,7 @@ import { MarcaEmpresa } from './MarcaEmpresa'
 import { ZonaEmpresa } from './ZonaEmpresa'
 import { Ayuda } from '../ayuda/Ayuda'
 import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
+import { activarPush, desactivarPush, enviarPrueba, useEstadoPush } from '../../lib/push'
 import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
@@ -236,7 +237,62 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
         </dl>
       </Seccion>
 
+      {!plataforma && u.rol === 'administrador' && <AvisosPush />}
+
     </>
+  )
+}
+
+// Avisos push en esta computadora o teléfono, sin abrir la app de reparto (lib/push.ts, el mismo service worker). Hoy
+// al administrador le llegan los cortes confirmados que dejan de cuadrar; tocarlos abre Cobranza → Cortes.
+function AvisosPush() {
+  const { estado, refrescar } = useEstadoPush()
+  const [ocupado, setOcupado] = useState(false)
+  async function accion(f: () => Promise<string>) {
+    setOcupado(true)
+    try { aviso(await f()) } catch (e) { aviso(e instanceof Error ? e.message : mensaje(e)) } finally { setOcupado(false); void refrescar() }
+  }
+  const activar = () => accion(async () => ((await activarPush()) === 'push'
+    ? 'Avisos activados en este dispositivo'
+    : 'El servidor aún no tiene avisos push configurados: por ahora los cortes que no cuadran se ven en Cobranza → Cortes.'))
+  const probar = () => accion(async () => {
+    const r = await enviarPrueba()
+    return r.dispositivos ? `Prueba enviada a ${r.enviados} de ${r.dispositivos} ${r.dispositivos === 1 ? 'dispositivo' : 'dispositivos'}` : 'Este dispositivo aún no está suscrito'
+  })
+  const apagar = () => accion(async () => { await desactivarPush(); return 'Este dispositivo ya no recibirá avisos' })
+
+  const activo = !!estado?.suscrito && estado.permiso === 'granted'
+  const puede = !!estado?.soportado && estado.permiso !== 'denied'
+  let texto = 'Revisando…'
+  if (estado) {
+    if (!estado.soportado) texto = estado.motivo ?? 'Este navegador no puede recibir notificaciones.'
+    else if (estado.permiso === 'denied') texto = 'Bloqueaste las notificaciones de este sitio. Actívalas en los ajustes del navegador (el candado junto a la dirección).'
+    else if (activo) texto = 'Recibes los avisos aquí aunque el panel esté cerrado.'
+    else if (estado.servidor === false) texto = 'El servidor aún no tiene avisos push configurados.'
+    else texto = 'Actívalos para enterarte, aunque no tengas el panel abierto, cuando un corte confirmado deje de cuadrar.'
+  }
+  const boton = `rounded-md px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40 ${anillo}`
+  return (
+    <Seccion id="avisos" titulo="Avisos en este dispositivo" descripcion="Cada computadora o teléfono se activa por separado.">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex max-w-lg items-center gap-3 text-sm">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-niebla" aria-hidden="true">{activo ? <BellRing size={18} /> : <Bell size={18} />}</span>
+          <span>{texto}</span>
+        </div>
+        {puede && estado?.servidor !== false && (
+          <div className="flex flex-wrap gap-2">
+            {activo ? (
+              <>
+                <button type="button" onClick={() => void probar()} disabled={ocupado} className={`${boton} bg-niebla hover:bg-linea`}>Enviar prueba</button>
+                <button type="button" onClick={() => void apagar()} disabled={ocupado} className={`${boton} bg-niebla hover:bg-linea`}>Desactivar</button>
+              </>
+            ) : (
+              <button type="button" onClick={() => void activar()} disabled={ocupado} className={`${boton} bg-tinta text-white hover:bg-marca-oscuro`}>Activar avisos</button>
+            )}
+          </div>
+        )}
+      </div>
+    </Seccion>
   )
 }
 
