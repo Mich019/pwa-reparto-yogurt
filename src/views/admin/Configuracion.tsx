@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CreditCard, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
@@ -13,6 +13,7 @@ import { MarcaEmpresa } from './MarcaEmpresa'
 import { ZonaEmpresa } from './ZonaEmpresa'
 import { Ayuda } from '../ayuda/Ayuda'
 import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
+import { useMenu, type SeccionAdmin } from './menu'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -92,7 +93,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
     ...extra,
     { id: 'privacidad', texto: 'Privacidad y datos', ayuda: 'Descargar, eliminar, avisos', icono: LockKeyhole },
-    { id: 'apariencia', texto: 'Apariencia', ayuda: 'Tema, texto y movimiento', icono: Palette },
+    { id: 'apariencia', texto: 'Apariencia', ayuda: plataforma ? 'Tema, texto y movimiento' : 'Tema, texto y orden del menú', icono: Palette },
     ...(plataforma ? [] : [{ id: 'ayuda', texto: 'Ayuda', ayuda: 'Guías paso a paso', icono: LifeBuoy }]),
   ]
   const visible = menu.some((m) => m.id === apartado) ? apartado : 'cuenta'
@@ -151,7 +152,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
               <PrivacidadYDatos plataforma={plataforma} />
             </Seccion>
           )}
-          {visible === 'apariencia' && <Apariencia />}
+          {visible === 'apariencia' && <Apariencia plataforma={plataforma} />}
           {visible === 'ayuda' && (
             <Seccion id="ayuda" titulo="Ayuda" descripcion="Guías cortas de lo que más se hace, con lo que hay que tocar resaltado. Sólo ves lo que tu cuenta puede hacer.">
               <Ayuda donde="panel" ir={(d) => (menu.some((m) => m.id === d) ? elegir(d) : SECCIONES_PANEL.includes(d) && irA?.(d))} />
@@ -328,7 +329,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
 
 // ---------------------------------------------------------------------------------------------------------- apariencia
 
-function Apariencia() {
+function Apariencia({ plataforma }: { plataforma: boolean }) {
   const tema = usePreferenciaTema()
   const p = usePreferenciasPanel()
   return (
@@ -379,6 +380,71 @@ function Apariencia() {
           </label>
         </Fila>
       </Seccion>
+
+      {!plataforma && <OrdenMenu />}
     </>
+  )
+}
+
+// El orden de las secciones del menú del panel (arriba en la computadora, la barra de abajo en el teléfono): se
+// arrastran. Con el ratón, desde cualquier parte de la fila; con el dedo, desde la agarradera (así la lista no estorba
+// para desplazar la página). Con el teclado: enfocar la agarradera y mover con ↑ ↓.
+function OrdenMenu() {
+  const menu = useMenu().filter((m) => m.id !== 'configuracion')
+  const propio = usePreferenciasPanel().ordenMenu.length > 0
+  const [arrastre, setArrastre] = useState<{ id: SeccionAdmin; desde: number; y0: number; dy: number; alto: number } | null>(null)
+  const ids = menu.map((m) => m.id)
+
+  // Mientras se arrastra, las filas no cambian de lugar en la página (moverlas soltaría el puntero): se desplazan con
+  // transform, la arrastrada siguiendo al puntero y las demás haciéndole hueco donde caería.
+  const destino = arrastre ? Math.max(0, Math.min(ids.length - 1, arrastre.desde + Math.round(arrastre.dy / arrastre.alto))) : -1
+  const orden = arrastre ? (() => { const o = ids.filter((x) => x !== arrastre.id); o.splice(destino, 0, arrastre.id); return o })() : ids
+  const guardar = (o: SeccionAdmin[]) => { if (o.join() !== ids.join()) cambiarPreferencias({ ordenMenu: o }) }
+
+  function empezar(e: React.PointerEvent<HTMLLIElement>, id: SeccionAdmin) {
+    if (e.button !== 0) return
+    if (e.pointerType !== 'mouse' && !(e.target as HTMLElement).closest('[data-agarradera]')) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setArrastre({ id, desde: ids.indexOf(id), y0: e.clientY, dy: 0, alto: e.currentTarget.offsetHeight })
+  }
+  const mover = (e: React.PointerEvent) => { if (arrastre) setArrastre({ ...arrastre, dy: e.clientY - arrastre.y0 }) }
+  const soltar = () => { if (arrastre) { guardar(orden); setArrastre(null) } }
+
+  function teclado(e: React.KeyboardEvent, i: number) {
+    const paso = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0
+    if (!paso || i + paso < 0 || i + paso >= ids.length) return
+    e.preventDefault()
+    const o = [...ids]
+    ;[o[i], o[i + paso]] = [o[i + paso], o[i]]
+    guardar(o)
+    requestAnimationFrame(() => document.getElementById(`agarrar-${o[i + paso]}`)?.focus())
+  }
+
+  return (
+    <Seccion id="orden-menu" titulo="Orden del menú" descripcion="Arrastra las secciones para poner primero lo que más usas. Configuración siempre va al final."
+      acciones={propio && <button type="button" onClick={() => cambiarPreferencias({ ordenMenu: [] })} className={`rounded-md bg-niebla px-4 py-2 text-sm font-semibold transition-colors hover:bg-linea ${anillo}`}>Restablecer</button>}>
+      <ol className="max-w-md select-none" aria-label="Orden del menú">
+        {menu.map(({ id, texto, icono: Icono }, k) => {
+          const i = orden.indexOf(id)
+          const activa = arrastre?.id === id
+          const desplazo = !arrastre ? 0 : activa ? arrastre.dy : (i - k) * arrastre.alto
+          return (
+            <li key={id} onPointerDown={(e) => empezar(e, id)} onPointerMove={mover} onPointerUp={soltar} onPointerCancel={soltar}
+              style={desplazo ? { transform: `translateY(${desplazo}px)` } : undefined}
+              className={`relative flex items-center gap-3 border-t border-linea py-2 first:border-t-0 md:cursor-grab ${activa ? 'z-10 cursor-grabbing rounded-md border-transparent bg-papel shadow-[0_8px_24px_rgba(0,32,20,0.18)]' : 'bg-[var(--color-lienzo)] transition-transform duration-150'}`}>
+              <button type="button" id={`agarrar-${id}`} data-agarradera aria-label={`Mover ${texto}, posición ${i + 1} de ${orden.length}. Usa las flechas arriba y abajo.`}
+                onKeyDown={(e) => teclado(e, i)}
+                className={`grid h-9 w-9 shrink-0 touch-none place-items-center rounded-md text-apagado hover:bg-niebla hover:text-tinta ${anillo}`}>
+                <GripVertical size={18} aria-hidden="true" />
+              </button>
+              <span className="w-5 text-right text-sm tabular-nums text-apagado">{i + 1}</span>
+              <Icono size={18} aria-hidden="true" />
+              <span className="flex-1 text-sm font-semibold">{texto}</span>
+            </li>
+          )
+        })}
+      </ol>
+    </Seccion>
   )
 }

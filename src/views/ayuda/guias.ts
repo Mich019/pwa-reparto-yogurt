@@ -293,11 +293,12 @@ export const GUIAS: Guia[] = [
   },
   {
     id: 'apariencia', tema: 'cuenta', titulo: 'Modo oscuro y letra más grande', icono: Moon, donde: 'panel', para: 'administrador', ir: 'apariencia',
-    resumen: 'El tema, el tamaño del texto y menos animaciones, a tu gusto en esta computadora.',
-    palabras: 'oscuro claro tema noche letra grande tamaño texto animaciones movimiento apariencia',
+    resumen: 'El tema, el tamaño del texto, menos animaciones y el orden del menú, a tu gusto en esta computadora.',
+    palabras: 'oscuro claro tema noche letra grande tamaño texto animaciones movimiento apariencia orden menu secciones acomodar',
     pasos: [
       { texto: 'En Configuración, abre «Apariencia» y elige Claro, Oscuro o Automático.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Apariencia' }, { t: 'tarjetas', n: 3, alto: 'bajo', foco: 1 }]) },
       { texto: 'En «Tamaño del texto» agrandas letras, botones y tablas; «Menos movimiento» quita animaciones.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Lectura y movimiento' }, { t: 'chips', items: ['Normal', 'Grande', 'Más grande'], elegido: 1, foco: 1 }, { t: 'caja', titulo: 'Menos movimiento', texto: 'Quita animaciones y transiciones' }]) },
+      { texto: 'En «Orden del menú» arrastra cada sección a donde la quieras (en el teléfono, desde los puntitos de la izquierda). «Restablecer» lo deja como venía.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Orden del menú' }, { t: 'filas', n: 5 }, { t: 'botones', items: [{ texto: 'Restablecer', foco: true }] }]) },
     ],
   },
   {

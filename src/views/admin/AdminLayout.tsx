@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, ChartLine, HandCoins, CloudOff, IceCreamBowl, LayoutDashboard, LogOut, MapPin, RefreshCw, Settings, ShieldAlert, Smartphone, Users } from 'lucide-react'
+import { CloudOff, LogOut, RefreshCw, Settings, ShieldAlert, Smartphone } from 'lucide-react'
+import { PESTANAS, useMenu, type SeccionAdmin } from './menu'
 import { hace } from '../../lib/fechas'
 import { cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
@@ -19,18 +20,7 @@ import { PantallaCobro } from './Suscripcion'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
-export type SeccionAdmin = 'resumen' | 'equipo' | 'clientes' | 'produccion' | 'sabores' | 'cobranza' | 'reportes' | 'configuracion'
-
-const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
-  { id: 'resumen', texto: 'Resumen', icono: LayoutDashboard },
-  { id: 'equipo', texto: 'Vendedores', icono: Users },
-  { id: 'clientes', texto: 'Clientes', icono: MapPin },
-  { id: 'produccion', texto: 'Producción', icono: BarChart3 },
-  { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl },
-  { id: 'cobranza', texto: 'Cobranza', icono: HandCoins },
-  { id: 'reportes', texto: 'Reportes', icono: ChartLine },
-  { id: 'configuracion', texto: 'Configuración', icono: Settings },
-]
+export type { SeccionAdmin } from './menu'
 
 // La sección abierta sobrevive a recargar la página (sólo en esta pestaña del navegador).
 const CLAVE_SECCION = 'admin-seccion'
@@ -74,6 +64,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const sesion = useSesion()
   const [seccion, setSeccionEstado] = useState<SeccionAdmin>(seccionGuardada)
   const [cerrando, setCerrando] = useState(false)
+  const menu = useMenu()
   useAplicarPreferencias()
   // Con qué apartado se abre Configuración: el aviso de la prueba lleva directo a la suscripción.
   const [apartado, setApartado] = useState<{ id: ApartadoConfig; vez: number }>({ id: 'cuenta', vez: 0 })
@@ -152,7 +143,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
 
         {/* Sólo texto; la sección activa lleva el mismo trazo amarillo que el nombre del saludo. */}
         <nav aria-label="Secciones del panel" className="hidden shrink-0 items-center gap-1 xl:flex">
-          {PESTANAS.map(({ id, texto }) => {
+          {menu.map(({ id, texto }) => {
             const activa = seccion === id
             return (
               <button
@@ -234,7 +225,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}
       <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:hidden">
         <ul className="pointer-events-auto flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel/90 p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.16)] backdrop-blur-xl">
-          {PESTANAS.filter((p) => p.id !== 'configuracion').map(({ id, texto, icono: Icono }) => {
+          {menu.filter((p) => p.id !== 'configuracion').map(({ id, texto, icono: Icono }) => {
             const activa = seccion === id
             return (
               <li key={id} className={activa ? 'shrink-0 min-[430px]:min-w-0 min-[430px]:flex-1' : 'shrink-0'}>

@@ -37,16 +37,17 @@ export const useTemaOscuro = () =>
   useSyncExternalStore(suscribir, () => preferencia === 'oscuro' || (preferencia === 'sistema' && !!sistemaOscuro?.matches))
 
 // Más preferencias del panel, también de cada navegador: el tamaño del texto (todo va en rem, así que basta con el
-// tamaño de la raíz) y menos movimiento (tema.css).
+// tamaño de la raíz), menos movimiento (tema.css) y el orden del menú del panel (views/admin/menu.ts).
 export type TamanoTexto = 'normal' | 'grande' | 'mas-grande'
-export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean }
+export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean; ordenMenu: string[] }
 const CLAVE_PREF = 'preferencias-panel'
-const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false }
+const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false, ordenMenu: [] }
 export const TAMANOS: Record<TamanoTexto, string> = { normal: '100%', grande: '112.5%', 'mas-grande': '125%' }
 
 let preferencias: PreferenciasPanel = (() => {
   try {
-    return { ...PREF_INICIAL, ...JSON.parse(localStorage.getItem(CLAVE_PREF) ?? '{}') }
+    const p = { ...PREF_INICIAL, ...JSON.parse(localStorage.getItem(CLAVE_PREF) ?? '{}') }
+    return Array.isArray(p.ordenMenu) ? p : { ...p, ordenMenu: [] }
   } catch {
     return PREF_INICIAL
   }
