@@ -91,6 +91,12 @@ describe('corte del día', () => {
     await x.entrega('EFECTIVO', 1) // $60 tarde
     const marcado = (await llamar(x.admin, 'GET', '/cortes')).body.filas.find((f: { vendedorId: string }) => f.vendedorId === x.ana.id)
     assert.equal(marcado.cambioDespues, 60)
+    // …y al administrador le llega el aviso (al vendedor que sincronizó, no).
+    const { rows: avisos } = await db.query(`SELECT id_usuario, cuerpo, datos FROM notificaciones WHERE tipo = 'corte_descuadrado' AND id_usuario = ANY($1::uuid[])`, [[x.admin.id, x.ana.id]])
+    assert.equal(avisos.length, 1)
+    assert.equal(avisos[0].id_usuario, x.admin.id)
+    assert.ok(avisos[0].cuerpo.includes('+$60.00'), avisos[0].cuerpo)
+    assert.equal(avisos[0].datos.url, '/admin?ir=cortes')
     const d = (await llamar(x.admin, 'GET', '/cortes/descuadres')).body.cortes
     assert.deepEqual(d.map((c: { id: string; cambio: number }) => [c.id, c.cambio]), [[r.body.id, 60]])
     assert.equal((await llamar(x.ana, 'GET', '/cortes/descuadres')).status, 403)

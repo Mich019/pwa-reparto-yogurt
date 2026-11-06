@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LockKeyhole, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LockKeyhole, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, Wallet, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
 import { ErrorApi, ErrorRed, MODO_SERVIDOR } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
@@ -131,7 +131,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
 }
 
 const ICONO_AVISO: Record<TipoAviso, LucideIcon> = {
-  pedido_urgente: Flame, ruta_modificada: MapPin, stock_asignado: Package, stock_bajo: Package, sync_pendiente: CloudOff, prueba: Bell,
+  pedido_urgente: Flame, ruta_modificada: MapPin, stock_asignado: Package, stock_bajo: Package, sync_pendiente: CloudOff, corte_descuadrado: Wallet, prueba: Bell,
 }
 const mensajeError = (e: unknown) => (e instanceof Error ? e.message : 'No se pudo completar. Intenta de nuevo.')
 
@@ -145,7 +145,8 @@ function Avisos({ irA }: { irA?: (p: PestanaAviso) => void }) {
       await db.avisos.update(a.id, { leida: true })
       if (!a.local) void marcarLeidosEnServidor([a.id])
     }
-    if (a.pestana) irA?.(a.pestana)
+    if (a.url) location.assign(a.url)
+    else if (a.pestana) irA?.(a.pestana)
   }
   async function leerTodo() {
     await db.avisos.filter((a) => !a.leida).modify({ leida: true })

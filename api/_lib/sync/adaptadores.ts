@@ -3,6 +3,8 @@ import type { Cx } from '../db.js'
 import type { Usuario } from '../app.js'
 import type { AvisoPendiente } from '../notificaciones.js'
 import { totalPorUnidad } from '../unidades.js'
+import { cifrasDelDia } from '../cortes.js'
+import { redondear } from '../cobranza.js'
 import {
   clienteWire, pedidoWire, productoWire, recordatorioWire,
   type ClienteWire, type PedidoWire, type ProductoWire, type RecordatorioWire, type Tabla,
@@ -213,6 +215,33 @@ async function escribirDetalle(c: Cx, idPedido: string, items: PedidoWire['items
   }
 }
 
+// Una venta en efectivo que llega, cambia o se borra después de confirmar el corte de ese día deja el corte sin cuadrar
+// (lo típico: el teléfono sincronizó tarde). Se avisa a los administradores para que lo reabran; al que hizo el cambio no.
+const esEfectivo = (w?: PedidoWire) => !!w && w.estado === 'ENTREGADO' && (w.metodo_pago ?? 'EFECTIVO') === 'EFECTIVO'
+const diaCorto = (f: string) => new Date(`${f}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+async function avisarCortesDescuadrados(c: Cx, u: Usuario, dias: { fecha: string; vendedor: string | null }[]): Promise<AvisoPendiente[]> {
+  const vistos = new Set<string>()
+  const lineas: string[] = []
+  for (const { fecha, vendedor } of dias) {
+    if (!vendedor || vistos.has(`${fecha}|${vendedor}`)) continue
+    vistos.add(`${fecha}|${vendedor}`)
+    const { rows: [k] } = await c.query(
+      `SELECT k.efectivo_esperado::float8 AS esp, v.nombre FROM cortes_dia k JOIN usuarios v ON v.id_usuario = k.id_vendedor
+        WHERE k.fecha = $1 AND k.id_vendedor = $2 AND k.estado = 'confirmado'`,
+      [fecha, vendedor],
+    )
+    if (!k) continue
+    const cambio = redondear((await cifrasDelDia(c, fecha, vendedor)).esperado - k.esp)
+    if (Math.abs(cambio) < 0.01) continue
+    lineas.push(`${k.nombre}, ${diaCorto(fecha)}: ${cambio > 0 ? '+' : '−'}$${Math.abs(cambio).toFixed(2)}`)
+  }
+  if (!lineas.length) return []
+  const { rows: admins } = await c.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo AND id_usuario <> $1`, [u.id])
+  const cuerpo = `${lineas.join('. ')}. Reábrelo en Cobranza → Cortes.`
+  return admins.map((a) => ({ para: a.id_usuario as string, tipo: 'corte_descuadrado' as const, titulo: 'Un corte confirmado ya no cuadra', cuerpo, datos: { url: '/admin?ir=cortes' } }))
+}
+
 const pedidos: Adaptador<PedidoWire> = {
   esquema: pedidoWire,
   async listar(c, f) {
@@ -301,8 +330,34 @@ const pedidos: Adaptador<PedidoWire> = {
       [w.id, w.clienteId, dueno, w.fecha, estado, w.metodo_pago ? w.metodo_pago.toLowerCase() : null, entregado, w.orden_ruta ?? null, w.fecha_entregado_real ?? null, urgente],
     )
   },
-  // RF-054: cuando el administrador agrega, cambia o urgente un pedido del día, el vendedor se entera.
   async avisarEscritura(c, u, w, ex, hoy) {
+    let cortes: AvisoPendiente[] = []
+    const previo = ex?.wire
+    const cambioCaja = (esEfectivo(w) || esEfectivo(previo)) &&
+      (!previo || esEfectivo(w) !== esEfectivo(previo) || w.fecha !== previo.fecha || firmaItems(w.items) !== firmaItems(previo.items))
+    if (cambioCaja) {
+      const { rows: [d] } = await c.query(`SELECT id_vendedor FROM pedidos WHERE id_pedido = $1`, [w.id])
+      cortes = await avisarCortesDescuadrados(c, u, [{ fecha: w.fecha, vendedor: d?.id_vendedor ?? null }, ...(previo ? [{ fecha: previo.fecha, vendedor: ex!.dueno }] : [])])
+    }
+    return [...cortes, ...(await avisosDeRuta(c, u, w, ex, hoy))]
+  },
+  async avisarBorrado(c, u, ex, hoy) {
+    const cortes = esEfectivo(ex.wire) ? await avisarCortesDescuadrados(c, u, [{ fecha: ex.wire.fecha, vendedor: ex.dueno }]) : []
+    return [...cortes, ...(await avisoDeBorrado(c, u, ex, hoy))]
+  },
+  autorizarBorrado(u, ex) {
+    if (esAdmin(u)) return null
+    if (ex.final) return 'El pedido ya está cerrado y no se puede borrar'
+    return ex.dueno === u.id || ex.extra?.vendedorCliente === u.id ? null : 'Ese pedido no es de tu cartera'
+  },
+  async borrar(c, id) {
+    await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`)
+    await c.query(`DELETE FROM pedidos WHERE id_pedido = $1`, [id])
+  },
+}
+
+// RF-054: cuando el administrador agrega, cambia o urgente un pedido del día, el vendedor se entera.
+async function avisosDeRuta(c: Cx, u: Usuario, w: PedidoWire, ex: Existente<PedidoWire> | null, hoy: string): Promise<AvisoPendiente[]> {
     if (!esAdmin(u) || ex?.final) return []
     const { rows: [p] } = await c.query(
       `SELECT p.id_vendedor, p.urgente, cl.nombre FROM pedidos p JOIN clientes cl USING (id_cliente) WHERE p.id_pedido = $1`,
@@ -328,21 +383,12 @@ const pedidos: Adaptador<PedidoWire> = {
     if (antes.estado !== w.estado) return w.estado === 'PENDIENTE' ? ruta(`${p.nombre} volvió a tu ruta de hoy`) : ruta(`${p.nombre} se quitó de tu ruta de hoy`)
     if (firmaItems(antes.items) !== firmaItems(w.items)) return ruta(`Cambió el pedido de ${p.nombre}: ahora ${litros}`)
     return []
-  },
-  async avisarBorrado(c, u, ex, hoy) {
+}
+
+async function avisoDeBorrado(c: Cx, u: Usuario, ex: Existente<PedidoWire>, hoy: string): Promise<AvisoPendiente[]> {
     if (!esAdmin(u) || ex.final || ex.wire.fecha !== hoy || !ex.dueno || ex.dueno === u.id) return []
     const { rows: [cl] } = await c.query(`SELECT nombre FROM clientes WHERE id_cliente = $1`, [ex.wire.clienteId])
     return [{ para: ex.dueno, tipo: 'ruta_modificada', titulo: 'Tu ruta cambió', cuerpo: `Se quitó el pedido de ${cl?.nombre ?? 'un cliente'} de tu ruta de hoy`, datos: { pestana: 'ruta' } }]
-  },
-  autorizarBorrado(u, ex) {
-    if (esAdmin(u)) return null
-    if (ex.final) return 'El pedido ya está cerrado y no se puede borrar'
-    return ex.dueno === u.id || ex.extra?.vendedorCliente === u.id ? null : 'Ese pedido no es de tu cartera'
-  },
-  async borrar(c, id) {
-    await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`)
-    await c.query(`DELETE FROM pedidos WHERE id_pedido = $1`, [id])
-  },
 }
 
 // ---------------------------------------------------------------- recordatorios

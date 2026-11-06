@@ -15,6 +15,9 @@ import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } 
 // informe. Todo viene del servidor y necesita conexión.
 
 type Parte = 'cobrar' | 'envases' | 'cortes' | 'meses'
+
+// `?ir=cortes` (lo pone el aviso de un corte que ya no cuadra) abre Cobranza → Cortes.
+export const irACortes = () => new URLSearchParams(location.search).get('ir') === 'cortes'
 const PARTES: { id: Parte; texto: string }[] = [
   { id: 'cobrar', texto: 'Por cobrar' },
   { id: 'envases', texto: 'Envases' },
@@ -23,7 +26,11 @@ const PARTES: { id: Parte; texto: string }[] = [
 ]
 
 export function Cobranza() {
-  const [parte, setParte] = useState<Parte>('cobrar')
+  const [parte, setParte] = useState<Parte>(() => {
+    if (!irACortes()) return 'cobrar'
+    history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
+    return 'cortes'
+  })
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
       <Encabezado titulo="Cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">

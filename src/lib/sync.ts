@@ -34,7 +34,7 @@ interface AvisoServidor {
   tipo: TipoAviso
   titulo: string
   cuerpo: string
-  datos?: { pestana?: PestanaAviso }
+  datos?: { pestana?: PestanaAviso; url?: string }
   creado: number
 }
 interface Bajada {
@@ -106,7 +106,7 @@ async function descargar(desde?: number) {
     if (r.avisos?.length) {
       const previos = await db.avisos.bulkGet(r.avisos.map((a) => a.id))
       const altas = r.avisos.flatMap((a, i): Aviso[] =>
-        previos[i] ? [] : [{ id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo, pestana: a.datos?.pestana, creado: a.creado, leida: false }])
+        previos[i] ? [] : [{ id: a.id, tipo: a.tipo, titulo: a.titulo, cuerpo: a.cuerpo, pestana: a.datos?.pestana, url: a.datos?.url, creado: a.creado, leida: false }])
       await db.avisos.bulkAdd(altas)
       nuevos.push(...altas)
     }

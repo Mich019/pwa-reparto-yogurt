@@ -65,7 +65,7 @@ self.addEventListener('push', (e) => {
       await self.registration.showNotification(aviso.titulo || 'Delisy', {
         body: aviso.cuerpo || '',
         tag: aviso.id || undefined,
-        data: { pestana: aviso.datos && aviso.datos.pestana },
+        data: { pestana: aviso.datos && aviso.datos.pestana, url: aviso.datos && aviso.datos.url },
       })
     })(),
   )
@@ -75,9 +75,12 @@ self.addEventListener('push', (e) => {
 self.addEventListener('notificationclick', (e) => {
   e.notification.close()
   const pestana = e.notification.data && e.notification.data.pestana
+  const url = e.notification.data && e.notification.data.url
   e.waitUntil(
     (async () => {
       const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      // Los avisos del administrador llevan al panel: mejor una ventana nueva que perder lo que tenga abierto.
+      if (url) return void (await self.clients.openWindow(url))
       const v = ventanas.find((x) => x.visibilityState === 'visible') || ventanas[0]
       if (v) {
         try { await v.focus() } catch { /* el navegador no siempre lo permite */ }

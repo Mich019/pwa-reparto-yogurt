@@ -10,13 +10,14 @@ import { claveUsuario } from './seguridad.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
-export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'prueba'
+export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'prueba'
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso
   titulo: string
   cuerpo: string
-  datos?: { pestana?: 'ruta' | 'stock' | 'clientes' | 'cuenta'; pedidoId?: string }
+  // `url`: abre esa dirección en vez de una pestaña de la app (los avisos para el administrador llevan al panel).
+  datos?: { pestana?: 'ruta' | 'stock' | 'clientes' | 'cuenta'; pedidoId?: string; url?: string }
 }
 
 const MAX_DISPOSITIVOS = 10
@@ -35,7 +36,7 @@ export function unir(avisos: AvisoPendiente[]): AvisoPendiente[] {
     const cuerpo = lineas.slice(0, 3).join('. ') + (lineas.length > 3 ? ` y ${lineas.length - 3} más` : '')
     const { para, tipo } = g[0]
     const titulo = tipo === 'pedido_urgente' ? `${g.length} pedidos urgentes` : tipo === 'ruta_modificada' ? 'Tu ruta cambió' : g[0].titulo
-    return { para, tipo, titulo, cuerpo, datos: { pestana: g[0].datos?.pestana } }
+    return { para, tipo, titulo: tipo === 'corte_descuadrado' ? `${g.length} cortes confirmados ya no cuadran` : titulo, cuerpo, datos: { pestana: g[0].datos?.pestana, url: g[0].datos?.url } }
   })
 }
 

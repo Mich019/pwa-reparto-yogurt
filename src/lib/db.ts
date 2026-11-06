@@ -77,7 +77,7 @@ export interface StockDia {
   version?: number
 }
 
-export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'prueba' | 'stock_bajo' | 'sync_pendiente'
+export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'prueba' | 'stock_bajo' | 'sync_pendiente'
 export type PestanaAviso = 'ruta' | 'clientes' | 'stock' | 'cuenta'
 
 // Avisos para el vendedor (RF-054, RF-055). Los de pedido urgente, ruta y carga los manda el servidor; los de stock
@@ -88,6 +88,7 @@ export interface Aviso {
   titulo: string
   cuerpo: string
   pestana?: PestanaAviso // a dónde lleva al tocarlo
+  url?: string // o a qué dirección (los del administrador llevan al panel)
   creado: number
   leida: boolean
   local?: boolean

@@ -5,7 +5,7 @@ import { cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
-import { Cobranza } from './Cobranza'
+import { Cobranza, irACortes } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { Subrayado } from './piezas'
 import { Equipo } from '../pwa/Equipo'
@@ -35,6 +35,7 @@ const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[] = [
 // La sección abierta sobrevive a recargar la página (sólo en esta pestaña del navegador).
 const CLAVE_SECCION = 'admin-seccion'
 function seccionGuardada(): SeccionAdmin {
+  if (irACortes()) return 'cobranza'
   try {
     const s = sessionStorage.getItem(CLAVE_SECCION)
     return PESTANAS.find((p) => p.id === s)?.id ?? 'resumen'
