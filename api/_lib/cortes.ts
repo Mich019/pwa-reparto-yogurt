@@ -29,24 +29,40 @@ const num = (x: unknown) => (x === null || x === undefined ? 0 : Number(x))
 export interface CifrasDia { esperado: number; efectivoVentas: number; efectivoAbonos: number; transferencias: number; credito: number }
 
 // Lo que un vendedor cobró ese día. El efectivo esperado = ventas pagadas en efectivo + abonos recibidos en efectivo.
-export async function cifrasDelDia(q: Consulta, fecha: string, idVendedor: string): Promise<CifrasDia> {
-  const { rows: [v] } = await q.query(
-    `SELECT coalesce(sum(total) FILTER (WHERE metodo_pago = 'efectivo'), 0)::float8 AS efectivo,
+// `idVendedor` null = todos los vendedores de una vez (dos consultas en total, no dos por vendedor).
+async function cifrasPorVendedor(q: Consulta, fecha: string, idVendedor: string | null): Promise<Map<string, CifrasDia>> {
+  const { rows: ventas } = await q.query(
+    `SELECT id_vendedor, coalesce(sum(total) FILTER (WHERE metodo_pago = 'efectivo'), 0)::float8 AS efectivo,
             coalesce(sum(total) FILTER (WHERE metodo_pago = 'transferencia'), 0)::float8 AS transferencia,
             coalesce(sum(total) FILTER (WHERE metodo_pago = 'credito'), 0)::float8 AS credito
-       FROM pedidos WHERE estado = 'entregado' AND fecha = $1 AND id_vendedor = $2`,
+       FROM pedidos WHERE estado = 'entregado' AND fecha = $1 AND ($2::uuid IS NULL OR id_vendedor = $2) GROUP BY id_vendedor`,
     [fecha, idVendedor],
   )
-  const { rows: [a] } = await q.query(
-    `SELECT coalesce(sum(monto) FILTER (WHERE metodo = 'efectivo'), 0)::float8 AS efectivo,
+  const { rows: abonos } = await q.query(
+    `SELECT id_vendedor, coalesce(sum(monto) FILTER (WHERE metodo = 'efectivo'), 0)::float8 AS efectivo,
             coalesce(sum(monto) FILTER (WHERE metodo = 'transferencia'), 0)::float8 AS transferencia
-       FROM abonos WHERE anulado_en IS NULL AND fecha = $1 AND id_vendedor = $2`,
+       FROM abonos WHERE anulado_en IS NULL AND fecha = $1 AND ($2::uuid IS NULL OR id_vendedor = $2) GROUP BY id_vendedor`,
     [fecha, idVendedor],
   )
-  return {
-    esperado: redondear(v.efectivo + a.efectivo), efectivoVentas: redondear(v.efectivo), efectivoAbonos: redondear(a.efectivo),
-    transferencias: redondear(v.transferencia + a.transferencia), credito: redondear(v.credito),
+  const porAbono = new Map(abonos.map((a) => [a.id_vendedor as string, a]))
+  const ids = new Set([...ventas.map((v) => v.id_vendedor as string), ...porAbono.keys()])
+  const porVenta = new Map(ventas.map((v) => [v.id_vendedor as string, v]))
+  const r = new Map<string, CifrasDia>()
+  for (const id of ids) {
+    const v = porVenta.get(id) ?? { efectivo: 0, transferencia: 0, credito: 0 }
+    const a = porAbono.get(id) ?? { efectivo: 0, transferencia: 0 }
+    r.set(id, {
+      esperado: redondear(v.efectivo + a.efectivo), efectivoVentas: redondear(v.efectivo), efectivoAbonos: redondear(a.efectivo),
+      transferencias: redondear(v.transferencia + a.transferencia), credito: redondear(v.credito),
+    })
   }
+  return r
+}
+
+const SIN_MOVIMIENTO: CifrasDia = { esperado: 0, efectivoVentas: 0, efectivoAbonos: 0, transferencias: 0, credito: 0 }
+
+export async function cifrasDelDia(q: Consulta, fecha: string, idVendedor: string): Promise<CifrasDia> {
+  return (await cifrasPorVendedor(q, fecha, idVendedor)).get(idVendedor) ?? SIN_MOVIMIENTO
 }
 
 interface FilaCorte {
@@ -253,10 +269,11 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       [fecha],
     )
     const porVendedor = new Map(cortes.map((c) => [c.id_vendedor as string, c]))
+    const cifras = await cifrasPorVendedor(db, fecha, esAdmin ? null : req.usuario.id)
     const filas: FilaCorte[] = []
     for (const v of vend) {
       const c = porVendedor.get(v.id_usuario)
-      const hoy = await cifrasDelDia(db, fecha, v.id_usuario)
+      const hoy = cifras.get(v.id_usuario) ?? SIN_MOVIMIENTO
       filas.push({
         id: c?.id_corte ?? '', fecha, vendedorId: v.id_usuario, vendedor: v.nombre,
         esperado: c?.estado === 'confirmado' ? c.esp : hoy.esperado, transferencias: c?.estado === 'confirmado' ? c.tr : hoy.transferencias, credito: c?.estado === 'confirmado' ? c.cr : hoy.credito,

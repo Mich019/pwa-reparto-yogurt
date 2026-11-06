@@ -66,6 +66,24 @@ describe('corte del día', () => {
     assert.equal(ok.body.diferencia, -5)
     assert.equal((await llamar(x.admin, 'POST', `/cortes/${r.body.id}/confirmar`, {})).status, 409)
     assert.equal((await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 170 })).status, 409) // confirmado: ya no cambia
+    // Efectivo con fecha de un día ya confirmado: nadie lo esperaría. Por transferencia sí entra.
+    const tarde = await llamar(x.ana, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'efectivo', fecha: hoy })
+    assert.equal(tarde.status, 409)
+    assert.match(tarde.body.error, /confirmado/)
+    assert.equal((await llamar(x.ana, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'transferencia' })).status, 201)
+  })
+
+  it('el administrador ve lo esperado de cada vendedor por separado', async () => {
+    const x = await escenario()
+    await x.entrega('EFECTIVO', 2) // $120 de Ana
+    const c = cliente({ nombre: 'Tienda de Beto' })
+    await push(x.beto, [op('clientes', c.id, c)])
+    const p = pedido(c.id, x.s.id, { fecha: hoy, estado: 'ENTREGADO', metodo_pago: 'TRANSFERENCIA', fecha_entregado_real: Date.now(), items: [{ productoId: x.s.id, litros: 1, precio_litro: 60 }] })
+    await push(x.beto, [op('pedidos', p.id, p)])
+    const filas = (await llamar(x.admin, 'GET', '/cortes')).body.filas as { vendedorId: string; esperado: number; transferencias: number }[]
+    const de = (id: string) => filas.find((f) => f.vendedorId === id)!
+    assert.deepEqual([de(x.ana.id).esperado, de(x.ana.id).transferencias], [120, 0])
+    assert.deepEqual([de(x.beto.id).esperado, de(x.beto.id).transferencias], [0, 60])
   })
 
   it('un vendedor no captura el corte de otro; el administrador sí, y no hay cortes de días futuros', async () => {
@@ -128,6 +146,9 @@ describe('cierre de mes', () => {
     const abono = await llamar(x.admin, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 10, metodo: 'efectivo', fecha: `${MES}-28` })
     assert.equal(abono.status, 409)
     assert.match(abono.body.error, /ya está cerrado/)
+    const corte = await llamar(x.admin, 'POST', '/cortes', { efectivoEntregado: 120, fecha: `${MES}-10`, vendedorId: x.ana.id })
+    assert.equal(corte.status, 409) // los cortes de un mes cerrado tampoco cambian
+    assert.match(corte.body.error, /ya está cerrado/)
 
     // Las cifras del mes quedan congeladas aunque después cambie la deuda.
     await llamar(x.admin, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 60, metodo: 'efectivo' })

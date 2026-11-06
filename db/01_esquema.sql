@@ -690,7 +690,7 @@ CREATE TABLE cierres_mes (
   CONSTRAINT cierres_unico_por_mes UNIQUE (id_empresa, mes)
 );
 
--- Un mes cerrado no admite cambios a sus ventas ni a sus abonos (hasta reabrirlo). En los pedidos sólo cuentan los
+-- Un mes cerrado no admite cambios a sus ventas, sus abonos ni sus cortes (hasta reabrirlo). En los pedidos sólo cuentan los
 -- cambios que mueven cifras (cliente, fecha, estado, total, forma de pago): reasignar al vendedor no.
 -- Sólo los meses cerrados de la empresa de la fila (quien corre como dueño de la base ve los de todas).
 CREATE FUNCTION fn_revisar_mes_cerrado(empresa uuid, fechas date[]) RETURNS void
@@ -726,6 +726,14 @@ BEGIN
 END $$;
 CREATE TRIGGER pedidos_mes_cerrado BEFORE INSERT OR UPDATE OR DELETE ON pedidos FOR EACH ROW EXECUTE FUNCTION fn_pedidos_mes_cerrado();
 CREATE TRIGGER abonos_mes_cerrado BEFORE INSERT OR UPDATE OR DELETE ON abonos FOR EACH ROW EXECUTE FUNCTION fn_abonos_mes_cerrado();
+CREATE FUNCTION fn_cortes_mes_cerrado() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN PERFORM fn_revisar_mes_cerrado(OLD.id_empresa, ARRAY[OLD.fecha]); END IF;
+  IF TG_OP IN ('UPDATE', 'INSERT') THEN PERFORM fn_revisar_mes_cerrado(NEW.id_empresa, ARRAY[NEW.fecha]); END IF;
+  RETURN coalesce(NEW, OLD);
+END $$;
+CREATE TRIGGER cortes_mes_cerrado BEFORE INSERT OR UPDATE OR DELETE ON cortes_dia FOR EACH ROW EXECUTE FUNCTION fn_cortes_mes_cerrado();
 -- Envases retornables: cuáles productos lo son y los envases que el cliente devuelve. Lo que tiene prestado un cliente de
 -- un producto = lo entregado (pedidos entregados) − lo recogido (esta tabla, sin las anuladas).
 CREATE TABLE envases_recogidos (

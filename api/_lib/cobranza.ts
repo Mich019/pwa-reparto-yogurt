@@ -146,6 +146,15 @@ export async function rutasCobranza(app: FastifyInstance, { db, config }: Contex
         if (b.data.monto > saldo + 0.004) throw new Falla(409, saldo > 0 ? `Este cliente debe $${saldo.toFixed(2)}, no puedes abonar más` : 'Este cliente no debe nada')
         const fecha = b.data.fecha ?? hoy
         if (fecha > hoy) throw new Falla(400, 'La fecha del abono no puede ser futura')
+        // El efectivo de un día con el corte ya confirmado nunca se esperaría: la deuda bajaría sin que nadie entregue ese
+        // dinero. FOR SHARE espera a una confirmación en curso.
+        if (b.data.metodo === 'efectivo') {
+          const { rows: [k] } = await c.query(
+            `SELECT 1 AS ok FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 AND estado = 'confirmado' FOR SHARE`,
+            [fecha, req.usuario.id],
+          )
+          if (k) throw new Falla(409, fecha === hoy ? 'Tu corte de hoy ya está confirmado: registra este abono mañana' : 'El corte de ese día ya está confirmado: registra el abono con la fecha de hoy')
+        }
         const { rows: [a] } = await c.query(
           `INSERT INTO abonos (id_cliente, id_vendedor, fecha, monto, metodo, nota) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_abono`,
           [b.data.clienteId, req.usuario.id, fecha, b.data.monto, b.data.metodo, b.data.nota || null],
