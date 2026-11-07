@@ -191,9 +191,10 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
             onClick={() => setSeccion('configuracion')}
             aria-label="Configuración"
             title="Configuración"
-            className={`hidden h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:bg-niebla xl:grid 2xl:hidden ${pildora} ${anillo}`}
+            className={`group hidden h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:text-marca xl:grid 2xl:hidden ${anillo}`}
           >
-            <Settings size={17} aria-hidden="true" />
+            {/* Sin fondo; el engrane gira al pasar encima y un poco más al tocarlo (sólo transform: no repinta nada). */}
+            <Settings size={19} aria-hidden="true" className="transition-transform duration-500 ease-out group-hover:rotate-90 group-active:rotate-180 group-active:duration-200 motion-reduce:transition-none" />
           </button>
           <button
             type="button"
@@ -210,9 +211,10 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
             disabled={cerrando}
             aria-label="Cerrar sesión"
             title="Cerrar sesión"
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:bg-rojo/10 hover:text-rojo disabled:opacity-40 ${pildora} ${anillo}`}
+            className={`group grid h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:text-rojo disabled:opacity-40 ${anillo}`}
           >
-            <LogOut size={17} aria-hidden="true" />
+            {/* La flecha sale hacia la puerta al pasar encima y se va del todo al tocarla. */}
+            <LogOut size={19} aria-hidden="true" className="transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-active:translate-x-1 group-disabled:translate-x-0 motion-reduce:transition-none" />
           </button>
         </div>
       </header>
