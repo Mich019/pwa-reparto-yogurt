@@ -6,6 +6,7 @@ import { saldosEnvases } from './envases.js'
 import { tx, type Cx, type Db } from './db.js'
 import { aXlsx, type Tabla } from './exportar.js'
 import { hoyEn, zonaDeEmpresa } from './fechas.js'
+import type { Despachador } from './notificaciones.js'
 
 // Corte del día, cierre de mes e informe mensual.
 //  · Corte del día: cada vendedor dice cuánto efectivo entrega; el sistema sabe cuánto debía (lo cobrado en efectivo,
@@ -25,6 +26,9 @@ const idParam = z.object({ id: z.uuid() })
 const num = (x: unknown) => (x === null || x === undefined ? 0 : Number(x))
 
 // ------------------------------------------------------------------ corte del día
+
+// «6 nov.» para los avisos.
+export const diaCorto = (f: string) => new Date(`${f}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 
 export interface CifrasDia { esperado: number; efectivoVentas: number; efectivoAbonos: number; transferencias: number; credito: number }
 
@@ -248,7 +252,7 @@ function hojas(x: CifrasMes): Tabla[] {
 
 type Historial = { accion: 'cerrado' | 'reabierto'; por: string; en: string; motivo?: string }[]
 
-export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto, { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia }) {
+export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto, { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia }, despachador?: Despachador) {
   const hoyDe = async () => hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
   const responder = (rep: FastifyReply, e: unknown) => {
     const f = comoFalla(e)
@@ -349,6 +353,18 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
             )
         return { id: corte.id_corte as string, esperado: x.esperado, entregado: b.data.efectivoEntregado, diferencia: redondear(corte.dif) }
       })
+      // El vendedor entregó (o corrigió) su corte: los administradores se enteran para confirmarlo. Si lo capturó un
+      // administrador, no hace falta.
+      if (!esAdmin && despachador) {
+        const { rows: [yo] } = await db.query(`SELECT nombre FROM usuarios WHERE id_usuario = $1`, [req.usuario.id])
+        const { rows: admins } = await db.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo`)
+        const cuadre = r.diferencia === 0 ? 'cuadra' : `${r.diferencia < 0 ? 'faltan' : 'sobran'} $${Math.abs(r.diferencia).toFixed(2)}`
+        const dia = fecha === hoy ? 'de hoy' : `del ${diaCorto(fecha)}`
+        await despachador.despachar(admins.map((a) => ({
+          para: a.id_usuario as string, tipo: 'corte_entregado' as const, titulo: 'Corte por confirmar',
+          cuerpo: `${yo?.nombre ?? 'Un vendedor'} entregó su corte ${dia}: $${r.entregado.toFixed(2)} (${cuadre})`, datos: { url: '/admin?ir=cortes' },
+        })))
+      }
       return rep.code(201).send(r)
     } catch (e) {
       return responder(rep, e)

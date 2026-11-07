@@ -51,6 +51,10 @@ describe('corte del día', () => {
 
     const r = await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 160, nota: 'Faltan 10 de cambio' })
     assert.equal(r.status, 201)
+    // Al administrador le llega «Corte por confirmar».
+    const { rows: [entregado] } = await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'corte_entregado' AND id_usuario = $1`, [x.admin.id])
+    assert.ok(entregado.cuerpo.includes('$160.00 (faltan $10.00)'), entregado.cuerpo)
+    assert.equal(entregado.datos.url, '/admin?ir=cortes')
     assert.equal(r.body.diferencia, -10)
     // Lo puede corregir mientras esté pendiente.
     assert.equal((await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 170 })).body.diferencia, 0)

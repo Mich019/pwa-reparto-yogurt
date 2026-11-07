@@ -243,8 +243,8 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
   )
 }
 
-// Avisos push en esta computadora o teléfono, sin abrir la app de reparto (lib/push.ts, el mismo service worker). Hoy
-// al administrador le llegan los cortes confirmados que dejan de cuadrar; tocarlos abre Cobranza → Cortes.
+// Avisos push en esta computadora o teléfono, sin abrir la app de reparto (lib/push.ts, el mismo service worker). Al
+// administrador le llegan: un vendedor entregó su corte, un corte confirmado dejó de cuadrar y la prueba gratis por vencer.
 function AvisosPush() {
   const { estado, refrescar } = useEstadoPush()
   const [ocupado, setOcupado] = useState(false)
@@ -269,7 +269,7 @@ function AvisosPush() {
     else if (estado.permiso === 'denied') texto = 'Bloqueaste las notificaciones de este sitio. Actívalas en los ajustes del navegador (el candado junto a la dirección).'
     else if (activo) texto = 'Recibes los avisos aquí aunque el panel esté cerrado.'
     else if (estado.servidor === false) texto = 'El servidor aún no tiene avisos push configurados.'
-    else texto = 'Actívalos para enterarte, aunque no tengas el panel abierto, cuando un corte confirmado deje de cuadrar.'
+    else texto = 'Actívalos para enterarte aunque no tengas el panel abierto: cuando un vendedor entrega su corte, cuando uno confirmado deja de cuadrar y cuando tu prueba gratis está por vencer.'
   }
   const boton = `rounded-md px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40 ${anillo}`
   return (

@@ -6,6 +6,7 @@ import type { Config } from './config.js'
 import { hashPassword } from './contrasenas.js'
 import { correoAviso, correoInvitacion, enviarCorreo, enviarCorreos } from './correo.js'
 import type { Db } from './db.js'
+import type { Despachador } from './notificaciones.js'
 import { purgarBajas } from './privacidad.js'
 import { hashInvitacion } from './registro.js'
 import { passwordTemporal, tokenAleatorio } from './seguridad.js'
@@ -88,7 +89,28 @@ const estadoDe = (e: { activa: boolean; exenta: boolean; suscripcion_estado: str
     : e.suscripcion_estado === 'cancelled' ? 'cancelada' : 'vencida'
 
 
-export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db: Db; config: Config }, { requiereSesionSinCobro }: { requiereSesionSinCobro: Guardia }) {
+// Cron diario: a los administradores de las empresas cuya prueba gratis vence pronto les llega un aviso (push y en la app)
+// el día que entran en el plazo del aviso automático y el último día. Una vez al día por empresa, así que no se repite.
+export async function avisarPruebasPorVencer(db: Db, config: Config, despachador: Despachador) {
+  const { avisoPrueba } = await leerAjustes(db, config)
+  if (avisoPrueba.dias <= 0) return 0
+  const { rows } = await db.query(
+    `SELECT u.id_usuario, ceil(extract(epoch FROM e.prueba_hasta - now()) / 86400)::int AS dias
+       FROM empresas e JOIN usuarios u ON u.id_empresa = e.id_empresa AND u.rol = 'administrador' AND u.activo
+      WHERE e.activa AND NOT e.interna AND NOT e.exenta AND e.prueba_hasta > now()
+        AND coalesce(e.suscripcion_estado, '') NOT IN ('authorized', 'pending')
+        AND ceil(extract(epoch FROM e.prueba_hasta - now()) / 86400)::int IN ($1, 1)`,
+    [avisoPrueba.dias],
+  )
+  await despachador.despachar(rows.map((r) => ({
+    para: r.id_usuario as string, tipo: 'prueba_por_vencer' as const,
+    titulo: r.dias === 1 ? 'Mañana termina tu prueba gratis' : `Quedan ${r.dias} días de prueba gratis`,
+    cuerpo: 'Suscríbete para que tu equipo no pierda el acceso.', datos: { url: '/admin?ir=suscripcion' },
+  })))
+  return rows.length
+}
+
+export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db: Db; config: Config }, { requiereSesionSinCobro }: { requiereSesionSinCobro: Guardia }, despachador?: Despachador) {
   async function requierePlataforma(req: FastifyRequest, rep: FastifyReply) {
     await requiereSesionSinCobro(req, rep)
     if (rep.sent) return
@@ -205,7 +227,8 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     if (dado.length !== bueno.length || !timingSafeEqual(dado, bueno)) return rep.code(401).send({ error: 'No autorizado' })
     await mandarAvisosPorCorreo(req.log)
     const borradas = await purgarBajas(db, req.log) // empresas cuya baja ya venció (privacidad.ts)
-    return { ok: true, borradas }
+    const pruebas = despachador ? await avisarPruebasPorVencer(db, config, despachador).catch((e) => { req.log.error(e, 'No se pudieron avisar las pruebas por vencer'); return 0 }) : 0
+    return { ok: true, borradas, pruebas }
   })
 
   // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.

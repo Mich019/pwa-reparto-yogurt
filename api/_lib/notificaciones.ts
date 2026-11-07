@@ -10,7 +10,7 @@ import { claveUsuario } from './seguridad.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
-export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'prueba'
+export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'prueba'
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso
@@ -36,18 +36,20 @@ export function unir(avisos: AvisoPendiente[]): AvisoPendiente[] {
     const cuerpo = lineas.slice(0, 3).join('. ') + (lineas.length > 3 ? ` y ${lineas.length - 3} más` : '')
     const { para, tipo } = g[0]
     const titulo = tipo === 'pedido_urgente' ? `${g.length} pedidos urgentes` : tipo === 'ruta_modificada' ? 'Tu ruta cambió' : g[0].titulo
-    return { para, tipo, titulo: tipo === 'corte_descuadrado' ? `${g.length} cortes confirmados ya no cuadran` : titulo, cuerpo, datos: { pestana: g[0].datos?.pestana, url: g[0].datos?.url } }
+    const titulos: Partial<Record<TipoAviso, string>> = { corte_descuadrado: `${g.length} cortes confirmados ya no cuadran`, corte_entregado: `${g.length} cortes por confirmar` }
+    return { para, tipo, titulo: titulos[tipo] ?? titulo, cuerpo, datos: { pestana: g[0].datos?.pestana, url: g[0].datos?.url } }
   })
 }
 
 export interface Registro { error: (e: unknown, mensaje?: string) => void }
 
 export function crearDespachador(db: Db, enviador: Enviador | null, log: Registro) {
-  // Lo guarda sólo si la persona sigue activa; devuelve su id.
+  // Lo guarda sólo si la persona sigue activa; devuelve su id. La empresa sale de la cuenta: así sirve también desde el
+  // cron, que corre como dueño de la base sin empresa en alcance.
   async function guardar(a: AvisoPendiente): Promise<string | null> {
     const { rows } = await db.query(
-      `INSERT INTO notificaciones (id_usuario, tipo, titulo, cuerpo, datos)
-       SELECT id_usuario, $2, $3, $4, $5::jsonb FROM usuarios WHERE id_usuario = $1 AND activo
+      `INSERT INTO notificaciones (id_empresa, id_usuario, tipo, titulo, cuerpo, datos)
+       SELECT id_empresa, id_usuario, $2, $3, $4, $5::jsonb FROM usuarios WHERE id_usuario = $1 AND activo
        RETURNING id_notificacion`,
       [a.para, a.tipo, a.titulo.slice(0, 120), a.cuerpo, JSON.stringify(a.datos ?? {})],
     )

@@ -25,8 +25,17 @@ export type { SeccionAdmin } from './menu'
 
 // La sección abierta sobrevive a recargar la página (sólo en esta pestaña del navegador).
 const CLAVE_SECCION = 'admin-seccion'
+// `?ir=suscripcion` lo pone el aviso de que la prueba gratis está por vencer: abre Configuración → Suscripción.
+const irASuscripcion = () => {
+  if (new URLSearchParams(location.search).get('ir') !== 'suscripcion') return false
+  history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
+  return true
+}
+const IR_SUSCRIPCION = irASuscripcion()
+
 function seccionGuardada(): SeccionAdmin {
   if (irACortes()) return 'cobranza'
+  if (IR_SUSCRIPCION) return 'configuracion'
   try {
     const s = sessionStorage.getItem(CLAVE_SECCION)
     return PESTANAS.find((p) => p.id === s)?.id ?? 'resumen'
@@ -68,7 +77,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   const menu = useMenu()
   useAplicarPreferencias()
   // Con qué apartado se abre Configuración: el aviso de la prueba lleva directo a la suscripción.
-  const [apartado, setApartado] = useState<{ id: ApartadoConfig; vez: number }>({ id: 'cuenta', vez: 0 })
+  const [apartado, setApartado] = useState<{ id: ApartadoConfig; vez: number }>({ id: IR_SUSCRIPCION ? 'suscripcion' : 'cuenta', vez: 0 })
   const abrirConfiguracion = (id: ApartadoConfig) => { setApartado((a) => ({ id, vez: a.vez + 1 })); setSeccion('configuracion') }
   const esAdmin = sesion?.usuario.rol === 'administrador'
   const suscripcion = useSuscripcion(esAdmin ? sesion?.usuario.id : undefined)

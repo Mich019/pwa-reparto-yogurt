@@ -163,7 +163,8 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasRegistro(app, ctx, { requiereAdmin })
   await rutasEmpresa(app, ctx, { requiereSesionAunConPasswordPendiente, requiereAdmin })
   // Cruza empresas: con la conexión sin envolver (dueño de la base), no la de la empresa de quien llama.
-  await rutasPlataforma(app, { db: entrada.db, config: ctx.config }, { requiereSesionSinCobro })
+  // Sus avisos del cron (también cruzan empresas) se guardan con esa conexión: crearDespachador toma la empresa de la cuenta.
+  await rutasPlataforma(app, { db: entrada.db, config: ctx.config }, { requiereSesionSinCobro }, crearDespachador(entrada.db, enviador, app.log))
   const mp = ctx.mercadoPago !== undefined ? ctx.mercadoPago : crearClienteMp(ctx.config)
   await rutasSuscripcion(app, ctx, mp, { requiereAdminSinCobro })
   await rutasPrivacidad(app, ctx, mp, { requiereSesionAunConPasswordPendiente, requiereSesionSinCobro, requiereAdminSinCobro })
@@ -177,7 +178,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasCobranza(app, ctx, { requiereSesion, requiereAdmin })
   await rutasEnvases(app, ctx, { requiereSesion, requiereAdmin })
   await rutasPrecios(app, ctx, { requiereAdmin })
-  await rutasCortes(app, ctx, { requiereSesion, requiereAdmin })
+  await rutasCortes(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
 
   return app
