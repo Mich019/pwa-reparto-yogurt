@@ -112,8 +112,8 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
     setGirando(false)
   }
 
-  // En vivo: cuando cambia un pedido, un cliente o un sabor en la empresa (lib/enVivo.ts).
-  useEnVivo('datos', () => { void cargar(); recargarVentas() })
+  // En vivo: cuando cambia un pedido, un cliente o un sabor en la empresa (lib/enVivo.ts). Las ventas (useReporte) se piden solas.
+  useEnVivo('datos', () => void cargar())
 
   // Sin la conexión en vivo (sin señal, o el servidor no la da) se refresca cada minuto mientras se ve. Al volver a la
   // pestaña la conexión en vivo ya avisa de todo.

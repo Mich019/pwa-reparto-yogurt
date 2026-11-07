@@ -234,7 +234,7 @@ function HojaProduccion({ abierta, onCerrar, dia, sabores, onGuardado }: {
     if (!abierta) return
     setValores(Object.fromEntries(dia.produccion.map((x) => [x.productoId, aTexto(x.litros)])))
     setError('')
-  }, [abierta, dia])
+  }, [abierta, dia.fecha]) // eslint-disable-line react-hooks/exhaustive-deps -- sólo al abrir: lo que llega en vivo no pisa lo que se está escribiendo
 
   async function guardar() {
     const lineas: { productoId: string; litros: number }[] = []

@@ -114,6 +114,41 @@ export function correoAviso(nombre: string, texto: string, url: string) {
   }
 }
 
+// Resumen diario para el administrador (resumen.ts): lo de ayer en renglones, sólo lo que tiene algo.
+export interface CifrasResumen {
+  dia: string // AAAA-MM-DD, ayer en la zona de la empresa
+  entregados: number; vendido: number; efectivo: number; transferencia: number; fiado: number; abonos: number
+  sinAtender: number; cortesPorConfirmar: number; urgentes: number
+}
+const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const veces = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
+export function correoResumen(nombre: string, empresa: string, c: CifrasResumen, url: string) {
+  const [a, m, d] = c.dia.split('-').map(Number)
+  const dia = new Date(Date.UTC(a, m - 1, d, 12)).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+  const renglones: [string, string][] = [['Vendido', c.entregados ? `${pesos(c.vendido)} en ${veces(c.entregados, 'pedido', 'pedidos')}` : 'Sin ventas']]
+  if (c.entregados) renglones.push(['En efectivo', pesos(c.efectivo)], ['Por transferencia', pesos(c.transferencia)])
+  if (c.fiado) renglones.push(['Fiado', pesos(c.fiado)])
+  if (c.abonos) renglones.push(['Abonos cobrados', pesos(c.abonos)])
+  const pendientes = [
+    c.cortesPorConfirmar ? `${veces(c.cortesPorConfirmar, 'corte', 'cortes')} por confirmar` : '',
+    c.sinAtender ? `${veces(c.sinAtender, 'pedido quedó', 'pedidos quedaron')} sin atender` : '',
+    c.urgentes ? `${veces(c.urgentes, 'urgente tardó', 'urgentes tardaron')} más de media hora` : '',
+  ].filter(Boolean)
+  const celda = 'padding:8px 0;border-top:1px solid #eee'
+  const tabla = `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${renglones
+    .map(([k, v]) => `<tr><td style="${celda};color:#6b6b6b">${escapar(k)}</td><td align="right" style="${celda};font-weight:600">${escapar(v)}</td></tr>`).join('')}</table></td></tr>`
+  const pie = 'Lo recibes porque lo pediste en Configuración → Preferencias. Ahí mismo lo apagas.'
+  return {
+    asunto: `${empresa}: tu resumen de ayer`,
+    texto: `Hola ${nombre}:\n\nAsí le fue a ${empresa} el ${dia}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}${pendientes.length ? `\n\nPendiente: ${pendientes.join('; ')}.` : ''}\n\nEntra a Delisy: ${url}\n\n${pie}`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)}, así le fue a <strong>${escapar(empresa)}</strong> el ${escapar(dia)}:`) + tabla
+      + (pendientes.length ? parrafo(`<strong>Pendiente:</strong> ${escapar(pendientes.join('; '))}.`) : '')
+      + boton(url, 'Abrir el panel')
+      + nota(pie)),
+  }
+}
+
 // Constancia de que la cuenta se eliminó (derecho de cancelación): sale al correo que tenía antes de anonimizarla.
 export function correoCuentaEliminada(nombre: string, empresa: string) {
   return {

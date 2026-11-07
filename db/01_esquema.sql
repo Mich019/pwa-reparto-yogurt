@@ -85,6 +85,8 @@ CREATE TABLE usuarios (
   avisos_apagados       text[],                             -- tipos de aviso que la cuenta no quiere (027_avisos_apagados.sql)
   silencio_desde        smallint,                           -- horario de silencio del push, horas 0–23 en la zona de la empresa
   silencio_hasta        smallint,                           -- (028_horario_silencio.sql; null = sin horario)
+  resumen_correo        boolean NOT NULL DEFAULT false,     -- resumen diario por correo (030_resumen_correo.sql)
+  resumen_enviado_dia   date,                               -- el día del último resumen mandado (no repetir)
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040

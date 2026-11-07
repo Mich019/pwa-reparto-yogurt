@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEnVivo } from './enVivo'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ErrorRed } from './api'
 import { db } from './db'
@@ -46,16 +47,19 @@ export function useDiaStock(fecha: string) {
   const [cargando, setCargando] = useState(true)
   const pedido = useRef(0)
 
-  const recargar = useCallback(() => {
+  const pedir = useCallback((callado: boolean) => {
     const mio = ++pedido.current
-    setCargando(true)
+    if (!callado) setCargando(true)
     cargarDia(fecha)
       .then((d) => { if (mio === pedido.current) { setDia(d); setError(null) } })
-      .catch((e: Error) => { if (mio === pedido.current) setError({ texto: e.message, sinRed: e instanceof ErrorRed }) })
-      .finally(() => { if (mio === pedido.current) setCargando(false) })
+      .catch((e: Error) => { if (mio === pedido.current && !callado) setError({ texto: e.message, sinRed: e instanceof ErrorRed }) })
+      .finally(() => { if (mio === pedido.current && !callado) setCargando(false) })
   }, [fecha])
+  const recargar = useCallback(() => pedir(false), [pedir])
 
   useEffect(() => { recargar() }, [recargar])
+  // En vivo (lib/enVivo.ts): una venta o una carga nueva en la empresa se ve sin recargar, en silencio.
+  useEnVivo('datos', () => pedir(true))
   // Lo que devuelve el servidor tras guardar sustituye al día a la vista (si sigue siendo el mismo día).
   const adoptar = useCallback((d: DiaStock) => { if (d.fecha === fecha) setDia(d) }, [fecha])
   return { dia, error, cargando, recargar, adoptar }

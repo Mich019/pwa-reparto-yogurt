@@ -18,7 +18,8 @@ type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
 // `db` es la conexión sin envolver (dueño de la base): la consulta filtra por empresa y sesión a mano, sin abrir una
 // transacción por vuelta.
-export async function rutasEnVivo(app: FastifyInstance, db: Db, { requiereSesion }: { requiereSesion: Guardia }, opciones: OpcionesEnVivo = EN_VIVO) {
+// `alVuelta`: algo que conviene revisar seguido mientras haya alguien conectado (urgentes.ts); ella misma se dosifica.
+export async function rutasEnVivo(app: FastifyInstance, db: Db, { requiereSesion }: { requiereSesion: Guardia }, opciones: OpcionesEnVivo = EN_VIVO, alVuelta?: () => void) {
   app.get('/eventos', { preHandler: requiereSesion }, async (req, rep) => {
     const { empresa, sid, id } = req.usuario
     const leer = async () => {
@@ -63,6 +64,7 @@ export async function rutasEnVivo(app: FastifyInstance, db: Db, { requiereSesion
     const vuelta = setInterval(async () => {
       if (ocupado || cerrado) return
       ocupado = true
+      alVuelta?.()
       try {
         const r = await leer()
         if (!r.viva) return terminar('fin')

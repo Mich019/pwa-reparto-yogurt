@@ -303,6 +303,7 @@ function AvisosPush() {
 const TIPOS_AVISO = [
   { tipo: 'corte_entregado', titulo: 'Corte por confirmar', ayuda: 'Un vendedor entregó o corrigió su corte del día.' },
   { tipo: 'corte_descuadrado', titulo: 'Corte que ya no cuadra', ayuda: 'Llegó una venta en efectivo de un día con el corte ya confirmado.' },
+  { tipo: 'urgente_sin_atender', titulo: 'Urgente sin atender', ayuda: 'Un pedido urgente sigue pendiente 30 minutos después.' },
   { tipo: 'prueba_por_vencer', titulo: 'Prueba gratis por vencer', ayuda: 'Unos días antes y el último día de la prueba.' },
 ] as const
 
@@ -317,7 +318,7 @@ function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encend
 }
 
 function Preferencias() {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
   const silencio = prefs?.silencio ?? null
   const claseHora = `rounded-md border border-linea bg-papel px-3 py-2 text-sm font-semibold ${anillo}`
   return (
@@ -329,6 +330,11 @@ function Preferencias() {
             <Interruptor encendido={encendido(tipo)} deshabilitado={!prefs} etiqueta={titulo} alCambiar={(si) => void alternar(tipo, si)} />
           </Fila>
         ))}
+      </Seccion>
+      <Seccion id="resumen" titulo="Resumen diario por correo" descripcion="Cada mañana, lo de ayer en un solo correo: ventas, cobro, fiado, cortes por confirmar y urgentes que tardaron. Si lo prendes, puedes apagar arriba «Corte por confirmar» para no recibir un aviso por cada uno.">
+        <Fila titulo="Mandarme el resumen" ayuda={prefs?.resumenCorreo ? 'Te llega a tu correo cada mañana.' : 'Apagado.'}>
+          <Interruptor encendido={!!prefs?.resumenCorreo} deshabilitado={!prefs} etiqueta="Mandarme el resumen" alCambiar={(si) => void cambiarResumen(si)} />
+        </Fila>
       </Seccion>
       <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>

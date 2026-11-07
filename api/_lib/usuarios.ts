@@ -51,7 +51,8 @@ const bloqueo = (config: Config) => {
 const columnas = (config: Config) => `u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.comision_pct::float8 AS comision_pct, u.meta_mensual::float8 AS meta_mensual, u.rol, u.activo, u.debe_cambiar_password, u.ultimo_acceso, u.creado_en,
   ${bloqueo(config)},
   (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario) AS clientes,
-  (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario AND c.activo) AS clientes_activos`
+  (SELECT count(*)::int FROM clientes c WHERE c.id_vendedor = u.id_usuario AND c.activo) AS clientes_activos,
+  (SELECT count(*)::int FROM suscripciones_push s WHERE s.id_usuario = u.id_usuario) AS dispositivos_push, u.avisos_apagados`
 
 function wire(r: any) {
   const bloqueada = r.bloqueado_hasta && new Date(r.bloqueado_hasta) > new Date()
@@ -63,6 +64,8 @@ function wire(r: any) {
     creadoEn: new Date(r.creado_en).toISOString(),
     clientes: r.clientes as number, clientesActivos: r.clientes_activos as number,
     comisionPct: r.comision_pct as number, metaMensual: (r.meta_mensual ?? null) as number | null,
+    // Si le llegan los avisos con la app cerrada: en cuántos teléfonos o computadoras los activó y cuáles apagó.
+    dispositivosPush: (r.dispositivos_push ?? 0) as number, avisosApagados: (r.avisos_apagados ?? []) as string[],
   }
 }
 const otroAdminActivo = async (c: Cx, excepto: string) =>

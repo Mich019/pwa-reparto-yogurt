@@ -21,6 +21,8 @@ export interface Miembro {
   clientesActivos: number
   comisionPct: number // % de comisión sobre lo vendido en el mes (0 = sin comisión)
   metaMensual: number | null
+  dispositivosPush: number // teléfonos o computadoras con los avisos activados
+  avisosApagados: string[] // tipos que apagó en Preferencias
 }
 export interface Equipo {
   usuarios: Miembro[]

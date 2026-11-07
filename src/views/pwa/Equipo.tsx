@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, Check, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, BellOff, Check, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
@@ -22,6 +22,17 @@ const SIN_VENDEDOR = 'sin' // en los selectores, "ningún vendedor"
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
 const mensaje = (e: unknown) => (e instanceof ErrorApi || e instanceof ErrorRed ? e.message : 'No se pudo completar. Intenta de nuevo.')
 const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHasta) > new Date()
+
+// Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
+const NOMBRE_AVISO: Record<string, string> = {
+  stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender',
+}
+function textoAvisos(m: Miembro) {
+  const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'
+  const apagados = m.avisosApagados.map((t) => NOMBRE_AVISO[t]).filter(Boolean)
+  return apagados.length ? `${donde}. Apagó: ${apagados.join(', ')}` : donde
+}
 
 function Etiqueta({ m }: { m: Miembro }) {
   const [texto, clase] = !m.activo ? ['De baja', 'bg-rojo/10 text-rojo']
@@ -79,6 +90,9 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
           {panel && <span className="truncate"> · {m.correo}</span>}
         </div>
       </div>
+      {m.activo && m.rol === 'vendedor' && !m.dispositivosPush && (
+        <span title="No tiene los avisos activados en su teléfono" className="shrink-0 text-apagado"><BellOff size={16} aria-label="Sin avisos en el teléfono" /></span>
+      )}
       <Etiqueta m={m} />
       <ChevronRight size={18} className="shrink-0 text-apagado/60" />
     </button>
@@ -278,6 +292,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           <Linea t="Teléfono" v={m.telefono || '—'} />
           <Linea t="Último acceso" v={m.ultimoAcceso ? hace(new Date(m.ultimoAcceso).getTime()) : 'Todavía no ha entrado'} />
           {m.rol === 'vendedor' && <Linea t="Clientes" v={`${m.clientes}${m.clientes !== m.clientesActivos ? ` (${m.clientesActivos} activos)` : ''}`} />}
+          <Linea t="Avisos" v={textoAvisos(m)} />
         </dl>
 
         {!confirmar && (

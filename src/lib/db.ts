@@ -77,7 +77,7 @@ export interface StockDia {
   version?: number
 }
 
-export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'prueba' | 'stock_bajo' | 'sync_pendiente'
+export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'prueba' | 'stock_bajo' | 'sync_pendiente'
 export type PestanaAviso = 'ruta' | 'clientes' | 'stock' | 'cuenta'
 
 // Avisos para el vendedor (RF-054, RF-055). Los de pedido urgente, ruta y carga los manda el servidor; los de stock

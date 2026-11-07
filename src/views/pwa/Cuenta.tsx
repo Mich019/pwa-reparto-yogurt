@@ -133,7 +133,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
 }
 
 const ICONO_AVISO: Record<TipoAviso, LucideIcon> = {
-  pedido_urgente: Flame, ruta_modificada: MapPin, stock_asignado: Package, stock_bajo: Package, sync_pendiente: CloudOff, corte_descuadrado: Wallet, corte_entregado: Wallet, prueba_por_vencer: CreditCard, prueba: Bell,
+  pedido_urgente: Flame, urgente_sin_atender: Flame, ruta_modificada: MapPin, stock_asignado: Package, stock_bajo: Package, sync_pendiente: CloudOff, corte_descuadrado: Wallet, corte_entregado: Wallet, prueba_por_vencer: CreditCard, prueba: Bell,
 }
 const mensajeError = (e: unknown) => (e instanceof Error ? e.message : 'No se pudo completar. Intenta de nuevo.')
 

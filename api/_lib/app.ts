@@ -31,6 +31,7 @@ import { ipCliente } from './seguridad.js'
 import { almacenLimites } from './limites.js'
 import { reportarError } from './errores.js'
 import { rutasEnVivo, type OpcionesEnVivo } from './envivo.js'
+import { revisarDeVezEnCuando, rutasUrgentes } from './urgentes.js'
 
 export type Rol = 'administrador' | 'vendedor'
 export interface Usuario {
@@ -182,7 +183,10 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasPrecios(app, ctx, { requiereAdmin })
   await rutasCortes(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
-  await rutasEnVivo(app, entrada.db, { requiereSesion }, ctx.enVivo)
+  // Los urgentes sin atender cruzan empresas: con la conexión del dueño, como el cron.
+  const despachadorDueno = crearDespachador(entrada.db, enviador, app.log)
+  await rutasEnVivo(app, entrada.db, { requiereSesion }, ctx.enVivo, () => revisarDeVezEnCuando(entrada.db, despachadorDueno, app.log))
+  await rutasUrgentes(app, entrada.db, ctx.config, despachadorDueno)
 
   return app
 }

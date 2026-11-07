@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEnVivo } from './enVivo'
 import { ErrorRed } from './api'
 import { descargarAutenticado, llamarAutenticado } from './sesion'
 import { desdeIso, hoy, iso, sumarDias } from './fechas'
@@ -147,19 +148,22 @@ export function useReporte(rango: Rango, agrupar: Agrupar, comparar?: Rango) {
   const [cargando, setCargando] = useState(true)
   const pedido = useRef(0)
 
-  const cargar = useCallback(() => {
+  const pedir = useCallback((callado: boolean) => {
     const mio = ++pedido.current
-    setCargando(true)
+    if (!callado) setCargando(true)
     llamarAutenticado<Reporte>(rutaReporte(rango, agrupar, comparar))
       .then((r) => { if (mio === pedido.current) { setReporte(r); setError(null) } })
       .catch((e: Error) => {
-        if (mio !== pedido.current) return
+        if (mio !== pedido.current || callado) return
         setError({ texto: e.message, sinRed: e instanceof ErrorRed })
       })
-      .finally(() => { if (mio === pedido.current) setCargando(false) })
+      .finally(() => { if (mio === pedido.current && !callado) setCargando(false) })
   }, [rango.desde, rango.hasta, agrupar, comparar?.desde, comparar?.hasta])
+  const cargar = useCallback(() => pedir(false), [pedir])
 
   useEffect(() => { cargar() }, [cargar])
+  // En vivo (lib/enVivo.ts): una venta entregada en la empresa se suma sin recargar y sin apagar lo que se ve.
+  useEnVivo('datos', () => pedir(true), 1500)
   return { reporte, error, cargando, recargar: cargar }
 }
 

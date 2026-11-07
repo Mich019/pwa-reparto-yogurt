@@ -236,7 +236,7 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
 }
 
 // El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
-export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null }) {
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean }) {
   const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
   if (datos.silencio !== undefined) void recordarSilencio(datos.silencio)
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
