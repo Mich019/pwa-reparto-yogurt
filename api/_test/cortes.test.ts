@@ -191,7 +191,7 @@ describe('cierre de mes', () => {
     const medallas = async () => (await db.query(`SELECT titulo, datos FROM notificaciones WHERE tipo = 'medalla_ganada' AND id_usuario = $1`, [x.admin.id])).rows
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
     const r1 = (await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id]
-    assert.deepEqual([r1.racha, r1.mejorRacha, r1.medallas], [3, 3, [{ medalla: 3, mes: MES }]])
+    assert.deepEqual([r1.racha, r1.mejorRacha, r1.medallas, r1.cumplidos], [3, 3, [{ medalla: 3, mes: MES }], 3])
     const [m] = await medallas()
     assert.equal(m.titulo, 'Medalla de 3 meses')
     assert.deepEqual([m.datos.medalla, m.datos.vendedorIds], [3, [x.ana.id]])

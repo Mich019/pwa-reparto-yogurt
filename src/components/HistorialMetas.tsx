@@ -8,6 +8,37 @@ export interface MesDeMeta { mes: string; ventas: number; meta: number | null; c
 const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
 
+// Lo vendido mes a mes (el más viejo a la izquierda): verde los meses que llegó a su meta, y la meta de cada mes como una
+// raya encima. Sin librerías; colores del tema.
+function Tendencia({ historial }: { historial: MesDeMeta[] }) {
+  const meses = [...historial].reverse()
+  const tope = Math.max(1, ...meses.map((h) => Math.max(h.ventas, h.meta ?? 0)))
+  const ancho = 22
+  const alto = 56
+  const y = (v: number) => alto - (v / tope) * (alto - 4)
+  return (
+    <figure className="desplegar px-4 pb-3">
+      <svg viewBox={`0 0 ${meses.length * ancho} ${alto}`} className="h-16 w-full" preserveAspectRatio="none" role="img"
+        aria-label={`Lo vendido en los últimos ${meses.length} meses cerrados`}>
+        {meses.map((h, i) => {
+          const llego = !!h.meta && (h.cumplimientoPct ?? 0) >= 100
+          return (
+            <g key={h.mes}>
+              <title>{`${mesCorto(h.mes)}: ${pesos(h.ventas)}${h.meta ? ` de ${pesos(h.meta)}` : ''}`}</title>
+              <rect x={i * ancho + 4} y={y(h.ventas)} width={ancho - 8} height={Math.max(1, alto - y(h.ventas))} rx={3}
+                className={llego ? 'fill-verde' : 'fill-marca'} opacity={llego ? 1 : 0.55} />
+              {h.meta ? <rect x={i * ancho + 2} y={y(h.meta) - 1} width={ancho - 4} height={2} rx={1} className="fill-tinta" opacity={0.5} /> : null}
+            </g>
+          )
+        })}
+      </svg>
+      <figcaption className="mt-1 flex justify-between text-[11px] capitalize text-apagado">
+        <span>{mesCorto(meses[0].mes)}</span><span>{mesCorto(meses[meses.length - 1].mes)}</span>
+      </figcaption>
+    </figure>
+  )
+}
+
 export function HistorialMetas({ historial, titulo = 'Historial de metas', className = '' }: { historial: MesDeMeta[]; titulo?: string; className?: string }) {
   const [abierto, setAbierto] = useState(false)
   if (!historial.length) return null
@@ -18,6 +49,7 @@ export function HistorialMetas({ historial, titulo = 'Historial de metas', class
         {titulo}
         <ChevronRight size={16} aria-hidden="true" className={`text-apagado transition-transform duration-200 ${abierto ? 'rotate-90' : ''}`} />
       </button>
+      {abierto && historial.length >= 2 && <Tendencia historial={historial} />}
       {abierto && (
         <ul className="desplegar space-y-2.5 px-4 pb-4 text-sm">
           {historial.map((h) => {

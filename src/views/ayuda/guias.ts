@@ -2,7 +2,7 @@ import {
   ArrowRightLeft, Bell, BellRing, BookUser, Camera, CalendarDays, CircleSlash, CreditCard, Download, Factory, Flame, History,
   IceCreamBowl, KeyRound, LayoutDashboard, LineChart, LogOut, Mail, MapPin, MapPinned, Moon, Package, Pencil, Printer, QrCode,
   RefreshCw, ScanLine, ShieldCheck, ShoppingBag, Smartphone, SwatchBook, TrendingUp, UserCog, UserPlus, UserX, WifiOff,
-  Archive, BadgePercent, Boxes, HandCoins, Lock, Wallet, type LucideIcon,
+  Archive, BadgePercent, Boxes, Crown, HandCoins, Lock, Medal, Target, Trophy, Wallet, type LucideIcon,
 } from 'lucide-react'
 
 // El manual de la sección Ayuda: cada guía son unos pasos cortos, y cada paso trae su «captura»: una pantalla de
@@ -405,6 +405,26 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Cuenta, toca «Corte de hoy»: te dice cuánto efectivo debes entregar (sin transferencias ni fiado).', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Corte de hoy', texto: 'Efectivo a entregar $1,240', icono: Wallet, foco: true }]) },
       { texto: 'Escribe lo que entregas y toca «Entregar corte». Puedes corregirlo hasta que el administrador lo confirme.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }], { titulo: 'Corte de hoy', piezas: [{ t: 'campos', items: [{ etiqueta: 'Efectivo que entregas', valor: '1240', foco: true }] }, { t: 'boton', texto: 'Entregar corte' }] }) },
+    ],
+  },
+  {
+    id: 'mis-metas', tema: 'cuenta', titulo: 'Tu meta, tu racha y tus medallas', icono: Trophy, donde: 'app', para: 'vendedor',
+    resumen: 'Cuánto llevas del mes, los meses seguidos que llegas a tu meta y las medallas de 3, 6 y 12 meses.',
+    palabras: 'meta mes avance racha seguidos medalla trofeo lugar ranking ventas historial',
+    pasos: [
+      { texto: 'En Cuenta, «Meta del mes» te dice cuánto llevas, cuánto te falta y en qué lugar vas. En Ruta la ves como una barrita bajo «cobrado hoy».', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Meta del mes', texto: '$14,200 de $20,000 · vas en 2.º lugar', icono: Target, foco: true }]) },
+      { texto: 'Cada mes que el administrador cierra y llegaste a tu meta cuenta como trofeo. Si lo haces varios meses seguidos, llevas una racha. Del día 25 en adelante te avisamos si está en riesgo.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Llegaste a tu meta 4 meses', texto: 'Llevas 3 meses seguidos. ¡Que no se corte!', icono: Trophy, foco: true }]) },
+      { texto: 'Con 3, 6 y 12 meses seguidos ganas una medalla, y se queda aunque la racha se corte. Abajo, «Tus metas de los meses pasados» muestra cada mes con lo que vendiste.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'chips', items: ['3 meses', '6 meses', '1 año'], elegido: 0, foco: 1 }, { t: 'caja', titulo: 'Tus metas de los meses pasados', icono: Medal }]) },
+    ],
+  },
+  {
+    id: 'metas-equipo', tema: 'equipo', titulo: 'Poner metas y felicitar a tu equipo', icono: Target, donde: 'panel', para: 'administrador', ir: 'equipo',
+    resumen: 'Una meta para todos o según lo que vendió cada uno, y cómo ver rachas, medallas y el salón de la fama.',
+    palabras: 'meta metas comision vendedores todos porcentaje mes pasado racha medalla felicitar whatsapp salon fama ranking',
+    pasos: [
+      { texto: 'En Vendedores, toca «Meta para todos». Pon la misma cantidad o «Según su mes pasado» con un porcentaje; abajo ves cómo quedaría la de cada uno antes de guardar.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'botones', items: [{ texto: 'Invitar' }, { icono: Target, texto: 'Meta para todos', foco: true }, { texto: 'Nueva cuenta', primario: true }] }], { titulo: 'Meta para todos', piezas: [{ t: 'chips', items: ['La misma para todos', 'Según su mes pasado'], elegido: 1 }, { t: 'campos', items: [{ etiqueta: 'Más que su mes pasado (%)', valor: '10', foco: true }] }, { t: 'filas', n: 3, textos: ['Rosa  $12,000 → $13,200', 'Juan  $9,500 → $10,450', 'Luis  Sin ventas'] }] }) },
+      { texto: 'Al cerrar el mes, quien llega a 3, 6 o 12 meses seguidos gana una medalla: te avisamos y aparece en el Resumen. En su ficha, «Felicitar por WhatsApp» te da tres mensajes para elegir.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Rosa Hernández', piezas: [{ t: 'chips', items: ['Vendedor', '4 metas cumplidas', '3 seguidos'] }, { t: 'boton', texto: 'Felicitar por WhatsApp', secundario: true, foco: true }, { t: 'caja', titulo: 'Historial de metas' }] }) },
+      { texto: '«Salón de la fama» muestra las mejores rachas de todos los tiempos, también de quienes ya no están.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'botones', items: [{ texto: 'Meta para todos' }, { icono: Crown, texto: 'Salón de la fama', foco: true }] }], { titulo: 'Salón de la fama', piezas: [{ t: 'opciones', items: [{ titulo: 'Rosa Hernández', sub: '6 seguidos · 9 metas cumplidas' }, { titulo: 'Juan Pérez', sub: '3 seguidos · 5 metas cumplidas' }], foco: 0 }] }) },
     ],
   },
   {

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, BellOff, BellRing, Check, Flame, Target, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, BellOff, BellRing, Check, Crown, Flame, Target, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
   avisoDePrueba, cargarEquipo, crearMiembro, metaParaTodos, ventasMesPasado, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
-  type Miembro, type Trofeos,
+  type Miembro, type Rachas, type Trofeos,
 } from '../../lib/equipo'
+import { useServidor } from '../../lib/cobranza'
 import { hace } from '../../lib/fechas'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { useSesion, type Rol } from '../../lib/sesion'
@@ -88,6 +89,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const [q, setQ] = useState('')
   const [verBaja, setVerBaja] = useState(false)
   const [metaTodos, setMetaTodos] = useState(false)
+  const [fama, setFama] = useState(false)
 
   async function cargar() {
     setCargando(true)
@@ -138,6 +140,9 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
       </button>
       <button onClick={() => setMetaTodos(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
         <Target size={18} /> Meta para todos
+      </button>
+      <button onClick={() => setFama(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+        <Crown size={18} /> Salón de la fama
       </button>
       <button onClick={() => setForm('nuevo')} className={panel ? `${botonPanel} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700'}>
         <UserPlus size={18} /> Nueva cuenta
@@ -225,6 +230,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
         />
       )}
       {clave && <ClaveTemporal datos={clave} onCerrar={() => setClave(null)} />}
+      {fama && <SalonDeLaFama onCerrar={() => setFama(false)} onAbrir={(id) => { setFama(false); setFichaId(id) }} />}
       {metaTodos && <MetaParaTodos vendedores={activos.filter((u) => u.rol === 'vendedor')} onCerrar={() => setMetaTodos(false)} />}
       {invitando && <Invitar onCerrar={() => setInvitando(false)} />}
       {cartera && equipo && <ReasignarCartera equipo={equipo.usuarios} sinAsignar={equipo.clientesSinAsignar} desdeInicial={cartera.desde} onCerrar={() => setCartera(null)} />}
@@ -263,6 +269,61 @@ function Invitar({ onCerrar }: { onCerrar: () => void }) {
 }
 
 // ------------------------------------------------------------------ la misma meta para todos los vendedores
+// Las mejores rachas de todos los tiempos (de las fotos de los cierres de mes, también de quienes ya se fueron): la mejor
+// racha manda, luego cuántos meses cumplió en total. Tocar a alguien que sigue en el equipo abre su ficha.
+function SalonDeLaFama({ onCerrar, onAbrir }: { onCerrar: () => void; onAbrir: (id: string) => void }) {
+  const r = useServidor<Rachas>('/usuarios/rachas', 'cobranza')
+  const usuarios = useEquipo()?.usuarios ?? []
+  const lista = Object.entries(r.datos ?? {})
+    .map(([id, v]) => ({ id, ...v, actual: usuarios.find((u) => u.id === id) }))
+    .sort((a, b) => b.mejorRacha - a.mejorRacha || b.cumplidos - a.cumplidos || a.nombre.localeCompare(b.nombre))
+    .slice(0, 10)
+  return (
+    <Hoja abierta onCerrar={onCerrar} titulo="Salón de la fama">
+      <p className="mb-3 text-sm text-apagado">Las mejores rachas de meses seguidos llegando a la meta, de todos los meses cerrados.</p>
+      {r.error && !r.datos ? <p className="text-sm text-rojo">{r.error}</p>
+        : !r.datos ? <p className="text-sm text-apagado">Cargando…</p>
+        : !lista.length ? <p className="rounded-lg bg-niebla p-4 text-sm text-apagado">Todavía nadie llega a su meta en un mes cerrado. Al cerrar el primero aparecen aquí.</p>
+        : (
+          <ol className="space-y-1.5">
+            {lista.map((v, i) => {
+              const fila = (
+                <>
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 ? 'bg-ambar/50 text-tinta' : i < 3 ? 'bg-marca/15 text-tinta' : 'bg-papel text-apagado'}`}>
+                    {i === 0 ? <Crown size={16} aria-label="Primer lugar" /> : i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate font-semibold">{v.nombre}</span>
+                      <Medallas mejorRacha={v.mejorRacha} soloMejor />
+                      {v.actual && !v.actual.activo && <span className="shrink-0 text-xs text-apagado">(de baja)</span>}
+                      {!v.actual && <span className="shrink-0 text-xs text-apagado">(ya no está)</span>}
+                    </span>
+                    <span className="block text-xs text-apagado">
+                      {plural(v.cumplidos, 'meta cumplida', 'metas cumplidas')}{v.racha >= 2 ? ` · lleva ${v.racha} seguidos ahora` : ''}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-lg font-bold tabular-nums leading-none">{v.mejorRacha}</span>
+                    <span className="text-xs text-apagado">{v.mejorRacha === 1 ? 'mes' : 'seguidos'}</span>
+                  </span>
+                </>
+              )
+              const clase = 'desplegar-opcion flex w-full items-center gap-3 rounded-lg bg-niebla px-3 py-2.5 text-left'
+              return (
+                <li key={v.id} style={i < 10 ? { animationDelay: `${i * 30}ms` } : undefined}>
+                  {v.actual
+                    ? <button type="button" onClick={() => onAbrir(v.id)} className={`${clase} transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.985] motion-reduce:active:scale-100`}>{fila}</button>
+                    : <div className={clase}>{fila}</div>}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+    </Hoja>
+  )
+}
+
 function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerrar: () => void }) {
   const metas = [...new Set(vendedores.map((v) => v.metaMensual))]
   const [modo, setModo] = useState<'monto' | 'pct'>('monto')

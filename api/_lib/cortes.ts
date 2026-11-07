@@ -496,7 +496,8 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     }
   }
   // Racha y mejor racha de cada vendedor con al menos un mes cumplido, y en qué mes ganó cada medalla (el primero en que
-  // su racha llegó a 3, 6 o 12): { [id]: { nombre, racha, mejorRacha, medallas: [{ medalla, mes }] } }.
+  // su racha llegó a 3, 6 o 12) y cuántos meses ha cumplido en total (`cumplidos`, para el salón de la fama). Incluye a
+  // los que ya se fueron: el nombre viene de la foto de cada cierre.
   async function rachas() {
     const porVendedor = new Map<string, { nombre: string; meses: string[] }>()
     for (const r of await mesesCumplidos(null)) {
@@ -511,7 +512,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         const mes = subiendo.find((x) => rachaDesde(meses, x) >= n)
         return mes ? [{ medalla: n, mes }] : []
       })
-      return [id, { nombre, racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses), medallas }]
+      return [id, { nombre, racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses), medallas, cumplidos: meses.length }]
     }))
   }
   app.get('/usuarios/rachas', { preHandler: requiereAdmin }, async () => rachas())
