@@ -165,6 +165,10 @@ describe('meta y comisión', () => {
     assert.equal((await llamar(x.admin, 'POST', '/usuarios/metas', { pctMesAnterior: 400 })).status, 400)
     const r = (await llamar(x.admin, 'POST', '/usuarios/metas', { pctMesAnterior: 25 })).body
     assert.deepEqual([r.actualizados, r.sinVentas], [1, 1])
+    // La vista previa trae lo del mes pasado de cada uno (sólo el administrador).
+    assert.equal((await llamar(x.ana, 'GET', '/usuarios/metas/mes-pasado')).status, 403)
+    const previa = (await llamar(x.admin, 'GET', '/usuarios/metas/mes-pasado')).body.ventas
+    assert.deepEqual([previa[x.ana.id], previa[x.beto.id]], [120, 0])
     assert.equal((await llamar(x.ana, 'GET', '/mi-meta')).body.meta, 150)
     assert.equal((await llamar(x.beto, 'GET', '/mi-meta')).body.meta, 500)
   })
@@ -173,6 +177,27 @@ describe('meta y comisión', () => {
 describe('cierre de mes', () => {
   // El mes pasado: el cierre no admite el mes en curso, y la lista de /cierres llega hasta el primer pedido.
   const MES = (() => { const [a, m] = hoy.slice(0, 7).split('-').map(Number); return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}` })()
+  it('al cerrar el mes, quien llega a 3 meses seguidos en su meta gana medalla y los administradores se enteran, una vez', async () => {
+    const x = await escenario()
+    await llamar(x.admin, 'PATCH', `/usuarios/${x.ana.id}`, { metaMensual: 100 })
+    await x.entrega('EFECTIVO', 2, `${MES}-10`) // $120: 120% de su meta
+    const antes = (n: number) => { const [a, m] = MES.split('-').map(Number); const f = new Date(a, m - 1 - n, 1); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-01` }
+    const cifras = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 110, meta: 100, cumplimientoPct: 110 }] })
+    await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [x.empresa])
+    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $3, now(), '[]'), ($2, 'cerrado', $3, now(), '[]')`, [antes(1), antes(2), cifras])
+    assert.deepEqual((await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id], { racha: 0, mejorRacha: 2 })
+    assert.equal((await llamar(x.ana, 'GET', '/usuarios/rachas')).status, 403)
+    const medallas = async () => (await db.query(`SELECT titulo, datos FROM notificaciones WHERE tipo = 'medalla_ganada' AND id_usuario = $1`, [x.admin.id])).rows
+    assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
+    assert.deepEqual((await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id], { racha: 3, mejorRacha: 3 })
+    const [m] = await medallas()
+    assert.equal(m.titulo, 'Medalla de 3 meses')
+    assert.deepEqual([m.datos.medalla, m.datos.vendedorIds], [3, [x.ana.id]])
+    // Reabrir y volver a cerrar no la repite.
+    assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/reabrir`, { motivo: 'Corrección de prueba' })).status, 200)
+    assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
+    assert.equal((await medallas()).length, 1)
+  })
   it('no cierra el mes en curso ni uno con pedidos sin cerrar; al cerrar guarda las cifras y bloquea las correcciones', async () => {
     const x = await escenario()
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${hoy.slice(0, 7)}/cerrar`)).status, 409) // todavía no termina

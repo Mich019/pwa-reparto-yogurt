@@ -92,6 +92,14 @@ export async function metaParaTodos(cuerpo: { metaMensual: number | null } | { p
   return r
 }
 
+// Racha y mejor racha de cada vendedor con algún mes cumplido (ranking del panel).
+export type Rachas = Record<string, { racha: number; mejorRacha: number }>
+
+// Lo que vendió cada vendedor activo el mes pasado, para la vista previa de «según su mes pasado».
+export function ventasMesPasado() {
+  return llamarAutenticado<{ ventas: Record<string, number> }>('/usuarios/metas/mes-pasado').then((r) => r.ventas)
+}
+
 // Aviso de prueba a los dispositivos de otra cuenta (api/_lib/notificaciones.ts).
 export function avisoDePrueba(id: string) {
   return llamarAutenticado<{ dispositivos: number; enviados: number }>(`/usuarios/${id}/aviso-prueba`, { metodo: 'POST' })

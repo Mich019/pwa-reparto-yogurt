@@ -307,6 +307,7 @@ const TIPOS_AVISO = [
   { tipo: 'corte_descuadrado', titulo: 'Corte que ya no cuadra', ayuda: 'Llegó una venta en efectivo de un día con el corte ya confirmado.' },
   { tipo: 'urgente_sin_atender', titulo: 'Urgente sin atender', ayuda: 'Un pedido urgente sigue pendiente después del tiempo que elijas abajo.' },
   { tipo: 'vendedor_en_meta', titulo: 'Vendedor que llegó a su meta', ayuda: 'El día que alguien alcanza su meta del mes.' },
+  { tipo: 'medalla_ganada', titulo: 'Medalla de un vendedor', ayuda: 'Al cerrar el mes, si alguien llega a 3, 6 o 12 meses seguidos en su meta.' },
   { tipo: 'meta_atrasada', titulo: 'Vendedor atrasado con su meta', ayuda: 'A mitad de mes, si alguien lleva mucho menos de lo que debería.' },
   { tipo: 'prueba_por_vencer', titulo: 'Prueba gratis por vencer', ayuda: 'Unos días antes y el último día de la prueba.' },
 ] as const

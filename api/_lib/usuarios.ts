@@ -117,6 +117,25 @@ export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contex
   })
 
   // La misma meta del mes para todos los vendedores activos de un jalón (null se la quita a todos).
+  // Lo que vendió cada vendedor el mes pasado (`ini`: el parámetro con su día 1), para «según su mes pasado» y su vista previa.
+  const ventasMesPasado = (ini: string) => `SELECT pe.id_vendedor, sum(d.subtotal) AS ventas FROM pedidos pe JOIN detalle_pedido d USING (id_pedido)
+                  WHERE pe.estado = 'entregado' AND pe.fecha >= ${ini}::date AND pe.fecha < (${ini}::date + interval '1 month')::date
+                  GROUP BY pe.id_vendedor`
+  async function inicioMesPasado() {
+    const [a, m] = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria)).slice(0, 7).split('-').map(Number)
+    return m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`
+  }
+  // Vista previa: lo vendido el mes pasado por cada vendedor activo (0 si nada); el panel calcula la meta con el %.
+  app.get('/usuarios/metas/mes-pasado', pre, async () => {
+    const { rows } = await db.query(
+      `SELECT u.id_usuario AS id, coalesce(v.ventas, 0)::float8 AS ventas
+         FROM usuarios u LEFT JOIN (${ventasMesPasado('$1')}) v ON v.id_vendedor = u.id_usuario
+        WHERE u.rol = 'vendedor' AND u.activo`,
+      [await inicioMesPasado()],
+    )
+    return { ventas: Object.fromEntries(rows.map((r) => [r.id, r.ventas])) }
+  })
+
   app.post('/usuarios/metas', { ...pre, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, rep) => {
     // O un monto igual para todos, o `pctMesAnterior`: lo que vendió cada uno el mes pasado más ese porcentaje (puede
     // ser negativo). Quien no vendió nada el mes pasado se queda con la que tenía (`sinVentas`).
@@ -131,14 +150,11 @@ export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contex
         (await c.query(`UPDATE usuarios SET meta_mensual = $1 WHERE rol = 'vendedor' AND activo`, [datos.metaMensual])).rowCount ?? 0)
       return { actualizados: n, sinVentas: 0 }
     }
-    const [a, m] = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria)).slice(0, 7).split('-').map(Number)
-    const ini = m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`
+    const ini = await inicioMesPasado()
     return tx(db, req.usuario.id, async (c) => {
       const { rowCount } = await c.query(
         `UPDATE usuarios u SET meta_mensual = round(v.ventas * (100 + $1) / 100.0)
-           FROM (SELECT pe.id_vendedor, sum(d.subtotal) AS ventas FROM pedidos pe JOIN detalle_pedido d USING (id_pedido)
-                  WHERE pe.estado = 'entregado' AND pe.fecha >= $2::date AND pe.fecha < ($2::date + interval '1 month')::date
-                  GROUP BY pe.id_vendedor) v
+           FROM (${ventasMesPasado('$2')}) v
           WHERE v.id_vendedor = u.id_usuario AND u.rol = 'vendedor' AND u.activo AND v.ventas > 0`,
         [datos.pctMesAnterior, ini],
       )

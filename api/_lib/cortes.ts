@@ -460,22 +460,37 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
 
   // Los meses cerrados en que un vendedor llegó a su meta (sus trofeos), de la foto de cada cierre, y su racha: cuántos
   // meses seguidos la alcanzó, contando hacia atrás desde el mes pasado (un mes sin cerrar o sin meta la corta), y la mejor.
-  async function trofeos(id: string) {
+  // `id` = uno; sin él, todos los vendedores (ranking del panel, medallas al cerrar el mes).
+  async function mesesCumplidos(id: string | null) {
     const { rows } = await db.query(
-      `SELECT to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
+      `SELECT v->>'id' AS id, to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
          FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
-        WHERE c.estado = 'cerrado' AND v->>'id' = $1 AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
-        ORDER BY c.mes DESC LIMIT 36`,
+        WHERE c.estado = 'cerrado' AND ($1::text IS NULL OR v->>'id' = $1) AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
+        ORDER BY c.mes DESC`,
       [id],
     )
-    const meses = rows.map((r) => r.mes as string)
+    return rows as { id: string; mes: string; ventas: number; meta: number }[]
+  }
+  async function mesPasado() {
     let [a, m] = (await hoyDe()).slice(0, 7).split('-').map(Number)
     if (--m === 0) { m = 12; a-- }
-    const racha = rachaDesde(meses, `${a}-${String(m).padStart(2, '0')}`)
-    // La mejor racha que ha tenido: las medallas de 3, 6 y 12 meses seguidos se quedan aunque después se corte.
-    const mejorRacha = Math.max(0, ...meses.map((x) => rachaDesde(meses, x)))
-    return { meses: rows as { mes: string; ventas: number; meta: number }[], racha, mejorRacha }
+    return `${a}-${String(m).padStart(2, '0')}`
   }
+  // La mejor racha que ha tenido: las medallas de 3, 6 y 12 meses seguidos se quedan aunque después se corte.
+  const mejorDe = (meses: string[]) => Math.max(0, ...meses.map((x) => rachaDesde(meses, x)))
+  async function trofeos(id: string) {
+    const filas = (await mesesCumplidos(id)).slice(0, 36)
+    const meses = filas.map((r) => r.mes)
+    return { meses: filas.map(({ mes, ventas, meta }) => ({ mes, ventas, meta })), racha: rachaDesde(meses, await mesPasado()), mejorRacha: mejorDe(meses) }
+  }
+  // Racha y mejor racha de cada vendedor con al menos un mes cumplido: { [id]: { racha, mejorRacha } }.
+  async function rachas() {
+    const porVendedor = new Map<string, string[]>()
+    for (const r of await mesesCumplidos(null)) porVendedor.set(r.id, [...(porVendedor.get(r.id) ?? []), r.mes])
+    const pasado = await mesPasado()
+    return Object.fromEntries([...porVendedor].map(([id, meses]) => [id, { racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses) }]))
+  }
+  app.get('/usuarios/rachas', { preHandler: requiereAdmin }, async () => rachas())
   // Los del vendedor, en su ficha de Vendedores (administrador)…
   app.get('/usuarios/:id/metas', { preHandler: requiereAdmin }, async (req, rep) => {
     const p = z.object({ id: z.uuid() }).safeParse(req.params)
@@ -529,6 +544,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     try {
       const hoy = await hoyDe()
       if (m.data >= hoy.slice(0, 7)) throw new Falla(409, 'Ese mes todavía no termina')
+      const antes = await rachas()
       const r = await tx(db, req.usuario.id, async (c) => {
         await c.query(`SELECT pg_advisory_xact_lock(hashtext('cierre_mes'))`)
         const { rows: [ex] } = await c.query(`SELECT estado FROM cierres_mes WHERE mes = $1 FOR UPDATE`, [primerDia(m.data)])
@@ -545,6 +561,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         )
         return cifras
       })
+      await avisarMedallas(antes, r).catch((e) => req.log.error(e, 'No se pudieron avisar las medallas'))
       // Cuántos administradores quieren el informe por correo: el panel arma el PDF sólo si alguien lo quiere (resumen.ts).
       const { rows: [{ n: porCorreo }] } = await db.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'administrador' AND activo AND resumen_mensual`)
       return { ok: true, cifras: r, porCorreo }
@@ -552,6 +569,29 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       return responder(rep, e)
     }
   })
+
+  // Con el mes recién cerrado, el vendedor cuya mejor racha llegó a 3, 6 o 12 meses ganó una medalla: los
+  // administradores se enteran para felicitarlo. Una vez por vendedor y medalla (reabrir y volver a cerrar no repite).
+  async function avisarMedallas(antes: Awaited<ReturnType<typeof rachas>>, cifras: CifrasMes) {
+    if (!despachador) return
+    const medalla = (n: number) => [12, 6, 3].find((x) => n >= x) ?? 0
+    const despues = await rachas()
+    const nuevas = Object.entries(despues)
+      .map(([id, r]) => ({ id, medalla: medalla(r.mejorRacha), antes: medalla(antes[id]?.mejorRacha ?? 0) }))
+      .filter((x) => x.medalla > x.antes)
+    if (!nuevas.length) return
+    const { rows: ya } = await db.query(
+      `SELECT DISTINCT datos->'vendedorIds'->>0 AS id, (datos->>'medalla')::int AS medalla FROM notificaciones WHERE tipo = 'medalla_ganada'`)
+    const pendientes = nuevas.filter((x) => !ya.some((y) => y.id === x.id && y.medalla === x.medalla))
+    if (!pendientes.length) return
+    const { rows: admins } = await db.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo`)
+    const nombre = (id: string) => cifras.vendedores.find((v) => v.id === id)?.nombre ?? 'Un vendedor'
+    await despachador.despachar(pendientes.flatMap((x) => admins.map((a) => ({
+      para: a.id_usuario as string, tipo: 'medalla_ganada' as const, titulo: `Medalla de ${x.medalla === 12 ? 'un año' : `${x.medalla} meses`}`,
+      cuerpo: `${nombre(x.id)} lleva ${x.medalla} meses seguidos llegando a su meta. ¡Mándale una felicitación!`,
+      datos: { url: `/admin?ir=equipo&persona=${x.id}`, vendedorIds: [x.id], medalla: x.medalla },
+    }))))
+  }
 
   // Reabrir exige el motivo; las correcciones vuelven a ser posibles hasta cerrarlo otra vez.
   app.post('/cierres/:mes/reabrir', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {

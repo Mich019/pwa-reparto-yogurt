@@ -9,8 +9,18 @@ const MEDALLAS = [
   { meses: 12, texto: '1 año', clase: 'bg-ambar/40' },
 ]
 
-export function Medallas({ mejorRacha, todas = false }: { mejorRacha: number; todas?: boolean }) {
-  const lista = MEDALLAS.filter((m) => todas || mejorRacha >= m.meses)
+// `soloMejor`: sólo la más alta ganada, sin texto (el ranking del panel).
+export function Medallas({ mejorRacha, todas = false, soloMejor = false }: { mejorRacha: number; todas?: boolean; soloMejor?: boolean }) {
+  const ganadas = MEDALLAS.filter((m) => mejorRacha >= m.meses)
+  if (soloMejor) {
+    const m = ganadas.at(-1)
+    return m ? (
+      <span title={`Medalla de ${m.texto} seguidos en la meta`} className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${m.clase} text-tinta`}>
+        <Medal size={12} aria-hidden="true" /><span className="sr-only">Medalla de {m.texto} seguidos en la meta</span>
+      </span>
+    ) : null
+  }
+  const lista = todas ? MEDALLAS : ganadas
   if (!lista.length) return null
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Medallas por meses seguidos en la meta">

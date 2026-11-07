@@ -5,7 +5,7 @@ import { ArrowRightLeft, BellOff, BellRing, Check, Flame, Target, Trophy, Chevro
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
-  avisoDePrueba, cargarEquipo, crearMiembro, metaParaTodos, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
+  avisoDePrueba, cargarEquipo, crearMiembro, metaParaTodos, ventasMesPasado, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro,
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
@@ -21,6 +21,7 @@ import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave
 
 const ROL_TEXTO: Record<Rol, string> = { administrador: 'Administrador', vendedor: 'Vendedor' }
 const SIN_VENDEDOR = 'sin' // en los selectores, "ningún vendedor"
+const dineroCorto = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
 const mensaje = (e: unknown) => (e instanceof ErrorApi || e instanceof ErrorRed ? e.message : 'No se pudo completar. Intenta de nuevo.')
 const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHasta) > new Date()
@@ -28,7 +29,7 @@ const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHast
 // Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
 const NOMBRE_AVISO: Record<string, string> = {
   stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
-  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas',
 }
 function textoAvisos(m: Miembro) {
   const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'
@@ -249,6 +250,14 @@ function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerr
   const [monto, setMonto] = useState(metas.length === 1 && metas[0] ? String(metas[0]) : '')
   const [pct, setPct] = useState('10')
   const [guardando, setGuardando] = useState(false)
+  // Vista previa: cómo quedaría la meta de cada uno (como en el servidor: lo del mes pasado más el %, redondeado).
+  const [ventas, setVentas] = useState<Record<string, number> | null>(null)
+  useEffect(() => {
+    if (modo !== 'pct' || ventas) return
+    let vigente = true
+    ventasMesPasado().then((v) => { if (vigente) setVentas(v) }).catch(() => {})
+    return () => { vigente = false }
+  }, [modo, ventas])
   const valor = Number(monto)
   const porcentaje = Number(pct)
   const valido = modo === 'monto'
@@ -297,6 +306,34 @@ function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerr
         <Campo etiqueta="Más que su mes pasado (%)">
           <input className={claseInput} inputMode="numeric" value={pct} onChange={(e) => setPct(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valido && enviar()} placeholder="Ej. 10" />
         </Campo>
+      )}
+      {modo === 'pct' && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold text-apagado">Así quedaría</p>
+          {!ventas ? <p className="text-sm text-apagado">Cargando…</p> : (
+            <ul className="divide-y divide-linea rounded-lg bg-niebla px-3 text-sm">
+              {vendedores.map((v) => {
+                const antes = ventas[v.id] ?? 0
+                const nueva = valido && antes > 0 ? Math.round((antes * (100 + porcentaje)) / 100) : null
+                return (
+                  <li key={v.id} className="flex items-baseline justify-between gap-3 py-2">
+                    <span className="min-w-0 truncate">{v.nombre}</span>
+                    <span className="shrink-0 text-right tabular-nums">
+                      {antes > 0 ? (
+                        <>
+                          <span className="text-apagado">{dineroCorto(antes)} → </span>
+                          <span className="font-semibold">{nueva !== null ? dineroCorto(nueva) : '—'}</span>
+                        </>
+                      ) : (
+                        <span className="text-apagado">Sin ventas: se queda {v.metaMensual ? `con ${dineroCorto(v.metaMensual)}` : 'sin meta'}</span>
+                      )}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       )}
       {modo === 'monto' && vendedores.some((v) => v.metaMensual) && (
         <button type="button" onClick={() => void aplicar(null)} disabled={guardando} className="mt-3 text-sm font-semibold text-rojo underline-offset-4 hover:underline disabled:opacity-50">

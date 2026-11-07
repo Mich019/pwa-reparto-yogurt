@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, RefreshCw, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Medallas } from '../../components/Medallas'
+import type { Rachas } from '../../lib/equipo'
 import { litrosTxt, ordenarPorVentas, saludo, usePedidosRecientes, useVentasPorSabor } from '../../lib/admin-datos'
 import { db } from '../../lib/db'
 import { DIAS_CORTOS, desdeIso, dinero, hoy, sumarDias } from '../../lib/fechas'
@@ -344,6 +346,8 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
   const [atras, setAtras] = useState(0)
   const mes = moverMes(actual, -atras)
   const r = useServidor<{ cifras: CifrasMes }>(`/cierres/${mes}`, ['datos', 'cobranza', 'equipo'])
+  // La racha de hoy (meses seguidos en la meta hasta el mes pasado) y la mejor medalla de cada quien.
+  const rachas = useServidor<Rachas>('/usuarios/rachas', 'cobranza').datos ?? {}
   const filas = (r.datos?.cifras.mes === mes ? r.datos.cifras.vendedores : []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
   const nombreMes = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', atras ? { month: 'long', year: 'numeric' } : { month: 'long' })
   const flecha = `grid h-8 w-8 place-items-center rounded-full transition-colors hover:bg-papel disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca`
@@ -375,7 +379,15 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
                 <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 && v.ventas > 0 ? 'bg-marca text-white' : 'bg-papel text-apagado'}`}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="truncate font-semibold">{v.nombre}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate font-semibold">{v.nombre}</span>
+                      {(rachas[v.id]?.racha ?? 0) >= 2 && (
+                        <span title={`${rachas[v.id].racha} meses seguidos en su meta`} className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-marca">
+                          <Flame size={13} aria-hidden="true" />{rachas[v.id].racha}<span className="sr-only"> meses seguidos en su meta</span>
+                        </span>
+                      )}
+                      <Medallas mejorRacha={rachas[v.id]?.mejorRacha ?? 0} soloMejor />
+                    </span>
                     <span className="shrink-0 font-semibold tabular-nums">{dinero(v.ventas)}</span>
                   </div>
                   {pct !== null ? (

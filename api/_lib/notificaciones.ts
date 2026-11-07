@@ -10,10 +10,10 @@ import { claveUsuario } from './seguridad.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
-export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'meta_atrasada' | 'meta_alcanzada' | 'vendedor_en_meta' | 'racha_en_riesgo' | 'prueba'
+export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'meta_atrasada' | 'meta_alcanzada' | 'vendedor_en_meta' | 'racha_en_riesgo' | 'medalla_ganada' | 'prueba'
 // Los que cada quien puede apagar (usuarios.avisos_apagados; PATCH /me `avisosApagados`): los del administrador y,
 // del vendedor, la carga y los cambios de ruta. El pedido urgente y la prueba nunca.
-export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'urgente_sin_atender', 'meta_atrasada', 'meta_alcanzada', 'vendedor_en_meta', 'racha_en_riesgo', 'ruta_modificada', 'stock_asignado'] as const
+export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'urgente_sin_atender', 'meta_atrasada', 'meta_alcanzada', 'vendedor_en_meta', 'racha_en_riesgo', 'medalla_ganada', 'ruta_modificada', 'stock_asignado'] as const
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso
@@ -22,7 +22,7 @@ export interface AvisoPendiente {
   // `url`: abre esa dirección en vez de una pestaña de la app (los avisos para el administrador llevan al panel).
   // `pedidoIds`: todos los pedidos de un aviso que juntó varios (unir); urgentes.ts los sigue para recordar los que no se atienden.
   // `vendedorIds`: los vendedores de un aviso de meta atrasada (resumen.ts no repite el aviso del mismo mes).
-  datos?: { pestana?: 'ruta' | 'stock' | 'clientes' | 'cuenta'; pedidoId?: string; pedidoIds?: string[]; vendedorIds?: string[]; url?: string }
+  datos?: { pestana?: 'ruta' | 'stock' | 'clientes' | 'cuenta'; pedidoId?: string; pedidoIds?: string[]; vendedorIds?: string[]; url?: string; medalla?: number }
 }
 
 const MAX_DISPOSITIVOS = 10
