@@ -481,7 +481,19 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   async function trofeos(id: string) {
     const filas = (await mesesCumplidos(id)).slice(0, 36)
     const meses = filas.map((r) => r.mes)
-    return { meses: filas.map(({ mes, ventas, meta }) => ({ mes, ventas, meta })), racha: rachaDesde(meses, await mesPasado()), mejorRacha: mejorDe(meses) }
+    // Historial: los últimos 12 meses cerrados en que aparece, con la meta que tenía y lo que vendió (cumpliera o no).
+    const { rows: historial } = await db.query(
+      `SELECT to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta,
+              (v->>'cumplimientoPct')::float8 AS "cumplimientoPct"
+         FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
+        WHERE c.estado = 'cerrado' AND v->>'id' = $1
+        ORDER BY c.mes DESC LIMIT 12`,
+      [id],
+    )
+    return {
+      meses: filas.map(({ mes, ventas, meta }) => ({ mes, ventas, meta })), racha: rachaDesde(meses, await mesPasado()), mejorRacha: mejorDe(meses),
+      historial: historial as { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[],
+    }
   }
   // Racha y mejor racha de cada vendedor con al menos un mes cumplido: { [id]: { racha, mejorRacha } }.
   async function rachas() {
@@ -571,7 +583,8 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   })
 
   // Con el mes recién cerrado, el vendedor cuya mejor racha llegó a 3, 6 o 12 meses ganó una medalla: los
-  // administradores se enteran para felicitarlo. Una vez por vendedor y medalla (reabrir y volver a cerrar no repite).
+  // administradores se enteran para felicitarlo, y él también. Una vez por vendedor y medalla (reabrir y volver a cerrar
+  // no repite).
   async function avisarMedallas(antes: Awaited<ReturnType<typeof rachas>>, cifras: CifrasMes) {
     if (!despachador) return
     const medalla = (n: number) => [12, 6, 3].find((x) => n >= x) ?? 0
@@ -586,11 +599,19 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     if (!pendientes.length) return
     const { rows: admins } = await db.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo`)
     const nombre = (id: string) => cifras.vendedores.find((v) => v.id === id)?.nombre ?? 'Un vendedor'
-    await despachador.despachar(pendientes.flatMap((x) => admins.map((a) => ({
-      para: a.id_usuario as string, tipo: 'medalla_ganada' as const, titulo: `Medalla de ${x.medalla === 12 ? 'un año' : `${x.medalla} meses`}`,
-      cuerpo: `${nombre(x.id)} lleva ${x.medalla} meses seguidos llegando a su meta. ¡Mándale una felicitación!`,
-      datos: { url: `/admin?ir=equipo&persona=${x.id}`, vendedorIds: [x.id], medalla: x.medalla },
-    }))))
+    const texto = (n: number) => (n === 12 ? 'un año' : `${n} meses`)
+    await despachador.despachar(pendientes.flatMap((x) => [
+      {
+        para: x.id, tipo: 'medalla_ganada' as const, titulo: `¡Ganaste la medalla de ${texto(x.medalla)}!`,
+        cuerpo: `Llevas ${x.medalla} meses seguidos llegando a tu meta. ¡Felicidades!`,
+        datos: { pestana: 'cuenta' as const, vendedorIds: [x.id], medalla: x.medalla },
+      },
+      ...admins.map((a) => ({
+        para: a.id_usuario as string, tipo: 'medalla_ganada' as const, titulo: `Medalla de ${texto(x.medalla)}`,
+        cuerpo: `${nombre(x.id)} lleva ${x.medalla} meses seguidos llegando a su meta. ¡Mándale una felicitación!`,
+        datos: { url: `/admin?ir=equipo&persona=${x.id}`, vendedorIds: [x.id], medalla: x.medalla },
+      })),
+    ]))
   }
 
   // Reabrir exige el motivo; las correcciones vuelven a ser posibles hasta cerrarlo otra vez.

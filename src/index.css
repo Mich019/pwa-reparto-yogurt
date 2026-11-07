@@ -92,6 +92,17 @@ body {
 .desplegar-opcion { animation: desplegar-opcion 0.18s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .desplegar, .desplegar-opcion { animation: none; } }
 
+/* Medalla nueva en Cuenta (views/pwa/MiDia.tsx): la tarjeta salta un poco y el trofeo gira y brilla, una sola vez. */
+@keyframes medalla-nueva { 0% { transform: scale(0.96); } 45% { transform: scale(1.03); } 100% { transform: none; } }
+@keyframes medalla-nueva-icono {
+  0% { transform: scale(0.6) rotate(-25deg); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-marca) 50%, transparent); }
+  55% { transform: scale(1.18) rotate(8deg); }
+  100% { transform: none; box-shadow: 0 0 0 14px transparent; }
+}
+.medalla-nueva { animation: medalla-nueva 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.medalla-nueva-icono { animation: medalla-nueva-icono 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s both; }
+@media (prefers-reduced-motion: reduce) { .medalla-nueva, .medalla-nueva-icono { animation: none; } }
+
 /* Cada «captura» de la Ayuda (views/ayuda) entra con un leve fundido al cambiar de paso. */
 @keyframes ayuda-entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .ayuda-entrar { animation: ayuda-entrar 0.22s ease-out; }

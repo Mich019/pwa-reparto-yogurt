@@ -79,7 +79,12 @@ export async function darDeBaja(id: string) {
 }
 
 // Los meses cerrados en que un vendedor llegó a su meta (trofeo de su ficha).
-export interface Trofeos { meses: { mes: string; ventas: number; meta: number }[]; racha: number; mejorRacha: number }
+export interface Trofeos {
+  meses: { mes: string; ventas: number; meta: number }[]
+  racha: number
+  mejorRacha: number
+  historial: { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[] // últimos 12 meses cerrados
+}
 export function metasCumplidas(id: string) {
   return llamarAutenticado<Trofeos>(`/usuarios/${id}/metas`)
 }

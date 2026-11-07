@@ -193,6 +193,12 @@ describe('cierre de mes', () => {
     const [m] = await medallas()
     assert.equal(m.titulo, 'Medalla de 3 meses')
     assert.deepEqual([m.datos.medalla, m.datos.vendedorIds], [3, [x.ana.id]])
+    // A ella también le llega, y su historial trae los tres meses con la meta y lo vendido.
+    const suya = (await db.query(`SELECT titulo FROM notificaciones WHERE tipo = 'medalla_ganada' AND id_usuario = $1`, [x.ana.id])).rows
+    assert.deepEqual(suya.map((n) => n.titulo), ['¡Ganaste la medalla de 3 meses!'])
+    const h = (await llamar(x.admin, 'GET', `/usuarios/${x.ana.id}/metas`)).body.historial
+    assert.equal(h.length, 3)
+    assert.deepEqual([h[0].mes, h[0].ventas, h[0].meta, h[0].cumplimientoPct], [MES, 120, 100, 120])
     // Reabrir y volver a cerrar no la repite.
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/reabrir`, { motivo: 'Corrección de prueba' })).status, 200)
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)

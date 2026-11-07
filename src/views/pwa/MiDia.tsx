@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSesion } from '../../lib/sesion'
 import { Medallas } from '../../components/Medallas'
 import { ChevronRight, Flame, Trophy, Wallet } from 'lucide-react'
 import { entregarCorte, useServidor, type FilaCorte, type MiMeta } from '../../lib/cobranza'
@@ -14,6 +15,20 @@ export function MiDia() {
   // Sus trofeos: los meses cerrados en que llegó a su meta, y cuántos seguidos.
   const trofeos = useServidor<{ meses: { mes: string }[]; racha: number; mejorRacha: number }>('/mi-meta/trofeos')
   const [hoja, setHoja] = useState(false)
+  // La medalla más alta que ya vio en este teléfono: si ahora tiene una más alta, la tarjeta la celebra una vez.
+  const id = useSesion()?.usuario?.id ?? ''
+  const llave = `delisy:medalla-vista:${id}`
+  const [celebrar, setCelebrar] = useState(false)
+  const nivel = (n: number) => [12, 6, 3].find((x) => n >= x) ?? 0
+  const mejor = trofeos.datos ? nivel(trofeos.datos.mejorRacha) : 0
+  useEffect(() => {
+    if (!id || !mejor) return
+    let vista = 0
+    try { vista = Number(localStorage.getItem(llave)) || 0 } catch { /* sin almacenamiento: no se celebra */ return }
+    if (mejor <= vista) return
+    setCelebrar(true)
+    try { localStorage.setItem(llave, String(mejor)) } catch { /* nada */ }
+  }, [id, llave, mejor])
   const fila = corte.datos?.filas[0]
   const m = meta.datos
   const t = trofeos.datos
@@ -49,12 +64,13 @@ export function MiDia() {
         </div>
       )}
       {!!t?.meses.length && (
-        <div className="mt-3 flex items-center gap-3 rounded-lg bg-niebla p-4">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ambar/40"><Trophy size={20} aria-hidden="true" /></span>
+        <div className={`mt-3 flex items-center gap-3 rounded-lg bg-niebla p-4 ${celebrar ? 'medalla-nueva' : ''}`}>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ambar/40 ${celebrar ? 'medalla-nueva-icono' : ''}`}><Trophy size={20} aria-hidden="true" /></span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">{t.meses.length === 1 ? 'Llegaste a tu meta 1 mes' : `Llegaste a tu meta ${t.meses.length} meses`}</span>
             <span className="block truncate text-sm text-apagado">{t.meses.slice(0, 4).map((x) => mesCorto(x.mes)).join(' · ')}{t.meses.length > 4 ? ' · …' : ''}</span>
             {t.racha >= 2 && <span className="mt-1 flex items-center gap-1 text-sm font-semibold"><Flame size={15} aria-hidden="true" className="text-marca" /> Llevas {t.racha} meses seguidos. ¡Que no se corte!</span>}
+            {celebrar && <span className="mt-1 block text-sm font-semibold text-marca" role="status">¡Medalla nueva de {mejor === 12 ? 'un año' : `${mejor} meses`}!</span>}
             <span className="mt-2 block"><Medallas mejorRacha={t.mejorRacha} todas /></span>
           </span>
         </div>
