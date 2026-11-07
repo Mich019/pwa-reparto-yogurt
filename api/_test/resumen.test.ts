@@ -176,11 +176,15 @@ describe('resumen diario por correo', () => {
     await push(vend, [op('clientes', c.id, c)])
     const p = pedido(c.id, s.id) // 3 × $60 = $180
     await push(vend, [op('pedidos', p.id, p)])
-    await db.query(`UPDATE pedidos SET estado = 'entregado', metodo_pago = 'efectivo', fecha_entregado_real = now() WHERE id_pedido = $1`, [p.id])
+    await db.query(`UPDATE pedidos SET estado = 'entregado', metodo_pago = 'efectivo', fecha_entregado_real = now(), fecha = (now() AT TIME ZONE 'America/Mexico_City')::date WHERE id_pedido = $1`, [p.id])
     assert.equal(await felicitarMeta(db, despachador, vend.id), true)
     const { rows } = await db.query(`SELECT titulo, cuerpo FROM notificaciones WHERE tipo = 'meta_alcanzada' AND id_usuario = $1`, [vend.id])
     assert.equal(rows.length, 1)
     assert.match(rows[0].cuerpo, /Llevas \$180 de \$150/)
+    // Al administrador también, con la ficha del vendedor.
+    const { rows: [deAdmin] } = await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'vendedor_en_meta' AND id_usuario = $1`, [admin.id])
+    assert.match(deAdmin.cuerpo, /lleva \$180 de \$150/)
+    assert.equal(deAdmin.datos.url, `/admin?ir=equipo&persona=${vend.id}`)
     assert.equal(await felicitarMeta(db, despachador, vend.id), false) // una vez al mes
   })
 

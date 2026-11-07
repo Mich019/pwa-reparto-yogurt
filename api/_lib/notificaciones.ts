@@ -10,10 +10,10 @@ import { claveUsuario } from './seguridad.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
-export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'meta_atrasada' | 'meta_alcanzada' | 'prueba'
+export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'meta_atrasada' | 'meta_alcanzada' | 'vendedor_en_meta' | 'prueba'
 // Los que cada quien puede apagar (usuarios.avisos_apagados; PATCH /me `avisosApagados`): los del administrador y,
 // del vendedor, la carga y los cambios de ruta. El pedido urgente y la prueba nunca.
-export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'urgente_sin_atender', 'meta_atrasada', 'meta_alcanzada', 'ruta_modificada', 'stock_asignado'] as const
+export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'urgente_sin_atender', 'meta_atrasada', 'meta_alcanzada', 'vendedor_en_meta', 'ruta_modificada', 'stock_asignado'] as const
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso
@@ -41,11 +41,11 @@ export function unir(avisos: AvisoPendiente[]): AvisoPendiente[] {
     const cuerpo = lineas.slice(0, 3).join('. ') + (lineas.length > 3 ? ` y ${lineas.length - 3} más` : '')
     const { para, tipo } = g[0]
     const titulo = tipo === 'pedido_urgente' ? `${g.length} pedidos urgentes` : tipo === 'ruta_modificada' ? 'Tu ruta cambió' : g[0].titulo
-    const titulos: Partial<Record<TipoAviso, string>> = { corte_descuadrado: `${g.length} cortes confirmados ya no cuadran`, corte_entregado: `${g.length} cortes por confirmar`, urgente_sin_atender: `${g.length} urgentes sin atender`, meta_atrasada: `${g.length} vendedores atrasados con su meta` }
+    const titulos: Partial<Record<TipoAviso, string>> = { corte_descuadrado: `${g.length} cortes confirmados ya no cuadran`, corte_entregado: `${g.length} cortes por confirmar`, urgente_sin_atender: `${g.length} urgentes sin atender`, meta_atrasada: `${g.length} vendedores atrasados con su meta`, vendedor_en_meta: `${g.length} vendedores llegaron a su meta` }
     const pedidoIds = g.flatMap((x) => x.datos?.pedidoIds ?? (x.datos?.pedidoId ? [x.datos.pedidoId] : []))
     const vendedorIds = g.flatMap((x) => x.datos?.vendedorIds ?? [])
     // Varios vendedores atrasados: el aviso abre la lista, no la ficha del primero.
-    const url = tipo === 'meta_atrasada' ? '/admin?ir=equipo' : g[0].datos?.url
+    const url = tipo === 'meta_atrasada' || tipo === 'vendedor_en_meta' ? '/admin?ir=equipo' : g[0].datos?.url
     return { para, tipo, titulo: titulos[tipo] ?? titulo, cuerpo, datos: { pestana: g[0].datos?.pestana, url, ...(pedidoIds.length ? { pedidoIds } : {}), ...(vendedorIds.length ? { vendedorIds } : {}) } }
   })
 }

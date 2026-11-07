@@ -11,6 +11,7 @@ import type { SeccionAdmin } from './AdminLayout'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { useFichaSabor } from './PanelSabor'
 import { textoPorUnidad } from '../../lib/unidades'
+import { useServidor, type CifrasMes } from '../../lib/cobranza'
 import { ChipEstado, Delta, Subrayado, TarjetaSabor, Vacio } from './piezas'
 
 export interface DashboardStats {
@@ -287,6 +288,8 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           </Tarjeta>
         </div>
 
+        <RankingMes onNavegar={onNavegar} />
+
         <Tarjeta
           id="t-pedidos"
           titulo="Pedidos recientes"
@@ -324,5 +327,57 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
 
       {ficha.panel}
     </div>
+  )
+}
+
+// Vendedores del mes, de quien más vendió a quien menos, con su avance contra la meta. Sólo el administrador ve esta
+// pantalla; las cifras son las del cierre de mes en vivo (GET /cierres/:mes).
+function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
+  const mes = hoy().slice(0, 7)
+  const r = useServidor<{ cifras: CifrasMes }>(`/cierres/${mes}`, ['datos', 'cobranza', 'equipo'])
+  const filas = (r.datos?.cifras.vendedores ?? []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
+  const nombreMes = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
+  return (
+    <Tarjeta
+      id="t-ranking"
+      titulo="Vendedores del mes"
+      subtitulo={`Lo vendido en ${nombreMes} y cómo va cada quien con su meta`}
+      accion={<button type="button" onClick={() => onNavegar('equipo')} className="rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver vendedores</button>}
+    >
+      {r.error && !r.datos ? (
+        <p className="mt-3 rounded-2xl bg-rojo/10 p-3 text-sm font-medium text-rojo">No se pudo traer el mes. <button className="font-semibold underline underline-offset-2" onClick={r.recargar}>Reintentar</button></p>
+      ) : !r.datos ? (
+        <p className="mt-3 text-sm text-apagado">Cargando…</p>
+      ) : !filas.length ? (
+        <Vacio>Cuando tus vendedores entreguen pedidos este mes aparecen aquí.</Vacio>
+      ) : (
+        <ol className="mt-3 divide-y divide-linea">
+          {filas.map((v, i) => {
+            const pct = v.meta ? Math.round(v.cumplimientoPct ?? 0) : null
+            return (
+              <li key={v.id} className="flex items-center gap-3 py-3">
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 && v.ventas > 0 ? 'bg-marca text-white' : 'bg-papel text-apagado'}`}>{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="truncate font-semibold">{v.nombre}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{dinero(v.ventas)}</span>
+                  </div>
+                  {pct !== null ? (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-linea" role="progressbar" aria-label={`${v.nombre}: ${pct}% de su meta`} aria-valuenow={Math.min(100, pct)} aria-valuemin={0} aria-valuemax={100}>
+                        <div className={`h-full rounded-full ${pct >= 100 ? 'bg-verde' : 'bg-marca'}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                      </div>
+                      <span className="w-24 shrink-0 text-right text-xs text-apagado tabular-nums">{pct}% de {dinero(v.meta!)}</span>
+                    </div>
+                  ) : (
+                    <p className="mt-0.5 text-xs text-apagado">{v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'} · sin meta</p>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+    </Tarjeta>
   )
 }

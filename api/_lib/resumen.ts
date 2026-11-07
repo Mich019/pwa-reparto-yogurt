@@ -153,26 +153,35 @@ export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dia
   return atrasados.length
 }
 
-// Al sincronizar ventas del vendedor (sync/rutas.ts): si con ellas llegó a su meta del mes, se le felicita. Una vez al
-// mes; si apagó el aviso, no se guarda ni suena.
+// Al sincronizar ventas del vendedor (sync/rutas.ts): si con ellas llegó a su meta del mes, se le felicita y se avisa a
+// los administradores (`vendedor_en_meta`). Una vez al mes: cualquiera de los dos avisos guardado cuenta. Las ventas se
+// cuentan como en GET /mi-meta (pedidos entregados con fecha del mes), para que cuadre con su barra de avance.
 export async function felicitarMeta(db: Db, despachador: Despachador, idVendedor: string): Promise<boolean> {
   const { rows: [r] } = await db.query(
-    `SELECT u.meta_mensual::float8 AS meta,
-            (SELECT coalesce(sum(p.total), 0)::float8 FROM pedidos p
+    `SELECT u.nombre, u.id_empresa, u.meta_mensual::float8 AS meta,
+            (SELECT coalesce(sum(d.subtotal), 0)::float8 FROM pedidos p JOIN detalle_pedido d ON d.id_pedido = p.id_pedido
               WHERE p.id_empresa = u.id_empresa AND p.id_vendedor = u.id_usuario AND p.estado = 'entregado'
-                AND (p.fecha_entregado_real AT TIME ZONE e.zona_horaria)::date >= date_trunc('month', now() AT TIME ZONE e.zona_horaria)::date) AS vendido
+                AND p.fecha >= date_trunc('month', now() AT TIME ZONE e.zona_horaria)::date
+                AND p.fecha < (date_trunc('month', now() AT TIME ZONE e.zona_horaria) + interval '1 month')::date) AS vendido
        FROM usuarios u JOIN empresas e ON e.id_empresa = u.id_empresa
       WHERE u.id_usuario = $1 AND u.rol = 'vendedor' AND u.activo AND u.meta_mensual > 0
-        AND NOT EXISTS (SELECT 1 FROM notificaciones n WHERE n.id_usuario = u.id_usuario AND n.tipo = 'meta_alcanzada'
-                         AND n.creado_en >= date_trunc('month', now() AT TIME ZONE e.zona_horaria) AT TIME ZONE e.zona_horaria)`,
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n
+                         WHERE n.id_empresa = u.id_empresa AND n.tipo IN ('meta_alcanzada', 'vendedor_en_meta')
+                           AND (n.id_usuario = u.id_usuario OR coalesce(n.datos->'vendedorIds', '[]') ? u.id_usuario::text)
+                           AND n.creado_en >= date_trunc('month', now() AT TIME ZONE e.zona_horaria) AT TIME ZONE e.zona_horaria)`,
     [idVendedor],
   )
   if (!r || r.vendido < r.meta) return false
   const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
-  await despachador.despachar([{
-    para: idVendedor, tipo: 'meta_alcanzada', titulo: '¡Llegaste a tu meta del mes!',
-    cuerpo: `Llevas ${pesos(r.vendido)} de ${pesos(r.meta)}. ¡Muy bien!`, datos: { pestana: 'cuenta' },
-  }])
+  const { rows: admins } = await db.query(`SELECT id_usuario FROM usuarios WHERE id_empresa = $1 AND rol = 'administrador' AND activo`, [r.id_empresa])
+  await despachador.despachar([
+    { para: idVendedor, tipo: 'meta_alcanzada', titulo: '¡Llegaste a tu meta del mes!', cuerpo: `Llevas ${pesos(r.vendido)} de ${pesos(r.meta)}. ¡Muy bien!`, datos: { pestana: 'cuenta' } },
+    ...admins.map((a) => ({
+      para: a.id_usuario as string, tipo: 'vendedor_en_meta' as const, titulo: 'Un vendedor llegó a su meta',
+      cuerpo: `${r.nombre} lleva ${pesos(r.vendido)} de ${pesos(r.meta)}`,
+      datos: { url: `/admin?ir=equipo&persona=${idVendedor}`, vendedorIds: [idVendedor] },
+    })),
+  ])
   return true
 }
 

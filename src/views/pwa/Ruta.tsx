@@ -13,6 +13,8 @@ import { baseDelUltimoPedido } from '../../lib/codigos'
 import { enlaceComprobante } from '../../lib/comprobante'
 import { marcaActual } from '../../lib/marca'
 import { AlertasRuta } from './AlertasRuta'
+import { useServidor, type MiMeta } from '../../lib/cobranza'
+import { sesionActual } from '../../lib/sesion'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
@@ -269,13 +271,14 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
               <ScanLine size={20} />
             </BotonRedondo>
           </div>
-          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md bg-papel px-5 py-2.5 shadow-tarjeta">
+          <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 overflow-hidden rounded-md bg-papel px-5 py-2.5 shadow-tarjeta">
             <span className="text-lg leading-none font-semibold tabular-nums">{dinero(cobradoDia)}</span>
             {enLinea ? (
               <span className="text-xs font-medium text-apagado">cobrado hoy</span>
             ) : (
               <span className="flex items-center gap-1 text-xs font-semibold text-amber-600"><WifiOff size={14} /> sin red</span>
             )}
+            <BarraMeta />
           </div>
         </div>
 
@@ -593,6 +596,27 @@ function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: React
         <div className="truncate text-sm text-apagado">{sub}</div>
       </div>
       <ChevronRight size={20} className="shrink-0 opacity-40" />
+    </button>
+  )
+}
+
+// Debajo de «cobrado hoy»: cuánto va de su meta del mes (GET /mi-meta). Sólo vendedores con meta y con conexión; al
+// tocarla dice las cifras. El avance se guarda en este teléfono para verlo también sin señal.
+const CLAVE_META = 'meta-del-mes'
+function BarraMeta() {
+  const vendedor = MODO_SERVIDOR && sesionActual()?.usuario.rol === 'vendedor'
+  const r = useServidor<MiMeta>(vendedor ? '/mi-meta' : null, ['datos', 'cobranza'])
+  let m = r.datos
+  try {
+    if (m) localStorage.setItem(CLAVE_META, JSON.stringify(m))
+    else m = JSON.parse(localStorage.getItem(CLAVE_META) ?? 'null')
+  } catch { /* sin almacenamiento: sólo se ve con señal */ }
+  if (!vendedor || !m?.meta || m.mes !== hoy().slice(0, 7)) return null
+  const pct = Math.round(m.cumplimientoPct ?? 0)
+  const texto = `Meta del mes: ${dinero(m.ventas)} de ${dinero(m.meta)} (${pct}%)`
+  return (
+    <button type="button" onClick={() => aviso(pct >= 100 ? `${texto}. ¡Ya llegaste!` : texto)} aria-label={texto} className="absolute inset-x-0 bottom-0 h-1.5 bg-linea">
+      <span className={`block h-full transition-[width] duration-500 ${pct >= 100 ? 'bg-verde' : 'bg-marca'}`} style={{ width: `${Math.min(100, pct)}%` }} />
     </button>
   )
 }
