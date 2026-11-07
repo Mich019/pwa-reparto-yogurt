@@ -442,7 +442,11 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
 // Ventas y utilidad del mes, cobranza y comisión por vendedor y las diferencias de los cortes. Si el mes está cerrado
 // son las cifras congeladas al cerrarlo (api/_lib/cortes.ts).
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-export function informeMensualPdf(i: InformeMes, ahora = new Date()): PdfListo {
+// Lo de metas que va al final del informe mensual (lib/cobranza.ts `logrosDelMes`, de GET /usuarios/rachas): medallas
+// ganadas con ese mes y las mejores rachas de todos los tiempos (a la fecha en que se genera).
+export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fama: { nombre: string; mejorRacha: number; cumplidos: number; racha: number }[] }
+
+export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: LogrosMes): PdfListo {
   const c = i.cifras
   const [anio, mesNum] = i.mes.split('-').map(Number)
   const nombreMes = `${MESES[mesNum - 1]} de ${anio}`
@@ -500,6 +504,22 @@ export function informeMensualPdf(i: InformeMes, ahora = new Date()): PdfListo {
     { titulo: 'Estado', ancho: 0.12, valor: (k) => (k.estado === 'confirmado' ? 'Confirmado' : 'Pendiente') },
   ], c.cortes.detalle, c.cortes.detalle.length ? ['Total', '', din(c.cortes.detalle.reduce((s, k) => s + k.esperado, 0)), din(c.cortes.detalle.reduce((s, k) => s + k.entregado, 0)), din(c.cortes.diferencia), ''] : undefined)
   if (c.cortes.sinCorte > 0) inf.nota(`${ent(c.cortes.sinCorte)} ${c.cortes.sinCorte === 1 ? 'día con cobro en efectivo no tiene' : 'días con cobro en efectivo no tienen'} corte.`)
+  if (logros && (logros.medallas.length || logros.fama.length)) {
+    inf.tituloSeccion('Medallas y salón de la fama', 'Meses seguidos llegando a la meta')
+    const textoMedalla = (n: number) => (n === 12 ? 'un año' : `${n} meses`)
+    inf.nota(logros.medallas.length
+      ? `Medallas ganadas con ${nombreMes}: ${logros.medallas.map((m) => `${m.nombre} (${textoMedalla(m.medalla)})`).join(', ')}.`
+      : `Nadie ganó medalla con ${nombreMes}.`)
+    if (logros.fama.length) {
+      inf.tabla<LogrosMes['fama'][number] & { lugar: number }>([
+        { titulo: 'Lugar', ancho: 0.1, valor: (f) => `${f.lugar}.º` },
+        { titulo: 'Vendedor', ancho: 0.36, valor: (f) => f.nombre },
+        { titulo: 'Mejor racha', ancho: 0.18, der: true, valor: (f) => `${ent(f.mejorRacha)} ${f.mejorRacha === 1 ? 'mes' : 'meses'}`, detalle: (f) => (f.mejorRacha >= 3 ? `Medalla de ${textoMedalla([12, 6, 3].find((n) => f.mejorRacha >= n)!)}` : null) },
+        { titulo: 'Metas cumplidas', ancho: 0.18, der: true, valor: (f) => ent(f.cumplidos) },
+        { titulo: 'Racha actual', ancho: 0.18, der: true, valor: (f) => (f.racha ? `${ent(f.racha)} ${f.racha === 1 ? 'mes' : 'meses'}` : '-') },
+      ], logros.fama.map((f, k) => ({ ...f, lugar: k + 1 })))
+    }
+  }
   inf.nota('Notas: se consideran los pedidos entregados por su fecha de entrega. La comisión es el porcentaje de cada vendedor sobre lo vendido en el mes. '
     + '"Por cobrar" es lo vendido a crédito menos los abonos, al último día del mes. Una diferencia negativa es efectivo que faltó.')
   return inf.listo()

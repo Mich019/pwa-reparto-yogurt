@@ -94,6 +94,22 @@ export interface PrecioCliente { productoId: string; sabor: string; unidad: stri
 export const guardarPrecios = (clienteId: string, precios: { productoId: string; precioLitro: number | null }[]) =>
   llamarAutenticado<{ precios: PrecioCliente[] }>(`/clientes/${clienteId}/precios`, { metodo: 'PUT', cuerpo: { precios } })
 
+// Medallas ganadas con `mes` y las 5 mejores rachas (salón de la fama), para el PDF del informe. Si no se puede traer,
+// el informe sale sin esa parte.
+async function logrosDelMes(mes: string) {
+  try {
+    const r = await llamarAutenticado<Record<string, { nombre: string; racha: number; mejorRacha: number; cumplidos: number; medallas: { medalla: number; mes: string }[] }>>('/usuarios/rachas')
+    const todos = Object.values(r)
+    return {
+      medallas: todos.flatMap((v) => v.medallas.filter((m) => m.mes === mes).map((m) => ({ nombre: v.nombre, medalla: m.medalla }))),
+      fama: [...todos].sort((a, b) => b.mejorRacha - a.mejorRacha || b.cumplidos - a.cumplidos || a.nombre.localeCompare(b.nombre)).slice(0, 5)
+        .map(({ nombre, mejorRacha, cumplidos, racha }) => ({ nombre, mejorRacha, cumplidos, racha })),
+    }
+  } catch {
+    return undefined
+  }
+}
+
 // El informe mensual: el Excel lo arma el servidor; el PDF, este equipo con las mismas cifras (se abre en la vista previa).
 export async function exportarInforme(informe: InformeMes, formato: 'pdf' | 'xlsx'): Promise<void> {
   const nombre = `informe-mensual-${informe.mes}.${formato}`
@@ -102,16 +118,16 @@ export async function exportarInforme(informe: InformeMes, formato: 'pdf' | 'xls
     return
   }
   const pdf = await import('./reportePdf')
-  await pdf.prepararLogoPdf()
-  mostrarPdf(pdf.informeMensualPdf(informe), nombre)
+  const [, logros] = await Promise.all([pdf.prepararLogoPdf(), logrosDelMes(informe.mes)])
+  mostrarPdf(pdf.informeMensualPdf(informe, new Date(), logros), nombre)
 }
 
 // Al cerrar el mes: arma aquí el PDF del informe y el servidor lo manda a los administradores que lo pidieron.
 export async function mandarInformePorCorreo(mes: string) {
   const informe = await llamarAutenticado<InformeMes>(`/cierres/${mes}/informe`)
   const pdf = await import('./reportePdf')
-  await pdf.prepararLogoPdf()
-  const { bytes } = pdf.informeMensualPdf(informe)
+  const [, logros] = await Promise.all([pdf.prepararLogoPdf(), logrosDelMes(mes)])
+  const { bytes } = pdf.informeMensualPdf(informe, new Date(), logros)
   let s = ''
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   return enviar<{ enviados: number }>(`/cierres/${mes}/correo`, { pdf: btoa(s) })

@@ -201,10 +201,35 @@ describe('cierre de mes', () => {
     const h = (await llamar(x.admin, 'GET', `/usuarios/${x.ana.id}/metas`)).body.historial
     assert.equal(h.length, 3)
     assert.deepEqual([h[0].mes, h[0].ventas, h[0].meta, h[0].cumplimientoPct], [MES, 120, 100, 120])
+    // Su lugar en el salón de la fama (sólo el número) y, sin medalla nueva, el récord personal no aplica todavía.
+    assert.deepEqual((await llamar(x.ana, 'GET', '/mi-meta/trofeos')).body.fama, { lugar: 1, de: 1 })
+    assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'record_personal'  AND id_usuario = $1`, [x.ana.id])).rowCount, 0)
     // Reabrir y volver a cerrar no la repite.
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/reabrir`, { motivo: 'Corrección de prueba' })).status, 200)
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
     assert.equal((await medallas()).length, 1)
+  })
+
+  it('al superar su mejor racha sin medalla nueva, el vendedor recibe su récord personal, una vez', async () => {
+    const x = await escenario()
+    await llamar(x.admin, 'PATCH', `/usuarios/${x.ana.id}`, { metaMensual: 100 })
+    await x.entrega('EFECTIVO', 2, `${MES}-10`)
+    const antes = (n: number) => { const [a, m] = MES.split('-').map(Number); const f = new Date(a, m - 1 - n, 1); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-01` }
+    const bien = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 110, meta: 100, cumplimientoPct: 110 }] })
+    const mal = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 10, meta: 100, cumplimientoPct: 10 }] })
+    await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [x.empresa])
+    // Antes: una racha de 1 (hace 3 meses), luego un mes sin llegar; ahora 2 seguidos (el anterior y este) = récord de 2.
+    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $3, now(), '[]'), ($2, 'cerrado', $4, now(), '[]'), ($5, 'cerrado', $3, now(), '[]')`,
+      [antes(3), antes(2), bien, mal, antes(1)])
+    assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
+    const records = async () => (await db.query(`SELECT titulo, cuerpo, datos FROM notificaciones WHERE tipo = 'record_personal' AND id_usuario = $1`, [x.ana.id])).rows
+    const [r] = await records()
+    assert.equal(r.titulo, '¡Nuevo récord personal!')
+    assert.match(r.cuerpo, /^2 meses seguidos .*Uno más y ganas la medalla de 3 meses/)
+    assert.equal(r.datos.racha, 2)
+    await llamar(x.admin, 'POST', `/cierres/${MES}/reabrir`, { motivo: 'Corrección de prueba' })
+    await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)
+    assert.equal((await records()).length, 1)
   })
   it('no cierra el mes en curso ni uno con pedidos sin cerrar; al cerrar guarda las cifras y bloquea las correcciones', async () => {
     const x = await escenario()

@@ -495,6 +495,13 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       historial: historial as { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[],
     }
   }
+  // Su lugar en el salón de la fama (mismo orden que SalonDeLaFama en Equipo.tsx): sólo el número, nunca lo de los demás.
+  async function lugarEnFama(id: string) {
+    const orden = Object.entries(await rachas())
+      .sort(([, a], [, b]) => b.mejorRacha - a.mejorRacha || b.cumplidos - a.cumplidos || a.nombre.localeCompare(b.nombre))
+    const i = orden.findIndex(([x]) => x === id)
+    return i < 0 ? null : { lugar: i + 1, de: orden.length }
+  }
   // Racha y mejor racha de cada vendedor con al menos un mes cumplido, y en qué mes ganó cada medalla (el primero en que
   // su racha llegó a 3, 6 o 12) y cuántos meses ha cumplido en total (`cumplidos`, para el salón de la fama). Incluye a
   // los que ya se fueron: el nombre viene de la foto de cada cierre.
@@ -523,7 +530,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     return trofeos(p.data.id)
   })
   // …y los propios, en su app (Cuenta).
-  app.get('/mi-meta/trofeos', { preHandler: requiereSesion }, async (req) => trofeos(req.usuario.id))
+  app.get('/mi-meta/trofeos', { preHandler: requiereSesion }, async (req) => ({ ...(await trofeos(req.usuario.id)), fama: await lugarEnFama(req.usuario.id) }))
 
   // ---- cierre de mes
   const mesDeRuta = (req: FastifyRequest) => mesTexto.safeParse((req.params as { mes?: string }).mes)
@@ -586,7 +593,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         )
         return cifras
       })
-      await avisarMedallas(antes, r).catch((e) => req.log.error(e, 'No se pudieron avisar las medallas'))
+      await avisarLogros(antes, r).catch((e) => req.log.error(e, 'No se pudieron avisar las medallas'))
       // Cuántos administradores quieren el informe por correo: el panel arma el PDF sólo si alguien lo quiere (resumen.ts).
       const { rows: [{ n: porCorreo }] } = await db.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'administrador' AND activo AND resumen_mensual`)
       return { ok: true, cifras: r, porCorreo }
@@ -598,17 +605,28 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   // Con el mes recién cerrado, el vendedor cuya mejor racha llegó a 3, 6 o 12 meses ganó una medalla: los
   // administradores se enteran para felicitarlo, y él también. Una vez por vendedor y medalla (reabrir y volver a cerrar
   // no repite).
-  async function avisarMedallas(antes: Awaited<ReturnType<typeof rachas>>, cifras: CifrasMes) {
+  // Y si superó su mejor racha sin ganar medalla (de 2 meses en adelante), al vendedor le llega `record_personal`, una vez
+  // por récord.
+  async function avisarLogros(antes: Awaited<ReturnType<typeof rachas>>, cifras: CifrasMes) {
     if (!despachador) return
     const medalla = (n: number) => [12, 6, 3].find((x) => n >= x) ?? 0
     const despues = await rachas()
-    const nuevas = Object.entries(despues)
-      .map(([id, r]) => ({ id, medalla: medalla(r.mejorRacha), antes: medalla(antes[id]?.mejorRacha ?? 0) }))
-      .filter((x) => x.medalla > x.antes)
-    if (!nuevas.length) return
+    const cambios = Object.entries(despues).map(([id, r]) => ({ id, mejor: r.mejorRacha, antesMejor: antes[id]?.mejorRacha ?? 0, medalla: medalla(r.mejorRacha), antes: medalla(antes[id]?.mejorRacha ?? 0) }))
+    const nuevas = cambios.filter((x) => x.medalla > x.antes)
+    const records = cambios.filter((x) => x.medalla === x.antes && x.antesMejor >= 1 && x.mejor > x.antesMejor && x.mejor >= 2)
+    if (!nuevas.length && !records.length) return
     const { rows: ya } = await db.query(
-      `SELECT DISTINCT datos->'vendedorIds'->>0 AS id, (datos->>'medalla')::int AS medalla FROM notificaciones WHERE tipo = 'medalla_ganada'`)
-    const pendientes = nuevas.filter((x) => !ya.some((y) => y.id === x.id && y.medalla === x.medalla))
+      `SELECT DISTINCT tipo, datos->'vendedorIds'->>0 AS id, (datos->>'medalla')::int AS medalla, (datos->>'racha')::int AS racha
+         FROM notificaciones WHERE tipo IN ('medalla_ganada', 'record_personal')`)
+    const pendientes = nuevas.filter((x) => !ya.some((y) => y.tipo === 'medalla_ganada' && y.id === x.id && y.medalla === x.medalla))
+    const recordsPendientes = records.filter((x) => !ya.some((y) => y.tipo === 'record_personal' && y.id === x.id && y.racha === x.mejor))
+    if (recordsPendientes.length) {
+      await despachador.despachar(recordsPendientes.map((x) => ({
+        para: x.id, tipo: 'record_personal' as const, titulo: '¡Nuevo récord personal!',
+        cuerpo: `${x.mejor} meses seguidos llegando a tu meta: tu mejor racha (antes ${x.antesMejor} ${x.antesMejor === 1 ? 'mes' : 'meses'}). ${x.mejor < 3 ? 'Uno más y ganas la medalla de 3 meses.' : x.mejor < 6 ? `Te faltan ${6 - x.mejor} para la de 6 meses.` : x.mejor < 12 ? `Te faltan ${12 - x.mejor} para la de un año.` : '¡Sigue así!'}`,
+        datos: { pestana: 'cuenta' as const, vendedorIds: [x.id], racha: x.mejor },
+      })))
+    }
     if (!pendientes.length) return
     const { rows: admins } = await db.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo`)
     const nombre = (id: string) => cifras.vendedores.find((v) => v.id === id)?.nombre ?? 'Un vendedor'

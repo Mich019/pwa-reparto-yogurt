@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSesion } from '../../lib/sesion'
 import { Medallas } from '../../components/Medallas'
 import { HistorialMetas, type MesDeMeta } from '../../components/HistorialMetas'
-import { ChevronRight, Flame, Trophy, Wallet } from 'lucide-react'
+import { ChevronRight, Crown, Flame, Trophy, Wallet } from 'lucide-react'
 import { entregarCorte, useServidor, type FilaCorte, type MiMeta } from '../../lib/cobranza'
 import { dinero } from '../../lib/fechas'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
@@ -14,7 +14,7 @@ export function MiDia() {
   const corte = useServidor<{ fecha: string; filas: FilaCorte[] }>('/cortes')
   const meta = useServidor<MiMeta>('/mi-meta')
   // Sus trofeos: los meses cerrados en que llegó a su meta, y cuántos seguidos.
-  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number; mejorRacha: number; historial: MesDeMeta[] }>('/mi-meta/trofeos')
+  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number; mejorRacha: number; historial: MesDeMeta[]; fama: { lugar: number; de: number } | null }>('/mi-meta/trofeos')
   const [hoja, setHoja] = useState(false)
   // La medalla más alta que ya vio en este teléfono: si ahora tiene una más alta, la tarjeta la celebra una vez.
   const id = useSesion()?.usuario?.id ?? ''
@@ -71,6 +71,12 @@ export function MiDia() {
             <span className="block font-semibold">{t.meses.length === 1 ? 'Llegaste a tu meta 1 mes' : `Llegaste a tu meta ${t.meses.length} meses`}</span>
             <span className="block truncate text-sm text-apagado">{t.meses.slice(0, 4).map((x) => mesCorto(x.mes)).join(' · ')}{t.meses.length > 4 ? ' · …' : ''}</span>
             {t.racha >= 2 && <span className="mt-1 flex items-center gap-1 text-sm font-semibold"><Flame size={15} aria-hidden="true" className="text-marca" /> Llevas {t.racha} meses seguidos. ¡Que no se corte!</span>}
+            {t.fama && t.fama.de > 1 && (
+              <span className="mt-1 flex items-center gap-1 text-sm text-apagado">
+                <Crown size={15} aria-hidden="true" className={t.fama.lugar === 1 ? 'text-marca' : ''} />
+                {t.fama.lugar === 1 ? `¡Eres el mejor de todos los tiempos en tu equipo!` : `Vas en ${t.fama.lugar}.º lugar de todos los tiempos (de ${t.fama.de})`}
+              </span>
+            )}
             {celebrar && <span className="mt-1 block text-sm font-semibold text-marca" role="status">¡Medalla nueva de {mejor === 12 ? 'un año' : `${mejor} meses`}!</span>}
             <span className="mt-2 block"><Medallas mejorRacha={t.mejorRacha} todas /></span>
           </span>
