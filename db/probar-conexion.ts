@@ -71,7 +71,8 @@ try {
               EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'cortes_mes_cerrado') AS m024,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cortes_dia' AND column_name = 'historial') AS m025,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'orden_menu') AS m026,
-              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'avisos_apagados') AS m027`,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'avisos_apagados') AS m027,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'silencio_desde') AS m028`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

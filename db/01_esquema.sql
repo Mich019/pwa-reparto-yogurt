@@ -83,6 +83,8 @@ CREATE TABLE usuarios (
   foto                  text,                               -- foto de perfil (data URL de 256 px; 012_foto_perfil.sql)
   orden_menu            text[],                             -- orden del menú del panel (null = de fábrica; 026_orden_menu.sql)
   avisos_apagados       text[],                             -- tipos de aviso que la cuenta no quiere (027_avisos_apagados.sql)
+  silencio_desde        smallint,                           -- horario de silencio del push, horas 0–23 en la zona de la empresa
+  silencio_hasta        smallint,                           -- (028_horario_silencio.sql; null = sin horario)
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040
@@ -102,6 +104,8 @@ CREATE TABLE usuarios (
   CONSTRAINT usuarios_password_argon2 CHECK (password_hash LIKE '$argon2id$%'),
   CONSTRAINT usuarios_comision_rango CHECK (comision_pct BETWEEN 0 AND 100),
   CONSTRAINT usuarios_meta_positiva CHECK (meta_mensual IS NULL OR meta_mensual > 0),
+  CONSTRAINT usuarios_silencio_valido CHECK ((silencio_desde IS NULL AND silencio_hasta IS NULL)
+    OR (silencio_desde BETWEEN 0 AND 23 AND silencio_hasta BETWEEN 0 AND 23 AND silencio_desde <> silencio_hasta)),
   CONSTRAINT usuarios_empresa_id UNIQUE (id_empresa, id_usuario)
 );
 -- Único en todo el sistema: el correo dice a qué empresa se entra (cada cuenta es de una sola empresa).

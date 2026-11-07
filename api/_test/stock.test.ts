@@ -254,6 +254,21 @@ describe('aviso de la carga al vendedor', () => {
     await carga(admin, vend.id, hoy(), [{ productoId: a.id, asignada: 3 }])
     assert.equal(enviados.length, 0)
     assert.equal((await pull(vend)).body.avisos.length, 2)
+
+    // Horario de silencio (en la hora de la empresa): no suena por push, pero el aviso queda y llega al sincronizar.
+    await ajustar({ avisosApagados: [] })
+    const { rows: [{ h }] } = await db.query(`SELECT extract(hour FROM now() AT TIME ZONE e.zona_horaria)::int AS h FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`, [vend.id])
+    assert.equal((await ajustar({ silencio: { desde: 5, hasta: 5 } })).statusCode, 400)
+    assert.deepEqual((await ajustar({ silencio: { desde: h, hasta: (h + 1) % 24 } })).json().silencio, { desde: h, hasta: (h + 1) % 24 })
+    enviados.length = 0
+    await carga(admin, vend.id, hoy(), [{ productoId: a.id, asignada: 4 }])
+    assert.equal(enviados.length, 0)
+    assert.equal((await pull(vend)).body.avisos.length, 3)
+    // Uno que pasa de medianoche y deja fuera la hora de ahora sí deja sonar.
+    await ajustar({ silencio: { desde: (h + 1) % 24, hasta: h } })
+    await carga(admin, vend.id, hoy(), [{ productoId: a.id, asignada: 6 }])
+    assert.equal(enviados.length, 1)
+    assert.equal((await ajustar({ silencio: null })).json().silencio, null)
   })
 
   it('no avisa si no cambió lo asignado, si sólo se registra una devolución, ni por días que ya pasaron', async () => {

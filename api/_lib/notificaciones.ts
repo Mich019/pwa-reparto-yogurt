@@ -47,17 +47,26 @@ export function unir(avisos: AvisoPendiente[]): AvisoPendiente[] {
 export interface Registro { error: (e: unknown, mensaje?: string) => void }
 
 export function crearDespachador(db: Db, enviador: Enviador | null, log: Registro) {
-  // Lo guarda sólo si la persona sigue activa; devuelve su id. La empresa sale de la cuenta: así sirve también desde el
-  // cron, que corre como dueño de la base sin empresa en alcance.
-  async function guardar(a: AvisoPendiente): Promise<string | null> {
+  // Lo guarda sólo si la persona sigue activa y no lo apagó; devuelve su id y si está en su horario de silencio (la hora
+  // de la empresa; puede pasar de medianoche). La empresa sale de la cuenta: así sirve también desde el cron, que corre
+  // como dueño de la base sin empresa en alcance.
+  async function guardar(a: AvisoPendiente): Promise<{ id: string; callado: boolean } | null> {
     const { rows } = await db.query(
-      `INSERT INTO notificaciones (id_empresa, id_usuario, tipo, titulo, cuerpo, datos)
-       SELECT id_empresa, id_usuario, $2::text, $3, $4, $5::jsonb FROM usuarios
-        WHERE id_usuario = $1 AND activo AND NOT ($2::text = ANY (coalesce(avisos_apagados, '{}')))
-       RETURNING id_notificacion`,
+      `WITH u AS (
+         SELECT u.id_empresa, u.id_usuario,
+                coalesce(CASE WHEN u.silencio_desde < u.silencio_hasta THEN x.h >= u.silencio_desde AND x.h < u.silencio_hasta
+                              ELSE x.h >= u.silencio_desde OR x.h < u.silencio_hasta END, false) AS callado
+           FROM usuarios u JOIN empresas e USING (id_empresa)
+          CROSS JOIN LATERAL (SELECT extract(hour FROM now() AT TIME ZONE e.zona_horaria)::int AS h) x
+          WHERE u.id_usuario = $1 AND u.activo AND NOT ($2::text = ANY (coalesce(u.avisos_apagados, '{}')))
+       ), n AS (
+         INSERT INTO notificaciones (id_empresa, id_usuario, tipo, titulo, cuerpo, datos)
+         SELECT id_empresa, id_usuario, $2::text, $3, $4, $5::jsonb FROM u RETURNING id_notificacion
+       )
+       SELECT n.id_notificacion, u.callado FROM n, u`,
       [a.para, a.tipo, a.titulo.slice(0, 120), a.cuerpo, JSON.stringify(a.datos ?? {})],
     )
-    return rows[0]?.id_notificacion ?? null
+    return rows[0] ? { id: rows[0].id_notificacion, callado: rows[0].callado } : null
   }
 
   // Manda el aviso a cada teléfono suscrito. Los que ya no existen se olvidan.
@@ -82,8 +91,9 @@ export function crearDespachador(db: Db, enviador: Enviador | null, log: Registr
       await Promise.all(
         unir(avisos).map(async (a) => {
           try {
-            const id = await guardar(a)
-            if (id) await entregar(id, a)
+            const r = await guardar(a)
+            // En silencio no suena: queda en la lista y llega al sincronizar. El urgente suena siempre.
+            if (r && (!r.callado || a.tipo === 'pedido_urgente')) await entregar(r.id, a)
           } catch (e) {
             log.error(e, 'No se pudo registrar el aviso')
           }
@@ -92,8 +102,8 @@ export function crearDespachador(db: Db, enviador: Enviador | null, log: Registr
     },
     async probar(idUsuario: string) {
       const aviso: AvisoPendiente = { para: idUsuario, tipo: 'prueba', titulo: 'Prueba de avisos', cuerpo: 'Si lo ves, este teléfono recibirá los avisos de tu ruta.', datos: { pestana: 'cuenta' } }
-      const id = await guardar(aviso)
-      return id ? entregar(id, aviso) : { dispositivos: 0, enviados: 0 }
+      const r = await guardar(aviso) // la prueba suena aunque sea horario de silencio: es lo que se quiere comprobar
+      return r ? entregar(r.id, aviso) : { dispositivos: 0, enviados: 0 }
     },
   }
 }

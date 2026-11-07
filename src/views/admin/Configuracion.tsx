@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Bell, BellRing, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
@@ -14,6 +14,7 @@ import { ZonaEmpresa } from './ZonaEmpresa'
 import { Ayuda } from '../ayuda/Ayuda'
 import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
 import { activarPush, desactivarPush, enviarPrueba, useEstadoPush } from '../../lib/push'
+import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
 import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
@@ -29,7 +30,7 @@ const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX',
 // Secciones del panel a las que puede llevar el «Ir a…» de una guía (las demás son apartados de aquí).
 const SECCIONES_PANEL = ['resumen', 'equipo', 'clientes', 'produccion', 'sabores', 'reportes']
 
-export type ApartadoConfig = 'cuenta' | 'seguridad' | 'marca' | 'suscripcion' | 'privacidad' | 'apariencia' | 'ayuda'
+export type ApartadoConfig = 'cuenta' | 'seguridad' | 'preferencias' | 'marca' | 'suscripcion' | 'privacidad' | 'apariencia' | 'ayuda'
 export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
@@ -90,6 +91,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
   const menu: { id: string; texto: string; ayuda: string; icono: typeof Sun }[] = [
     { id: 'cuenta', texto: 'Cuenta', ayuda: 'Tu perfil y tu actividad', icono: UserRound },
     { id: 'seguridad', texto: 'Seguridad', ayuda: 'Contraseña y sesiones', icono: ShieldCheck },
+    ...(!plataforma && u?.rol === 'administrador' ? [{ id: 'preferencias', texto: 'Preferencias', ayuda: 'Avisos y horario de silencio', icono: Bell }] : []),
     ...(plataforma ? [] : [{ id: 'marca', texto: 'Marca', ayuda: 'Nombre, logo y color', icono: SwatchBook }]),
     ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
     ...extra,
@@ -136,6 +138,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
         <div id="apartado-config" className="min-w-0 space-y-7 lg:-mx-2 lg:overflow-y-auto lg:px-2 lg:pb-12">
           {visible === 'cuenta' && <Cuenta plataforma={plataforma} />}
           {visible === 'seguridad' && <Seguridad plataforma={plataforma} />}
+          {visible === 'preferencias' && <Preferencias />}
           {extra.find((x) => x.id === visible)?.contenido}
           {visible === 'marca' && (
             <>
@@ -237,8 +240,6 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
         </dl>
       </Seccion>
 
-      {!plataforma && u.rol === 'administrador' && <><AvisosPush /><QueAvisos /></>}
-
     </>
   )
 }
@@ -296,41 +297,59 @@ function AvisosPush() {
   )
 }
 
-// Qué avisos quiere cada administrador. Vale para su cuenta (en todos sus dispositivos) y para la lista de avisos de la
-// app: uno apagado no se guarda ni se manda. Los nombres van como en notificaciones.ts (AVISOS_ELEGIBLES).
+// Qué avisos quiere cada administrador y su horario de silencio. Valen para su cuenta (en todos sus dispositivos): uno
+// apagado no se guarda ni se manda; en silencio no suena por push y queda en la lista. Los tipos van como en
+// notificaciones.ts (AVISOS_ELEGIBLES).
 const TIPOS_AVISO = [
   { tipo: 'corte_entregado', titulo: 'Corte por confirmar', ayuda: 'Un vendedor entregó o corrigió su corte del día.' },
   { tipo: 'corte_descuadrado', titulo: 'Corte que ya no cuadra', ayuda: 'Llegó una venta en efectivo de un día con el corte ya confirmado.' },
   { tipo: 'prueba_por_vencer', titulo: 'Prueba gratis por vencer', ayuda: 'Unos días antes y el último día de la prueba.' },
 ] as const
 
-function QueAvisos() {
-  const [apagados, setApagados] = useState<string[] | null>(null)
-  useEffect(() => { llamarAutenticado<{ avisosApagados?: string[] }>('/me').then((r) => setApagados(r.avisosApagados ?? [])).catch(() => setApagados([])) }, [])
-  async function cambiar(tipo: string, encendido: boolean) {
-    if (!apagados) return
-    const antes = apagados
-    const nuevos = encendido ? apagados.filter((t) => t !== tipo) : [...apagados, tipo]
-    setApagados(nuevos)
-    try {
-      await guardarPerfil({ avisosApagados: nuevos })
-    } catch (e) {
-      setApagados(antes)
-      aviso(mensaje(e))
-    }
-  }
+function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encendido: boolean; deshabilitado: boolean; etiqueta: string; alCambiar: (si: boolean) => void }) {
   return (
-    <Seccion id="que-avisos" titulo="Qué avisos recibes" descripcion="Se guarda en tu cuenta: vale en todos tus dispositivos.">
-      {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
-        <Fila key={tipo} titulo={titulo} ayuda={ayuda}>
-          <label className="relative inline-flex cursor-pointer items-center">
-            <input type="checkbox" role="switch" checked={!!apagados && !apagados.includes(tipo)} disabled={!apagados} onChange={(e) => void cambiar(tipo, e.target.checked)} className="peer sr-only" aria-label={titulo} />
-            <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
-            <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
-          </label>
+    <label className="relative inline-flex cursor-pointer items-center">
+      <input type="checkbox" role="switch" checked={encendido} disabled={deshabilitado} onChange={(e) => alCambiar(e.target.checked)} className="peer sr-only" aria-label={etiqueta} />
+      <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
+      <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
+    </label>
+  )
+}
+
+function Preferencias() {
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const silencio = prefs?.silencio ?? null
+  const claseHora = `rounded-md border border-linea bg-papel px-3 py-2 text-sm font-semibold ${anillo}`
+  return (
+    <>
+      <AvisosPush />
+      <Seccion id="que-avisos" titulo="Qué avisos recibes" descripcion={sinSenal ? 'Sin conexión con el servidor: se pueden cambiar cuando vuelva.' : 'Se guarda en tu cuenta: vale en todos tus dispositivos.'}>
+        {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
+          <Fila key={tipo} titulo={titulo} ayuda={ayuda}>
+            <Interruptor encendido={encendido(tipo)} deshabilitado={!prefs} etiqueta={titulo} alCambiar={(si) => void alternar(tipo, si)} />
+          </Fila>
+        ))}
+      </Seccion>
+      <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
+        <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>
+          <Interruptor encendido={!!silencio} deshabilitado={!prefs} etiqueta="Silenciar avisos" alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />
         </Fila>
-      ))}
-    </Seccion>
+        {silencio && (
+          <Fila titulo="Horas" ayuda="Puede pasar de medianoche, por ejemplo de 21:00 a 07:00.">
+            <span className="flex items-center gap-2 text-sm">
+              <BellOff size={16} aria-hidden="true" className="text-apagado" />
+              <select value={silencio.desde} onChange={(e) => { const desde = Number(e.target.value); if (desde !== silencio.hasta) void cambiarSilencio({ ...silencio, desde }) }} className={claseHora} aria-label="Desde">
+                {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.hasta}>{hora(h)}</option>)}
+              </select>
+              a
+              <select value={silencio.hasta} onChange={(e) => { const hasta = Number(e.target.value); if (hasta !== silencio.desde) void cambiarSilencio({ ...silencio, hasta }) }} className={claseHora} aria-label="Hasta">
+                {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.desde}>{hora(h)}</option>)}
+              </select>
+            </span>
+          </Fila>
+        )}
+      </Seccion>
+    </>
   )
 }
 

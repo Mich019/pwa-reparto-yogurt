@@ -180,13 +180,13 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'avisos-panel', tema: 'reportes', titulo: 'Recibir avisos en la computadora', icono: BellRing, donde: 'panel', para: 'administrador', ir: 'cuenta',
+    id: 'avisos-panel', tema: 'reportes', titulo: 'Recibir avisos en la computadora', icono: BellRing, donde: 'panel', para: 'administrador', ir: 'preferencias',
     resumen: 'Te llega una notificación cuando un vendedor entrega su corte, cuando uno confirmado deja de cuadrar y cuando tu prueba gratis está por vencer, aunque el panel esté cerrado.',
-    palabras: 'avisos notificaciones push alerta computadora corte cuadrar activar',
+    palabras: 'avisos notificaciones push alerta computadora corte cuadrar activar preferencias silencio noche horario',
     pasos: [
-      { texto: 'En Configuración, abre «Cuenta» y en «Avisos en este dispositivo» toca «Activar avisos». El navegador te pide permiso: acéptalo.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'texto', lineas: 2 }, { t: 'botones', items: [{ texto: 'Activar avisos', primario: true, foco: true }] }]) },
+      { texto: 'En Configuración, abre «Preferencias» y en «Avisos en este dispositivo» toca «Activar avisos». El navegador te pide permiso: acéptalo.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'texto', lineas: 2 }, { t: 'botones', items: [{ texto: 'Activar avisos', primario: true, foco: true }] }]) },
       { texto: 'Con «Enviar prueba» compruebas que llegan. Al tocar un aviso de corte se abre Cobranza → Cortes; el de la prueba, tu Suscripción.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
-      { texto: 'En «Qué avisos recibes» apaga los que no quieras. Vale para tu cuenta en todos tus dispositivos.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Qué avisos recibes' }, { t: 'filas', n: 3 }]) },
+      { texto: 'En «Qué avisos recibes» apaga los que no quieras, y en «Horario de silencio» elige las horas en que no suenan (los ves después). Vale para tu cuenta en todos tus dispositivos.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Qué avisos recibes' }, { t: 'filas', n: 3 }, { t: 'titulo', texto: 'Horario de silencio' }, { t: 'filas', n: 1 }]) },
     ],
   },
   {
@@ -474,11 +474,12 @@ export const GUIAS: Guia[] = [
   {
     id: 'notificaciones', tema: 'cuenta', titulo: 'Activar las notificaciones', icono: BellRing, donde: 'app', para: 'todos',
     resumen: 'Para que te lleguen los pedidos urgentes y los cambios de ruta aunque la app esté cerrada.',
-    palabras: 'notificaciones avisos push alertas sonido permiso',
+    palabras: 'notificaciones avisos push alertas sonido permiso preferencias silencio noche horario',
     pasos: [
-      { texto: 'En Cuenta, en «Notificaciones en este teléfono», toca «Activar avisos» y acepta el permiso.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Notificaciones en este teléfono', icono: BellRing }, { t: 'boton', texto: 'Activar avisos', foco: true }]) },
-      { texto: 'Con «Enviar prueba» confirmas que llegan. También puedes pedir que te avise si te quedan ventas sin enviar en la tarde.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Notificaciones en este teléfono', icono: BellRing }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
+      { texto: 'En Cuenta, en «Preferencias», toca «Activar avisos» y acepta el permiso.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Preferencias', icono: BellRing }, { t: 'boton', texto: 'Activar avisos', foco: true }]) },
+      { texto: 'Con «Enviar prueba» confirmas que llegan. También puedes pedir que te avise si te quedan ventas sin enviar en la tarde.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Preferencias', icono: BellRing }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
       { texto: 'Si eres vendedor, en «Qué avisos recibes» puedes apagar los de tu carga del día o los cambios en tu ruta. Los pedidos urgentes siempre llegan.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Qué avisos recibes', icono: BellRing }]) },
+      { texto: 'Con «Horario de silencio» los avisos no suenan de noche (o en las horas que elijas): los ves al abrir la app. Los urgentes sí suenan.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Horario de silencio', icono: BellRing }]) },
     ],
   },
   {

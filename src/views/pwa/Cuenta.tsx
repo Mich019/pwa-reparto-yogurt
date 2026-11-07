@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LockKeyhole, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, Wallet, CreditCard, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
@@ -6,7 +6,8 @@ import { ErrorApi, ErrorRed, MODO_SERVIDOR } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
 import { hace } from '../../lib/fechas'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
-import { cambiarPassword, cerrarSesion, guardarPerfil, llamarAutenticado, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
+import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
+import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
@@ -226,8 +227,9 @@ function Notificaciones() {
 
   return (
     <div className="mt-3 rounded-lg bg-niebla p-4">
-      <div className="flex items-center gap-2 font-semibold"><Bell size={18} /> Notificaciones en este teléfono</div>
-      <p className="mt-1 text-sm text-apagado" data-estado-push={activo ? 'activo' : 'inactivo'}>{texto}</p>
+      <div className="flex items-center gap-2 font-semibold"><Bell size={18} /> Preferencias</div>
+      <div className="mt-3 text-sm font-semibold">Notificaciones en este teléfono</div>
+      <p className="mt-0.5 text-sm text-apagado" data-estado-push={activo ? 'activo' : 'inactivo'}>{texto}</p>
       {puede && (
         <div className="mt-3 flex gap-2">
           {activo ? (
@@ -251,54 +253,76 @@ function Notificaciones() {
           {[...new Set([HORA_CIERRE, 14, 15, 16, 17, 18, 19, 20, 21, 22, horaCierre])].sort((a, b) => a - b).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
         </select>
       </label>
-      {MODO_SERVIDOR && sesionActual()?.usuario.rol === 'vendedor' && <QueAvisos />}
+      {MODO_SERVIDOR && <PreferenciasAvisos vendedor={sesionActual()?.usuario.rol === 'vendedor'} />}
     </div>
   )
 }
 
-// Los avisos del servidor que el vendedor puede apagar (AVISOS_ELEGIBLES en api/_lib/notificaciones.ts). Se guarda en
-// su cuenta: uno apagado no llega ni por push ni a la lista. El pedido urgente siempre llega.
+// Los avisos del servidor que el vendedor puede apagar (AVISOS_ELEGIBLES en api/_lib/notificaciones.ts) y el horario de
+// silencio. Se guardan en su cuenta (lib/preferencias.ts): uno apagado no llega; en silencio no suena por push y llega
+// al sincronizar. El pedido urgente siempre llega y siempre suena.
 const TIPOS_AVISO = [
   { tipo: 'stock_asignado', titulo: 'Tu carga del día', ayuda: 'Cuando te asignan o cambian la carga.' },
   { tipo: 'ruta_modificada', titulo: 'Cambios en tu ruta', ayuda: 'Pedidos de hoy que se agregan, cambian o quitan, y clientes que pasan a tu cartera.' },
 ] as const
 
-function QueAvisos() {
-  const [apagados, setApagados] = useState<string[] | null>(null)
-  const [sinSenal, setSinSenal] = useState(false)
-  useEffect(() => {
-    llamarAutenticado<{ avisosApagados?: string[] }>('/me').then((r) => setApagados(r.avisosApagados ?? [])).catch(() => setSinSenal(true))
-  }, [])
-  async function cambiar(tipo: string, encendido: boolean) {
-    if (!apagados) return
-    const antes = apagados
-    const nuevos = encendido ? apagados.filter((t) => t !== tipo) : [...apagados, tipo]
-    setApagados(nuevos)
-    try {
-      await guardarPerfil({ avisosApagados: nuevos })
-    } catch (e) {
-      setApagados(antes)
-      aviso(mensajeError(e))
-    }
-  }
+function Interruptor({ encendido, deshabilitado, alCambiar }: { encendido: boolean; deshabilitado: boolean; alCambiar: (si: boolean) => void }) {
   return (
-    <div className="mt-4 border-t border-linea pt-3">
-      <div className="text-sm font-semibold">Qué avisos recibes</div>
-      <p className="text-xs text-apagado">{sinSenal ? 'Sin conexión: se pueden cambiar cuando haya señal.' : 'Los pedidos urgentes siempre te llegan.'}</p>
-      {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
-        <label key={tipo} className="mt-3 flex cursor-pointer items-center justify-between gap-3">
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">{titulo}</span>
-            <span className="block text-xs text-apagado">{ayuda}</span>
-          </span>
-          <span className="relative inline-flex shrink-0 items-center">
-            <input type="checkbox" role="switch" checked={!!apagados && !apagados.includes(tipo)} disabled={!apagados} onChange={(e) => void cambiar(tipo, e.target.checked)} className="peer sr-only" />
-            <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
-            <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
-          </span>
-        </label>
-      ))}
-    </div>
+    <span className="relative inline-flex shrink-0 items-center">
+      <input type="checkbox" role="switch" checked={encendido} disabled={deshabilitado} onChange={(e) => alCambiar(e.target.checked)} className="peer sr-only" />
+      <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
+      <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
+    </span>
+  )
+}
+
+function Opcion({ titulo, ayuda, children }: { titulo: string; ayuda: string; children: React.ReactNode }) {
+  return (
+    <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{titulo}</span>
+        <span className="block text-xs text-apagado">{ayuda}</span>
+      </span>
+      {children}
+    </label>
+  )
+}
+
+function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio } = usePreferenciasAvisos((e) => aviso(mensajeError(e)))
+  const silencio = prefs?.silencio ?? null
+  const claseHora = 'rounded-md bg-papel px-3 py-2 text-sm font-semibold'
+  return (
+    <>
+      {sinSenal && <p className="mt-4 border-t border-linea pt-3 text-xs text-apagado">Sin conexión: lo de abajo se puede cambiar cuando haya señal.</p>}
+      {vendedor && (
+        <div className="mt-4 border-t border-linea pt-3">
+          <div className="text-sm font-semibold">Qué avisos recibes</div>
+          <p className="text-xs text-apagado">Los pedidos urgentes siempre te llegan.</p>
+          {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
+            <Opcion key={tipo} titulo={titulo} ayuda={ayuda}>
+              <Interruptor encendido={encendido(tipo)} deshabilitado={!prefs} alCambiar={(si) => void alternar(tipo, si)} />
+            </Opcion>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 border-t border-linea pt-3">
+        <Opcion titulo="Horario de silencio" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)} no suenan; los ves al abrir la app. Los urgentes sí suenan.` : 'Los avisos suenan a cualquier hora.'}>
+          <Interruptor encendido={!!silencio} deshabilitado={!prefs} alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />
+        </Opcion>
+        {silencio && (
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <select value={silencio.desde} onChange={(e) => { const desde = Number(e.target.value); if (desde !== silencio.hasta) void cambiarSilencio({ ...silencio, desde }) }} className={claseHora} aria-label="Silencio desde">
+              {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.hasta}>{hora(h)}</option>)}
+            </select>
+            <span className="text-apagado">a</span>
+            <select value={silencio.hasta} onChange={(e) => { const hasta = Number(e.target.value); if (hasta !== silencio.desde) void cambiarSilencio({ ...silencio, hasta }) }} className={claseHora} aria-label="Silencio hasta">
+              {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.desde}>{hora(h)}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

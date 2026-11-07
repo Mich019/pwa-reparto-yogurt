@@ -35,7 +35,12 @@ const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional
   // El orden del menú del panel (views/admin/menu.ts); [] vuelve al de fábrica.
   ordenMenu: z.array(z.string().regex(/^[a-z]{1,20}$/)).max(20).optional(),
   // Los avisos que no quiere recibir (notificaciones.ts, AVISOS_ELEGIBLES); [] = todos.
-  avisosApagados: z.array(z.enum(AVISOS_ELEGIBLES)).max(AVISOS_ELEGIBLES.length).optional() }).strict()
+  avisosApagados: z.array(z.enum(AVISOS_ELEGIBLES)).max(AVISOS_ELEGIBLES.length).optional(),
+  // Horario de silencio del push (horas 0–23 en la zona de la empresa; puede pasar de medianoche); null lo quita.
+  silencio: z.object({ desde: z.number().int().min(0).max(23), hasta: z.number().int().min(0).max(23) }).strict()
+    .refine((s) => s.desde !== s.hasta).nullable().optional() }).strict()
+const silencioDe = (u: { silencio_desde: number | null; silencio_hasta: number | null }) =>
+  u.silencio_desde === null ? null : { desde: u.silencio_desde, hasta: u.silencio_hasta }
 const bodyCerrarSesion = z.object({ id: z.string().uuid().optional() }).strict()
 const bodyCambio = z.object({ actual: z.string().min(1).max(PASSWORD_MAX), nueva: z.string().max(1000) })
 
@@ -233,7 +238,7 @@ export async function rutasAuth(
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, u.avisos_apagados, e.interna, e.nombre AS empresa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, u.avisos_apagados, u.silencio_desde, u.silencio_hasta, e.interna, e.nombre AS empresa
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [req.usuario.id],
     )
@@ -245,6 +250,7 @@ export async function rutasAuth(
       legalPendiente: u.legal_version !== VERSION_LEGAL, versionLegal: VERSION_LEGAL,
       ordenMenu: u.orden_menu ?? null,
       avisosApagados: u.avisos_apagados ?? [],
+      silencio: silencioDe(u),
     }
   })
 
@@ -260,13 +266,16 @@ export async function rutasAuth(
       `UPDATE usuarios SET nombre = COALESCE($2, nombre), telefono = CASE WHEN $3::boolean THEN NULLIF($4, '') ELSE telefono END,
               foto = CASE WHEN $5::boolean THEN $6 ELSE foto END,
               orden_menu = CASE WHEN $7::boolean THEN $8::text[] ELSE orden_menu END,
-              avisos_apagados = CASE WHEN $9::boolean THEN $10::text[] ELSE avisos_apagados END
-        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu, avisos_apagados`,
+              avisos_apagados = CASE WHEN $9::boolean THEN $10::text[] ELSE avisos_apagados END,
+              silencio_desde = CASE WHEN $11::boolean THEN $12::smallint ELSE silencio_desde END,
+              silencio_hasta = CASE WHEN $11::boolean THEN $13::smallint ELSE silencio_hasta END
+        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu, avisos_apagados, silencio_desde, silencio_hasta`,
       [req.usuario.id, b.data.nombre ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.foto !== undefined, b.data.foto ?? null,
         b.data.ordenMenu !== undefined, b.data.ordenMenu?.length ? b.data.ordenMenu : null,
-        b.data.avisosApagados !== undefined, b.data.avisosApagados?.length ? [...new Set(b.data.avisosApagados)] : null],
+        b.data.avisosApagados !== undefined, b.data.avisosApagados?.length ? [...new Set(b.data.avisosApagados)] : null,
+        b.data.silencio !== undefined, b.data.silencio?.desde ?? null, b.data.silencio?.hasta ?? null],
     )).rows[0])
-    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null, avisosApagados: u.avisos_apagados ?? [] }
+    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null, avisosApagados: u.avisos_apagados ?? [], silencio: silencioDe(u) }
   })
 
   // Las sesiones abiertas de la cuenta (la de esta petición marcada) y cerrar una o todas las demás.
