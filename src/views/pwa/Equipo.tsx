@@ -13,6 +13,7 @@ import { copiarDelicado } from '../../lib/portapapeles'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
 import { Medallas } from '../../components/Medallas'
+import { HistorialMetas } from '../../components/HistorialMetas'
 import { usePaginas } from '../../components/Paginas'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
@@ -21,12 +22,19 @@ import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave
 
 const ROL_TEXTO: Record<Rol, string> = { administrador: 'Administrador', vendedor: 'Vendedor' }
 const SIN_VENDEDOR = 'sin' // en los selectores, "ningún vendedor"
-// El mensaje de «Felicitar por WhatsApp» de la ficha (lo escribe el administrador; puede cambiarlo antes de mandarlo).
-function textoFelicitar(nombre: string, racha: number, mejorRacha: number) {
+// Los mensajes para elegir en «Felicitar por WhatsApp» de la ficha (el administrador puede cambiarlo antes de mandarlo).
+function textosFelicitar(nombre: string, racha: number, mejorRacha: number) {
   const primero = nombre.split(' ')[0]
   const medalla = [12, 6, 3].find((n) => mejorRacha >= n)
-  if (racha >= 2) return `¡Felicidades, ${primero}! Llevas ${racha} meses seguidos llegando a tu meta${medalla && racha >= medalla ? ` y ya tienes la medalla de ${medalla === 12 ? 'un año' : `${medalla} meses`}` : ''}. ¡Sigue así!`
-  return `¡Felicidades, ${primero}! Ganaste la medalla de ${medalla === 12 ? 'un año' : `${medalla} meses`} seguidos en tu meta. ¡Vamos por más!`
+  const textoMedalla = medalla ? `la medalla de ${medalla === 12 ? 'un año' : `${medalla} meses`}` : ''
+  const logro = racha >= 2 ? `${racha} meses seguidos llegando a tu meta` : `${textoMedalla} seguidos en tu meta`
+  return [
+    racha >= 2
+      ? `¡Felicidades, ${primero}! Llevas ${logro}${medalla && racha >= medalla ? ` y ya tienes ${textoMedalla}` : ''}. ¡Sigue así!`
+      : `¡Felicidades, ${primero}! Ganaste ${logro}. ¡Vamos por más!`,
+    `${primero}, qué orgullo: ${racha >= 2 ? `ya van ${racha} meses seguidos en tu meta` : `te ganaste ${textoMedalla}`}. Gracias por tu esfuerzo de todos los días.`,
+    `¡Eres un ejemplo para el equipo, ${primero}! ${racha >= 2 ? `${racha} meses seguidos` : textoMedalla.charAt(0).toUpperCase() + textoMedalla.slice(1)}. ¡Por muchos más!`,
+  ]
 }
 const dineroCorto = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
@@ -52,9 +60,13 @@ function Etiqueta({ m }: { m: Miembro }) {
   return texto ? <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${clase}`}>{texto}</span> : null
 }
 
-// `/admin?ir=equipo&persona=<id>` (aviso de meta atrasada): abre Vendedores con la ficha de esa persona.
+// `/admin?ir=equipo&persona=<id>` (aviso de meta atrasada): abre Vendedores con la ficha de esa persona. `abrirFicha`
+// hace lo mismo desde el panel (tarjeta de medallas del inicio): se llama justo antes de ir a Vendedores.
 const pedido = new URLSearchParams(location.search)
 let personaPedida = pedido.get('ir') === 'equipo' && /^[0-9a-f-]{36}$/.test(pedido.get('persona') ?? '') ? pedido.get('persona') : null
+export function abrirFicha(id: string) {
+  personaPedida = id
+}
 export function irAEquipo() {
   if (pedido.get('ir') !== 'equipo') return false
   history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
@@ -369,7 +381,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   const [racha, setRacha] = useState(0)
   const [mejorRacha, setMejorRacha] = useState(0)
   const [historial, setHistorial] = useState<Trofeos['historial']>([])
-  const [verHistorial, setVerHistorial] = useState(false)
+  const [felicitar, setFelicitar] = useState(false)
   useEffect(() => {
     if (m.rol !== 'vendedor') return
     let vigente = true
@@ -453,42 +465,26 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           {!!metas?.length && <Linea t="Llegó a su meta" v={metas.slice(0, 6).map(mesCorto).join(', ') + (metas.length > 6 ? ` y ${metas.length - 6} más` : '')} />}
         </dl>
         {m.telefono && (racha >= 2 || mejorRacha >= 3) && (
-          <a href={`https://wa.me/${telLimpio(m.telefono)}?text=${encodeURIComponent(textoFelicitar(m.nombre, racha, mejorRacha))}`} target="_blank" rel="noopener noreferrer"
-            className="-mt-2 flex w-fit items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-tinta underline-offset-4 hover:underline">
-            <MessageCircle size={16} aria-hidden="true" /> Felicitar por WhatsApp
-          </a>
-        )}
-        {!!historial.length && (
-          <div className="rounded-lg bg-niebla">
-            <button type="button" onClick={() => setVerHistorial(!verHistorial)} aria-expanded={verHistorial}
-              className="flex w-full items-center justify-between gap-2 p-4 text-left text-sm font-semibold">
-              Historial de metas
-              <ChevronRight size={16} aria-hidden="true" className={`text-apagado transition-transform duration-200 ${verHistorial ? 'rotate-90' : ''}`} />
+          <div className="-mt-2">
+            <button type="button" onClick={() => setFelicitar(!felicitar)} aria-expanded={felicitar}
+              className="flex w-fit items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-tinta underline-offset-4 hover:underline">
+              <MessageCircle size={16} aria-hidden="true" /> Felicitar por WhatsApp
             </button>
-            {verHistorial && (
-              <ul className="desplegar space-y-2.5 px-4 pb-4 text-sm">
-                {historial.map((h) => {
-                  const pct = h.meta ? Math.round(h.cumplimientoPct ?? 0) : null
-                  return (
-                    <li key={h.mes}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="capitalize">{mesCorto(h.mes)}</span>
-                        <span className="tabular-nums text-apagado">
-                          {dineroCorto(h.ventas)}{h.meta ? <> de {dineroCorto(h.meta)} · <span className={pct! >= 100 ? 'font-semibold text-verde' : ''}>{pct}%</span></> : ' · sin meta'}
-                        </span>
-                      </div>
-                      {pct !== null && (
-                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-linea" role="progressbar" aria-label={`${mesCorto(h.mes)}: ${pct}% de su meta`} aria-valuenow={Math.min(100, pct)} aria-valuemin={0} aria-valuemax={100}>
-                          <div className={`h-full rounded-full ${pct >= 100 ? 'bg-verde' : 'bg-marca'}`} style={{ width: `${Math.min(100, pct)}%` }} />
-                        </div>
-                      )}
-                    </li>
-                  )
-                })}
+            {felicitar && (
+              <ul className="desplegar mt-2 space-y-1.5" aria-label="Elige el mensaje">
+                {textosFelicitar(m.nombre, racha, mejorRacha).map((t, i) => (
+                  <li key={i} className="desplegar-opcion" style={{ animationDelay: `${i * 30}ms` }}>
+                    <a href={`https://wa.me/${telLimpio(m.telefono!)}?text=${encodeURIComponent(t)}`} target="_blank" rel="noopener noreferrer" onClick={() => setFelicitar(false)}
+                      className="block rounded-lg bg-niebla px-3 py-2.5 text-sm transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.985] motion-reduce:active:scale-100">
+                      {t}
+                    </a>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
         )}
+        <HistorialMetas historial={historial} />
         {m.activo && m.dispositivosPush > 0 && (
           <button type="button" onClick={probar} disabled={trabajando} className="-mt-2 flex items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-tinta underline-offset-4 hover:underline disabled:opacity-50">
             <BellRing size={16} aria-hidden="true" /> Mandar aviso de prueba

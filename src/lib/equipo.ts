@@ -98,7 +98,7 @@ export async function metaParaTodos(cuerpo: { metaMensual: number | null } | { p
 }
 
 // Racha y mejor racha de cada vendedor con algún mes cumplido (ranking del panel).
-export type Rachas = Record<string, { racha: number; mejorRacha: number }>
+export type Rachas = Record<string, { nombre: string; racha: number; mejorRacha: number; medallas: { medalla: number; mes: string }[] }>
 
 // Lo que vendió cada vendedor activo el mes pasado, para la vista previa de «según su mes pasado».
 export function ventasMesPasado() {

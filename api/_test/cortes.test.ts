@@ -185,11 +185,13 @@ describe('cierre de mes', () => {
     const cifras = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 110, meta: 100, cumplimientoPct: 110 }] })
     await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [x.empresa])
     await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $3, now(), '[]'), ($2, 'cerrado', $3, now(), '[]')`, [antes(1), antes(2), cifras])
-    assert.deepEqual((await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id], { racha: 0, mejorRacha: 2 })
+    const r0 = (await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id]
+    assert.deepEqual([r0.racha, r0.mejorRacha, r0.medallas], [0, 2, []])
     assert.equal((await llamar(x.ana, 'GET', '/usuarios/rachas')).status, 403)
     const medallas = async () => (await db.query(`SELECT titulo, datos FROM notificaciones WHERE tipo = 'medalla_ganada' AND id_usuario = $1`, [x.admin.id])).rows
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
-    assert.deepEqual((await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id], { racha: 3, mejorRacha: 3 })
+    const r1 = (await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id]
+    assert.deepEqual([r1.racha, r1.mejorRacha, r1.medallas], [3, 3, [{ medalla: 3, mes: MES }]])
     const [m] = await medallas()
     assert.equal(m.titulo, 'Medalla de 3 meses')
     assert.deepEqual([m.datos.medalla, m.datos.vendedorIds], [3, [x.ana.id]])

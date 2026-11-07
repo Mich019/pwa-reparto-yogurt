@@ -463,13 +463,13 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   // `id` = uno; sin él, todos los vendedores (ranking del panel, medallas al cerrar el mes).
   async function mesesCumplidos(id: string | null) {
     const { rows } = await db.query(
-      `SELECT v->>'id' AS id, to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
+      `SELECT v->>'id' AS id, v->>'nombre' AS nombre, to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
          FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
         WHERE c.estado = 'cerrado' AND ($1::text IS NULL OR v->>'id' = $1) AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
         ORDER BY c.mes DESC`,
       [id],
     )
-    return rows as { id: string; mes: string; ventas: number; meta: number }[]
+    return rows as { id: string; nombre: string; mes: string; ventas: number; meta: number }[]
   }
   async function mesPasado() {
     let [a, m] = (await hoyDe()).slice(0, 7).split('-').map(Number)
@@ -495,12 +495,24 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       historial: historial as { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[],
     }
   }
-  // Racha y mejor racha de cada vendedor con al menos un mes cumplido: { [id]: { racha, mejorRacha } }.
+  // Racha y mejor racha de cada vendedor con al menos un mes cumplido, y en qué mes ganó cada medalla (el primero en que
+  // su racha llegó a 3, 6 o 12): { [id]: { nombre, racha, mejorRacha, medallas: [{ medalla, mes }] } }.
   async function rachas() {
-    const porVendedor = new Map<string, string[]>()
-    for (const r of await mesesCumplidos(null)) porVendedor.set(r.id, [...(porVendedor.get(r.id) ?? []), r.mes])
+    const porVendedor = new Map<string, { nombre: string; meses: string[] }>()
+    for (const r of await mesesCumplidos(null)) {
+      const v = porVendedor.get(r.id) ?? { nombre: r.nombre, meses: [] }
+      v.meses.push(r.mes)
+      porVendedor.set(r.id, v)
+    }
     const pasado = await mesPasado()
-    return Object.fromEntries([...porVendedor].map(([id, meses]) => [id, { racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses) }]))
+    return Object.fromEntries([...porVendedor].map(([id, { nombre, meses }]) => {
+      const subiendo = [...meses].sort()
+      const medallas = [3, 6, 12].flatMap((n) => {
+        const mes = subiendo.find((x) => rachaDesde(meses, x) >= n)
+        return mes ? [{ medalla: n, mes }] : []
+      })
+      return [id, { nombre, racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses), medallas }]
+    }))
   }
   app.get('/usuarios/rachas', { preHandler: requiereAdmin }, async () => rachas())
   // Los del vendedor, en su ficha de Vendedores (administrador)…

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSesion } from '../../lib/sesion'
 import { Medallas } from '../../components/Medallas'
+import { HistorialMetas, type MesDeMeta } from '../../components/HistorialMetas'
 import { ChevronRight, Flame, Trophy, Wallet } from 'lucide-react'
 import { entregarCorte, useServidor, type FilaCorte, type MiMeta } from '../../lib/cobranza'
 import { dinero } from '../../lib/fechas'
@@ -13,7 +14,7 @@ export function MiDia() {
   const corte = useServidor<{ fecha: string; filas: FilaCorte[] }>('/cortes')
   const meta = useServidor<MiMeta>('/mi-meta')
   // Sus trofeos: los meses cerrados en que llegó a su meta, y cuántos seguidos.
-  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number; mejorRacha: number }>('/mi-meta/trofeos')
+  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number; mejorRacha: number; historial: MesDeMeta[] }>('/mi-meta/trofeos')
   const [hoja, setHoja] = useState(false)
   // La medalla más alta que ya vio en este teléfono: si ahora tiene una más alta, la tarjeta la celebra una vez.
   const id = useSesion()?.usuario?.id ?? ''
@@ -33,7 +34,7 @@ export function MiDia() {
   const m = meta.datos
   const t = trofeos.datos
   const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
-  if (!fila && !(m && m.meta) && !t?.meses.length) return null
+  if (!fila && !(m && m.meta) && !t?.meses.length && !t?.historial?.length) return null
   const estado = !fila ? '' : fila.estado === 'confirmado' ? 'Confirmado' : fila.estado === 'pendiente' ? (fila.reabierto ? `Reabierto: ${fila.reabierto.motivo}` : 'Entregado, falta que lo confirmen') : 'Sin entregar'
   return (
     <>
@@ -75,6 +76,7 @@ export function MiDia() {
           </span>
         </div>
       )}
+      {!!t?.historial?.length && <HistorialMetas historial={t.historial} titulo="Tus metas de los meses pasados" className="mt-3" />}
       {hoja && fila && <HojaCorte fila={fila} onCerrar={() => setHoja(false)} onHecho={corte.recargar} />}
     </>
   )

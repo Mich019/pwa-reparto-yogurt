@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
 import { Medallas } from '../../components/Medallas'
 import type { Rachas } from '../../lib/equipo'
+import { abrirFicha } from '../pwa/Equipo'
 import { litrosTxt, ordenarPorVentas, saludo, usePedidosRecientes, useVentasPorSabor } from '../../lib/admin-datos'
 import { db } from '../../lib/db'
 import { DIAS_CORTOS, desdeIso, dinero, hoy, sumarDias } from '../../lib/fechas'
@@ -290,6 +291,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           </Tarjeta>
         </div>
 
+        <MedallasDelMes onNavegar={onNavegar} />
         <RankingMes onNavegar={onNavegar} />
 
         <Tarjeta
@@ -334,6 +336,32 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
 
 // Vendedores del mes, de quien más vendió a quien menos, con su avance contra la meta. Sólo el administrador ve esta
 // pantalla; las cifras son las del cierre de mes en vivo (GET /cierres/:mes).
+// Quién ganó una medalla con el mes pasado (3, 6 o 12 meses seguidos en su meta): sólo aparece si alguien la ganó, es
+// decir, una vez cerrado ese mes. Tocar a alguien abre su ficha, desde donde se le puede felicitar.
+function MedallasDelMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
+  const rachas = useServidor<Rachas>('/usuarios/rachas', 'cobranza').datos
+  const pasado = moverMes(hoy().slice(0, 7), -1)
+  const ganadas = Object.entries(rachas ?? {}).flatMap(([id, r]) => r.medallas.filter((m) => m.mes === pasado).map((m) => ({ id, nombre: r.nombre, medalla: m.medalla })))
+  if (!ganadas.length) return null
+  const nombreMes = new Date(`${pasado}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
+  return (
+    <Tarjeta id="t-medallas" titulo={`Medallas de ${nombreMes}`} subtitulo="Llegaron a su meta varios meses seguidos. Un buen momento para felicitarlos.">
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {ganadas.map((g, i) => (
+          <li key={`${g.id}-${g.medalla}`} className="medalla-nueva" style={{ animationDelay: `${i * 60}ms` }}>
+            <button type="button" onClick={() => { abrirFicha(g.id); onNavegar('equipo') }}
+              className="flex items-center gap-2 rounded-full bg-papel py-1.5 pl-1.5 pr-3.5 text-sm transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100">
+              <Medallas mejorRacha={g.medalla} soloMejor />
+              <span className="font-semibold">{g.nombre}</span>
+              <span className="text-apagado">{g.medalla === 12 ? '1 año' : `${g.medalla} meses`}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Tarjeta>
+  )
+}
+
 // Con las flechas se ven los meses anteriores (hasta dos años): los cerrados con la foto de su cierre.
 const MESES_ATRAS = 24
 const moverMes = (mes: string, n: number) => {
