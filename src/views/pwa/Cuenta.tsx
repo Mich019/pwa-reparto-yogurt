@@ -262,6 +262,7 @@ function Notificaciones() {
 // Los avisos del servidor que el vendedor puede apagar (AVISOS_ELEGIBLES en api/_lib/notificaciones.ts) y el horario de
 // silencio. Se guardan en su cuenta (lib/preferencias.ts): uno apagado no llega; en silencio no suena por push y llega
 // al sincronizar. El pedido urgente siempre llega y siempre suena.
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const TIPOS_AVISO = [
   { tipo: 'stock_asignado', titulo: 'Tu carga del día', ayuda: 'Cuando te asignan o cambian la carga.' },
   { tipo: 'ruta_modificada', titulo: 'Cambios en tu ruta', ayuda: 'Pedidos de hoy que se agregan, cambian o quitan, y clientes que pasan a tu cartera.' },
@@ -290,7 +291,8 @@ function Opcion({ titulo, ayuda, children }: { titulo: string; ayuda: string; ch
 }
 
 function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio } = usePreferenciasAvisos((e) => aviso(mensajeError(e)))
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarSemanal, cambiarDiaSemanal } = usePreferenciasAvisos((e) => aviso(mensajeError(e)))
+  const diaSemanal = prefs?.resumenSemanalDia ?? 1
   const silencio = prefs?.silencio ?? null
   const claseHora = 'rounded-md bg-papel px-3 py-2 text-sm font-semibold'
   return (
@@ -305,6 +307,18 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
               <Interruptor encendido={encendido(tipo)} deshabilitado={!prefs} alCambiar={(si) => void alternar(tipo, si)} />
             </Opcion>
           ))}
+        </div>
+      )}
+      {vendedor && (
+        <div className="mt-4 border-t border-linea pt-3">
+          <Opcion titulo="Tu semana por correo" ayuda={prefs?.resumenSemanal ? `Cada ${DIAS_SEMANA[diaSemanal - 1].toLowerCase()}: lo que vendiste, contra la semana anterior y cómo vas con tu meta.` : 'Apagado.'}>
+            <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} alCambiar={(si) => void cambiarSemanal(si)} />
+          </Opcion>
+          {prefs?.resumenSemanal && (
+            <select value={diaSemanal} onChange={(e) => void cambiarDiaSemanal(Number(e.target.value))} className={`mt-3 ${claseHora}`} aria-label="Día de tu resumen semanal">
+              {DIAS_SEMANA.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
+            </select>
+          )}
         </div>
       )}
       <div className="mt-4 border-t border-linea pt-3">

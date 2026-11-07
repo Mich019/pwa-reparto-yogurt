@@ -10,10 +10,10 @@ import { claveUsuario } from './seguridad.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
-export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'prueba'
+export type TipoAviso = 'pedido_urgente' | 'urgente_sin_atender' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'meta_atrasada' | 'prueba'
 // Los que cada quien puede apagar (usuarios.avisos_apagados; PATCH /me `avisosApagados`): los del administrador y,
 // del vendedor, la carga y los cambios de ruta. El pedido urgente y la prueba nunca.
-export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'urgente_sin_atender', 'ruta_modificada', 'stock_asignado'] as const
+export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'urgente_sin_atender', 'meta_atrasada', 'ruta_modificada', 'stock_asignado'] as const
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso
@@ -21,7 +21,8 @@ export interface AvisoPendiente {
   cuerpo: string
   // `url`: abre esa dirección en vez de una pestaña de la app (los avisos para el administrador llevan al panel).
   // `pedidoIds`: todos los pedidos de un aviso que juntó varios (unir); urgentes.ts los sigue para recordar los que no se atienden.
-  datos?: { pestana?: 'ruta' | 'stock' | 'clientes' | 'cuenta'; pedidoId?: string; pedidoIds?: string[]; url?: string }
+  // `vendedorIds`: los vendedores de un aviso de meta atrasada (resumen.ts no repite el aviso del mismo mes).
+  datos?: { pestana?: 'ruta' | 'stock' | 'clientes' | 'cuenta'; pedidoId?: string; pedidoIds?: string[]; vendedorIds?: string[]; url?: string }
 }
 
 const MAX_DISPOSITIVOS = 10
@@ -40,9 +41,10 @@ export function unir(avisos: AvisoPendiente[]): AvisoPendiente[] {
     const cuerpo = lineas.slice(0, 3).join('. ') + (lineas.length > 3 ? ` y ${lineas.length - 3} más` : '')
     const { para, tipo } = g[0]
     const titulo = tipo === 'pedido_urgente' ? `${g.length} pedidos urgentes` : tipo === 'ruta_modificada' ? 'Tu ruta cambió' : g[0].titulo
-    const titulos: Partial<Record<TipoAviso, string>> = { corte_descuadrado: `${g.length} cortes confirmados ya no cuadran`, corte_entregado: `${g.length} cortes por confirmar`, urgente_sin_atender: `${g.length} urgentes sin atender` }
+    const titulos: Partial<Record<TipoAviso, string>> = { corte_descuadrado: `${g.length} cortes confirmados ya no cuadran`, corte_entregado: `${g.length} cortes por confirmar`, urgente_sin_atender: `${g.length} urgentes sin atender`, meta_atrasada: `${g.length} vendedores atrasados con su meta` }
     const pedidoIds = g.flatMap((x) => x.datos?.pedidoIds ?? (x.datos?.pedidoId ? [x.datos.pedidoId] : []))
-    return { para, tipo, titulo: titulos[tipo] ?? titulo, cuerpo, datos: { pestana: g[0].datos?.pestana, url: g[0].datos?.url, ...(pedidoIds.length ? { pedidoIds } : {}) } }
+    const vendedorIds = g.flatMap((x) => x.datos?.vendedorIds ?? [])
+    return { para, tipo, titulo: titulos[tipo] ?? titulo, cuerpo, datos: { pestana: g[0].datos?.pestana, url: g[0].datos?.url, ...(pedidoIds.length ? { pedidoIds } : {}), ...(vendedorIds.length ? { vendedorIds } : {}) } }
   })
 }
 

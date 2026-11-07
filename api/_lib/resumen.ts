@@ -2,7 +2,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Config } from './config.js'
-import { correoMensual, correoResumen, enviarCorreos, type CifrasResumen } from './correo.js'
+import { correoMensual, correoResumen, correoVendedor, enviarCorreos, type CifrasResumen, type CifrasVendedor } from './correo.js'
+import { xlsxDelMes } from './cortes.js'
+import type { Despachador } from './notificaciones.js'
 import type { Db } from './db.js'
 
 // Resumen por correo para el administrador (Configuración → Preferencias): cada administrador que lo pidió recibe lo
@@ -11,9 +13,12 @@ import type { Db } from './db.js'
 //   · diario (usuarios.resumen_correo, migración 030): cada mañana, lo de ayer;
 //   · semanal (usuarios.resumen_semanal, migración 031): el día que elija (`resumen_semanal_dia`, 032; lunes de
 //     fábrica), los siete días anteriores comparados con los siete de antes («vendiste 12% más»), el mejor día, lo que
-//     más se vendió y cada vendedor contra su meta del mes;
+//     más se vendió y cada vendedor contra su meta del mes. Los vendedores también lo pueden pedir (PWA Cuenta →
+//     Preferencias): a ellos les llega sólo lo suyo, sin costos (`correoVendedor`);
 //   · mensual (usuarios.resumen_mensual, migración 033): al cerrar un mes, con el PDF del informe adjunto. El PDF lo
-//     dibuja el navegador que cerró el mes (reportePdf.ts) y lo manda a POST /cierres/:mes/correo.
+//     dibuja el navegador que cerró el mes (reportePdf.ts) y lo manda a POST /cierres/:mes/correo; el Excel lo arma el
+//     servidor y va adjunto también.
+// Y el aviso de meta atrasada (`avisarMetasAtrasadas`), también del cron diario.
 // Lo llama el cron diario (plataforma.ts, GET /cron/avisos) con la conexión del dueño: cruza empresas. «Ayer» y «lunes»
 // salen de la zona de cada empresa. Cada cuenta se reclama (`resumen_enviado_dia`, `resumen_semanal_enviado`) antes de
 // mandarle nada: aunque el cron corra dos veces, no le llega dos veces.
@@ -32,15 +37,22 @@ export async function mandarResumenes(db: Db, config: Config, log: Log): Promise
       `UPDATE usuarios u SET ${r.enviado} = (now() AT TIME ZONE e.zona_horaria)::date
          FROM empresas e
         WHERE e.id_empresa = u.id_empresa AND e.activa AND NOT e.interna
-          AND u.rol = 'administrador' AND u.activo AND u.${r.activo}
+          AND (u.rol = 'administrador'${semanal ? " OR u.rol = 'vendedor'" : ''}) AND u.activo AND u.${r.activo}
           AND u.${r.enviado} IS DISTINCT FROM (now() AT TIME ZONE e.zona_horaria)::date
           ${semanal ? 'AND extract(isodow FROM now() AT TIME ZONE e.zona_horaria) = u.resumen_semanal_dia' : ''}
-        RETURNING u.id_usuario, u.nombre, u.correo, u.id_empresa, e.nombre AS empresa`,
+        RETURNING u.id_usuario, u.nombre, u.correo, u.rol, u.id_empresa, e.nombre AS empresa`,
     )
     if (!cuentas.length) continue
     const cifras = new Map<string, CifrasResumen>()
-    for (const id of new Set(cuentas.map((c) => c.id_empresa as string))) cifras.set(id, await cifrasDe(db, id, r.dias))
-    const msjs = cuentas.map((c) => ({ para: c.correo as string, ...correoResumen(c.nombre, c.empresa, cifras.get(c.id_empresa)!, `${config.urlApp}/admin`) }))
+    const msjs = []
+    for (const c of cuentas) {
+      if (c.rol === 'vendedor') {
+        msjs.push({ para: c.correo as string, ...correoVendedor(c.nombre, c.empresa, await cifrasVendedor(db, c.id_empresa, c.id_usuario), `${config.urlApp}/`) })
+        continue
+      }
+      if (!cifras.has(c.id_empresa)) cifras.set(c.id_empresa, await cifrasDe(db, c.id_empresa, r.dias))
+      msjs.push({ para: c.correo as string, ...correoResumen(c.nombre, c.empresa, cifras.get(c.id_empresa)!, `${config.urlApp}/admin`) })
+    }
     mandados += await enviarCorreos(config, msjs, log)
   }
   return mandados
@@ -81,6 +93,65 @@ export async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise
     entregados: r.entregados, vendido: r.vendido, efectivo: r.efectivo, transferencia: r.transferencia, fiado: r.fiado,
     abonos: r.abonos, sinAtender: r.sin_atender, cortesPorConfirmar: r.cortes_por_confirmar, urgentes: r.urgentes,
   }
+}
+
+// El semanal de un vendedor: los siete días que terminan ayer, los siete de antes y lo que va del mes.
+export async function cifrasVendedor(db: Db, idEmpresa: string, idVendedor: string): Promise<CifrasVendedor> {
+  const { rows: [r] } = await db.query(
+    `WITH d AS (SELECT (now() AT TIME ZONE zona_horaria)::date - 1 AS hasta, (now() AT TIME ZONE zona_horaria)::date - 7 AS desde, zona_horaria AS zona
+                  FROM empresas WHERE id_empresa = $1),
+     v AS (SELECT p.total, (p.fecha_entregado_real AT TIME ZONE d.zona)::date AS dia FROM pedidos p, d
+            WHERE p.id_empresa = $1 AND p.id_vendedor = $2 AND p.estado = 'entregado'
+              AND (p.fecha_entregado_real AT TIME ZONE d.zona)::date BETWEEN least(d.desde - 7, date_trunc('month', d.hasta)::date) AND d.hasta)
+     SELECT to_char(d.desde, 'YYYY-MM-DD') AS desde, to_char(d.hasta, 'YYYY-MM-DD') AS hasta,
+            (SELECT count(*)::int FROM v WHERE v.dia BETWEEN d.desde AND d.hasta) AS pedidos,
+            (SELECT coalesce(sum(total), 0)::float8 FROM v WHERE v.dia BETWEEN d.desde AND d.hasta) AS vendido,
+            (SELECT coalesce(sum(total), 0)::float8 FROM v WHERE v.dia BETWEEN d.desde - 7 AND d.hasta - 7) AS antes,
+            (SELECT coalesce(sum(total), 0)::float8 FROM v WHERE v.dia >= date_trunc('month', d.hasta)::date) AS mes,
+            (SELECT meta_mensual::float8 FROM usuarios WHERE id_usuario = $2) AS meta,
+            round(100.0 * extract(day FROM d.hasta) / extract(day FROM date_trunc('month', d.hasta) + interval '1 month - 1 day'))::int AS avance
+       FROM d`,
+    [idEmpresa, idVendedor],
+  )
+  return { desde: r.desde, dia: r.hasta, pedidos: r.pedidos, vendido: r.vendido, vendidoAntes: r.antes, mes: r.mes, meta: r.meta, avanceMesPct: r.avance }
+}
+
+// Cron diario, a mitad de mes (días 15 a 20 en la zona de cada empresa): si un vendedor con meta lleva menos del 70%
+// de lo que debería a estas alturas, se avisa a los administradores. Una vez al mes por vendedor (`datos.vendedorIds`).
+// Cruza empresas: la conexión del dueño. `dias` sólo lo cambian las pruebas.
+export const RITMO_MINIMO = 0.7
+export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dias: [number, number] = [15, 20]): Promise<number> {
+  const { rows } = await db.query(
+    `WITH f AS (
+       SELECT id_empresa, zona_horaria AS z, (now() AT TIME ZONE zona_horaria)::date AS hoy,
+              date_trunc('month', (now() AT TIME ZONE zona_horaria)::date)::date AS ini
+         FROM empresas WHERE activa AND NOT interna
+     )
+     SELECT u.id_usuario, u.id_empresa, u.nombre, u.meta_mensual::float8 AS meta,
+            coalesce((SELECT sum(p.total) FROM pedidos p
+                       WHERE p.id_empresa = u.id_empresa AND p.id_vendedor = u.id_usuario AND p.estado = 'entregado'
+                         AND (p.fecha_entregado_real AT TIME ZONE f.z)::date >= f.ini AND (p.fecha_entregado_real AT TIME ZONE f.z)::date < f.hoy), 0)::float8 AS vendido,
+            (extract(day FROM f.hoy) - 1) / extract(day FROM f.ini + interval '1 month - 1 day') AS avance
+       FROM f JOIN usuarios u ON u.id_empresa = f.id_empresa AND u.rol = 'vendedor' AND u.activo AND u.meta_mensual > 0
+      WHERE extract(day FROM f.hoy) BETWEEN $1 AND $2
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n
+                         WHERE n.id_empresa = u.id_empresa AND n.tipo = 'meta_atrasada' AND n.creado_en >= (f.ini::timestamp AT TIME ZONE f.z)
+                           AND coalesce(n.datos->'vendedorIds', '[]') ? u.id_usuario::text)`,
+    dias,
+  )
+  const atrasados = rows.filter((r) => r.vendido < r.meta * Number(r.avance) * RITMO_MINIMO)
+  if (!atrasados.length) return 0
+  const { rows: admins } = await db.query(
+    `SELECT id_usuario, id_empresa FROM usuarios WHERE rol = 'administrador' AND activo AND id_empresa = ANY($1::uuid[])`,
+    [[...new Set(atrasados.map((r) => r.id_empresa))]],
+  )
+  const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
+  await despachador.despachar(atrasados.flatMap((r) => admins.filter((a) => a.id_empresa === r.id_empresa).map((a) => ({
+    para: a.id_usuario as string, tipo: 'meta_atrasada' as const, titulo: 'Vendedor atrasado con su meta',
+    cuerpo: `${r.nombre} lleva ${pesos(r.vendido)} de ${pesos(r.meta)} (${Math.round((r.vendido / r.meta) * 100)}%) y el mes va en ${Math.round(Number(r.avance) * 100)}%`,
+    datos: { url: '/admin', vendedorIds: [r.id_usuario as string] },
+  }))))
+  return atrasados.length
 }
 
 // Lo que sólo trae el semanal. El mes de cada vendedor va del día 1 del mes de `hasta` hasta `hasta`.
@@ -150,7 +221,10 @@ export async function rutasResumen(app: FastifyInstance, { db, config }: Context
       vendedores: (f.vendedores as { nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[])
         .map((v) => ({ nombre: v.nombre, ventas: v.ventas, meta: v.meta, cumplimientoPct: v.cumplimientoPct })),
     }
-    const adjuntos = [{ nombre: `informe-mensual-${m.data.mes}.pdf`, base64: b.data.pdf }]
+    const adjuntos = [
+      { nombre: `informe-mensual-${m.data.mes}.pdf`, base64: b.data.pdf },
+      { nombre: `informe-mensual-${m.data.mes}.xlsx`, base64: xlsxDelMes(f, m.data.mes, 'Mes cerrado').toString('base64') },
+    ]
     const enviados = await enviarCorreos(config, para.map((u) => ({ para: u.correo as string, ...correoMensual(u.nombre, u.empresa, m.data.mes, cifras, `${config.urlApp}/admin`), adjuntos })), req.log)
     return { enviados }
   })

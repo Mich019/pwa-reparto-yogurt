@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
-import { correoMensual, correoResumen } from '../_lib/correo.js'
-import { cifrasDeAyer, cifrasDeLaSemana, mandarResumenes } from '../_lib/resumen.js'
+import { correoMensual, correoResumen, correoVendedor } from '../_lib/correo.js'
+import { avisarMetasAtrasadas, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
+import { xlsxDelMes } from '../_lib/cortes.js'
+import { crearDespachador } from '../_lib/notificaciones.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
 
 // Resumen diario por correo para el administrador (resumen.ts) y lo que el equipo muestra de los avisos de cada quien.
@@ -96,8 +98,38 @@ describe('resumen diario por correo', () => {
     await mandarResumenes(db, config, log)
     assert.equal(await enviado(), null)
     await yo(admin, { resumenSemanalDia: hoy })
+    // El vendedor también lo pide: le llega lo suyo, sin costos.
+    assert.equal((await yo(vend, { resumenSemanal: true, resumenSemanalDia: hoy })).statusCode, 200)
     await mandarResumenes(db, config, log)
     assert.ok(await enviado())
+    assert.ok((await db.query(`SELECT resumen_semanal_enviado FROM usuarios WHERE id_usuario = $1`, [vend.id])).rows[0].resumen_semanal_enviado)
+    const suyo = await cifrasVendedor(db, empresa, vend.id)
+    assert.equal(suyo.vendido, semana.vendido)
+    assert.equal(suyo.vendidoAntes, semana.vendido)
+    assert.equal(suyo.meta, 1000)
+    const cv = correoVendedor('Beto', 'Lácteos Semana', suyo, 'https://ejemplo.test/')
+    assert.match(cv.texto, /Contra la semana anterior: Igual/)
+    assert.match(cv.texto, /Tu mes: \$[\d,.]+ de \$1,000\.00/)
+    assert.doesNotMatch(cv.texto, /utilidad|costo/i)
+  })
+
+  it('a mitad de mes avisa a los administradores del vendedor atrasado, una vez', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const { rows: [{ dia }] } = await db.query(`SELECT extract(day FROM now() AT TIME ZONE zona_horaria)::int AS dia FROM empresas WHERE id_empresa = $1`, [empresa])
+    if (dia === 1) return // el día 1 nadie va atrasado: el mes no ha empezado
+    await db.query(`UPDATE usuarios SET meta_mensual = 100000 WHERE id_usuario = $1`, [vend.id])
+    const despachador = crearDespachador(db, null, { error: () => {} })
+    const avisos = async () => (await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'meta_atrasada' AND id_usuario = $1`, [admin.id])).rows
+    await avisarMetasAtrasadas(db, despachador, [dia + 1, 31]) // fuera de los días: nada
+    assert.equal((await avisos()).length, 0)
+    await avisarMetasAtrasadas(db, despachador, [1, 31])
+    const [a] = await avisos()
+    assert.match(a.cuerpo, /lleva \$0 de \$100,000 \(0%\)/)
+    assert.deepEqual(a.datos.vendedorIds, [vend.id])
+    await avisarMetasAtrasadas(db, despachador, [1, 31])
+    assert.equal((await avisos()).length, 1)
   })
 
   it('«mandar uno ahora» le llega al administrador que lo pide', async () => {
@@ -133,6 +165,8 @@ describe('resumen diario por correo', () => {
     assert.equal((await pedir(vend, '/cierres/2026-01/correo', { pdf })).statusCode, 403)
     const c = correoMensual('Ana López', 'Lácteos Mes', '2026-01', { ingreso: 1500, utilidad: 600, pedidos: 12, porCobrar: 0, vendedores: [{ nombre: 'Beto', ventas: 900, meta: 1000, cumplimientoPct: 90 }] }, 'https://ejemplo.test/admin')
     assert.match(c.asunto, /Lácteos Mes: cierre de enero de 2026/)
+    const informe = (await app.inject({ method: 'GET', url: '/cierres/2026-01', headers: { authorization: `Bearer ${admin.token}` } })).json()
+    assert.equal(xlsxDelMes(informe.cifras, '2026-01', 'Mes cerrado').subarray(0, 2).toString(), 'PK')
     assert.match(c.texto, /Beto: \$900\.00 de \$1,000\.00 \(90%\)/)
   })
 

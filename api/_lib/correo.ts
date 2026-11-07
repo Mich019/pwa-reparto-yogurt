@@ -147,6 +147,40 @@ export interface CifrasResumen {
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const veces = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
 
+const contraAntes = (vendido: number, antes: number) => {
+  const p = antes ? Math.round(((vendido - antes) / antes) * 100) : null
+  return p === null ? (vendido ? 'La anterior no hubo ventas' : '')
+    : p === 0 ? `Igual (${pesos(antes)})`
+    : `${Math.abs(p)}% ${p > 0 ? 'más' : 'menos'} (${pesos(antes)})`
+}
+const fechaLarga = (s: string) => { const [a, m, d] = s.split('-').map(Number); return new Date(Date.UTC(a, m - 1, d, 12)).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) }
+
+// Resumen semanal del vendedor (resumen.ts): lo suyo, sin costos ni lo de los demás.
+export interface CifrasVendedor {
+  desde: string; dia: string // los siete días que terminan ayer
+  pedidos: number; vendido: number; vendidoAntes: number
+  mes: number; meta: number | null; avanceMesPct: number // cuánto del mes ya pasó, para comparar con la meta
+}
+export function correoVendedor(nombre: string, empresa: string, c: CifrasVendedor, url: string) {
+  const renglones: [string, string][] = [['Vendiste', c.pedidos ? `${pesos(c.vendido)} en ${veces(c.pedidos, 'pedido', 'pedidos')}` : 'Sin ventas']]
+  const comparado = contraAntes(c.vendido, c.vendidoAntes)
+  if (comparado) renglones.push(['Contra la semana anterior', comparado])
+  if (c.meta) {
+    renglones.push(['Tu mes', `${pesos(c.mes)} de ${pesos(c.meta)} (${Math.round((c.mes / c.meta) * 100)}%)`])
+    renglones.push(['Del mes ya pasó', `${c.avanceMesPct}%`])
+  } else renglones.push(['En lo que va del mes', pesos(c.mes)])
+  const celda = 'padding:8px 0;border-top:1px solid #eee'
+  const tabla = `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${renglones
+    .map(([k, v]) => `<tr><td style="${celda};color:#6b6b6b">${escapar(k)}</td><td align="right" style="${celda};font-weight:600">${escapar(v)}</td></tr>`).join('')}</table></td></tr>`
+  const dia = `del ${fechaLarga(c.desde)} al ${fechaLarga(c.dia)}`
+  const pie = 'Lo recibes porque lo pediste en la app, en Cuenta → Preferencias. Ahí mismo lo apagas.'
+  return {
+    asunto: `${empresa}: tu semana`,
+    texto: `Hola ${nombre}:\n\nAsí te fue ${dia}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}\n\nAbre la app: ${url}\n\n${pie}`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)}, así te fue ${escapar(dia)}:`) + tabla + boton(url, 'Abrir la app') + nota(pie)),
+  }
+}
+
 export function correoResumen(nombre: string, empresa: string, c: CifrasResumen, url: string) {
   const fecha = (s: string, o: Intl.DateTimeFormatOptions) => { const [a, m, d] = s.split('-').map(Number); return new Date(Date.UTC(a, m - 1, d, 12)).toLocaleDateString('es-MX', { ...o, timeZone: 'UTC' }) }
   const semanal = c.desde !== c.dia
@@ -156,10 +190,7 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
   const renglones: [string, string][] = [['Vendido', c.entregados ? `${pesos(c.vendido)} en ${veces(c.entregados, 'pedido', 'pedidos')}` : 'Sin ventas']]
   if (c.entregados) renglones.push(['En efectivo', pesos(c.efectivo)], ['Por transferencia', pesos(c.transferencia)])
   if (c.vendidoAntes !== null) {
-    const p = c.vendidoAntes ? Math.round(((c.vendido - c.vendidoAntes) / c.vendidoAntes) * 100) : null
-    const comparado = p === null ? (c.vendido ? 'La anterior no hubo ventas' : '')
-      : p === 0 ? `Igual (${pesos(c.vendidoAntes)})`
-      : `${Math.abs(p)}% ${p > 0 ? 'más' : 'menos'} (${pesos(c.vendidoAntes)})`
+    const comparado = contraAntes(c.vendido, c.vendidoAntes)
     if (comparado) renglones.push(['Contra la semana anterior', comparado])
   }
   if (c.semana?.mejorDia) renglones.push(['Mejor día', `${fecha(c.semana.mejorDia.dia, { weekday: 'long', day: 'numeric' })} · ${pesos(c.semana.mejorDia.vendido)}`])

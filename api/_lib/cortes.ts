@@ -219,6 +219,9 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
 
 // El Excel del informe: una hoja con las cifras del mes, otra por vendedor y otra con los cortes.
 const pesos = (v: number | null) => ({ v, t: 'dinero' as const })
+// El Excel del informe mensual: el de GET /cierres/:mes/informe y el que va adjunto al correo del cierre (resumen.ts).
+export const xlsxDelMes = (cifras: CifrasMes, mes: string, subtitulo: string) => aXlsx(hojas(cifras), { titulo: `Informe mensual ${mes}`, subtitulo })
+
 function hojas(x: CifrasMes): Tabla[] {
   const resumen: Tabla = {
     nombre: 'Resumen',
@@ -532,7 +535,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     if (f.data.formato === 'json') return mes
     const generado = new Date().toLocaleString('es-MX', { timeZone: await zonaDeEmpresa(db, config.zonaHoraria), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const estado = mes.estado === 'cerrado' ? 'Mes cerrado' : mes.estado === 'reabierto' ? 'Mes reabierto (cifras al momento de generarlo)' : 'Mes abierto (cifras al momento de generarlo)'
-    const datos = aXlsx(hojas(mes.cifras), { titulo: `Informe mensual ${m.data}`, subtitulo: `${estado} · Generado el ${generado}` })
+    const datos = xlsxDelMes(mes.cifras, m.data, `${estado} · Generado el ${generado}`)
     return rep
       .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .header('content-disposition', `attachment; filename="informe-mensual-${m.data}.xlsx"`)

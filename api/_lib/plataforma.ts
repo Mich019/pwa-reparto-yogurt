@@ -1,5 +1,5 @@
 import { cronAutorizado } from './urgentes.js'
-import { mandarResumenes } from './resumen.js'
+import { avisarMetasAtrasadas, mandarResumenes } from './resumen.js'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { leerAjustes } from './ajustes.js'
@@ -228,7 +228,8 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     const borradas = await purgarBajas(db, req.log) // empresas cuya baja ya venció (privacidad.ts)
     const pruebas = despachador ? await avisarPruebasPorVencer(db, config, despachador).catch((e) => { req.log.error(e, 'No se pudieron avisar las pruebas por vencer'); return 0 }) : 0
     const resumenes = await mandarResumenes(db, config, req.log).catch((e) => { req.log.error(e, 'No se pudieron mandar los resúmenes diarios'); return 0 })
-    return { ok: true, borradas, pruebas, resumenes }
+    const metas = despachador ? await avisarMetasAtrasadas(db, despachador).catch((e) => { req.log.error(e, 'No se pudieron revisar las metas atrasadas'); return 0 }) : 0
+    return { ok: true, borradas, pruebas, resumenes, metas }
   })
 
   // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.
