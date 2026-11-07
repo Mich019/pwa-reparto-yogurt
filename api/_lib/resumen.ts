@@ -18,7 +18,7 @@ import type { Db } from './db.js'
 //   · mensual (usuarios.resumen_mensual, migración 033): al cerrar un mes, con el PDF del informe adjunto. El PDF lo
 //     dibuja el navegador que cerró el mes (reportePdf.ts) y lo manda a POST /cierres/:mes/correo; el Excel lo arma el
 //     servidor y va adjunto también.
-// Y el aviso de meta atrasada (`avisarMetasAtrasadas`), también del cron diario.
+// Y el aviso de meta atrasada (`avisarMetasAtrasadas`) y el de racha en riesgo (`avisarRachasEnRiesgo`), también del cron diario.
 // Lo llama el cron diario (plataforma.ts, GET /cron/avisos) con la conexión del dueño: cruza empresas. «Ayer» y «lunes»
 // salen de la zona de cada empresa. Cada cuenta se reclama (`resumen_enviado_dia`, `resumen_semanal_enviado`) antes de
 // mandarle nada: aunque el cron corra dos veces, no le llega dos veces.
@@ -151,6 +151,59 @@ export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dia
     datos: { url: `/admin?ir=equipo&persona=${r.id_usuario}`, vendedorIds: [r.id_usuario as string] },
   }))))
   return atrasados.length
+}
+
+// Cron diario, al final del mes (del 25 en adelante en la zona de cada empresa): al vendedor que llegó a su meta el mes
+// pasado (cierre guardado) y este mes todavía no, se le avisa cuánto le falta para no cortar su racha. Una vez al mes.
+// Las ventas se cuentan como en GET /mi-meta. Cruza empresas: la conexión del dueño. `dias` sólo lo cambian las pruebas.
+export async function avisarRachasEnRiesgo(db: Db, despachador: Despachador, dias: [number, number] = [25, 31]): Promise<number> {
+  const { rows } = await db.query(
+    `WITH f AS (
+       SELECT id_empresa, zona_horaria AS z, (now() AT TIME ZONE zona_horaria)::date AS hoy,
+              date_trunc('month', (now() AT TIME ZONE zona_horaria)::date)::date AS ini
+         FROM empresas WHERE activa AND NOT interna
+     )
+     SELECT u.id_usuario, u.meta_mensual::float8 AS meta,
+            coalesce((SELECT sum(d.subtotal) FROM pedidos p JOIN detalle_pedido d ON d.id_pedido = p.id_pedido
+                       WHERE p.id_empresa = u.id_empresa AND p.id_vendedor = u.id_usuario AND p.estado = 'entregado'
+                         AND p.fecha >= f.ini AND p.fecha < (f.ini + interval '1 month')::date), 0)::float8 AS vendido,
+            ARRAY(SELECT c.mes::text FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
+                   WHERE c.id_empresa = u.id_empresa AND c.estado = 'cerrado' AND c.mes < f.ini AND v->>'id' = u.id_usuario::text
+                     AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
+                   ORDER BY c.mes DESC) AS cumplidos,
+            (f.ini - interval '1 month')::date::text AS pasado
+       FROM f JOIN usuarios u ON u.id_empresa = f.id_empresa AND u.rol = 'vendedor' AND u.activo AND u.meta_mensual > 0
+      WHERE extract(day FROM f.hoy) BETWEEN $1 AND $2
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n
+                         WHERE n.id_empresa = u.id_empresa AND n.id_usuario = u.id_usuario AND n.tipo = 'racha_en_riesgo'
+                           AND n.creado_en >= (f.ini::timestamp AT TIME ZONE f.z))`,
+    dias,
+  )
+  const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
+  const avisos = rows.flatMap((r) => {
+    if (r.vendido >= r.meta) return []
+    const racha = rachaDesde(r.cumplidos as string[], r.pasado as string)
+    if (!racha) return []
+    return [{
+      para: r.id_usuario as string, tipo: 'racha_en_riesgo' as const, titulo: '¡Que no se corte tu racha!',
+      cuerpo: `Llevas ${racha === 1 ? 'un mes' : `${racha} meses seguidos`} llegando a tu meta. Te faltan ${pesos(r.meta - r.vendido)} este mes.`,
+      datos: { pestana: 'cuenta' as const },
+    }]
+  })
+  if (avisos.length) await despachador.despachar(avisos)
+  return avisos.length
+}
+
+// Cuántos meses seguidos hay en `meses` ('YYYY-MM…') contando hacia atrás desde `desde` (incluido).
+export function rachaDesde(meses: string[], desde: string): number {
+  const hay = new Set(meses.map((m) => m.slice(0, 7)))
+  let [a, m] = desde.slice(0, 7).split('-').map(Number)
+  let n = 0
+  while (hay.has(`${a}-${String(m).padStart(2, '0')}`)) {
+    n++
+    if (--m === 0) { m = 12; a-- }
+  }
+  return n
 }
 
 // Al sincronizar ventas del vendedor (sync/rutas.ts): si con ellas llegó a su meta del mes, se le felicita y se avisa a

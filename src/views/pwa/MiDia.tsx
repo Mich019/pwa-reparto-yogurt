@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Medallas } from '../../components/Medallas'
 import { ChevronRight, Flame, Trophy, Wallet } from 'lucide-react'
 import { entregarCorte, useServidor, type FilaCorte, type MiMeta } from '../../lib/cobranza'
 import { dinero } from '../../lib/fechas'
@@ -11,7 +12,7 @@ export function MiDia() {
   const corte = useServidor<{ fecha: string; filas: FilaCorte[] }>('/cortes')
   const meta = useServidor<MiMeta>('/mi-meta')
   // Sus trofeos: los meses cerrados en que llegó a su meta, y cuántos seguidos.
-  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number }>('/mi-meta/trofeos')
+  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number; mejorRacha: number }>('/mi-meta/trofeos')
   const [hoja, setHoja] = useState(false)
   const fila = corte.datos?.filas[0]
   const m = meta.datos
@@ -54,6 +55,7 @@ export function MiDia() {
             <span className="block font-semibold">{t.meses.length === 1 ? 'Llegaste a tu meta 1 mes' : `Llegaste a tu meta ${t.meses.length} meses`}</span>
             <span className="block truncate text-sm text-apagado">{t.meses.slice(0, 4).map((x) => mesCorto(x.mes)).join(' · ')}{t.meses.length > 4 ? ' · …' : ''}</span>
             {t.racha >= 2 && <span className="mt-1 flex items-center gap-1 text-sm font-semibold"><Flame size={15} aria-hidden="true" className="text-marca" /> Llevas {t.racha} meses seguidos. ¡Que no se corte!</span>}
+            <span className="mt-2 block"><Medallas mejorRacha={t.mejorRacha} todas /></span>
           </span>
         </div>
       )}

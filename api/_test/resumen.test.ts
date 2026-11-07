@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { correoMensual, correoResumen, correoVendedor } from '../_lib/correo.js'
-import { avisarMetasAtrasadas, felicitarMeta, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
+import { avisarMetasAtrasadas, avisarRachasEnRiesgo, felicitarMeta, rachaDesde, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
 import { xlsxDelMes } from '../_lib/cortes.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
@@ -246,6 +246,25 @@ describe('resumen diario por correo', () => {
     await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $4, now(), '[]'), ($2, 'cerrado', $4, now(), '[]'), ($3, 'cerrado', $5, now(), '[]')
                     ON CONFLICT (id_empresa, mes) DO UPDATE SET cifras = EXCLUDED.cifras, estado = 'cerrado'`, [m1, m2, m3, cifras(110), cifras(50)])
     assert.equal((await ver(admin)).json().racha, 2)
+    // La mejor racha (medallas) cuenta cualquier tramo, aunque ya se haya cortado.
+    assert.equal(rachaDesde(['2025-11-01', '2025-12-01', '2026-01-01', '2026-03-01'], '2026-01'), 3)
+    assert.equal(rachaDesde(['2025-12-01'], '2026-01'), 0)
+    assert.ok((await ver(admin)).json().mejorRacha >= 2)
+
+    // Al final del mes, si este mes todavía no llega, se le avisa que su racha está en riesgo, una vez.
+    const despachador = crearDespachador(db, null, { error: () => {} })
+    const avisos = async () => (await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'racha_en_riesgo' AND id_usuario = $1`, [vend.id])).rows
+    await avisarRachasEnRiesgo(db, despachador, [1, 31]) // sin meta este mes: nada
+    assert.equal((await avisos()).length, 0)
+    await db.query(`UPDATE usuarios SET meta_mensual = 1000 WHERE id_usuario = $1`, [vend.id])
+    await avisarRachasEnRiesgo(db, despachador, [32, 32]) // fuera de los días: nada
+    assert.equal((await avisos()).length, 0)
+    await avisarRachasEnRiesgo(db, despachador, [1, 31])
+    await avisarRachasEnRiesgo(db, despachador, [1, 31])
+    const r = await avisos()
+    assert.equal(r.length, 1)
+    assert.match(r[0].cuerpo, /Llevas 2 meses seguidos llegando a tu meta\. Te faltan \$1,000 este mes/)
+    assert.equal(r[0].datos.pestana, 'cuenta')
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

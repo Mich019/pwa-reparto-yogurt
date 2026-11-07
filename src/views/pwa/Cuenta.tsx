@@ -266,6 +266,7 @@ const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sáb
 const TIPOS_AVISO = [
   { tipo: 'stock_asignado', titulo: 'Tu carga del día', ayuda: 'Cuando te asignan o cambian la carga.' },
   { tipo: 'meta_alcanzada', titulo: 'Tu meta del mes', ayuda: 'Te felicitamos cuando llegas a tu meta.' },
+  { tipo: 'racha_en_riesgo', titulo: 'Tu racha en riesgo', ayuda: 'Al final del mes, si llegaste a tu meta el mes pasado y este todavía no.' },
   { tipo: 'ruta_modificada', titulo: 'Cambios en tu ruta', ayuda: 'Pedidos de hoy que se agregan, cambian o quitan, y clientes que pasan a tu cartera.' },
 ] as const
 

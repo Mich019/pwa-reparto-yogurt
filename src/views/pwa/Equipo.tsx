@@ -12,6 +12,7 @@ import { hace } from '../../lib/fechas'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
+import { Medallas } from '../../components/Medallas'
 import { usePaginas } from '../../components/Paginas'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
@@ -27,7 +28,7 @@ const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHast
 // Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
 const NOMBRE_AVISO: Record<string, string> = {
   stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
-  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo',
 }
 function textoAvisos(m: Miembro) {
   const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'
@@ -244,14 +245,32 @@ function Invitar({ onCerrar }: { onCerrar: () => void }) {
 // ------------------------------------------------------------------ la misma meta para todos los vendedores
 function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerrar: () => void }) {
   const metas = [...new Set(vendedores.map((v) => v.metaMensual))]
+  const [modo, setModo] = useState<'monto' | 'pct'>('monto')
   const [monto, setMonto] = useState(metas.length === 1 && metas[0] ? String(metas[0]) : '')
+  const [pct, setPct] = useState('10')
   const [guardando, setGuardando] = useState(false)
   const valor = Number(monto)
-  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor > 0
+  const porcentaje = Number(pct)
+  const valido = modo === 'monto'
+    ? monto.trim() !== '' && Number.isFinite(valor) && valor > 0
+    : pct.trim() !== '' && Number.isInteger(porcentaje) && porcentaje >= -50 && porcentaje <= 300
+  const enviar = () => void (modo === 'monto' ? aplicar(valor) : aplicarPct())
+  async function aplicarPct() {
+    setGuardando(true)
+    try {
+      const r = await metaParaTodos({ pctMesAnterior: porcentaje })
+      aviso(`Meta nueva para ${plural(r.actualizados, 'vendedor', 'vendedores')}${r.sinVentas ? `; ${plural(r.sinVentas, 'no vendió', 'no vendieron')} el mes pasado y se ${r.sinVentas === 1 ? 'queda' : 'quedan'} con la suya` : ''}`)
+      onCerrar()
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
   async function aplicar(meta: number | null) {
     setGuardando(true)
     try {
-      const n = await metaParaTodos(meta)
+      const n = (await metaParaTodos({ metaMensual: meta })).actualizados
       aviso(meta ? `Meta de $${meta.toLocaleString('es-MX')} para ${plural(n, 'vendedor', 'vendedores')}` : `Se quitó la meta a ${plural(n, 'vendedor', 'vendedores')}`)
       onCerrar()
     } catch (e) {
@@ -262,15 +281,24 @@ function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerr
   }
   return (
     <Hoja abierta onCerrar={onCerrar} titulo="Meta para todos"
-      pie={<Boton className="w-full" onClick={() => void aplicar(valor)} disabled={guardando || !valido || !vendedores.length}>{guardando ? 'Guardando…' : `Poner a ${plural(vendedores.length, 'vendedor', 'vendedores')}`}</Boton>}>
+      pie={<Boton className="w-full" onClick={enviar} disabled={guardando || !valido || !vendedores.length}>{guardando ? 'Guardando…' : `Poner a ${plural(vendedores.length, 'vendedor', 'vendedores')}`}</Boton>}>
+      <Segmentado className="mb-3" valor={modo} onChange={setModo}
+        opciones={[{ valor: 'monto', texto: 'La misma para todos' }, { valor: 'pct', texto: 'Según su mes pasado' }]} />
       <p className="mb-3 text-sm text-apagado">
-        La misma meta de venta del mes para cada vendedor activo. Reemplaza la que tenga cada uno; después puedes cambiar la de alguien en su ficha.
-        {metas.length > 1 && ' Ahora no todos tienen la misma.'}
+        {modo === 'monto'
+          ? `La misma meta de venta del mes para cada vendedor activo. Reemplaza la que tenga cada uno; después puedes cambiar la de alguien en su ficha.${metas.length > 1 ? ' Ahora no todos tienen la misma.' : ''}`
+          : 'A cada vendedor, lo que vendió el mes pasado más este porcentaje (negativo si quieres bajarla). Quien no vendió nada el mes pasado se queda con la que tiene.'}
       </p>
-      <Campo etiqueta="Meta del mes por vendedor ($)">
-        <input className={claseInput} inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valido && void aplicar(valor)} placeholder="Ej. 20000" />
-      </Campo>
-      {vendedores.some((v) => v.metaMensual) && (
+      {modo === 'monto' ? (
+        <Campo etiqueta="Meta del mes por vendedor ($)">
+          <input className={claseInput} inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valido && enviar()} placeholder="Ej. 20000" />
+        </Campo>
+      ) : (
+        <Campo etiqueta="Más que su mes pasado (%)">
+          <input className={claseInput} inputMode="numeric" value={pct} onChange={(e) => setPct(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valido && enviar()} placeholder="Ej. 10" />
+        </Campo>
+      )}
+      {modo === 'monto' && vendedores.some((v) => v.metaMensual) && (
         <button type="button" onClick={() => void aplicar(null)} disabled={guardando} className="mt-3 text-sm font-semibold text-rojo underline-offset-4 hover:underline disabled:opacity-50">
           Quitar la meta a todos
         </button>
@@ -295,10 +323,11 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   // Trofeo: los meses cerrados en que llegó a su meta.
   const [metas, setMetas] = useState<string[] | null>(null)
   const [racha, setRacha] = useState(0)
+  const [mejorRacha, setMejorRacha] = useState(0)
   useEffect(() => {
     if (m.rol !== 'vendedor') return
     let vigente = true
-    metasCumplidas(m.id).then((r) => { if (vigente) { setMetas(r.meses.map((x) => x.mes)); setRacha(r.racha) } }).catch(() => {})
+    metasCumplidas(m.id).then((r) => { if (vigente) { setMetas(r.meses.map((x) => x.mes)); setRacha(r.racha); setMejorRacha(r.mejorRacha) } }).catch(() => {})
     return () => { vigente = false }
   }, [m.id, m.rol])
   const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
@@ -366,6 +395,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
               <Flame size={14} aria-hidden="true" /> {racha} seguidos
             </span>
           )}
+          <Medallas mejorRacha={mejorRacha} />
         </div>
 
         <dl className="space-y-1 rounded-lg bg-niebla p-4 text-sm">

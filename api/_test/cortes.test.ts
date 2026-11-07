@@ -158,6 +158,15 @@ describe('meta y comisión', () => {
     assert.equal((await llamar(x.admin, 'POST', '/usuarios/metas', { metaMensual: 0 })).status, 400)
     assert.equal((await llamar(x.admin, 'POST', '/usuarios/metas', { metaMensual: 500 })).body.actualizados, 2)
     assert.equal((await llamar(x.beto, 'GET', '/mi-meta')).body.meta, 500)
+    // O según lo que vendió cada uno el mes pasado: Ana $120 + 25% = $150; Beto no vendió y se queda con la suya.
+    const [a, mm] = hoy.slice(0, 7).split('-').map(Number)
+    const pasado = mm === 1 ? `${a - 1}-12-10` : `${a}-${String(mm - 1).padStart(2, '0')}-10`
+    await x.entrega('EFECTIVO', 2, pasado)
+    assert.equal((await llamar(x.admin, 'POST', '/usuarios/metas', { pctMesAnterior: 400 })).status, 400)
+    const r = (await llamar(x.admin, 'POST', '/usuarios/metas', { pctMesAnterior: 25 })).body
+    assert.deepEqual([r.actualizados, r.sinVentas], [1, 1])
+    assert.equal((await llamar(x.ana, 'GET', '/mi-meta')).body.meta, 150)
+    assert.equal((await llamar(x.beto, 'GET', '/mi-meta')).body.meta, 500)
   })
 })
 

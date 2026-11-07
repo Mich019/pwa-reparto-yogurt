@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { rachaDesde } from './resumen.js'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { comoFalla, Falla, redondear, saldos } from './cobranza.js'
@@ -458,7 +459,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   })
 
   // Los meses cerrados en que un vendedor llegó a su meta (sus trofeos), de la foto de cada cierre, y su racha: cuántos
-  // meses seguidos la alcanzó, contando hacia atrás desde el mes pasado (un mes sin cerrar o sin meta la corta).
+  // meses seguidos la alcanzó, contando hacia atrás desde el mes pasado (un mes sin cerrar o sin meta la corta), y la mejor.
   async function trofeos(id: string) {
     const { rows } = await db.query(
       `SELECT to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
@@ -467,15 +468,13 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         ORDER BY c.mes DESC LIMIT 36`,
       [id],
     )
-    const cumplidos = new Set(rows.map((r) => r.mes as string))
+    const meses = rows.map((r) => r.mes as string)
     let [a, m] = (await hoyDe()).slice(0, 7).split('-').map(Number)
-    let racha = 0
-    for (;;) {
-      if (--m === 0) { m = 12; a-- }
-      if (!cumplidos.has(`${a}-${String(m).padStart(2, '0')}`)) break
-      racha++
-    }
-    return { meses: rows as { mes: string; ventas: number; meta: number }[], racha }
+    if (--m === 0) { m = 12; a-- }
+    const racha = rachaDesde(meses, `${a}-${String(m).padStart(2, '0')}`)
+    // La mejor racha que ha tenido: las medallas de 3, 6 y 12 meses seguidos se quedan aunque después se corte.
+    const mejorRacha = Math.max(0, ...meses.map((x) => rachaDesde(meses, x)))
+    return { meses: rows as { mes: string; ventas: number; meta: number }[], racha, mejorRacha }
   }
   // Los del vendedor, en su ficha de Vendedores (administrador)…
   app.get('/usuarios/:id/metas', { preHandler: requiereAdmin }, async (req, rep) => {

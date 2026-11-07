@@ -4,6 +4,7 @@ import type { Contexto } from './app.js'
 import type { Config } from './config.js'
 import { hashPassword, revisarPassword } from './contrasenas.js'
 import { tx, type Cx } from './db.js'
+import { hoyEn, zonaDeEmpresa } from './fechas.js'
 import { passwordTemporal } from './seguridad.js'
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -117,11 +118,33 @@ export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contex
 
   // La misma meta del mes para todos los vendedores activos de un jalón (null se la quita a todos).
   app.post('/usuarios/metas', { ...pre, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, rep) => {
-    const b = z.object({ metaMensual: z.number().positive().max(999_999_999).nullable() }).strict().safeParse(req.body)
-    if (!b.success) return rep.code(400).send({ error: 'La meta debe ser un monto mayor a cero' })
-    const n = await tx(db, req.usuario.id, async (c) =>
-      (await c.query(`UPDATE usuarios SET meta_mensual = $1 WHERE rol = 'vendedor' AND activo`, [b.data.metaMensual])).rowCount ?? 0)
-    return { actualizados: n }
+    // O un monto igual para todos, o `pctMesAnterior`: lo que vendió cada uno el mes pasado más ese porcentaje (puede
+    // ser negativo). Quien no vendió nada el mes pasado se queda con la que tenía (`sinVentas`).
+    const b = z.union([
+      z.object({ metaMensual: z.number().positive().max(999_999_999).nullable() }).strict(),
+      z.object({ pctMesAnterior: z.number().int().min(-50).max(300) }).strict(),
+    ]).safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: 'La meta debe ser un monto mayor a cero, o un porcentaje entre -50 y 300' })
+    const datos = b.data
+    if ('metaMensual' in datos) {
+      const n = await tx(db, req.usuario.id, async (c) =>
+        (await c.query(`UPDATE usuarios SET meta_mensual = $1 WHERE rol = 'vendedor' AND activo`, [datos.metaMensual])).rowCount ?? 0)
+      return { actualizados: n, sinVentas: 0 }
+    }
+    const [a, m] = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria)).slice(0, 7).split('-').map(Number)
+    const ini = m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`
+    return tx(db, req.usuario.id, async (c) => {
+      const { rowCount } = await c.query(
+        `UPDATE usuarios u SET meta_mensual = round(v.ventas * (100 + $1) / 100.0)
+           FROM (SELECT pe.id_vendedor, sum(d.subtotal) AS ventas FROM pedidos pe JOIN detalle_pedido d USING (id_pedido)
+                  WHERE pe.estado = 'entregado' AND pe.fecha >= $2::date AND pe.fecha < ($2::date + interval '1 month')::date
+                  GROUP BY pe.id_vendedor) v
+          WHERE v.id_vendedor = u.id_usuario AND u.rol = 'vendedor' AND u.activo AND v.ventas > 0`,
+        [datos.pctMesAnterior, ini],
+      )
+      const { rows: [t] } = await c.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'vendedor' AND activo`)
+      return { actualizados: rowCount ?? 0, sinVentas: t.n - (rowCount ?? 0) }
+    })
   })
 
   // RF-039: datos de contacto y rol.
