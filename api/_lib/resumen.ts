@@ -1,3 +1,6 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { z } from 'zod'
+import type { Contexto } from './app.js'
 import type { Config } from './config.js'
 import { correoResumen, enviarCorreos, type CifrasResumen } from './correo.js'
 import type { Db } from './db.js'
@@ -6,7 +9,8 @@ import type { Db } from './db.js'
 // de su empresa en un solo correo (ventas, cobro, fiado, cortes por confirmar, urgentes que se quedaron sin atender),
 // en vez de enterarse por un push de cada corte. Dos, cada uno con su interruptor:
 //   · diario (usuarios.resumen_correo, migración 030): cada mañana, lo de ayer;
-//   · semanal (usuarios.resumen_semanal, migración 031): cada lunes, los siete días anteriores.
+//   · semanal (usuarios.resumen_semanal, migración 031): el día que elija (`resumen_semanal_dia`, 032; lunes de
+//     fábrica), los siete días anteriores comparados con los siete de antes («vendiste 12% más»).
 // Lo llama el cron diario (plataforma.ts, GET /cron/avisos) con la conexión del dueño: cruza empresas. «Ayer» y «lunes»
 // salen de la zona de cada empresa. Cada cuenta se reclama (`resumen_enviado_dia`, `resumen_semanal_enviado`) antes de
 // mandarle nada: aunque el cron corra dos veces, no le llega dos veces.
@@ -17,8 +21,7 @@ const RESUMENES = [
   { activo: 'resumen_semanal', enviado: 'resumen_semanal_enviado', dias: 7 },
 ] as const
 
-// `diaSemanal`: el día (ISO, 1 = lunes) en que sale el semanal; sólo las pruebas lo cambian.
-export async function mandarResumenes(db: Db, config: Config, log: Log, diaSemanal = 1): Promise<number> {
+export async function mandarResumenes(db: Db, config: Config, log: Log): Promise<number> {
   let mandados = 0
   for (const r of RESUMENES) {
     const semanal = r.dias > 1
@@ -28,9 +31,8 @@ export async function mandarResumenes(db: Db, config: Config, log: Log, diaSeman
         WHERE e.id_empresa = u.id_empresa AND e.activa AND NOT e.interna
           AND u.rol = 'administrador' AND u.activo AND u.${r.activo}
           AND u.${r.enviado} IS DISTINCT FROM (now() AT TIME ZONE e.zona_horaria)::date
-          ${semanal ? 'AND extract(isodow FROM now() AT TIME ZONE e.zona_horaria) = $1' : ''}
+          ${semanal ? 'AND extract(isodow FROM now() AT TIME ZONE e.zona_horaria) = u.resumen_semanal_dia' : ''}
         RETURNING u.id_usuario, u.nombre, u.correo, u.id_empresa, e.nombre AS empresa`,
-      semanal ? [diaSemanal] : [],
     )
     if (!cuentas.length) continue
     const cifras = new Map<string, CifrasResumen>()
@@ -45,7 +47,7 @@ export const cifrasDeAyer = (db: Db, idEmpresa: string) => cifrasDe(db, idEmpres
 export const cifrasDeLaSemana = (db: Db, idEmpresa: string) => cifrasDe(db, idEmpresa, 7)
 
 // Los `dias` que terminan ayer, en la zona de la empresa.
-async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise<CifrasResumen> {
+export async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise<CifrasResumen> {
   const { rows: [r] } = await db.query(
     `WITH d AS (SELECT (now() AT TIME ZONE zona_horaria)::date - 1 AS hasta, (now() AT TIME ZONE zona_horaria)::date - $2::int AS desde,
                        zona_horaria AS zona FROM empresas WHERE id_empresa = $1),
@@ -54,6 +56,9 @@ async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise<Cifras
         WHERE p.id_empresa = $1 AND p.estado = 'entregado' AND (p.fecha_entregado_real AT TIME ZONE d.zona)::date BETWEEN d.desde AND d.hasta
      )
      SELECT to_char(d.desde, 'YYYY-MM-DD') AS desde, to_char(d.hasta, 'YYYY-MM-DD') AS hasta,
+            -- Lo vendido en los mismos días justo antes, para comparar (sólo lo usa el semanal).
+            (SELECT coalesce(sum(p.total), 0)::float8 FROM pedidos p WHERE p.id_empresa = $1 AND p.estado = 'entregado'
+              AND (p.fecha_entregado_real AT TIME ZONE d.zona)::date BETWEEN d.desde - $2::int AND d.hasta - $2::int) AS vendido_antes,
             (SELECT count(*)::int FROM v) AS entregados,
             (SELECT coalesce(sum(total), 0)::float8 FROM v) AS vendido,
             (SELECT coalesce(sum(total), 0)::float8 FROM v WHERE metodo_pago = 'efectivo') AS efectivo,
@@ -68,8 +73,27 @@ async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise<Cifras
     [idEmpresa, dias],
   )
   return {
-    desde: r.desde as string, dia: r.hasta as string,
+    desde: r.desde as string, dia: r.hasta as string, vendidoAntes: dias > 1 ? r.vendido_antes : null,
     entregados: r.entregados, vendido: r.vendido, efectivo: r.efectivo, transferencia: r.transferencia, fiado: r.fiado,
     abonos: r.abonos, sinAtender: r.sin_atender, cortesPorConfirmar: r.cortes_por_confirmar, urgentes: r.urgentes,
   }
+}
+
+// «Mandar uno ahora» (Preferencias): el administrador ve cómo le llega, sin esperar al cron. No cuenta como el del día:
+// el del cron sale igual.
+type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
+const bodyAhora = z.object({ tipo: z.enum(['diario', 'semanal']) }).strict()
+export async function rutasResumen(app: FastifyInstance, { db, config }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
+  app.post('/me/resumen/ahora', { preHandler: requiereAdmin, config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const b = bodyAhora.safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: 'Indica cuál resumen: diario o semanal' })
+    if (!config.resendApiKey && config.produccion) return rep.code(409).send({ error: 'Este servidor todavía no tiene configurado el correo', codigo: 'CORREO_NO_CONFIGURADO' })
+    const { rows: [u] } = await db.query(
+      `SELECT u.nombre, u.correo, e.nombre AS empresa FROM usuarios u JOIN empresas e ON e.id_empresa = u.id_empresa WHERE u.id_usuario = $1`,
+      [req.usuario.id],
+    )
+    const cifras = await cifrasDe(db, req.usuario.empresa, b.data.tipo === 'semanal' ? 7 : 1)
+    await enviarCorreos(config, [{ para: u.correo, ...correoResumen(u.nombre, u.empresa, cifras, `${config.urlApp}/admin`) }], req.log)
+    return { para: u.correo as string }
+  })
 }

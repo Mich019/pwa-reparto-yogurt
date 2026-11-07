@@ -68,16 +68,40 @@ describe('resumen diario por correo', () => {
     assert.equal(semana.entregados, 1)
     assert.equal(semana.vendido, semana.transferencia)
     assert.equal((await cifrasDeAyer(db, empresa)).entregados, 0)
+    assert.equal((await cifrasDeAyer(db, empresa)).vendidoAntes, null)
+    // El de hace 9 días cae en la semana anterior: mismo pedido, misma venta.
+    assert.equal(semana.vendidoAntes, semana.vendido)
     const correo = correoResumen('Ana', 'Lácteos Semana', semana, 'https://ejemplo.test/admin')
     assert.match(correo.asunto, /tu resumen de la semana/)
     assert.match(correo.texto, /del .+ al .+:/)
+    assert.match(correo.texto, /Contra la semana anterior: Igual/)
+    assert.match(correoResumen('Ana', 'X', { ...semana, vendidoAntes: semana.vendido / 2 }, 'u').texto, /100% más/)
+    assert.match(correoResumen('Ana', 'X', { ...semana, vendidoAntes: semana.vendido * 4 }, 'u').texto, /75% menos/)
 
     const enviado = async () => (await db.query(`SELECT resumen_semanal_enviado FROM usuarios WHERE id_usuario = $1`, [admin.id])).rows[0].resumen_semanal_enviado
     const { rows: [{ hoy }] } = await db.query(`SELECT extract(isodow FROM now() AT TIME ZONE zona_horaria)::int AS hoy FROM empresas WHERE id_empresa = $1`, [empresa])
-    await mandarResumenes(db, config, log, (hoy % 7) + 1) // otro día de la semana: no sale
+    // Cada quien elige el día: si no es hoy, no sale; si es hoy, sí.
+    assert.equal((await yo(admin, { resumenSemanalDia: (hoy % 7) + 1 })).json().resumenSemanalDia, (hoy % 7) + 1)
+    assert.equal((await yo(admin, { resumenSemanalDia: 8 })).statusCode, 400)
+    await mandarResumenes(db, config, log)
     assert.equal(await enviado(), null)
-    await mandarResumenes(db, config, log, hoy)
+    await yo(admin, { resumenSemanalDia: hoy })
+    await mandarResumenes(db, config, log)
     assert.ok(await enviado())
+  })
+
+  it('«mandar uno ahora» le llega al administrador que lo pide', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const ahora = (s: { token: string }, payload: object) => app.inject({ method: 'POST', url: '/me/resumen/ahora', headers: { authorization: `Bearer ${s.token}` }, payload })
+    const r = await ahora(admin, { tipo: 'semanal' })
+    assert.equal(r.statusCode, 200)
+    assert.equal(r.json().para, (await get(admin, '/me')).body.correo)
+    assert.equal((await ahora(admin, { tipo: 'mensual' })).statusCode, 400)
+    assert.equal((await ahora(vend, { tipo: 'diario' })).statusCode, 403)
+    // No cuenta como el del día.
+    assert.equal((await db.query(`SELECT resumen_enviado_dia FROM usuarios WHERE id_usuario = $1`, [admin.id])).rows[0].resumen_enviado_dia, null)
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

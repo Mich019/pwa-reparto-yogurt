@@ -120,6 +120,7 @@ export interface CifrasResumen {
   dia: string // AAAA-MM-DD, ayer en la zona de la empresa (el último día que cuenta)
   entregados: number; vendido: number; efectivo: number; transferencia: number; fiado: number; abonos: number
   sinAtender: number; cortesPorConfirmar: number; urgentes: number
+  vendidoAntes: number | null // semanal: lo vendido los siete días anteriores; null en el diario
 }
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const veces = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
@@ -132,6 +133,13 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
     : `el ${fecha(c.dia, { weekday: 'long', day: 'numeric', month: 'long' })}`
   const renglones: [string, string][] = [['Vendido', c.entregados ? `${pesos(c.vendido)} en ${veces(c.entregados, 'pedido', 'pedidos')}` : 'Sin ventas']]
   if (c.entregados) renglones.push(['En efectivo', pesos(c.efectivo)], ['Por transferencia', pesos(c.transferencia)])
+  if (c.vendidoAntes !== null) {
+    const p = c.vendidoAntes ? Math.round(((c.vendido - c.vendidoAntes) / c.vendidoAntes) * 100) : null
+    const comparado = p === null ? (c.vendido ? 'La anterior no hubo ventas' : '')
+      : p === 0 ? `Igual (${pesos(c.vendidoAntes)})`
+      : `${Math.abs(p)}% ${p > 0 ? 'más' : 'menos'} (${pesos(c.vendidoAntes)})`
+    if (comparado) renglones.push(['Contra la semana anterior', comparado])
+  }
   if (c.fiado) renglones.push(['Fiado', pesos(c.fiado)])
   if (c.abonos) renglones.push(['Abonos cobrados', pesos(c.abonos)])
   const pendientes = [

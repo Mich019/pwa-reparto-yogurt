@@ -25,6 +25,7 @@ import { rutasRegistro } from './registro.js'
 import { crearClienteMp, type ClienteMp } from './mercadopago.js'
 import { CON_ACCESO, rutasSuscripcion, SUSCRIPCION_VENCIDA } from './suscripcion.js'
 import { rutasEmpresa } from './empresa.js'
+import { rutasResumen } from './resumen.js'
 import { rutasPlataforma } from './plataforma.js'
 import { rutasPrivacidad } from './privacidad.js'
 import { ipCliente } from './seguridad.js'
@@ -165,6 +166,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasRecuperacion(app, ctx)
   await rutasRegistro(app, ctx, { requiereAdmin })
   await rutasEmpresa(app, ctx, { requiereSesionAunConPasswordPendiente, requiereAdmin })
+  await rutasResumen(app, ctx, { requiereAdmin })
   // Cruza empresas: con la conexión sin envolver (dueño de la base), no la de la empresa de quien llama.
   // Sus avisos del cron (también cruzan empresas) se guardan con esa conexión: crearDespachador toma la empresa de la cuenta.
   await rutasPlataforma(app, { db: entrada.db, config: ctx.config }, { requiereSesionSinCobro }, crearDespachador(entrada.db, enviador, app.log))

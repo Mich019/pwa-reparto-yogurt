@@ -310,6 +310,7 @@ const TIPOS_AVISO = [
 
 // De la empresa (no de la cuenta): cuánto espera un urgente pendiente antes de recordárselo al vendedor y avisar a los
 // administradores (api/_lib/urgentes.ts).
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const MINUTOS_URGENTE = [10, 15, 20, 30, 45, 60, 90, 120]
 function MinutosUrgente() {
   const marca = useMarca()
@@ -351,7 +352,20 @@ function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encend
 }
 
 function Preferencias() {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal, cambiarDiaSemanal } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const [mandando, setMandando] = useState<'diario' | 'semanal' | null>(null)
+  async function mandarAhora(tipo: 'diario' | 'semanal') {
+    setMandando(tipo)
+    try {
+      const r = await llamarAutenticado<{ para: string }>('/me/resumen/ahora', { metodo: 'POST', cuerpo: { tipo } })
+      aviso(`Listo: revisa ${r.para} en un momento`)
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setMandando(null)
+    }
+  }
+  const diaSemanal = prefs?.resumenSemanalDia ?? 1
   const silencio = prefs?.silencio ?? null
   const claseHora = `rounded-md border border-linea bg-papel px-3 py-2 text-sm font-semibold ${anillo}`
   return (
@@ -368,8 +382,25 @@ function Preferencias() {
         <Fila titulo="Cada mañana" ayuda={prefs?.resumenCorreo ? 'Lo de ayer, en tu correo.' : 'Apagado.'}>
           <Interruptor encendido={!!prefs?.resumenCorreo} deshabilitado={!prefs} etiqueta="Resumen de cada mañana" alCambiar={(si) => void cambiarResumen(si)} />
         </Fila>
-        <Fila titulo="Cada lunes" ayuda={prefs?.resumenSemanal ? 'La semana anterior completa, en tu correo.' : 'Apagado.'}>
-          <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} etiqueta="Resumen de cada lunes" alCambiar={(si) => void cambiarSemanal(si)} />
+        <Fila titulo="Cada semana" ayuda={prefs?.resumenSemanal ? `Cada ${DIAS_SEMANA[diaSemanal - 1].toLowerCase()}, los siete días anteriores comparados con los siete de antes.` : 'Apagado.'}>
+          <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} etiqueta="Resumen de cada semana" alCambiar={(si) => void cambiarSemanal(si)} />
+        </Fila>
+        {prefs?.resumenSemanal && (
+          <Fila titulo="Qué día" ayuda="El día que quieres repasar la semana.">
+            <select value={diaSemanal} onChange={(e) => void cambiarDiaSemanal(Number(e.target.value))} className={claseHora} aria-label="Día del resumen semanal">
+              {DIAS_SEMANA.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
+            </select>
+          </Fila>
+        )}
+        <Fila titulo="Ver cómo llega" ayuda="Te manda uno ahora a tu correo; el de cada día sale igual.">
+          <span className="flex flex-wrap gap-2">
+            {(['diario', 'semanal'] as const).map((t) => (
+              <button key={t} type="button" onClick={() => void mandarAhora(t)} disabled={!!mandando}
+                className={`rounded-md border border-linea px-3 py-2 text-sm font-semibold transition-colors hover:bg-niebla disabled:opacity-50 ${anillo}`}>
+                {mandando === t ? 'Mandando…' : t === 'diario' ? 'El de ayer' : 'El de la semana'}
+              </button>
+            ))}
+          </span>
         </Fila>
       </Seccion>
       <MinutosUrgente />
