@@ -6,6 +6,7 @@ import { db } from '../../lib/db'
 import { DIAS_CORTOS, desdeIso, dinero, hoy, sumarDias } from '../../lib/fechas'
 import { cambio, useReporte } from '../../lib/reportes'
 import { llamarAutenticado, useSesion } from '../../lib/sesion'
+import { enVivoConectado, useEnVivo, useEnVivoConectado } from '../../lib/enVivo'
 import type { SeccionAdmin } from './AdminLayout'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { useFichaSabor } from './PanelSabor'
@@ -83,7 +84,8 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
   const sesion = useSesion()
   const dia = hoy()
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [actualizando, setActualizando] = useState(true)
+  const [girando, setGirando] = useState(false) // sólo al tocar «Actualizar»: lo automático no se anuncia
+  const enVivo = useEnVivoConectado()
   const [error, setError] = useState<string | null>(null)
   const [ultima, setUltima] = useState<Date | null>(null)
   const [pagina, setPagina] = useState(0)
@@ -93,29 +95,32 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
   const ventas = useReporte(rango, 'dia')
   const recargarVentas = ventas.recargar
 
+  // Lo que ya se ve se queda mientras llega lo nuevo: nada parpadea ni dice «actualizando».
   async function cargar() {
-    setActualizando(true)
     try {
       setStats(await llamarAutenticado<DashboardStats>('/admin/stats'))
       setUltima(new Date())
       setError(null)
     } catch {
       setError('No se pudo traer el resumen. Revisa tu conexión e intenta de nuevo.')
-    } finally {
-      setActualizando(false)
     }
   }
+  async function aMano() {
+    setGirando(true)
+    recargarVentas()
+    await cargar()
+    setGirando(false)
+  }
 
-  // Se refresca cada minuto mientras la pestaña está a la vista, y al volver a ella.
+  // En vivo: cuando cambia un pedido, un cliente o un sabor en la empresa (lib/enVivo.ts).
+  useEnVivo('datos', () => { void cargar(); recargarVentas() })
+
+  // Sin la conexión en vivo (sin señal, o el servidor no la da) se refresca cada minuto mientras se ve. Al volver a la
+  // pestaña la conexión en vivo ya avisa de todo.
   useEffect(() => {
-    const refrescar = () => { if (document.visibilityState === 'visible') { void cargar(); recargarVentas() } }
     void cargar()
-    const reloj = setInterval(refrescar, 60_000)
-    document.addEventListener('visibilitychange', refrescar)
-    return () => {
-      clearInterval(reloj)
-      document.removeEventListener('visibilitychange', refrescar)
-    }
+    const reloj = setInterval(() => { if (document.visibilityState === 'visible' && !enVivoConectado()) { void cargar(); recargarVentas() } }, 60_000)
+    return () => clearInterval(reloj)
   }, [recargarVentas])
 
   const productos = useLiveQuery(() => db.productos.toArray(), [])
@@ -172,15 +177,15 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           </h1>
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-apagado">
             <span className="first-letter:uppercase">{fechaTexto || 'Cargando…'}</span>
-            <button
+            {!enVivo && <button
               type="button"
-              onClick={() => { void cargar(); recargarVentas() }}
-              disabled={actualizando}
+              onClick={() => void aMano()}
+              disabled={girando}
               className="flex items-center gap-1.5 rounded-md py-1 font-medium text-tinta hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-60"
             >
-              <RefreshCw size={14} className={actualizando ? 'animate-spin' : ''} aria-hidden="true" />
-              {actualizando ? 'Actualizando…' : ultima ? `Actualizado ${ultima.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}` : 'Actualizar'}
-            </button>
+              <RefreshCw size={14} className={girando ? 'animate-spin' : ''} aria-hidden="true" />
+              {ultima ? `Actualizado ${ultima.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}` : 'Actualizar'}
+            </button>}
           </p>
         </div>
 

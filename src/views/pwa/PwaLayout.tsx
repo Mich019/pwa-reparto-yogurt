@@ -14,6 +14,7 @@ import { useAlertasLocales } from '../../lib/alertas'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { alCerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { iniciarSincronizacionAutomatica } from '../../lib/sync'
+import { useConexionEnVivo } from '../../lib/enVivo'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
 
 type PestanaPwa = 'ruta' | 'clientes' | 'stock' | 'produccion' | 'sabores' | 'cuenta'
@@ -44,6 +45,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   const irA = (p: PestanaPwa) => { if (visibles.some((v) => v.id === p)) setPestana(p) }
 
   useEffect(() => iniciarSincronizacionAutomatica(), [])
+  useConexionEnVivo() // una conexión para toda la app; los datos llegan a cada pestaña por Dexie (lib/enVivo.ts)
   useEffect(() => { if (sesion) void refrescarPerfil() }, [sesion?.usuario.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useAlertasLocales() // RF-055: stock por agotarse y ventas sin enviar
 

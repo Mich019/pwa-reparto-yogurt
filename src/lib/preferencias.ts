@@ -34,5 +34,9 @@ export function usePreferenciasAvisos(alFallar: (e: unknown) => void) {
 
 export const HORAS = Array.from({ length: 24 }, (_, h) => h)
 export const hora = (h: number) => `${String(h).padStart(2, '0')}:00`
+// ¿La hora `h` (0–23) cae en el horario? Puede pasar de medianoche (21 a 7). Igual que en api/_lib/notificaciones.ts.
+export const enSilencio = (s: Silencio | null | undefined, h: number) =>
+  !!s && (s.desde < s.hasta ? h >= s.desde && h < s.hasta : h >= s.desde || h < s.hasta)
+
 // Lo que se propone al prender el silencio: de noche.
 export const SILENCIO_NOCHE: Silencio = { desde: 21, hasta: 7 }

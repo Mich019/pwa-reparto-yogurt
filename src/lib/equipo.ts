@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { llamarAutenticado, type Rol } from './sesion'
 import { sincronizar } from './sync'
+import { suscribir } from './enVivo'
 
 // Cuentas del equipo y cartera de clientes (RF-038 a RF-041). Sólo el administrador; requiere conexión.
 
@@ -28,8 +29,18 @@ export interface Equipo {
 
 let equipo: Equipo | null = null
 const oyentes = new Set<() => void>()
+// Mientras alguna pantalla lo use, se vuelve a pedir solo cuando cambia una cuenta o la cartera (lib/enVivo.ts). Una sola
+// vez aunque lo usen varios componentes a la vez.
+let dejarDeEscuchar: (() => void) | null = null
 export const useEquipo = () =>
-  useSyncExternalStore((f) => { oyentes.add(f); return () => { oyentes.delete(f) } }, () => equipo)
+  useSyncExternalStore((f) => {
+    oyentes.add(f)
+    dejarDeEscuchar ??= suscribir(['equipo', 'datos'], () => void cargarEquipo().catch(() => {}))
+    return () => {
+      oyentes.delete(f)
+      if (!oyentes.size) { dejarDeEscuchar?.(); dejarDeEscuchar = null }
+    }
+  }, () => equipo)
 
 export async function cargarEquipo(): Promise<Equipo> {
   equipo = await llamarAutenticado<Equipo>('/usuarios')

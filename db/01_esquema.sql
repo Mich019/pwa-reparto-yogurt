@@ -777,6 +777,56 @@ CREATE INDEX precios_cliente_empresa ON precios_cliente (id_empresa);
 
 
 -- =============================================================================
+-- Cambios en vivo (029_en_vivo.sql; api/_lib/envivo.ts, GET /eventos)
+-- =============================================================================
+-- Un contador por empresa y área que sube cuando cambia algo de esa área: quien tiene la app o el panel abiertos lo
+-- escucha y vuelve a pedir sólo lo suyo. datos = lo que baja la sincronización; cobranza = abonos, envases, cortes,
+-- cierres (y pedidos); equipo = las cuentas (sin el último acceso). Disparadores diferidos: suben cada contador una vez
+-- por transacción, al confirmar, así el candado de la fila dura casi nada.
+CREATE TABLE cambios (
+  id_empresa uuid NOT NULL DEFAULT nullif(current_setting('app.id_empresa', true), '')::uuid REFERENCES empresas (id_empresa) ON DELETE CASCADE,
+  area       varchar(20) NOT NULL,
+  version    bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id_empresa, area)
+);
+
+CREATE OR REPLACE FUNCTION fn_marcar_cambio() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  e uuid := CASE WHEN TG_OP = 'DELETE' THEN OLD.id_empresa ELSE NEW.id_empresa END;
+  marca text;
+BEGIN
+  IF e IS NULL THEN RETURN NULL; END IF;
+  marca := 'app.cambio_' || TG_ARGV[0] || '_' || replace(e::text, '-', '');
+  IF current_setting(marca, true) = 'on' THEN RETURN NULL; END IF; -- ya se subió en esta transacción
+  PERFORM set_config(marca, 'on', true);
+  -- Al borrar una empresa entera (privacidad.ts, borrarEmpresa) ya no hay a quién avisar.
+  INSERT INTO cambios (id_empresa, area, version) SELECT e, TG_ARGV[0], 1 WHERE EXISTS (SELECT 1 FROM empresas WHERE id_empresa = e)
+  ON CONFLICT (id_empresa, area) DO UPDATE SET version = cambios.version + 1;
+  RETURN NULL;
+END $$;
+
+DO $$
+DECLARE
+  par text[];
+BEGIN
+  FOREACH par SLICE 1 IN ARRAY ARRAY[
+    ['clientes', 'datos'], ['productos', 'datos'], ['stock_diario', 'datos'], ['pedidos', 'datos'], ['detalle_pedido', 'datos'],
+    ['recordatorios', 'datos'], ['eliminaciones', 'datos'], ['retiros_vendedor', 'datos'], ['precios_cliente', 'datos'],
+    ['pedidos', 'cobranza'], ['abonos', 'cobranza'], ['cortes_dia', 'cobranza'], ['cierres_mes', 'cobranza'], ['envases_recogidos', 'cobranza']
+  ] LOOP
+    EXECUTE format('CREATE CONSTRAINT TRIGGER %I AFTER INSERT OR UPDATE OR DELETE ON %I DEFERRABLE INITIALLY DEFERRED
+                    FOR EACH ROW EXECUTE FUNCTION fn_marcar_cambio(%L)', 'cambio_' || par[2], par[1], par[2]);
+  END LOOP;
+END $$;
+-- Un aviso nuevo, sí; marcarlo como leído no le importa a nadie más.
+CREATE CONSTRAINT TRIGGER cambio_datos AFTER INSERT ON notificaciones
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fn_marcar_cambio('datos');
+-- Las cuentas: sólo lo que se ve en Vendedores (iniciar sesión cambia ultimo_acceso y no debe despertar a nadie).
+CREATE CONSTRAINT TRIGGER cambio_equipo
+  AFTER INSERT OR DELETE OR UPDATE OF nombre, correo, telefono, foto, rol, activo, meta_mensual, comision_pct ON usuarios
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fn_marcar_cambio('equipo');
+
+-- =============================================================================
 -- Multiempresa · Rol de la API y reglas por filas (RLS)
 -- =============================================================================
 -- La API corre cada petición con sesión con el rol reparto_app (SET LOCAL ROLE) y app.id_empresa fijado
@@ -815,7 +865,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['empresas', 'usuarios', 'clientes', 'productos', 'stock_diario', 'produccion_diaria', 'pedidos',
                            'detalle_pedido', 'recordatorios', 'auditoria', 'operaciones_sync', 'eliminaciones',
                            'retiros_vendedor', 'suscripciones_push', 'notificaciones', 'invitaciones', 'abonos', 'cortes_dia',
-                           'cierres_mes', 'envases_recogidos', 'precios_cliente'] LOOP
+                           'cierres_mes', 'envases_recogidos', 'precios_cliente', 'cambios'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('CREATE POLICY por_empresa ON %I TO reparto_app USING (%s) WITH CHECK (%s)', t, regla, regla);
   END LOOP;

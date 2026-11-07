@@ -6,6 +6,7 @@ import { hoy } from './fechas'
 import { useStockDeHoy } from './stock'
 import { avisosQueToca, type AvisoNuevo, type EntradaAlertas } from './stock-calculo'
 import { aviso } from '../components/ui'
+import { enSilencio, type Silencio } from './preferencias'
 
 // RF-055 · Avisos locales: los genera la propia app en el teléfono (no necesitan servidor ni internet) cuando el stock
 // de un sabor en ruta está por agotarse o cuando, ya entrada la tarde, quedan ventas sin sincronizar.
@@ -35,6 +36,9 @@ async function guardarSiEsNuevo(a: AvisoNuevo): Promise<Aviso | null> {
 async function mostrar(a: Aviso) {
   if (document.visibilityState === 'visible') return aviso(`${a.titulo}. ${a.cuerpo}`)
   if (!('Notification' in window) || Notification.permission !== 'granted') return
+  // En su horario de silencio no suena: queda en Cuenta para cuando abra la app. Cuenta la hora del teléfono.
+  const silencio = (await db.meta.get('silencio'))?.valor as Silencio | null | undefined
+  if (enSilencio(silencio, new Date().getHours())) return
   const reg = await navigator.serviceWorker?.getRegistration()
   await reg?.showNotification(a.titulo, { body: a.cuerpo, tag: a.id, data: { pestana: a.pestana } })
 }

@@ -4,6 +4,7 @@ import { aviso } from '../components/ui'
 import { db, uid, type Aviso, type PestanaAviso, type StockDia, type Tabla, type TipoAviso } from './db'
 import { enviarCola } from './envio'
 import { hoy, sumarDias } from './fechas'
+import { enVivoConectado, suscribir } from './enVivo'
 import { dispositivoId, llamarAutenticado, pedirEnvioEnSegundoPlano, sesionActual } from './sesion'
 
 // Sincronización con el servidor (RF-051 a RF-053).
@@ -173,12 +174,16 @@ export function iniciarSincronizacionAutomatica(): () => void {
   document.addEventListener('visibilitychange', alVolver)
   navigator.serviceWorker?.addEventListener('message', alMensaje)
   db.cola.hook('creating', hook)
-  const reloj = setInterval(() => { if (document.visibilityState === 'visible') pronto(0) }, 60_000)
+  // En vivo: el servidor avisa en cuanto cambia algo de la empresa y se baja sólo eso (lib/enVivo.ts). Sin esa conexión
+  // queda el repaso de cada minuto con la app a la vista.
+  const dejarDeEscuchar = suscribir(['datos'], () => pronto(0), 0)
+  const reloj = setInterval(() => { if (document.visibilityState === 'visible' && !enVivoConectado()) pronto(0) }, 60_000)
   pronto(0)
 
   return () => {
     clearTimeout(t)
     clearInterval(reloj)
+    dejarDeEscuchar()
     window.removeEventListener('online', hook)
     document.removeEventListener('visibilitychange', alVolver)
     navigator.serviceWorker?.removeEventListener('message', alMensaje)

@@ -8,6 +8,7 @@ import { hace } from '../../lib/fechas'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
 import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
+import { useEnVivoConectado } from '../../lib/enVivo'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
@@ -335,6 +336,8 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
   const [ayuda, setAyuda] = useState(false)
   const [privacidad, setPrivacidad] = useState(false)
   const [saliendo, setSaliendo] = useState(false)
+  const [aMano, setAMano] = useState(false) // sólo lo que pidió la persona gira; lo automático pasa en silencio
+  const enVivo = useEnVivoConectado()
   if (!sesion) return null
   const u = sesion.usuario
 
@@ -362,16 +365,16 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
 
       <div className="mt-3 rounded-lg bg-niebla p-4">
         <div className="flex items-center gap-2 font-semibold">
-          {sync.error ? <CloudOff size={18} className="text-ambar" /> : <RefreshCw size={18} className={sync.sincronizando ? 'animate-spin' : ''} />}
+          {sync.error ? <CloudOff size={18} className="text-ambar" /> : <RefreshCw size={18} className={aMano ? 'animate-spin' : ''} />}
           Sincronización
         </div>
         <p className="mt-1 text-sm text-apagado">
-          {sync.sincronizando ? 'Sincronizando…' : sync.error ?? (sync.ultimaOk ? `Al día, ${hace(sync.ultimaOk)}` : 'Pendiente de la primera sincronización')}
+          {sync.error ?? (!sync.ultimaOk ? 'Pendiente de la primera sincronización' : enVivo ? 'Los cambios llegan solos.' : `Última vez ${hace(sync.ultimaOk)}`)}
         </p>
         <p className="mt-0.5 text-sm text-apagado">
           {pendientes ? `${pendientes} ${pendientes === 1 ? 'cambio' : 'cambios'} por enviar` : 'Nada pendiente por enviar'}
         </p>
-        <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => void sincronizar()} disabled={sync.sincronizando}>Sincronizar ahora</Boton>
+        <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => { setAMano(true); void sincronizar().finally(() => setAMano(false)) }} disabled={aMano}>Sincronizar ahora</Boton>
       </div>
 
       <DosPasos />

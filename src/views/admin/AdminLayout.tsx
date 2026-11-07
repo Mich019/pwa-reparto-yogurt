@@ -5,6 +5,7 @@ import { hace } from '../../lib/fechas'
 import { alCerrarSesion, cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
+import { useConexionEnVivo } from '../../lib/enVivo'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
 import { Cobranza, irACortes } from './Cobranza'
@@ -48,24 +49,16 @@ const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-vis
 // Los botones del encabezado son píldoras blancas con borde fino: sobre el crema sin borde casi no se distinguen.
 const pildora = 'border border-linea/70 bg-papel'
 
-// Estado de la copia local contra el servidor. Con poco espacio queda el punto de color y el texto va en el tooltip.
+// Sincronizar pasa solo, en segundo plano y en vivo: con todo bien no se muestra nada. Sólo aparece si algo falla.
 function EstadoDatos() {
   const sync = useEstadoSync()
-  const hayError = !!sync.error
-  const corto = hayError ? (sync.error!.startsWith('Sin conexión') ? 'Sin conexión' : 'Sin sincronizar')
-    : sync.sincronizando ? 'Sincronizando'
-    : sync.ultimaOk ? 'Al día'
-    : 'Esperando datos'
-  const largo = sync.error ?? (sync.sincronizando ? 'Sincronizando…' : sync.ultimaOk ? `Datos al día, ${hace(sync.ultimaOk)}` : 'Esperando la primera sincronización')
-  const alDia = !hayError && !sync.sincronizando && sync.ultimaOk
+  if (!sync.error) return null
+  const corto = sync.error.startsWith('Sin conexión') ? 'Sin conexión' : 'Sin sincronizar'
   return (
-    // En el teléfono, con todo en orden el punto sobra: el aviso sólo aparece cuando sincroniza o algo falla.
-    <p title={largo} aria-live="polite" className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-xs font-medium text-apagado ${pildora} ${alDia ? 'max-sm:hidden' : ''}`}>
-      {hayError ? <CloudOff size={15} className="shrink-0 text-amber-600" aria-hidden="true" />
-        : sync.sincronizando ? <RefreshCw size={14} className="shrink-0 animate-spin" aria-hidden="true" />
-        : <span className={`h-2 w-2 shrink-0 rounded-full ${alDia ? 'bg-serie' : 'bg-linea'}`} aria-hidden="true" />}
+    <p title={sync.error} aria-live="polite" className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-xs font-medium text-apagado ${pildora}`}>
+      <CloudOff size={15} className="shrink-0 text-amber-600" aria-hidden="true" />
       <span className="hidden sm:inline">{corto}</span>
-      <span className="sr-only sm:hidden">{largo}</span>
+      <span className="sr-only sm:hidden">{sync.error}</span>
     </p>
   )
 }
@@ -85,6 +78,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   // Clientes, sabores y producción se leen de la copia local: sin esto el panel abierto directo en /admin se queda
   // vacío y lo que se edita aquí no llega al servidor hasta abrir la app de reparto.
   useEffect(() => (esAdmin ? iniciarSincronizacionAutomatica() : undefined), [esAdmin])
+  useConexionEnVivo(esAdmin) // una conexión para todo el panel; cada sección escucha su área (lib/enVivo.ts)
   // Avisos push en esta computadora (Configuración → Preferencias): como en la app, al entrar se le recuerda al servidor de
   // quién es la suscripción y al cerrar sesión deja de recibir los de la cuenta.
   useEffect(() => {

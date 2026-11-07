@@ -11,7 +11,7 @@ import { Boton, Hoja, aviso, claseInput } from './ui'
 
 export function PreciosDelCliente({ clienteId, nombre }: { clienteId: string; nombre: string }) {
   const [abierta, setAbierta] = useState(false)
-  const lista = useServidor<{ precios: PrecioCliente[] }>(abierta ? `/clientes/${clienteId}/precios` : null)
+  const lista = useServidor<{ precios: PrecioCliente[] }>(abierta ? `/clientes/${clienteId}/precios` : null, 'datos')
   return (
     <>
       <button onClick={() => setAbierta(true)} className="flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-3 text-left active:bg-linea">

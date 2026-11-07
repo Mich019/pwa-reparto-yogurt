@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEnVivo, type AreaEnVivo } from './enVivo'
 import { descargarAutenticado, llamarAutenticado } from './sesion'
 import { descargarArchivo } from './pdf'
 import { mostrarPdf } from '../components/VisorPdf'
@@ -53,20 +54,26 @@ export interface InformeMes {
   cifras: CifrasMes
 }
 
-// Una consulta al servidor que se puede repetir (después de registrar algo).
-export function useServidor<T>(ruta: string | null) {
+// Una consulta al servidor que se puede repetir (después de registrar algo). Cada pantalla que la usa se vuelve a pedir
+// sola cuando cambia su área en la empresa (lib/enVivo.ts; por omisión, cobranza): en silencio, con lo de antes a la
+// vista, y si esa vuelta falla (sin señal) se queda lo que había. Sólo la gana la última respuesta.
+export function useServidor<T>(ruta: string | null, enVivo: AreaEnVivo | AreaEnVivo[] = 'cobranza') {
   const [datos, setDatos] = useState<T | null>(null)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(!!ruta)
-  const cargar = useCallback(() => {
+  const turno = useRef(0)
+  const pedir = useCallback((callado: boolean) => {
     if (!ruta) return
-    setCargando(true)
+    const mio = ++turno.current
+    if (!callado) setCargando(true)
     llamarAutenticado<T>(ruta)
-      .then((d) => { setDatos(d); setError('') })
-      .catch((e) => setError(e instanceof Error ? e.message : 'No se pudo cargar'))
-      .finally(() => setCargando(false))
+      .then((d) => { if (mio === turno.current) { setDatos(d); setError('') } })
+      .catch((e) => { if (mio === turno.current && !callado) setError(e instanceof Error ? e.message : 'No se pudo cargar') })
+      .finally(() => { if (mio === turno.current && !callado) setCargando(false) })
   }, [ruta])
+  const cargar = useCallback(() => pedir(false), [pedir])
   useEffect(() => { setDatos(null); cargar() }, [cargar])
+  useEnVivo(enVivo, () => pedir(true))
   return { datos, error, cargando, recargar: cargar }
 }
 

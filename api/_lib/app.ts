@@ -30,6 +30,7 @@ import { rutasPrivacidad } from './privacidad.js'
 import { ipCliente } from './seguridad.js'
 import { almacenLimites } from './limites.js'
 import { reportarError } from './errores.js'
+import { rutasEnVivo, type OpcionesEnVivo } from './envivo.js'
 
 export type Rol = 'administrador' | 'vendedor'
 export interface Usuario {
@@ -51,6 +52,7 @@ export interface Contexto {
   config: Config
   enviador?: Enviador | null // cómo mandar un push; por defecto el de las claves VAPID de config (null = sin push). Las pruebas ponen uno falso.
   mercadoPago?: ClienteMp | null // cobro; por defecto el de MP_ACCESS_TOKEN (null = sin cobro). Las pruebas ponen uno falso.
+  enVivo?: OpcionesEnVivo // cada cuánto se revisan los cambios en vivo (envivo.ts); las pruebas lo aceleran.
 }
 
 export async function construirApp(entrada: Contexto): Promise<FastifyInstance> {
@@ -180,6 +182,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasPrecios(app, ctx, { requiereAdmin })
   await rutasCortes(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
+  await rutasEnVivo(app, entrada.db, { requiereSesion }, ctx.enVivo)
 
   return app
 }
