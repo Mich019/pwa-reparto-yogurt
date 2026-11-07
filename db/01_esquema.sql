@@ -82,6 +82,7 @@ CREATE TABLE usuarios (
   telefono              varchar(20),
   foto                  text,                               -- foto de perfil (data URL de 256 px; 012_foto_perfil.sql)
   orden_menu            text[],                             -- orden del menú del panel (null = de fábrica; 026_orden_menu.sql)
+  avisos_apagados       text[],                             -- tipos de aviso que la cuenta no quiere (027_avisos_apagados.sql)
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040

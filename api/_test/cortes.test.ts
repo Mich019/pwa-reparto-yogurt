@@ -55,6 +55,13 @@ describe('corte del día', () => {
     const { rows: [entregado] } = await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'corte_entregado' AND id_usuario = $1`, [x.admin.id])
     assert.ok(entregado.cuerpo.includes('$160.00 (faltan $10.00)'), entregado.cuerpo)
     assert.equal(entregado.datos.url, '/admin?ir=cortes')
+    // Un administrador que lo apagó ya no lo recibe; un tipo que no se puede apagar se rechaza.
+    const ajustar = (payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${x.admin.token}` }, payload })
+    assert.equal((await ajustar({ avisosApagados: ['prueba'] })).statusCode, 400)
+    assert.deepEqual((await ajustar({ avisosApagados: ['corte_entregado'] })).json().avisosApagados, ['corte_entregado'])
+    await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 165 })
+    assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'corte_entregado' AND id_usuario = $1`, [x.admin.id])).rowCount, 1)
+    await ajustar({ avisosApagados: [] })
     assert.equal(r.body.diferencia, -10)
     // Lo puede corregir mientras esté pendiente.
     assert.equal((await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 170 })).body.diferencia, 0)

@@ -237,7 +237,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
         </dl>
       </Seccion>
 
-      {!plataforma && u.rol === 'administrador' && <AvisosPush />}
+      {!plataforma && u.rol === 'administrador' && <><AvisosPush /><QueAvisos /></>}
 
     </>
   )
@@ -292,6 +292,44 @@ function AvisosPush() {
           </div>
         )}
       </div>
+    </Seccion>
+  )
+}
+
+// Qué avisos quiere cada administrador. Vale para su cuenta (en todos sus dispositivos) y para la lista de avisos de la
+// app: uno apagado no se guarda ni se manda. Los nombres van como en notificaciones.ts (AVISOS_ELEGIBLES).
+const TIPOS_AVISO = [
+  { tipo: 'corte_entregado', titulo: 'Corte por confirmar', ayuda: 'Un vendedor entregó o corrigió su corte del día.' },
+  { tipo: 'corte_descuadrado', titulo: 'Corte que ya no cuadra', ayuda: 'Llegó una venta en efectivo de un día con el corte ya confirmado.' },
+  { tipo: 'prueba_por_vencer', titulo: 'Prueba gratis por vencer', ayuda: 'Unos días antes y el último día de la prueba.' },
+] as const
+
+function QueAvisos() {
+  const [apagados, setApagados] = useState<string[] | null>(null)
+  useEffect(() => { llamarAutenticado<{ avisosApagados?: string[] }>('/me').then((r) => setApagados(r.avisosApagados ?? [])).catch(() => setApagados([])) }, [])
+  async function cambiar(tipo: string, encendido: boolean) {
+    if (!apagados) return
+    const antes = apagados
+    const nuevos = encendido ? apagados.filter((t) => t !== tipo) : [...apagados, tipo]
+    setApagados(nuevos)
+    try {
+      await guardarPerfil({ avisosApagados: nuevos })
+    } catch (e) {
+      setApagados(antes)
+      aviso(mensaje(e))
+    }
+  }
+  return (
+    <Seccion id="que-avisos" titulo="Qué avisos recibes" descripcion="Se guarda en tu cuenta: vale en todos tus dispositivos.">
+      {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
+        <Fila key={tipo} titulo={titulo} ayuda={ayuda}>
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input type="checkbox" role="switch" checked={!!apagados && !apagados.includes(tipo)} disabled={!apagados} onChange={(e) => void cambiar(tipo, e.target.checked)} className="peer sr-only" aria-label={titulo} />
+            <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
+            <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
+          </label>
+        </Fila>
+      ))}
     </Seccion>
   )
 }

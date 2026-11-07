@@ -11,6 +11,8 @@ import { claveUsuario } from './seguridad.js'
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
 export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'prueba'
+// Los que cada administrador puede apagar (usuarios.avisos_apagados; PATCH /me `avisosApagados`). La prueba nunca.
+export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer'] as const
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso
@@ -49,7 +51,8 @@ export function crearDespachador(db: Db, enviador: Enviador | null, log: Registr
   async function guardar(a: AvisoPendiente): Promise<string | null> {
     const { rows } = await db.query(
       `INSERT INTO notificaciones (id_empresa, id_usuario, tipo, titulo, cuerpo, datos)
-       SELECT id_empresa, id_usuario, $2, $3, $4, $5::jsonb FROM usuarios WHERE id_usuario = $1 AND activo
+       SELECT id_empresa, id_usuario, $2::text, $3, $4, $5::jsonb FROM usuarios
+        WHERE id_usuario = $1 AND activo AND NOT ($2::text = ANY (coalesce(avisos_apagados, '{}')))
        RETURNING id_notificacion`,
       [a.para, a.tipo, a.titulo.slice(0, 120), a.cuerpo, JSON.stringify(a.datos ?? {})],
     )
