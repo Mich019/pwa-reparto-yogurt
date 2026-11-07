@@ -226,6 +226,18 @@ describe('resumen diario por correo', () => {
     assert.match(c.texto, /Beto: \$900\.00 de \$1,000\.00 \(90%\)/)
   })
 
+  it('la ficha del vendedor trae los meses cerrados en que llegó a su meta', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const cifras = (pct: number) => JSON.stringify({ vendedores: [{ id: vend.id, nombre: 'Beto', ventas: pct * 10, meta: 1000, cumplimientoPct: pct }] })
+    await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [empresa])
+    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ('2026-01-01', 'cerrado', $1, now(), '[]'), ('2026-02-01', 'cerrado', $2, now(), '[]')`, [cifras(120), cifras(80)])
+    const ver = (s: { token: string }) => app.inject({ method: 'GET', url: `/usuarios/${vend.id}/metas`, headers: { authorization: `Bearer ${s.token}` } })
+    assert.deepEqual((await ver(admin)).json().meses.map((m: { mes: string }) => m.mes), ['2026-01'])
+    assert.equal((await ver(vend)).statusCode, 403)
+  })
+
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {
     const empresa = await crearEmpresa()
     const admin = await sesion('administrador', 'tel-a', empresa)

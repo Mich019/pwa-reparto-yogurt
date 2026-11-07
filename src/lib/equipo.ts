@@ -78,6 +78,11 @@ export async function darDeBaja(id: string) {
   refrescar()
 }
 
+// Los meses cerrados en que un vendedor llegó a su meta (trofeo de su ficha).
+export function metasCumplidas(id: string) {
+  return llamarAutenticado<{ meses: { mes: string; ventas: number; meta: number }[] }>(`/usuarios/${id}/metas`)
+}
+
 // Aviso de prueba a los dispositivos de otra cuenta (api/_lib/notificaciones.ts).
 export function avisoDePrueba(id: string) {
   return llamarAutenticado<{ dispositivos: number; enviados: number }>(`/usuarios/${id}/aviso-prueba`, { metodo: 'POST' })

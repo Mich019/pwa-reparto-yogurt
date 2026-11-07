@@ -332,24 +332,40 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
 
 // Vendedores del mes, de quien más vendió a quien menos, con su avance contra la meta. Sólo el administrador ve esta
 // pantalla; las cifras son las del cierre de mes en vivo (GET /cierres/:mes).
+// Con las flechas se ven los meses anteriores (hasta dos años): los cerrados con la foto de su cierre.
+const MESES_ATRAS = 24
+const moverMes = (mes: string, n: number) => {
+  const [a, m] = mes.split('-').map(Number)
+  const f = new Date(a, m - 1 + n, 1)
+  return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}`
+}
 function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
-  const mes = hoy().slice(0, 7)
+  const actual = hoy().slice(0, 7)
+  const [atras, setAtras] = useState(0)
+  const mes = moverMes(actual, -atras)
   const r = useServidor<{ cifras: CifrasMes }>(`/cierres/${mes}`, ['datos', 'cobranza', 'equipo'])
-  const filas = (r.datos?.cifras.vendedores ?? []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
-  const nombreMes = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
+  const filas = (r.datos?.cifras.mes === mes ? r.datos.cifras.vendedores : []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
+  const nombreMes = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', atras ? { month: 'long', year: 'numeric' } : { month: 'long' })
+  const flecha = `grid h-8 w-8 place-items-center rounded-full transition-colors hover:bg-papel disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca`
   return (
     <Tarjeta
       id="t-ranking"
-      titulo="Vendedores del mes"
-      subtitulo={`Lo vendido en ${nombreMes} y cómo va cada quien con su meta`}
-      accion={<button type="button" onClick={() => onNavegar('equipo')} className="rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver vendedores</button>}
+      titulo={atras ? 'Vendedores de ese mes' : 'Vendedores del mes'}
+      subtitulo={`Lo vendido en ${nombreMes} y cómo le fue a cada quien con su meta`}
+      accion={
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setAtras(atras + 1)} disabled={atras >= MESES_ATRAS} aria-label="Mes anterior" title="Mes anterior" className={flecha}><ArrowLeft size={16} /></button>
+          <button type="button" onClick={() => setAtras(atras - 1)} disabled={atras === 0} aria-label="Mes siguiente" title="Mes siguiente" className={flecha}><ArrowRight size={16} /></button>
+          <button type="button" onClick={() => onNavegar('equipo')} className="ml-2 rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver vendedores</button>
+        </div>
+      }
     >
       {r.error && !r.datos ? (
         <p className="mt-3 rounded-2xl bg-rojo/10 p-3 text-sm font-medium text-rojo">No se pudo traer el mes. <button className="font-semibold underline underline-offset-2" onClick={r.recargar}>Reintentar</button></p>
-      ) : !r.datos ? (
+      ) : !r.datos || r.datos.cifras.mes !== mes ? (
         <p className="mt-3 text-sm text-apagado">Cargando…</p>
       ) : !filas.length ? (
-        <Vacio>Cuando tus vendedores entreguen pedidos este mes aparecen aquí.</Vacio>
+        <Vacio>{atras ? 'Ese mes no hubo ventas de vendedores.' : 'Cuando tus vendedores entreguen pedidos este mes aparecen aquí.'}</Vacio>
       ) : (
         <ol className="mt-3 divide-y divide-linea">
           {filas.map((v, i) => {

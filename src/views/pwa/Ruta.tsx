@@ -613,7 +613,7 @@ function BarraMeta() {
   } catch { /* sin almacenamiento: sólo se ve con señal */ }
   if (!vendedor || !m?.meta || m.mes !== hoy().slice(0, 7)) return null
   const pct = Math.round(m.cumplimientoPct ?? 0)
-  const texto = `Meta del mes: ${dinero(m.ventas)} de ${dinero(m.meta)} (${pct}%)`
+  const texto = `Meta del mes: ${dinero(m.ventas)} de ${dinero(m.meta)} (${pct}%)${m.lugar && m.de > 1 ? ` · vas en ${m.lugar}.º lugar de ${m.de}` : ''}`
   return (
     <button type="button" onClick={() => aviso(pct >= 100 ? `${texto}. ¡Ya llegaste!` : texto)} aria-label={texto} className="absolute inset-x-0 bottom-0 h-1.5 bg-linea">
       <span className={`block h-full transition-[width] duration-500 ${pct >= 100 ? 'bg-verde' : 'bg-marca'}`} style={{ width: `${Math.min(100, pct)}%` }} />

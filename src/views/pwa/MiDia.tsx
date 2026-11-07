@@ -39,6 +39,7 @@ export function MiDia() {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-linea" role="progressbar" aria-valuenow={Math.min(100, Math.round(m.cumplimientoPct ?? 0))} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full rounded-full bg-tinta" style={{ width: `${Math.min(100, m.cumplimientoPct ?? 0)}%` }} />
           </div>
+          {m.lugar && m.de > 1 && <p className="mt-2 text-sm text-apagado">Vas en {m.lugar}.º lugar de {m.de} vendedores este mes{m.lugar === 1 ? '. ¡Vas primero!' : ''}</p>}
           {m.comisionPct > 0 && <p className="mt-2 text-sm text-apagado">Comisión de este mes: {dinero(m.comision)}</p>}
         </div>
       )}

@@ -436,7 +436,39 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
          FROM usuarios u WHERE u.id_usuario = $1`,
       [req.usuario.id, primerDia(mes), ultimoDia(mes)],
     )
-    return { mes, ventas: redondear(r.ventas), meta: r.meta, cumplimientoPct: r.meta ? redondear((r.ventas / r.meta) * 100) : null, comisionPct: r.pct, comision: redondear((r.ventas * r.pct) / 100) }
+    // Su lugar entre los vendedores activos de la empresa por lo vendido en el mes: sólo el número, nunca lo de los demás.
+    const { rows: [l] } = await db.query(
+      `WITH v AS (
+         SELECT u.id_usuario, coalesce(sum(d.subtotal), 0) AS ventas
+           FROM usuarios u
+           LEFT JOIN pedidos pe ON pe.id_vendedor = u.id_usuario AND pe.estado = 'entregado' AND pe.fecha BETWEEN $2 AND $3
+           LEFT JOIN detalle_pedido d ON d.id_pedido = pe.id_pedido
+          WHERE u.rol = 'vendedor' AND u.activo
+          GROUP BY u.id_usuario
+       )
+       SELECT (SELECT count(*)::int FROM v) AS de,
+              CASE WHEN EXISTS (SELECT 1 FROM v WHERE id_usuario = $1)
+                   THEN (SELECT count(*)::int FROM v WHERE ventas > (SELECT ventas FROM v WHERE id_usuario = $1)) + 1 END AS lugar`,
+      [req.usuario.id, primerDia(mes), ultimoDia(mes)],
+    )
+    return {
+      mes, ventas: redondear(r.ventas), meta: r.meta, cumplimientoPct: r.meta ? redondear((r.ventas / r.meta) * 100) : null, comisionPct: r.pct, comision: redondear((r.ventas * r.pct) / 100),
+      lugar: (l.lugar as number | null) ?? null, de: l.de as number,
+    }
+  })
+
+  // Los meses cerrados en que un vendedor llegó a su meta (el trofeo de su ficha en Vendedores). De la foto del cierre.
+  app.get('/usuarios/:id/metas', { preHandler: requiereAdmin }, async (req, rep) => {
+    const p = z.object({ id: z.uuid() }).safeParse(req.params)
+    if (!p.success) return rep.code(400).send({ error: 'Cuenta no válida' })
+    const { rows } = await db.query(
+      `SELECT to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
+         FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
+        WHERE c.estado = 'cerrado' AND v->>'id' = $1 AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
+        ORDER BY c.mes DESC LIMIT 36`,
+      [p.data.id],
+    )
+    return { meses: rows }
   })
 
   // ---- cierre de mes

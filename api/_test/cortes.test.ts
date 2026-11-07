@@ -146,6 +146,11 @@ describe('meta y comisión', () => {
     assert.equal(m.meta, 1000)
     assert.equal(m.cumplimientoPct, 30)
     assert.equal(m.comision, 15)
+    // Su lugar entre los vendedores, sin las cifras de los demás.
+    assert.deepEqual([m.lugar, m.de], [1, 2])
+    const b = (await llamar(x.beto, 'GET', '/mi-meta')).body
+    assert.deepEqual([b.lugar, b.de], [2, 2])
+    assert.equal(Object.keys(b).some((k) => /otros|vendedores/.test(k)), false)
     assert.equal((await llamar(x.admin, 'PATCH', `/usuarios/${x.ana.id}`, { metaMensual: null })).status, 200)
     assert.equal((await llamar(x.ana, 'GET', '/mi-meta')).body.meta, null)
   })

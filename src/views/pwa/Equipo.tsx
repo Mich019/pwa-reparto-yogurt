@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, BellOff, BellRing, Check, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, BellOff, BellRing, Check, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
-  avisoDePrueba, cargarEquipo, crearMiembro, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
+  avisoDePrueba, cargarEquipo, crearMiembro, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro,
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
@@ -248,6 +248,15 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   const [confirmar, setConfirmar] = useState<'password' | 'baja' | null>(null)
   const [destino, setDestino] = useState('') // qué hacer con sus clientes al dar de baja: '' = decidir después
   const [trabajando, setTrabajando] = useState(false)
+  // Trofeo: los meses cerrados en que llegó a su meta.
+  const [metas, setMetas] = useState<string[] | null>(null)
+  useEffect(() => {
+    if (m.rol !== 'vendedor') return
+    let vigente = true
+    metasCumplidas(m.id).then((r) => { if (vigente) setMetas(r.meses.map((x) => x.mes)) }).catch(() => {})
+    return () => { vigente = false }
+  }, [m.id, m.rol])
+  const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
 
   async function correr(accion: () => Promise<void>) {
     setTrabajando(true)
@@ -302,6 +311,11 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
             {m.rol === 'administrador' && <ShieldCheck size={14} />}{ROL_TEXTO[m.rol]}
           </span>
           <Etiqueta m={m} />
+          {!!metas?.length && (
+            <span title={`Llegó a su meta en ${metas.map(mesCorto).join(', ')}`} className="flex items-center gap-1 rounded-md bg-ambar/30 px-3 py-1.5 text-xs font-semibold">
+              <Trophy size={14} aria-hidden="true" /> {plural(metas.length, 'meta cumplida', 'metas cumplidas')}
+            </span>
+          )}
         </div>
 
         <dl className="space-y-1 rounded-lg bg-niebla p-4 text-sm">
@@ -310,6 +324,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           <Linea t="Último acceso" v={m.ultimoAcceso ? hace(new Date(m.ultimoAcceso).getTime()) : 'Todavía no ha entrado'} />
           {m.rol === 'vendedor' && <Linea t="Clientes" v={`${m.clientes}${m.clientes !== m.clientesActivos ? ` (${m.clientesActivos} activos)` : ''}`} />}
           <Linea t="Avisos" v={textoAvisos(m)} />
+          {!!metas?.length && <Linea t="Llegó a su meta" v={metas.slice(0, 6).map(mesCorto).join(', ') + (metas.length > 6 ? ` y ${metas.length - 6} más` : '')} />}
         </dl>
         {m.activo && m.dispositivosPush > 0 && (
           <button type="button" onClick={probar} disabled={trabajando} className="-mt-2 flex items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-tinta underline-offset-4 hover:underline disabled:opacity-50">

@@ -34,7 +34,8 @@ export interface FilaCorte {
   cambioDespues: number | null // confirmado, pero el efectivo de ese día cambió después: conviene reabrirlo
 }
 export interface Descuadre { id: string; fecha: string; vendedorId: string; vendedor: string; confirmado: number; ahora: number; cambio: number }
-export interface MiMeta { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null; comisionPct: number; comision: number }
+// `lugar`/`de`: su lugar entre los vendedores activos por lo vendido en el mes (null si no es vendedor activo).
+export interface MiMeta { mes: string; ventas: number; meta: number | null; cumplimientoPct: number | null; comisionPct: number; comision: number; lugar: number | null; de: number }
 export interface MesCierre { mes: string; estado: 'abierto' | 'cerrado' | 'reabierto'; actual: boolean; cerradoEn: string | null }
 export interface CifrasMes {
   mes: string; desde: string; hasta: string
