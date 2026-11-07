@@ -245,6 +245,15 @@ describe('aviso de la carga al vendedor', () => {
 
     const avisos = (await pull(vend)).body.avisos
     assert.deepEqual(avisos.map((x: any) => x.tipo), ['stock_asignado', 'stock_asignado'])
+
+    // Si el vendedor lo apaga, ya no le llega (ni el push ni a la lista); el urgente no se puede apagar.
+    const ajustar = (payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${vend.token}` }, payload })
+    assert.equal((await ajustar({ avisosApagados: ['pedido_urgente'] })).statusCode, 400)
+    assert.deepEqual((await ajustar({ avisosApagados: ['stock_asignado'] })).json().avisosApagados, ['stock_asignado'])
+    enviados.length = 0
+    await carga(admin, vend.id, hoy(), [{ productoId: a.id, asignada: 3 }])
+    assert.equal(enviados.length, 0)
+    assert.equal((await pull(vend)).body.avisos.length, 2)
   })
 
   it('no avisa si no cambió lo asignado, si sólo se registra una devolución, ni por días que ya pasaron', async () => {

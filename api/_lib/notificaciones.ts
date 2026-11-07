@@ -11,8 +11,9 @@ import { claveUsuario } from './seguridad.js'
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
 
 export type TipoAviso = 'pedido_urgente' | 'ruta_modificada' | 'stock_asignado' | 'corte_descuadrado' | 'corte_entregado' | 'prueba_por_vencer' | 'prueba'
-// Los que cada administrador puede apagar (usuarios.avisos_apagados; PATCH /me `avisosApagados`). La prueba nunca.
-export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer'] as const
+// Los que cada quien puede apagar (usuarios.avisos_apagados; PATCH /me `avisosApagados`): los del administrador y,
+// del vendedor, la carga y los cambios de ruta. El pedido urgente y la prueba nunca.
+export const AVISOS_ELEGIBLES = ['corte_entregado', 'corte_descuadrado', 'prueba_por_vencer', 'ruta_modificada', 'stock_asignado'] as const
 export interface AvisoPendiente {
   para: string // id del usuario
   tipo: TipoAviso

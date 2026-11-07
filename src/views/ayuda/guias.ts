@@ -478,6 +478,7 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Cuenta, en «Notificaciones en este teléfono», toca «Activar avisos» y acepta el permiso.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Notificaciones en este teléfono', icono: BellRing }, { t: 'boton', texto: 'Activar avisos', foco: true }]) },
       { texto: 'Con «Enviar prueba» confirmas que llegan. También puedes pedir que te avise si te quedan ventas sin enviar en la tarde.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Notificaciones en este teléfono', icono: BellRing }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
+      { texto: 'Si eres vendedor, en «Qué avisos recibes» puedes apagar los de tu carga del día o los cambios en tu ruta. Los pedidos urgentes siempre llegan.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Qué avisos recibes', icono: BellRing }]) },
     ],
   },
   {

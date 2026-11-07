@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LockKeyhole, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, Wallet, CreditCard, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
@@ -6,7 +6,7 @@ import { ErrorApi, ErrorRed, MODO_SERVIDOR } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
 import { hace } from '../../lib/fechas'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
-import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
+import { cambiarPassword, cerrarSesion, guardarPerfil, llamarAutenticado, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
@@ -251,6 +251,53 @@ function Notificaciones() {
           {[...new Set([HORA_CIERRE, 14, 15, 16, 17, 18, 19, 20, 21, 22, horaCierre])].sort((a, b) => a - b).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
         </select>
       </label>
+      {MODO_SERVIDOR && sesionActual()?.usuario.rol === 'vendedor' && <QueAvisos />}
+    </div>
+  )
+}
+
+// Los avisos del servidor que el vendedor puede apagar (AVISOS_ELEGIBLES en api/_lib/notificaciones.ts). Se guarda en
+// su cuenta: uno apagado no llega ni por push ni a la lista. El pedido urgente siempre llega.
+const TIPOS_AVISO = [
+  { tipo: 'stock_asignado', titulo: 'Tu carga del día', ayuda: 'Cuando te asignan o cambian la carga.' },
+  { tipo: 'ruta_modificada', titulo: 'Cambios en tu ruta', ayuda: 'Pedidos de hoy que se agregan, cambian o quitan, y clientes que pasan a tu cartera.' },
+] as const
+
+function QueAvisos() {
+  const [apagados, setApagados] = useState<string[] | null>(null)
+  const [sinSenal, setSinSenal] = useState(false)
+  useEffect(() => {
+    llamarAutenticado<{ avisosApagados?: string[] }>('/me').then((r) => setApagados(r.avisosApagados ?? [])).catch(() => setSinSenal(true))
+  }, [])
+  async function cambiar(tipo: string, encendido: boolean) {
+    if (!apagados) return
+    const antes = apagados
+    const nuevos = encendido ? apagados.filter((t) => t !== tipo) : [...apagados, tipo]
+    setApagados(nuevos)
+    try {
+      await guardarPerfil({ avisosApagados: nuevos })
+    } catch (e) {
+      setApagados(antes)
+      aviso(mensajeError(e))
+    }
+  }
+  return (
+    <div className="mt-4 border-t border-linea pt-3">
+      <div className="text-sm font-semibold">Qué avisos recibes</div>
+      <p className="text-xs text-apagado">{sinSenal ? 'Sin conexión: se pueden cambiar cuando haya señal.' : 'Los pedidos urgentes siempre te llegan.'}</p>
+      {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
+        <label key={tipo} className="mt-3 flex cursor-pointer items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">{titulo}</span>
+            <span className="block text-xs text-apagado">{ayuda}</span>
+          </span>
+          <span className="relative inline-flex shrink-0 items-center">
+            <input type="checkbox" role="switch" checked={!!apagados && !apagados.includes(tipo)} disabled={!apagados} onChange={(e) => void cambiar(tipo, e.target.checked)} className="peer sr-only" />
+            <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />
+            <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-papel shadow transition-transform peer-checked:translate-x-5" />
+          </span>
+        </label>
+      ))}
     </div>
   )
 }
