@@ -116,22 +116,21 @@ export async function cifrasVendedor(db: Db, idEmpresa: string, idVendedor: stri
   return { desde: r.desde, dia: r.hasta, pedidos: r.pedidos, vendido: r.vendido, vendidoAntes: r.antes, mes: r.mes, meta: r.meta, avanceMesPct: r.avance }
 }
 
-// Cron diario, a mitad de mes (días 15 a 20 en la zona de cada empresa): si un vendedor con meta lleva menos del 70%
-// de lo que debería a estas alturas, se avisa a los administradores. Una vez al mes por vendedor (`datos.vendedorIds`).
+// Cron diario, a mitad de mes (días 15 a 20 en la zona de cada empresa): si un vendedor con meta lleva menos del
+// `empresas.ritmo_meta_pct` (70% de fábrica, migración 034) de lo que debería a estas alturas, se avisa a los administradores. Una vez al mes por vendedor (`datos.vendedorIds`).
 // Cruza empresas: la conexión del dueño. `dias` sólo lo cambian las pruebas.
-export const RITMO_MINIMO = 0.7
 export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dias: [number, number] = [15, 20]): Promise<number> {
   const { rows } = await db.query(
     `WITH f AS (
        SELECT id_empresa, zona_horaria AS z, (now() AT TIME ZONE zona_horaria)::date AS hoy,
-              date_trunc('month', (now() AT TIME ZONE zona_horaria)::date)::date AS ini
+              date_trunc('month', (now() AT TIME ZONE zona_horaria)::date)::date AS ini, ritmo_meta_pct / 100.0 AS ritmo
          FROM empresas WHERE activa AND NOT interna
      )
      SELECT u.id_usuario, u.id_empresa, u.nombre, u.meta_mensual::float8 AS meta,
             coalesce((SELECT sum(p.total) FROM pedidos p
                        WHERE p.id_empresa = u.id_empresa AND p.id_vendedor = u.id_usuario AND p.estado = 'entregado'
                          AND (p.fecha_entregado_real AT TIME ZONE f.z)::date >= f.ini AND (p.fecha_entregado_real AT TIME ZONE f.z)::date < f.hoy), 0)::float8 AS vendido,
-            (extract(day FROM f.hoy) - 1) / extract(day FROM f.ini + interval '1 month - 1 day') AS avance
+            (extract(day FROM f.hoy) - 1) / extract(day FROM f.ini + interval '1 month - 1 day') AS avance, f.ritmo
        FROM f JOIN usuarios u ON u.id_empresa = f.id_empresa AND u.rol = 'vendedor' AND u.activo AND u.meta_mensual > 0
       WHERE extract(day FROM f.hoy) BETWEEN $1 AND $2
         AND NOT EXISTS (SELECT 1 FROM notificaciones n
@@ -139,7 +138,7 @@ export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dia
                            AND coalesce(n.datos->'vendedorIds', '[]') ? u.id_usuario::text)`,
     dias,
   )
-  const atrasados = rows.filter((r) => r.vendido < r.meta * Number(r.avance) * RITMO_MINIMO)
+  const atrasados = rows.filter((r) => r.vendido < r.meta * Number(r.avance) * Number(r.ritmo))
   if (!atrasados.length) return 0
   const { rows: admins } = await db.query(
     `SELECT id_usuario, id_empresa FROM usuarios WHERE rol = 'administrador' AND activo AND id_empresa = ANY($1::uuid[])`,
@@ -149,9 +148,32 @@ export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dia
   await despachador.despachar(atrasados.flatMap((r) => admins.filter((a) => a.id_empresa === r.id_empresa).map((a) => ({
     para: a.id_usuario as string, tipo: 'meta_atrasada' as const, titulo: 'Vendedor atrasado con su meta',
     cuerpo: `${r.nombre} lleva ${pesos(r.vendido)} de ${pesos(r.meta)} (${Math.round((r.vendido / r.meta) * 100)}%) y el mes va en ${Math.round(Number(r.avance) * 100)}%`,
-    datos: { url: '/admin', vendedorIds: [r.id_usuario as string] },
+    datos: { url: `/admin?ir=equipo&persona=${r.id_usuario}`, vendedorIds: [r.id_usuario as string] },
   }))))
   return atrasados.length
+}
+
+// Al sincronizar ventas del vendedor (sync/rutas.ts): si con ellas llegó a su meta del mes, se le felicita. Una vez al
+// mes; si apagó el aviso, no se guarda ni suena.
+export async function felicitarMeta(db: Db, despachador: Despachador, idVendedor: string): Promise<boolean> {
+  const { rows: [r] } = await db.query(
+    `SELECT u.meta_mensual::float8 AS meta,
+            (SELECT coalesce(sum(p.total), 0)::float8 FROM pedidos p
+              WHERE p.id_empresa = u.id_empresa AND p.id_vendedor = u.id_usuario AND p.estado = 'entregado'
+                AND (p.fecha_entregado_real AT TIME ZONE e.zona_horaria)::date >= date_trunc('month', now() AT TIME ZONE e.zona_horaria)::date) AS vendido
+       FROM usuarios u JOIN empresas e ON e.id_empresa = u.id_empresa
+      WHERE u.id_usuario = $1 AND u.rol = 'vendedor' AND u.activo AND u.meta_mensual > 0
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n WHERE n.id_usuario = u.id_usuario AND n.tipo = 'meta_alcanzada'
+                         AND n.creado_en >= date_trunc('month', now() AT TIME ZONE e.zona_horaria) AT TIME ZONE e.zona_horaria)`,
+    [idVendedor],
+  )
+  if (!r || r.vendido < r.meta) return false
+  const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
+  await despachador.despachar([{
+    para: idVendedor, tipo: 'meta_alcanzada', titulo: '¡Llegaste a tu meta del mes!',
+    cuerpo: `Llevas ${pesos(r.vendido)} de ${pesos(r.meta)}. ¡Muy bien!`, datos: { pestana: 'cuenta' },
+  }])
+  return true
 }
 
 // Lo que sólo trae el semanal. El mes de cada vendedor va del día 1 del mes de `hasta` hasta `hasta`.

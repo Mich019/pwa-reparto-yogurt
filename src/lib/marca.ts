@@ -13,6 +13,7 @@ export interface Marca {
   contacto?: string | null
   zonaHoraria?: string // define el «hoy» de la empresa (migración 007)
   minutosUrgente?: number // cuánto espera un urgente antes de recordarlo (migración 031)
+  ritmoMetaPct?: number // por debajo de qué % del ritmo del mes una meta va atrasada (migración 034)
   de?: string // id de la cuenta con la que se guardó la copia
 }
 

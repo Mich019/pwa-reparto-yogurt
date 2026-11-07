@@ -342,6 +342,36 @@ function MinutosUrgente() {
   )
 }
 
+// También de la empresa: qué tan atrasado es «atrasado» para el aviso de meta (api/_lib/resumen.ts).
+const RITMOS = [50, 60, 70, 80, 90]
+function RitmoMeta() {
+  const marca = useMarca()
+  const [guardando, setGuardando] = useState(false)
+  if (!marca?.ritmoMetaPct) return null
+  const actual = marca.ritmoMetaPct
+  const opciones = RITMOS.includes(actual) ? RITMOS : [...RITMOS, actual].sort((a, b) => a - b)
+  async function cambiar(ritmoMetaPct: number) {
+    setGuardando(true)
+    try {
+      await guardarMarca({ ritmoMetaPct })
+      aviso('Guardado')
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <Seccion id="metas" titulo="Metas de los vendedores" descripcion="Vale para toda tu empresa. El aviso sale del 15 al 20 de cada mes, una vez por vendedor.">
+      <Fila titulo="Avisar si alguien va atrasado" ayuda={`Si lleva menos del ${actual}% de lo que debería a esas alturas. Por ejemplo, a mitad de mes, menos del ${Math.round(actual / 2)}% de su meta.`}>
+        <select value={actual} disabled={guardando} onChange={(e) => void cambiar(Number(e.target.value))} className={claseInputRecto} aria-label="Qué tan atrasado avisar">
+          {opciones.map((n) => <option key={n} value={n}>{`Menos del ${n}%`}</option>)}
+        </select>
+      </Fila>
+    </Seccion>
+  )
+}
+
 function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encendido: boolean; deshabilitado: boolean; etiqueta: string; alCambiar: (si: boolean) => void }) {
   return (
     <label className="relative inline-flex cursor-pointer items-center">
@@ -408,6 +438,7 @@ function Preferencias() {
         </Fila>
       </Seccion>
       <MinutosUrgente />
+      <RitmoMeta />
       <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>
           <Interruptor encendido={!!silencio} deshabilitado={!prefs} etiqueta="Silenciar avisos" alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />

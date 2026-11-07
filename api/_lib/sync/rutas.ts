@@ -5,6 +5,7 @@ import { tx } from '../db.js'
 import { hoyEn, zonaDeEmpresa } from '../fechas.js'
 import { claveUsuario } from '../seguridad.js'
 import type { Despachador } from '../notificaciones.js'
+import { felicitarMeta } from '../resumen.js'
 import { ADAPTADORES } from './adaptadores.js'
 import { conCostos, procesarOperacion, type Efectos, type Resultado } from './aplicar.js'
 import { bodyPush, TABLAS } from './esquemas.js'
@@ -50,6 +51,10 @@ export async function rutasSync(
     } finally {
       // Lo ya confirmado se avisa aunque una operación posterior haya fallado.
       await despachador.despachar(efectos.avisos)
+    }
+    // Ventas nuevas del vendedor: ¿llegó a su meta del mes? (resumen.ts). No detiene la respuesta si falla.
+    if (req.usuario.rol === 'vendedor' && body.data.operaciones.some((o, i) => o.tabla === 'pedidos' && resultados[i]?.estado === 'aplicada')) {
+      await felicitarMeta(db, despachador, req.usuario.id).catch((e) => req.log.error(e, 'No se pudo revisar la meta del vendedor'))
     }
     return { ahora: ahoraMs, resultados }
   })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { correoMensual, correoResumen, correoVendedor } from '../_lib/correo.js'
-import { avisarMetasAtrasadas, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
+import { avisarMetasAtrasadas, felicitarMeta, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
 import { xlsxDelMes } from '../_lib/cortes.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
@@ -128,8 +128,60 @@ describe('resumen diario por correo', () => {
     const [a] = await avisos()
     assert.match(a.cuerpo, /lleva \$0 de \$100,000 \(0%\)/)
     assert.deepEqual(a.datos.vendedorIds, [vend.id])
+    assert.equal(a.datos.url, `/admin?ir=equipo&persona=${vend.id}`)
     await avisarMetasAtrasadas(db, despachador, [1, 31])
     assert.equal((await avisos()).length, 1)
+  })
+
+  it('el umbral de meta atrasada es de cada empresa', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const r = await app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${admin.token}` }, payload: { ritmoMetaPct: 50 } })
+    assert.equal(r.json().ritmoMetaPct, 50)
+    assert.equal((await app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${admin.token}` }, payload: { ritmoMetaPct: 10 } })).statusCode, 400)
+    const { rows: [{ dia, avance }] } = await db.query(
+      `SELECT extract(day FROM now() AT TIME ZONE zona_horaria)::int AS dia,
+              ((extract(day FROM now() AT TIME ZONE zona_horaria) - 1) / extract(day FROM date_trunc('month', now() AT TIME ZONE zona_horaria) + interval '1 month - 1 day'))::float8 AS avance
+         FROM empresas WHERE id_empresa = $1`, [empresa])
+    if (dia === 1) return
+    const s = { id: randomUUID(), sabor: 'Coco', descripcion: '', presentacion: 1, precio_litro: 60, costo_litro: 20, color_hex: '#ffffff', disponible: true }
+    await push(admin, [op('productos', s.id, s)])
+    const c = cliente()
+    await push(vend, [op('clientes', c.id, c)])
+    const p = pedido(c.id, s.id) // $180
+    await push(vend, [op('pedidos', p.id, p)])
+    await db.query(`UPDATE pedidos SET estado = 'entregado', metodo_pago = 'efectivo', fecha_entregado_real = date_trunc('month', now()) + interval '12 hours' WHERE id_pedido = $1`, [p.id])
+    // La meta deja los $180 en el 60% del ritmo: con umbral 50% no va atrasado; con 90%, sí.
+    await db.query(`UPDATE usuarios SET meta_mensual = $2 WHERE id_usuario = $1`, [vend.id, Math.round(180 / (avance * 0.6))])
+    const despachador = crearDespachador(db, null, { error: () => {} })
+    const avisos = async () => (await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'meta_atrasada' AND id_usuario = $1`, [admin.id])).rowCount
+    await avisarMetasAtrasadas(db, despachador, [1, 31])
+    assert.equal(await avisos(), 0)
+    await app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${admin.token}` }, payload: { ritmoMetaPct: 90 } })
+    await avisarMetasAtrasadas(db, despachador, [1, 31])
+    assert.equal(await avisos(), 1)
+  })
+
+  it('felicita al vendedor una vez cuando llega a su meta', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const despachador = crearDespachador(db, null, { error: () => {} })
+    await db.query(`UPDATE usuarios SET meta_mensual = 150 WHERE id_usuario = $1`, [vend.id])
+    assert.equal(await felicitarMeta(db, despachador, vend.id), false) // sin ventas
+    const s = { id: randomUUID(), sabor: 'Nuez', descripcion: '', presentacion: 1, precio_litro: 60, costo_litro: 20, color_hex: '#a16207', disponible: true }
+    await push(admin, [op('productos', s.id, s)])
+    const c = cliente()
+    await push(vend, [op('clientes', c.id, c)])
+    const p = pedido(c.id, s.id) // 3 × $60 = $180
+    await push(vend, [op('pedidos', p.id, p)])
+    await db.query(`UPDATE pedidos SET estado = 'entregado', metodo_pago = 'efectivo', fecha_entregado_real = now() WHERE id_pedido = $1`, [p.id])
+    assert.equal(await felicitarMeta(db, despachador, vend.id), true)
+    const { rows } = await db.query(`SELECT titulo, cuerpo FROM notificaciones WHERE tipo = 'meta_alcanzada' AND id_usuario = $1`, [vend.id])
+    assert.equal(rows.length, 1)
+    assert.match(rows[0].cuerpo, /Llevas \$180 de \$150/)
+    assert.equal(await felicitarMeta(db, despachador, vend.id), false) // una vez al mes
   })
 
   it('«mandar uno ahora» le llega al administrador que lo pide', async () => {

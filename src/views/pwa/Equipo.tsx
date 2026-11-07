@@ -26,7 +26,7 @@ const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHast
 // Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
 const NOMBRE_AVISO: Record<string, string> = {
   stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
-  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada',
 }
 function textoAvisos(m: Miembro) {
   const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'
@@ -42,13 +42,23 @@ function Etiqueta({ m }: { m: Miembro }) {
   return texto ? <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${clase}`}>{texto}</span> : null
 }
 
+// `/admin?ir=equipo&persona=<id>` (aviso de meta atrasada): abre Vendedores con la ficha de esa persona.
+const pedido = new URLSearchParams(location.search)
+let personaPedida = pedido.get('ir') === 'equipo' && /^[0-9a-f-]{36}$/.test(pedido.get('persona') ?? '') ? pedido.get('persona') : null
+export function irAEquipo() {
+  if (pedido.get('ir') !== 'equipo') return false
+  history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
+  pedido.delete('ir')
+  return true
+}
+
 // `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
 export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const yo = useSesion()?.usuario
   const equipo = useEquipo()
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [fichaId, setFichaId] = useState<string | null>(null)
+  const [fichaId, setFichaId] = useState<string | null>(() => { const p = personaPedida; personaPedida = null; return p })
   const [form, setForm] = useState<Miembro | 'nuevo' | null>(null)
   const [clave, setClave] = useState<DatosClave | null>(null)
   const [cartera, setCartera] = useState<{ desde: string } | null>(null)

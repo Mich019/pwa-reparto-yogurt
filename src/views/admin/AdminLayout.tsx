@@ -11,7 +11,7 @@ import { AdminSabores } from './AdminSabores'
 import { Cobranza, irACortes } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { Subrayado } from './piezas'
-import { Equipo } from '../pwa/Equipo'
+import { Equipo, irAEquipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
 import { Reportes } from '../pwa/Reportes'
@@ -36,6 +36,7 @@ const IR_SUSCRIPCION = irASuscripcion()
 
 function seccionGuardada(): SeccionAdmin {
   if (irACortes()) return 'cobranza'
+  if (irAEquipo()) return 'equipo'
   if (IR_SUSCRIPCION) return 'configuracion'
   try {
     const s = sessionStorage.getItem(CLAVE_SECCION)
