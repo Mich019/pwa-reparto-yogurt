@@ -80,11 +80,27 @@ export function correoInvitacion(empresa: string, quien: string, url: string, di
 
 // Muchos correos de una vez (avisos de la plataforma): la API de lotes de Resend, de 100 en 100. Devuelve cuántos salieron;
 // si falla un lote, los anteriores ya se mandaron y el error dice cuántos.
-export async function enviarCorreos(config: Config, msjs: { para: string; asunto: string; html: string; texto: string }[], log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }) {
+export async function enviarCorreos(config: Config, msjs: { para: string; asunto: string; html: string; texto: string; adjuntos?: { nombre: string; base64: string }[] }[], log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }) {
   if (!config.resendApiKey) {
     if (config.produccion) throw new Error('Falta RESEND_API_KEY para enviar correos')
     log.warn({ cuantos: msjs.length }, 'RESEND_API_KEY vacío: correos NO enviados (sólo desarrollo)')
     return msjs.length
+  }
+  // El envío por lotes de Resend no acepta adjuntos: con adjunto, uno por uno.
+  if (msjs.some((m) => m.adjuntos?.length)) {
+    let n = 0
+    for (const m of msjs) {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${config.resendApiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ from: config.correoRemitente, to: [m.para], subject: m.asunto, html: m.html, text: m.texto, attachments: m.adjuntos?.map((a) => ({ filename: a.nombre, content: a.base64 })) }),
+        signal: AbortSignal.timeout(30_000),
+      })
+      if (!r.ok) throw Object.assign(new Error(`Resend respondió ${r.status} tras ${n} correos: ${await r.text().catch(() => '')}`), { enviados: n })
+      n++
+    }
+    log.info({ enviados: n }, 'correos con adjunto enviados')
+    return n
   }
   let enviados = 0
   for (let i = 0; i < msjs.length; i += 100) {
@@ -121,6 +137,12 @@ export interface CifrasResumen {
   entregados: number; vendido: number; efectivo: number; transferencia: number; fiado: number; abonos: number
   sinAtender: number; cortesPorConfirmar: number; urgentes: number
   vendidoAntes: number | null // semanal: lo vendido los siete días anteriores; null en el diario
+  // Sólo el semanal: el mejor día, lo que más se vendió y cada vendedor contra su meta del mes.
+  semana: {
+    mejorDia: { dia: string; vendido: number } | null
+    sabor: { nombre: string; vendido: number } | null
+    vendedores: { nombre: string; semana: number; mes: number; meta: number | null }[]
+  } | null
 }
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const veces = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
@@ -140,22 +162,55 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
       : `${Math.abs(p)}% ${p > 0 ? 'más' : 'menos'} (${pesos(c.vendidoAntes)})`
     if (comparado) renglones.push(['Contra la semana anterior', comparado])
   }
+  if (c.semana?.mejorDia) renglones.push(['Mejor día', `${fecha(c.semana.mejorDia.dia, { weekday: 'long', day: 'numeric' })} · ${pesos(c.semana.mejorDia.vendido)}`])
+  if (c.semana?.sabor) renglones.push(['Lo que más se vendió', `${c.semana.sabor.nombre} · ${pesos(c.semana.sabor.vendido)}`])
   if (c.fiado) renglones.push(['Fiado', pesos(c.fiado)])
   if (c.abonos) renglones.push(['Abonos cobrados', pesos(c.abonos)])
+  // Cada vendedor: lo de la semana y, si tiene meta, cómo va el mes.
+  const vendedores: [string, string][] = (c.semana?.vendedores ?? []).map((v) => [v.nombre,
+    `${pesos(v.semana)}${v.meta ? ` · mes: ${pesos(v.mes)} de ${pesos(v.meta)} (${Math.round((v.mes / v.meta) * 100)}%)` : ''}`])
   const pendientes = [
     c.cortesPorConfirmar ? `${veces(c.cortesPorConfirmar, 'corte', 'cortes')} por confirmar` : '',
     c.sinAtender ? `${veces(c.sinAtender, 'pedido quedó', 'pedidos quedaron')} sin atender` : '',
-    c.urgentes ? `${veces(c.urgentes, 'urgente tardó', 'urgentes tardaron')} más de media hora` : '',
+    c.urgentes ? `${veces(c.urgentes, 'urgente tardó', 'urgentes tardaron')} en atenderse` : '',
   ].filter(Boolean)
+  const celda = 'padding:8px 0;border-top:1px solid #eee'
+  const aTabla = (filas: [string, string][]) => `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${filas
+    .map(([k, v]) => `<tr><td style="${celda};color:#6b6b6b">${escapar(k)}</td><td align="right" style="${celda};font-weight:600">${escapar(v)}</td></tr>`).join('')}</table></td></tr>`
+  const tabla = aTabla(renglones) + (vendedores.length ? parrafo('<strong>Vendedores</strong> (la semana y, con meta, cómo va el mes)') + aTabla(vendedores) : '')
+  const pie = 'Lo recibes porque lo pediste en Configuración → Preferencias. Ahí mismo lo apagas.'
+  return {
+    asunto: `${empresa}: tu resumen de ${semanal ? 'la semana' : 'ayer'}`,
+    texto: `Hola ${nombre}:\n\nAsí le fue a ${empresa} ${dia}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}${vendedores.length ? `\n\nVendedores:\n${vendedores.map(([k, v]) => `· ${k}: ${v}`).join('\n')}` : ''}${pendientes.length ? `\n\nPendiente: ${pendientes.join('; ')}.` : ''}\n\nEntra a Delisy: ${url}\n\n${pie}`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)}, así le fue a <strong>${escapar(empresa)}</strong> ${escapar(dia)}:`) + tabla
+      + (pendientes.length ? parrafo(`<strong>Pendiente:</strong> ${escapar(pendientes.join('; '))}.`) : '')
+      + boton(url, 'Abrir el panel')
+      + nota(pie)),
+  }
+}
+
+// Informe del mes al cerrarlo (resumen.ts): las cifras principales en el correo y el PDF del informe adjunto.
+export interface CifrasCierre {
+  ingreso: number; utilidad: number; pedidos: number; porCobrar: number
+  vendedores: { nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[]
+}
+export function correoMensual(nombre: string, empresa: string, mes: string, c: CifrasCierre, url: string) {
+  const [a, m] = mes.split('-').map(Number)
+  const nombreMes = new Date(Date.UTC(a, m - 1, 15)).toLocaleDateString('es-MX', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const renglones: [string, string][] = [
+    ['Vendido', `${pesos(c.ingreso)} en ${veces(c.pedidos, 'pedido', 'pedidos')}`],
+    ['Utilidad', pesos(c.utilidad)],
+    ...(c.porCobrar ? [['Por cobrar al cierre', pesos(c.porCobrar)] as [string, string]] : []),
+    ...c.vendedores.filter((v) => v.ventas || v.meta).map((v): [string, string] => [v.nombre, `${pesos(v.ventas)}${v.meta ? ` de ${pesos(v.meta)} (${v.cumplimientoPct ?? 0}%)` : ''}`]),
+  ]
   const celda = 'padding:8px 0;border-top:1px solid #eee'
   const tabla = `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${renglones
     .map(([k, v]) => `<tr><td style="${celda};color:#6b6b6b">${escapar(k)}</td><td align="right" style="${celda};font-weight:600">${escapar(v)}</td></tr>`).join('')}</table></td></tr>`
   const pie = 'Lo recibes porque lo pediste en Configuración → Preferencias. Ahí mismo lo apagas.'
   return {
-    asunto: `${empresa}: tu resumen de ${semanal ? 'la semana' : 'ayer'}`,
-    texto: `Hola ${nombre}:\n\nAsí le fue a ${empresa} ${dia}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}${pendientes.length ? `\n\nPendiente: ${pendientes.join('; ')}.` : ''}\n\nEntra a Delisy: ${url}\n\n${pie}`,
-    html: marco(parrafo(`Hola ${primerNombre(nombre)}, así le fue a <strong>${escapar(empresa)}</strong> ${escapar(dia)}:`) + tabla
-      + (pendientes.length ? parrafo(`<strong>Pendiente:</strong> ${escapar(pendientes.join('; '))}.`) : '')
+    asunto: `${empresa}: cierre de ${nombreMes}`,
+    texto: `Hola ${nombre}:\n\nSe cerró ${nombreMes} en ${empresa}. Va adjunto el informe en PDF.\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}\n\nEntra a Delisy: ${url}\n\n${pie}`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)}, se cerró <strong>${escapar(nombreMes)}</strong> en ${escapar(empresa)}. Va adjunto el informe en PDF.`) + tabla
       + boton(url, 'Abrir el panel')
       + nota(pie)),
   }

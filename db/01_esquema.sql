@@ -91,6 +91,7 @@ CREATE TABLE usuarios (
   resumen_semanal       boolean NOT NULL DEFAULT false,     -- resumen semanal por correo, los lunes (031)
   resumen_semanal_enviado date,                             -- el día del último semanal mandado
   resumen_semanal_dia   smallint NOT NULL DEFAULT 1 CHECK (resumen_semanal_dia BETWEEN 1 AND 7), -- 1 = lunes (032)
+  resumen_mensual       boolean NOT NULL DEFAULT false,     -- informe del mes por correo al cerrarlo (033)
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
-import { correoResumen } from '../_lib/correo.js'
+import { correoMensual, correoResumen } from '../_lib/correo.js'
 import { cifrasDeAyer, cifrasDeLaSemana, mandarResumenes } from '../_lib/resumen.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
 
@@ -69,9 +69,19 @@ describe('resumen diario por correo', () => {
     assert.equal(semana.vendido, semana.transferencia)
     assert.equal((await cifrasDeAyer(db, empresa)).entregados, 0)
     assert.equal((await cifrasDeAyer(db, empresa)).vendidoAntes, null)
+    assert.equal((await cifrasDeAyer(db, empresa)).semana, null)
+    assert.equal(semana.semana?.sabor?.nombre, 'Mango')
+    assert.equal(semana.semana?.mejorDia?.vendido, semana.vendido)
     // El de hace 9 días cae en la semana anterior: mismo pedido, misma venta.
     assert.equal(semana.vendidoAntes, semana.vendido)
-    const correo = correoResumen('Ana', 'Lácteos Semana', semana, 'https://ejemplo.test/admin')
+    await db.query(`UPDATE usuarios SET meta_mensual = 1000 WHERE id_usuario = $1`, [vend.id])
+    const conMeta = await cifrasDeLaSemana(db, empresa)
+    const fila = conMeta.semana!.vendedores.find((v) => v.semana > 0)!
+    assert.equal(fila.semana, semana.vendido)
+    assert.equal(fila.meta, 1000)
+    const correo = correoResumen('Ana', 'Lácteos Semana', conMeta, 'https://ejemplo.test/admin')
+    assert.match(correo.texto, /Vendedores:\n· .+: \$[\d,.]+ · mes: \$[\d,.]+ de \$1,000\.00 \(\d+%\)/)
+    assert.match(correo.texto, /Lo que más se vendió: Mango/)
     assert.match(correo.asunto, /tu resumen de la semana/)
     assert.match(correo.texto, /del .+ al .+:/)
     assert.match(correo.texto, /Contra la semana anterior: Igual/)
@@ -102,6 +112,28 @@ describe('resumen diario por correo', () => {
     assert.equal((await ahora(vend, { tipo: 'diario' })).statusCode, 403)
     // No cuenta como el del día.
     assert.equal((await db.query(`SELECT resumen_enviado_dia FROM usuarios WHERE id_usuario = $1`, [admin.id])).rows[0].resumen_enviado_dia, null)
+  })
+
+  it('al cerrar el mes, el informe en PDF va a quien lo pidió', async () => {
+    const empresa = await crearEmpresa('Lácteos Mes')
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const pedir = (s: { token: string }, url: string, payload: object = {}) => app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${s.token}` }, payload })
+    assert.equal((await pedir(admin, '/cierres/2026-01/cerrar')).json().porCorreo, 0)
+    await yo(admin, { resumenMensual: true })
+    await pedir(admin, '/cierres/2026-01/reabrir', { motivo: 'Para volver a cerrarlo' })
+    assert.equal((await pedir(admin, '/cierres/2026-01/cerrar')).json().porCorreo, 1)
+
+    const pdf = Buffer.from('%PDF-1.4\n%prueba\n').toString('base64')
+    const r = await pedir(admin, '/cierres/2026-01/correo', { pdf })
+    assert.equal(r.statusCode, 200)
+    assert.equal(r.json().enviados, 1)
+    assert.equal((await pedir(admin, '/cierres/2026-01/correo', { pdf: Buffer.from('<html>').toString('base64') })).statusCode, 400)
+    assert.equal((await pedir(admin, '/cierres/2025-12/correo', { pdf })).statusCode, 409) // abierto
+    assert.equal((await pedir(vend, '/cierres/2026-01/correo', { pdf })).statusCode, 403)
+    const c = correoMensual('Ana López', 'Lácteos Mes', '2026-01', { ingreso: 1500, utilidad: 600, pedidos: 12, porCobrar: 0, vendedores: [{ nombre: 'Beto', ventas: 900, meta: 1000, cumplimientoPct: 90 }] }, 'https://ejemplo.test/admin')
+    assert.match(c.asunto, /Lácteos Mes: cierre de enero de 2026/)
+    assert.match(c.texto, /Beto: \$900\.00 de \$1,000\.00 \(90%\)/)
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

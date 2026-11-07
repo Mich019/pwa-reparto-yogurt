@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Config } from './config.js'
-import { correoResumen, enviarCorreos, type CifrasResumen } from './correo.js'
+import { correoMensual, correoResumen, enviarCorreos, type CifrasResumen } from './correo.js'
 import type { Db } from './db.js'
 
 // Resumen por correo para el administrador (Configuración → Preferencias): cada administrador que lo pidió recibe lo
@@ -10,7 +10,10 @@ import type { Db } from './db.js'
 // en vez de enterarse por un push de cada corte. Dos, cada uno con su interruptor:
 //   · diario (usuarios.resumen_correo, migración 030): cada mañana, lo de ayer;
 //   · semanal (usuarios.resumen_semanal, migración 031): el día que elija (`resumen_semanal_dia`, 032; lunes de
-//     fábrica), los siete días anteriores comparados con los siete de antes («vendiste 12% más»).
+//     fábrica), los siete días anteriores comparados con los siete de antes («vendiste 12% más»), el mejor día, lo que
+//     más se vendió y cada vendedor contra su meta del mes;
+//   · mensual (usuarios.resumen_mensual, migración 033): al cerrar un mes, con el PDF del informe adjunto. El PDF lo
+//     dibuja el navegador que cerró el mes (reportePdf.ts) y lo manda a POST /cierres/:mes/correo.
 // Lo llama el cron diario (plataforma.ts, GET /cron/avisos) con la conexión del dueño: cruza empresas. «Ayer» y «lunes»
 // salen de la zona de cada empresa. Cada cuenta se reclama (`resumen_enviado_dia`, `resumen_semanal_enviado`) antes de
 // mandarle nada: aunque el cron corra dos veces, no le llega dos veces.
@@ -74,8 +77,36 @@ export async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise
   )
   return {
     desde: r.desde as string, dia: r.hasta as string, vendidoAntes: dias > 1 ? r.vendido_antes : null,
+    semana: dias > 1 ? await detalleDeLaSemana(db, idEmpresa, r.desde, r.hasta) : null,
     entregados: r.entregados, vendido: r.vendido, efectivo: r.efectivo, transferencia: r.transferencia, fiado: r.fiado,
     abonos: r.abonos, sinAtender: r.sin_atender, cortesPorConfirmar: r.cortes_por_confirmar, urgentes: r.urgentes,
+  }
+}
+
+// Lo que sólo trae el semanal. El mes de cada vendedor va del día 1 del mes de `hasta` hasta `hasta`.
+async function detalleDeLaSemana(db: Db, idEmpresa: string, desde: string, hasta: string): Promise<NonNullable<CifrasResumen['semana']>> {
+  const entregados = `SELECT p.id_pedido, p.total, p.id_vendedor, (p.fecha_entregado_real AT TIME ZONE e.zona_horaria)::date AS dia
+                        FROM pedidos p JOIN empresas e ON e.id_empresa = p.id_empresa
+                       WHERE p.id_empresa = $1 AND p.estado = 'entregado'`
+  const [dia, sabor, vendedores] = await Promise.all([
+    db.query(`SELECT to_char(dia, 'YYYY-MM-DD') AS dia, sum(total)::float8 AS vendido FROM (${entregados}) v
+               WHERE dia BETWEEN $2::date AND $3::date GROUP BY dia ORDER BY 2 DESC, 1 LIMIT 1`, [idEmpresa, desde, hasta]),
+    db.query(`SELECT pr.sabor AS nombre, sum(dp.subtotal)::float8 AS vendido FROM (${entregados}) v
+                JOIN detalle_pedido dp ON dp.id_pedido = v.id_pedido JOIN productos pr ON pr.id_producto = dp.id_producto
+               WHERE v.dia BETWEEN $2::date AND $3::date GROUP BY pr.sabor ORDER BY 2 DESC, 1 LIMIT 1`, [idEmpresa, desde, hasta]),
+    db.query(`SELECT u.nombre, u.meta_mensual::float8 AS meta,
+                     coalesce(sum(v.total) FILTER (WHERE v.dia BETWEEN $2::date AND $3::date), 0)::float8 AS semana,
+                     coalesce(sum(v.total) FILTER (WHERE v.dia BETWEEN date_trunc('month', $3::date)::date AND $3::date), 0)::float8 AS mes
+                FROM usuarios u LEFT JOIN (${entregados}) v ON v.id_vendedor = u.id_usuario
+               WHERE u.id_empresa = $1 AND u.rol = 'vendedor' AND u.activo
+               GROUP BY u.id_usuario, u.nombre, u.meta_mensual
+              HAVING coalesce(sum(v.total) FILTER (WHERE v.dia BETWEEN $2::date AND $3::date), 0) > 0 OR u.meta_mensual IS NOT NULL
+               ORDER BY 3 DESC, 1`, [idEmpresa, desde, hasta]),
+  ])
+  return {
+    mejorDia: dia.rows[0] ? { dia: dia.rows[0].dia, vendido: dia.rows[0].vendido } : null,
+    sabor: sabor.rows[0] ? { nombre: sabor.rows[0].nombre, vendido: sabor.rows[0].vendido } : null,
+    vendedores: vendedores.rows.map((v) => ({ nombre: v.nombre, semana: v.semana, mes: v.mes, meta: v.meta })),
   }
 }
 
@@ -95,5 +126,32 @@ export async function rutasResumen(app: FastifyInstance, { db, config }: Context
     const cifras = await cifrasDe(db, req.usuario.empresa, b.data.tipo === 'semanal' ? 7 : 1)
     await enviarCorreos(config, [{ para: u.correo, ...correoResumen(u.nombre, u.empresa, cifras, `${config.urlApp}/admin`) }], req.log)
     return { para: u.correo as string }
+  })
+
+  // El informe del mes cerrado, a los administradores que lo pidieron, con el PDF que armó el navegador que lo cerró.
+  // Vercel no deja pasar más de 4.5 MB por petición: el PDF va en base64 y hasta unos 3 MB.
+  const bodyCorreoMes = z.object({ pdf: z.string().min(8).max(4_300_000).regex(/^[A-Za-z0-9+/]+=*$/, 'El PDF no es válido') }).strict()
+  app.post('/cierres/:mes/correo', { preHandler: requiereAdmin, bodyLimit: 4_400_000, config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const m = z.object({ mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }).safeParse(req.params)
+    const b = bodyCorreoMes.safeParse(req.body)
+    if (!m.success) return rep.code(400).send({ error: 'El mes va como AAAA-MM' })
+    if (!b.success || !Buffer.from(b.data.pdf.slice(0, 12), 'base64').toString('latin1').startsWith('%PDF-')) return rep.code(400).send({ error: 'El informe no es un PDF' })
+    const { rows: [c] } = await db.query(`SELECT estado, cifras FROM cierres_mes WHERE mes = $1::date`, [`${m.data.mes}-01`])
+    if (c?.estado !== 'cerrado') return rep.code(409).send({ error: 'Ese mes no está cerrado' })
+    const { rows: para } = await db.query(
+      `SELECT u.nombre, u.correo, e.nombre AS empresa FROM usuarios u JOIN empresas e ON e.id_empresa = u.id_empresa
+        WHERE u.id_empresa = $1 AND u.rol = 'administrador' AND u.activo AND u.resumen_mensual`,
+      [req.usuario.empresa],
+    )
+    if (!para.length) return { enviados: 0 }
+    const f = c.cifras
+    const cifras = {
+      ingreso: f.ventas.ingreso, utilidad: f.ventas.utilidad, pedidos: f.ventas.pedidos, porCobrar: f.porCobrar.saldo,
+      vendedores: (f.vendedores as { nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[])
+        .map((v) => ({ nombre: v.nombre, ventas: v.ventas, meta: v.meta, cumplimientoPct: v.cumplimientoPct })),
+    }
+    const adjuntos = [{ nombre: `informe-mensual-${m.data.mes}.pdf`, base64: b.data.pdf }]
+    const enviados = await enviarCorreos(config, para.map((u) => ({ para: u.correo as string, ...correoMensual(u.nombre, u.empresa, m.data.mes, cifras, `${config.urlApp}/admin`), adjuntos })), req.log)
+    return { enviados }
   })
 }

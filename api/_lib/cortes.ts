@@ -496,7 +496,9 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         )
         return cifras
       })
-      return { ok: true, cifras: r }
+      // Cuántos administradores quieren el informe por correo: el panel arma el PDF sólo si alguien lo quiere (resumen.ts).
+      const { rows: [{ n: porCorreo }] } = await db.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'administrador' AND activo AND resumen_mensual`)
+      return { ok: true, cifras: r, porCorreo }
     } catch (e) {
       return responder(rep, e)
     }

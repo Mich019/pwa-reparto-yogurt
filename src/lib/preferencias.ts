@@ -4,14 +4,14 @@ import { guardarPerfil, llamarAutenticado } from './sesion'
 // Preferencias de avisos de la cuenta (PATCH /me): qué avisos no quiere y su horario de silencio. Las usan el panel
 // (Configuración → Preferencias) y el teléfono (Cuenta → Preferencias). Se piden al abrir: sin señal quedan en null.
 export interface Silencio { desde: number; hasta: number }
-interface Prefs { avisosApagados: string[]; silencio: Silencio | null; resumenCorreo: boolean; resumenSemanal: boolean; resumenSemanalDia: number }
+interface Prefs { avisosApagados: string[]; silencio: Silencio | null; resumenCorreo: boolean; resumenSemanal: boolean; resumenSemanalDia: number; resumenMensual: boolean }
 
 export function usePreferenciasAvisos(alFallar: (e: unknown) => void) {
   const [prefs, setPrefs] = useState<Prefs | null>(null)
   const [sinSenal, setSinSenal] = useState(false)
   useEffect(() => {
     llamarAutenticado<Partial<Prefs>>('/me')
-      .then((r) => setPrefs({ avisosApagados: r.avisosApagados ?? [], silencio: r.silencio ?? null, resumenCorreo: !!r.resumenCorreo, resumenSemanal: !!r.resumenSemanal, resumenSemanalDia: r.resumenSemanalDia ?? 1 }))
+      .then((r) => setPrefs({ avisosApagados: r.avisosApagados ?? [], silencio: r.silencio ?? null, resumenCorreo: !!r.resumenCorreo, resumenSemanal: !!r.resumenSemanal, resumenSemanalDia: r.resumenSemanalDia ?? 1, resumenMensual: !!r.resumenMensual }))
       .catch(() => setSinSenal(true))
   }, [])
   // Se ve al momento; si el servidor no lo guarda, vuelve a como estaba.
@@ -29,7 +29,7 @@ export function usePreferenciasAvisos(alFallar: (e: unknown) => void) {
   const encendido = (tipo: string) => !!prefs && !prefs.avisosApagados.includes(tipo)
   const alternar = (tipo: string, si: boolean) =>
     prefs && cambiar({ avisosApagados: si ? prefs.avisosApagados.filter((t) => t !== tipo) : [...prefs.avisosApagados, tipo] })
-  return { prefs, sinSenal, encendido, alternar, cambiarSilencio: (silencio: Silencio | null) => cambiar({ silencio }), cambiarResumen: (resumenCorreo: boolean) => cambiar({ resumenCorreo }), cambiarSemanal: (resumenSemanal: boolean) => cambiar({ resumenSemanal }), cambiarDiaSemanal: (resumenSemanalDia: number) => cambiar({ resumenSemanalDia }) }
+  return { prefs, sinSenal, encendido, alternar, cambiarSilencio: (silencio: Silencio | null) => cambiar({ silencio }), cambiarResumen: (resumenCorreo: boolean) => cambiar({ resumenCorreo }), cambiarSemanal: (resumenSemanal: boolean) => cambiar({ resumenSemanal }), cambiarDiaSemanal: (resumenSemanalDia: number) => cambiar({ resumenSemanalDia }), cambiarMensual: (resumenMensual: boolean) => cambiar({ resumenMensual }) }
 }
 
 export const HORAS = Array.from({ length: 24 }, (_, h) => h)

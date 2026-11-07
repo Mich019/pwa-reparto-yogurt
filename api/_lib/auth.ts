@@ -43,7 +43,9 @@ const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional
   resumenCorreo: z.boolean().optional(),
   resumenSemanal: z.boolean().optional(),
   // Día ISO del semanal: 1 = lunes … 7 = domingo.
-  resumenSemanalDia: z.number().int().min(1).max(7).optional() }).strict()
+  resumenSemanalDia: z.number().int().min(1).max(7).optional(),
+  // El informe del mes por correo al cerrarlo.
+  resumenMensual: z.boolean().optional() }).strict()
 const silencioDe = (u: { silencio_desde: number | null; silencio_hasta: number | null }) =>
   u.silencio_desde === null ? null : { desde: u.silencio_desde, hasta: u.silencio_hasta }
 const bodyCerrarSesion = z.object({ id: z.string().uuid().optional() }).strict()
@@ -243,7 +245,7 @@ export async function rutasAuth(
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, u.avisos_apagados, u.silencio_desde, u.silencio_hasta, u.resumen_correo, u.resumen_semanal, u.resumen_semanal_dia, e.interna, e.nombre AS empresa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, u.avisos_apagados, u.silencio_desde, u.silencio_hasta, u.resumen_correo, u.resumen_semanal, u.resumen_semanal_dia, u.resumen_mensual, e.interna, e.nombre AS empresa
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [req.usuario.id],
     )
@@ -259,6 +261,7 @@ export async function rutasAuth(
       resumenCorreo: u.resumen_correo,
       resumenSemanal: u.resumen_semanal,
       resumenSemanalDia: u.resumen_semanal_dia,
+      resumenMensual: u.resumen_mensual,
     }
   })
 
@@ -279,14 +282,15 @@ export async function rutasAuth(
               silencio_hasta = CASE WHEN $11::boolean THEN $13::smallint ELSE silencio_hasta END,
               resumen_correo = COALESCE($14::boolean, resumen_correo),
               resumen_semanal = COALESCE($15::boolean, resumen_semanal),
-              resumen_semanal_dia = COALESCE($16::smallint, resumen_semanal_dia)
-        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu, avisos_apagados, silencio_desde, silencio_hasta, resumen_correo, resumen_semanal, resumen_semanal_dia`,
+              resumen_semanal_dia = COALESCE($16::smallint, resumen_semanal_dia),
+              resumen_mensual = COALESCE($17::boolean, resumen_mensual)
+        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu, avisos_apagados, silencio_desde, silencio_hasta, resumen_correo, resumen_semanal, resumen_semanal_dia, resumen_mensual`,
       [req.usuario.id, b.data.nombre ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.foto !== undefined, b.data.foto ?? null,
         b.data.ordenMenu !== undefined, b.data.ordenMenu?.length ? b.data.ordenMenu : null,
         b.data.avisosApagados !== undefined, b.data.avisosApagados?.length ? [...new Set(b.data.avisosApagados)] : null,
-        b.data.silencio !== undefined, b.data.silencio?.desde ?? null, b.data.silencio?.hasta ?? null, b.data.resumenCorreo ?? null, b.data.resumenSemanal ?? null, b.data.resumenSemanalDia ?? null],
+        b.data.silencio !== undefined, b.data.silencio?.desde ?? null, b.data.silencio?.hasta ?? null, b.data.resumenCorreo ?? null, b.data.resumenSemanal ?? null, b.data.resumenSemanalDia ?? null, b.data.resumenMensual ?? null],
     )).rows[0])
-    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null, avisosApagados: u.avisos_apagados ?? [], silencio: silencioDe(u), resumenCorreo: u.resumen_correo, resumenSemanal: u.resumen_semanal, resumenSemanalDia: u.resumen_semanal_dia }
+    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null, avisosApagados: u.avisos_apagados ?? [], silencio: silencioDe(u), resumenCorreo: u.resumen_correo, resumenSemanal: u.resumen_semanal, resumenSemanalDia: u.resumen_semanal_dia, resumenMensual: u.resumen_mensual }
   })
 
   // Las sesiones abiertas de la cuenta (la de esta petición marcada) y cerrar una o todas las demás.

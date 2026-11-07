@@ -105,7 +105,7 @@ describe('login y sesiones (M01)', () => {
     const editar = (payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${s.token}` }, payload })
     const r = await editar({ nombre: '  Rosa Pérez ', telefono: '555 123 4567' })
     assert.equal(r.statusCode, 200)
-    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null, avisosApagados: [], silencio: null, resumenCorreo: false, resumenSemanal: false, resumenSemanalDia: 1 })
+    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null, avisosApagados: [], silencio: null, resumenCorreo: false, resumenSemanal: false, resumenSemanalDia: 1, resumenMensual: false })
     const yo = await get(s, '/me')
     assert.equal(yo.body.nombre, 'Rosa Pérez')
     assert.equal(yo.body.telefono, '555 123 4567')

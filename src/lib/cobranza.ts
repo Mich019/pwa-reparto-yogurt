@@ -85,7 +85,7 @@ export const registrarRecogida = (b: { clienteId: string; productoId: string; ca
 export const anularRecogida = (id: string) => enviar(`/envases/recogidas/${id}/anular`)
 export const entregarCorte = (b: { efectivoEntregado: number; nota?: string; fecha?: string; vendedorId?: string }) => enviar<{ id: string; esperado: number; entregado: number; diferencia: number }>('/cortes', b)
 export const confirmarCorte = (id: string, nota?: string) => enviar<{ ok: true; esperado: number; diferencia: number }>(`/cortes/${id}/confirmar`, { nota })
-export const cerrarMes = (mes: string) => enviar(`/cierres/${mes}/cerrar`)
+export const cerrarMes = (mes: string) => enviar<{ ok: true; porCorreo: number }>(`/cierres/${mes}/cerrar`)
 export const reabrirCorte = (id: string, motivo: string) => enviar<{ ok: true }>(`/cortes/${id}/reabrir`, { motivo })
 export const reabrirMes = (mes: string, motivo: string) => enviar(`/cierres/${mes}/reabrir`, { motivo })
 
@@ -103,6 +103,17 @@ export async function exportarInforme(informe: InformeMes, formato: 'pdf' | 'xls
   const pdf = await import('./reportePdf')
   await pdf.prepararLogoPdf()
   mostrarPdf(pdf.informeMensualPdf(informe), nombre)
+}
+
+// Al cerrar el mes: arma aquí el PDF del informe y el servidor lo manda a los administradores que lo pidieron.
+export async function mandarInformePorCorreo(mes: string) {
+  const informe = await llamarAutenticado<InformeMes>(`/cierres/${mes}/informe`)
+  const pdf = await import('./reportePdf')
+  await pdf.prepararLogoPdf()
+  const { bytes } = pdf.informeMensualPdf(informe)
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return enviar<{ enviados: number }>(`/cierres/${mes}/correo`, { pdf: btoa(s) })
 }
 
 export const textoMes = (mes: string) => {

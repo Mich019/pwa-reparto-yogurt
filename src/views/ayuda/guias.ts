@@ -186,7 +186,7 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Configuración, abre «Preferencias» y en «Avisos en este dispositivo» toca «Activar avisos». El navegador te pide permiso: acéptalo.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'texto', lineas: 2 }, { t: 'botones', items: [{ texto: 'Activar avisos', primario: true, foco: true }] }]) },
       { texto: 'Con «Enviar prueba» compruebas que llegan. Al tocar un aviso de corte se abre Cobranza → Cortes; el de la prueba, tu Suscripción.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Avisos en este dispositivo' }, { t: 'botones', items: [{ texto: 'Enviar prueba', foco: true }, { texto: 'Desactivar' }] }]) },
-      { texto: 'En «Qué avisos recibes» apaga los que no quieras, con «Resumen por correo» te llega lo de ayer cada mañana o la semana el día que elijas (y puedes pedir uno ahora para verlo), y en «Horario de silencio» eliges las horas en que no suenan (los ves después). Vale para tu cuenta en todos tus dispositivos.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Qué avisos recibes' }, { t: 'filas', n: 3 }, { t: 'titulo', texto: 'Horario de silencio' }, { t: 'filas', n: 1 }]) },
+      { texto: 'En «Qué avisos recibes» apaga los que no quieras, con «Resumen por correo» te llega lo de ayer cada mañana la semana el día que elijas o el informe del mes en PDF al cerrarlo (y puedes pedir uno ahora para verlo), y en «Horario de silencio» eliges las horas en que no suenan (los ves después). Vale para tu cuenta en todos tus dispositivos.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Qué avisos recibes' }, { t: 'filas', n: 3 }, { t: 'titulo', texto: 'Horario de silencio' }, { t: 'filas', n: 1 }]) },
     ],
   },
   {

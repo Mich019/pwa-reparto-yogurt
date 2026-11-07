@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
-  cerrarMes, confirmarCorte, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
+  cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
   type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
 } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
@@ -390,7 +390,15 @@ function HojaCierre({ mes, reabrir, onCerrar, onHecho }: { mes: string; reabrir:
     setEnviando(true)
     try {
       if (reabrir) await reabrirMes(mes, motivo.trim())
-      else await cerrarMes(mes)
+      else {
+        const r = await cerrarMes(mes)
+        // El informe por correo sale aparte: si falla, el mes ya quedó cerrado.
+        if (r.porCorreo > 0) {
+          void mandarInformePorCorreo(mes)
+            .then((x) => aviso(`Informe del mes enviado por correo a ${x.enviados === 1 ? '1 administrador' : `${x.enviados} administradores`}`))
+            .catch((e) => aviso(`El mes se cerró, pero el informe no salió por correo: ${e instanceof Error ? e.message : 'intenta más tarde'}`))
+        }
+      }
       aviso(reabrir ? 'Mes reabierto' : 'Mes cerrado')
       onHecho()
       onCerrar()

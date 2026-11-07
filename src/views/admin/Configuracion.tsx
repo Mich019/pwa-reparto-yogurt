@@ -352,7 +352,7 @@ function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encend
 }
 
 function Preferencias() {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal, cambiarDiaSemanal } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal, cambiarDiaSemanal, cambiarMensual } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
   const [mandando, setMandando] = useState<'diario' | 'semanal' | null>(null)
   async function mandarAhora(tipo: 'diario' | 'semanal') {
     setMandando(tipo)
@@ -382,7 +382,7 @@ function Preferencias() {
         <Fila titulo="Cada mañana" ayuda={prefs?.resumenCorreo ? 'Lo de ayer, en tu correo.' : 'Apagado.'}>
           <Interruptor encendido={!!prefs?.resumenCorreo} deshabilitado={!prefs} etiqueta="Resumen de cada mañana" alCambiar={(si) => void cambiarResumen(si)} />
         </Fila>
-        <Fila titulo="Cada semana" ayuda={prefs?.resumenSemanal ? `Cada ${DIAS_SEMANA[diaSemanal - 1].toLowerCase()}, los siete días anteriores comparados con los siete de antes.` : 'Apagado.'}>
+        <Fila titulo="Cada semana" ayuda={prefs?.resumenSemanal ? `Cada ${DIAS_SEMANA[diaSemanal - 1].toLowerCase()}: los siete días anteriores contra los de antes, el mejor día, lo más vendido y cada vendedor contra su meta.` : 'Apagado.'}>
           <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} etiqueta="Resumen de cada semana" alCambiar={(si) => void cambiarSemanal(si)} />
         </Fila>
         {prefs?.resumenSemanal && (
@@ -392,6 +392,9 @@ function Preferencias() {
             </select>
           </Fila>
         )}
+        <Fila titulo="Al cerrar el mes" ayuda={prefs?.resumenMensual ? 'Te llega el informe del mes en PDF cuando alguien lo cierra en Cobranza → Meses.' : 'Apagado.'}>
+          <Interruptor encendido={!!prefs?.resumenMensual} deshabilitado={!prefs} etiqueta="Informe al cerrar el mes" alCambiar={(si) => void cambiarMensual(si)} />
+        </Fila>
         <Fila titulo="Ver cómo llega" ayuda="Te manda uno ahora a tu correo; el de cada día sale igual.">
           <span className="flex flex-wrap gap-2">
             {(['diario', 'semanal'] as const).map((t) => (
