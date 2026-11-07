@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, BellOff, Check, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, BellOff, BellRing, Check, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
-  cargarEquipo, crearMiembro, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
+  avisoDePrueba, cargarEquipo, crearMiembro, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro,
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
@@ -272,6 +272,13 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
     aviso(`${m.nombre} ya no puede entrar${extra}`)
   })
 
+  const probar = () => correr(async () => {
+    const r = await avisoDePrueba(m.id)
+    aviso(r.enviados ? `Aviso de prueba enviado a ${plural(r.enviados, 'dispositivo', 'dispositivos')} de ${m.nombre}`
+      : r.dispositivos ? 'No llegó: sus dispositivos ya no aceptan avisos. Que los vuelva a activar en Cuenta.'
+      : `${m.nombre} no tiene los avisos activados; lo verá al abrir la app`)
+  })
+
   const alta = () => correr(async () => {
     await reactivar(m.id)
     aviso(`${m.nombre} volvió a tener acceso`)
@@ -294,6 +301,11 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           {m.rol === 'vendedor' && <Linea t="Clientes" v={`${m.clientes}${m.clientes !== m.clientesActivos ? ` (${m.clientesActivos} activos)` : ''}`} />}
           <Linea t="Avisos" v={textoAvisos(m)} />
         </dl>
+        {m.activo && m.dispositivosPush > 0 && (
+          <button type="button" onClick={probar} disabled={trabajando} className="-mt-2 flex items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-tinta underline-offset-4 hover:underline disabled:opacity-50">
+            <BellRing size={16} aria-hidden="true" /> Mandar aviso de prueba
+          </button>
+        )}
 
         {!confirmar && (
           <div className="grid grid-cols-4 gap-1">

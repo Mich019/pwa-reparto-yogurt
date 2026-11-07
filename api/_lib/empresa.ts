@@ -22,11 +22,13 @@ const bodyMarca = z.object({
   contacto: z.string().trim().max(160, 'El contacto es de 160 letras como máximo').nullable().optional(),
   // Define el «hoy» de la empresa (ruta del día, stock, resumen y reportes).
   zonaHoraria: z.string().refine(zonaValida, 'Zona horaria no válida').optional(),
+  // Cuánto espera un urgente pendiente antes de recordarlo (urgentes.ts).
+  minutosUrgente: z.number().int().min(5, 'Mínimo 5 minutos').max(240, 'Máximo 4 horas').optional(),
 }).refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
 
 export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { requiereSesionAunConPasswordPendiente, requiereAdmin }: { requiereSesionAunConPasswordPendiente: Guardia; requiereAdmin: Guardia }) {
   const leer = async (id: string) => {
-    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria FROM empresas WHERE id_empresa = $1`, [id])
+    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente FROM empresas WHERE id_empresa = $1`, [id])
     return {
       nombre: e.nombre as string,
       color: (e.color_marca as string | null) ?? null,
@@ -34,6 +36,7 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
       lema: (e.lema as string | null) ?? null,
       contacto: (e.contacto as string | null) ?? null,
       zonaHoraria: e.zona_horaria as string,
+      minutosUrgente: e.minutos_urgente as number,
     }
   }
 
@@ -43,7 +46,7 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
   app.patch('/empresa', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyMarca.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
-    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria } = b.data
+    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente } = b.data
     await db.query(
       `UPDATE empresas SET nombre = coalesce($2, nombre),
               color_marca = CASE WHEN $3 THEN $4 ELSE color_marca END,
@@ -51,10 +54,11 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
               lema = CASE WHEN $7 THEN $8 ELSE lema END,
               contacto = CASE WHEN $9 THEN $10 ELSE contacto END,
               zona_horaria = coalesce($11, zona_horaria),
+              minutos_urgente = coalesce($12::smallint, minutos_urgente),
               actualizado_en = now()
         WHERE id_empresa = $1`,
       [req.usuario.empresa, nombre ?? null, c !== undefined, c ?? null, l !== undefined, l ?? null,
-        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null],
+        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null],
     )
     if (zonaHoraria) olvidarZona(req.usuario.empresa)
     return leer(req.usuario.empresa)

@@ -387,11 +387,18 @@ describe('entrega de los avisos', () => {
   })
 
   it('«enviar prueba» llega a los teléfonos de la cuenta, y sin push responde que no está activado', async () => {
-    const { vend, tel } = await escenario()
+    const { admin, vend, tel } = await escenario()
     const r = await llamar(vend, 'POST', '/notificaciones/prueba')
     assert.deepEqual(r.body, { dispositivos: 1, enviados: 1 })
     assert.equal(enviados[0].endpoint, tel)
     assert.equal(enviados[0].carga.tipo, 'prueba')
+
+    // El administrador se la manda desde la ficha del vendedor; el vendedor no puede mandársela a otros.
+    const desdeFicha = await llamar(admin, 'POST', `/usuarios/${vend.id}/aviso-prueba`)
+    assert.deepEqual(desdeFicha.body, { dispositivos: 1, enviados: 1 })
+    assert.match(enviados[1].carga.cuerpo, /te mandó esta prueba/)
+    assert.equal((await llamar(vend, 'POST', `/usuarios/${admin.id}/aviso-prueba`)).status, 403)
+    assert.equal((await llamar(admin, 'POST', `/usuarios/${randomUUID()}/aviso-prueba`)).status, 404)
 
     const sinPush = await llamar(vend, 'POST', '/notificaciones/prueba', undefined, app)
     assert.equal(sinPush.status, 409)

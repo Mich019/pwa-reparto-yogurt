@@ -55,6 +55,28 @@ describe('urgente sin atender', () => {
     assert.equal((await de(todos)).length, 3)
   })
 
+  it('cada empresa elige cuántos minutos espera', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    const cambio = await app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${admin.token}` }, payload: { minutosUrgente: 60 } })
+    assert.equal(cambio.json().minutosUrgente, 60)
+    const malo = await app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${admin.token}` }, payload: { minutosUrgente: 2 } })
+    assert.equal(malo.statusCode, 400)
+    const c = cliente()
+    await push(vend, [op('clientes', c.id, c)])
+    const producto = await unSabor(admin)
+    const p = { ...pedido(c.id, producto.id, { fecha: hoyEn(config.zonaHoraria), urgente: true }), vendedorId: vend.id }
+    await push(admin, [op('pedidos', p.id, p)])
+    const hace = (min: number) => db.query(`UPDATE notificaciones SET creado_en = now() - make_interval(mins => $2) WHERE tipo = 'pedido_urgente' AND id_usuario = $1`, [vend.id, min])
+    await hace(40)
+    await avisarUrgentesSinAtender(db, despachador)
+    assert.equal((await de([admin.id, vend.id])).length, 0) // a los 40 todavía no: eligió una hora
+    await hace(65)
+    await avisarUrgentesSinAtender(db, despachador)
+    assert.equal((await de([admin.id, vend.id])).length, 2)
+  })
+
   it('cada administrador lo puede apagar en Preferencias', async () => {
     const empresa = await crearEmpresa()
     const admin = await sesion('administrador', 'tel-a', empresa)

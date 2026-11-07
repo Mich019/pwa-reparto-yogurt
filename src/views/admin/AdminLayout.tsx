@@ -180,9 +180,9 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
               onClick={onIrAPwa}
               aria-label="Abrir la app de reparto"
               title="Abrir la app de reparto"
-              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm font-semibold text-tinta transition-colors hover:bg-niebla 2xl:px-4 ${pildora} ${anillo}`}
+              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm font-semibold text-tinta transition-colors hover:text-marca 2xl:px-4 ${anillo}`}
             >
-              <Smartphone size={17} aria-hidden="true" />
+              <Smartphone size={19} aria-hidden="true" />
               <span className="hidden 2xl:inline">App de reparto</span>
             </button>
           )}

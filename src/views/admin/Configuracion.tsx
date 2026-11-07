@@ -16,6 +16,7 @@ import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
 import { activarPush, desactivarPush, enviarPrueba, useEstadoPush } from '../../lib/push'
 import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
 import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
+import { guardarMarca, useMarca } from '../../lib/marca'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -303,9 +304,41 @@ function AvisosPush() {
 const TIPOS_AVISO = [
   { tipo: 'corte_entregado', titulo: 'Corte por confirmar', ayuda: 'Un vendedor entregó o corrigió su corte del día.' },
   { tipo: 'corte_descuadrado', titulo: 'Corte que ya no cuadra', ayuda: 'Llegó una venta en efectivo de un día con el corte ya confirmado.' },
-  { tipo: 'urgente_sin_atender', titulo: 'Urgente sin atender', ayuda: 'Un pedido urgente sigue pendiente 30 minutos después.' },
+  { tipo: 'urgente_sin_atender', titulo: 'Urgente sin atender', ayuda: 'Un pedido urgente sigue pendiente después del tiempo que elijas abajo.' },
   { tipo: 'prueba_por_vencer', titulo: 'Prueba gratis por vencer', ayuda: 'Unos días antes y el último día de la prueba.' },
 ] as const
+
+// De la empresa (no de la cuenta): cuánto espera un urgente pendiente antes de recordárselo al vendedor y avisar a los
+// administradores (api/_lib/urgentes.ts).
+const MINUTOS_URGENTE = [10, 15, 20, 30, 45, 60, 90, 120]
+function MinutosUrgente() {
+  const marca = useMarca()
+  const [guardando, setGuardando] = useState(false)
+  if (!marca?.minutosUrgente) return null
+  const actual = marca.minutosUrgente
+  const opciones = MINUTOS_URGENTE.includes(actual) ? MINUTOS_URGENTE : [...MINUTOS_URGENTE, actual].sort((a, b) => a - b)
+  async function cambiar(minutosUrgente: number) {
+    setGuardando(true)
+    try {
+      await guardarMarca({ minutosUrgente })
+      aviso('Tiempo de urgentes guardado')
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  const texto = (n: number) => (n < 60 ? `${n} minutos` : n === 60 ? '1 hora' : `${n / 60} horas`)
+  return (
+    <Seccion id="urgentes" titulo="Pedidos urgentes" descripcion="Vale para toda tu empresa: lo ven igual los demás administradores.">
+      <Fila titulo="Recordar si siguen pendientes" ayuda={`Después de ${texto(actual)} se le recuerda al vendedor y te avisa a ti.`}>
+        <select value={actual} disabled={guardando} onChange={(e) => void cambiar(Number(e.target.value))} className={claseInputRecto} aria-label="Tiempo antes de recordar un urgente">
+          {opciones.map((n) => <option key={n} value={n}>{texto(n)}</option>)}
+        </select>
+      </Fila>
+    </Seccion>
+  )
+}
 
 function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encendido: boolean; deshabilitado: boolean; etiqueta: string; alCambiar: (si: boolean) => void }) {
   return (
@@ -318,7 +351,7 @@ function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encend
 }
 
 function Preferencias() {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
   const silencio = prefs?.silencio ?? null
   const claseHora = `rounded-md border border-linea bg-papel px-3 py-2 text-sm font-semibold ${anillo}`
   return (
@@ -331,11 +364,15 @@ function Preferencias() {
           </Fila>
         ))}
       </Seccion>
-      <Seccion id="resumen" titulo="Resumen diario por correo" descripcion="Cada mañana, lo de ayer en un solo correo: ventas, cobro, fiado, cortes por confirmar y urgentes que tardaron. Si lo prendes, puedes apagar arriba «Corte por confirmar» para no recibir un aviso por cada uno.">
-        <Fila titulo="Mandarme el resumen" ayuda={prefs?.resumenCorreo ? 'Te llega a tu correo cada mañana.' : 'Apagado.'}>
-          <Interruptor encendido={!!prefs?.resumenCorreo} deshabilitado={!prefs} etiqueta="Mandarme el resumen" alCambiar={(si) => void cambiarResumen(si)} />
+      <Seccion id="resumen" titulo="Resumen por correo" descripcion="Ventas, cobro, fiado, cortes por confirmar y urgentes que tardaron, en un solo correo. Si lo prendes, puedes apagar arriba «Corte por confirmar» para no recibir un aviso por cada uno.">
+        <Fila titulo="Cada mañana" ayuda={prefs?.resumenCorreo ? 'Lo de ayer, en tu correo.' : 'Apagado.'}>
+          <Interruptor encendido={!!prefs?.resumenCorreo} deshabilitado={!prefs} etiqueta="Resumen de cada mañana" alCambiar={(si) => void cambiarResumen(si)} />
+        </Fila>
+        <Fila titulo="Cada lunes" ayuda={prefs?.resumenSemanal ? 'La semana anterior completa, en tu correo.' : 'Apagado.'}>
+          <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} etiqueta="Resumen de cada lunes" alCambiar={(si) => void cambiarSemanal(si)} />
         </Fila>
       </Seccion>
+      <MinutosUrgente />
       <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>
           <Interruptor encendido={!!silencio} deshabilitado={!prefs} etiqueta="Silenciar avisos" alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />

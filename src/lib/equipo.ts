@@ -78,6 +78,11 @@ export async function darDeBaja(id: string) {
   refrescar()
 }
 
+// Aviso de prueba a los dispositivos de otra cuenta (api/_lib/notificaciones.ts).
+export function avisoDePrueba(id: string) {
+  return llamarAutenticado<{ dispositivos: number; enviados: number }>(`/usuarios/${id}/aviso-prueba`, { metodo: 'POST' })
+}
+
 export async function reactivar(id: string) {
   await llamarAutenticado(`/usuarios/${id}/reactivar`, { metodo: 'POST' })
   refrescar()

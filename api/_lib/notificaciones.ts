@@ -102,8 +102,10 @@ export function crearDespachador(db: Db, enviador: Enviador | null, log: Registr
         }),
       )
     },
-    async probar(idUsuario: string) {
-      const aviso: AvisoPendiente = { para: idUsuario, tipo: 'prueba', titulo: 'Prueba de avisos', cuerpo: 'Si lo ves, este teléfono recibirá los avisos de tu ruta.', datos: { pestana: 'cuenta' } }
+    // `deQuien`: la manda un administrador desde la ficha de la persona (Equipo).
+    async probar(idUsuario: string, deQuien?: string) {
+      const cuerpo = deQuien ? `${deQuien} te mandó esta prueba. Si la ves, te llegan los avisos.` : 'Si lo ves, este teléfono recibirá los avisos de tu ruta.'
+      const aviso: AvisoPendiente = { para: idUsuario, tipo: 'prueba', titulo: 'Prueba de avisos', cuerpo, datos: { pestana: 'cuenta' } }
       const r = await guardar(aviso) // la prueba suena aunque sea horario de silencio: es lo que se quiere comprobar
       return r ? entregar(r.id, aviso) : { dispositivos: 0, enviados: 0 }
     },
@@ -123,7 +125,7 @@ const bodyLeidas = z.object({ ids: z.array(z.uuid()).min(1).max(200) })
 export async function rutasNotificaciones(
   app: FastifyInstance,
   { db, config }: Contexto,
-  { requiereSesion }: { requiereSesion: Guardia },
+  { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia },
   despachador: Despachador,
   enviador: Enviador | null,
 ) {
@@ -168,5 +170,18 @@ export async function rutasNotificaciones(
   app.post('/notificaciones/prueba', { preHandler: requiereSesion, config: limite(6) }, async (req, rep) => {
     if (!enviador) return rep.code(409).send({ error: 'Este servidor no tiene activadas las notificaciones push', codigo: 'PUSH_NO_CONFIGURADO' })
     return despachador.probar(req.usuario.id)
+  })
+
+  // Desde la ficha de una persona del equipo: el administrador comprueba que a ella le llegan (sin pedirle el teléfono).
+  // La base sólo deja ver las cuentas de su empresa.
+  app.post('/usuarios/:id/aviso-prueba', { preHandler: requiereAdmin, config: limite(6) }, async (req, rep) => {
+    const p = z.object({ id: z.uuid() }).safeParse(req.params)
+    if (!p.success) return rep.code(400).send({ error: 'Cuenta no válida' })
+    if (!enviador) return rep.code(409).send({ error: 'Este servidor no tiene activadas las notificaciones push', codigo: 'PUSH_NO_CONFIGURADO' })
+    const { rows: [u] } = await db.query(`SELECT activo FROM usuarios WHERE id_usuario = $1`, [p.data.id])
+    if (!u) return rep.code(404).send({ error: 'No existe esa cuenta' })
+    if (!u.activo) return rep.code(409).send({ error: 'Esa cuenta está dada de baja' })
+    const { rows: [yo] } = await db.query(`SELECT nombre FROM usuarios WHERE id_usuario = $1`, [req.usuario.id])
+    return despachador.probar(p.data.id, yo?.nombre)
   })
 }

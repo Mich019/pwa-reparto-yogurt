@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { correoResumen } from '../_lib/correo.js'
-import { cifrasDeAyer, mandarResumenes } from '../_lib/resumen.js'
+import { cifrasDeAyer, cifrasDeLaSemana, mandarResumenes } from '../_lib/resumen.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
 
 // Resumen diario por correo para el administrador (resumen.ts) y lo que el equipo muestra de los avisos de cada quien.
@@ -47,6 +47,37 @@ describe('resumen diario por correo', () => {
     const antes = await enviado(pide.id)
     await mandarResumenes(db, config, log)
     assert.deepEqual(await enviado(pide.id), antes)
+  })
+
+  it('el semanal cuenta los siete días anteriores y sale sólo el lunes', async () => {
+    const empresa = await crearEmpresa('Lácteos Semana')
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const vend = await sesion('vendedor', 'tel-v', empresa)
+    assert.equal((await yo(admin, { resumenSemanal: true })).json().resumenSemanal, true)
+    const s = { id: randomUUID(), sabor: 'Mango', descripcion: '', presentacion: 1, precio_litro: 40, costo_litro: 15, color_hex: '#f59e0b', disponible: true }
+    await push(admin, [op('productos', s.id, s)])
+    const c = cliente()
+    await push(vend, [op('clientes', c.id, c)])
+    const dentro = pedido(c.id, s.id), fuera = pedido(c.id, s.id)
+    await push(vend, [op('pedidos', dentro.id, dentro), op('pedidos', fuera.id, fuera)])
+    const entregar = (id: string, dias: number) => db.query(
+      `UPDATE pedidos SET estado = 'entregado', metodo_pago = 'transferencia', fecha_entregado_real = now() - make_interval(days => $2), fecha = (now() - make_interval(days => $2))::date WHERE id_pedido = $1`, [id, dias])
+    await entregar(dentro.id, 3)
+    await entregar(fuera.id, 9)
+    const semana = await cifrasDeLaSemana(db, empresa)
+    assert.equal(semana.entregados, 1)
+    assert.equal(semana.vendido, semana.transferencia)
+    assert.equal((await cifrasDeAyer(db, empresa)).entregados, 0)
+    const correo = correoResumen('Ana', 'Lácteos Semana', semana, 'https://ejemplo.test/admin')
+    assert.match(correo.asunto, /tu resumen de la semana/)
+    assert.match(correo.texto, /del .+ al .+:/)
+
+    const enviado = async () => (await db.query(`SELECT resumen_semanal_enviado FROM usuarios WHERE id_usuario = $1`, [admin.id])).rows[0].resumen_semanal_enviado
+    const { rows: [{ hoy }] } = await db.query(`SELECT extract(isodow FROM now() AT TIME ZONE zona_horaria)::int AS hoy FROM empresas WHERE id_empresa = $1`, [empresa])
+    await mandarResumenes(db, config, log, (hoy % 7) + 1) // otro día de la semana: no sale
+    assert.equal(await enviado(), null)
+    await mandarResumenes(db, config, log, hoy)
+    assert.ok(await enviado())
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

@@ -4,7 +4,8 @@ import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { AvisoPendiente, Despachador } from './notificaciones.js'
 
-// Pedido urgente sin atender (RF-054). Si un pedido marcado urgente sigue pendiente `MINUTOS` después del aviso al
+// Pedido urgente sin atender (RF-054). Si un pedido marcado urgente sigue pendiente los minutos de su empresa
+// (`empresas.minutos_urgente`, 30 de fábrica; Configuración → Preferencias) después del aviso al
 // vendedor, se le recuerda a él y se avisa a los administradores activos de la empresa. Una vez por cada vez que se
 // marcó urgente (si lo vuelven a marcar, puede volver a avisar).
 //
@@ -14,10 +15,10 @@ import type { AvisoPendiente, Despachador } from './notificaciones.js'
 // Cruza empresas: corre con la conexión del dueño de la base. Un candado de la base evita que dos instancias avisen
 // lo mismo a la vez.
 
-export const MINUTOS = 30
 const CADA_MS = 2 * 60_000
 
-export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador, minutos = MINUTOS): Promise<number> {
+// `minutos` sólo para pruebas: si no, cuenta lo que eligió cada empresa.
+export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador, minutos: number | null = null): Promise<number> {
   const c = await db.connect()
   try {
     await c.query('BEGIN')
@@ -38,8 +39,9 @@ export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador,
          FROM ultimo x
          JOIN pedidos p ON p.id_pedido = x.id_pedido
          JOIN clientes cl ON cl.id_cliente = p.id_cliente
+         JOIN empresas e ON e.id_empresa = p.id_empresa
          LEFT JOIN usuarios v ON v.id_usuario = p.id_vendedor
-        WHERE p.urgente AND p.estado = 'pendiente' AND x.desde < now() - make_interval(mins => $1)
+        WHERE p.urgente AND p.estado = 'pendiente' AND x.desde < now() - make_interval(mins => coalesce($1::int, e.minutos_urgente))
           AND NOT EXISTS (SELECT 1 FROM notificaciones m
                            WHERE m.tipo = 'urgente_sin_atender' AND m.creado_en > x.desde
                              AND coalesce(m.datos->'pedidoIds', jsonb_build_array(m.datos->'pedidoId')) ? p.id_pedido::text)`,

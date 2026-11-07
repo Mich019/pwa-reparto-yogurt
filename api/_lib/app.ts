@@ -182,7 +182,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasEnvases(app, ctx, { requiereSesion, requiereAdmin })
   await rutasPrecios(app, ctx, { requiereAdmin })
   await rutasCortes(app, ctx, { requiereSesion, requiereAdmin }, despachador)
-  await rutasNotificaciones(app, ctx, { requiereSesion }, despachador, enviador)
+  await rutasNotificaciones(app, ctx, { requiereSesion, requiereAdmin }, despachador, enviador)
   // Los urgentes sin atender cruzan empresas: con la conexión del dueño, como el cron.
   const despachadorDueno = crearDespachador(entrada.db, enviador, app.log)
   await rutasEnVivo(app, entrada.db, { requiereSesion }, ctx.enVivo, () => revisarDeVezEnCuando(entrada.db, despachadorDueno, app.log))

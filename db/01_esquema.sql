@@ -46,6 +46,7 @@ CREATE TABLE empresas (
   id_empresa     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre         varchar(120) NOT NULL,
   zona_horaria   varchar(64) NOT NULL DEFAULT 'America/Mexico_City',
+  minutos_urgente smallint NOT NULL DEFAULT 30 CHECK (minutos_urgente BETWEEN 5 AND 240), -- urgente sin atender (031)
   color_marca    char(7),
   logo           text,
   lema           varchar(80),                            -- marca: lema y contacto en los PDF (migración 013)
@@ -87,6 +88,8 @@ CREATE TABLE usuarios (
   silencio_hasta        smallint,                           -- (028_horario_silencio.sql; null = sin horario)
   resumen_correo        boolean NOT NULL DEFAULT false,     -- resumen diario por correo (030_resumen_correo.sql)
   resumen_enviado_dia   date,                               -- el día del último resumen mandado (no repetir)
+  resumen_semanal       boolean NOT NULL DEFAULT false,     -- resumen semanal por correo, los lunes (031)
+  resumen_semanal_enviado date,                             -- el lunes del último semanal mandado
   password_hash         text NOT NULL,                      -- RF-004: hash Argon2id generado por la API
   rol                   rol_usuario NOT NULL DEFAULT 'vendedor', -- RF-005
   activo                boolean NOT NULL DEFAULT true,      -- RF-040
