@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LockKeyhole, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, Wallet, CreditCard, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
@@ -245,14 +246,13 @@ function Notificaciones() {
       )}
       <label className="mt-4 flex items-center justify-between gap-3 text-sm">
         <span className="text-apagado">Avisarme si quedan ventas sin enviar a partir de las</span>
-        <select
-          value={horaCierre}
-          onChange={(e) => void cambiarHora(Number(e.target.value))}
+        <Selector
+          valor={horaCierre}
+          onCambiar={(h) => void cambiarHora(h)}
           className="rounded-md bg-papel px-3 py-2 text-sm font-semibold"
-          aria-label="Hora a partir de la cual avisar de ventas sin enviar"
-        >
-          {[...new Set([HORA_CIERRE, 14, 15, 16, 17, 18, 19, 20, 21, 22, horaCierre])].sort((a, b) => a - b).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-        </select>
+          etiqueta="Hora a partir de la cual avisar de ventas sin enviar"
+          opciones={[...new Set([HORA_CIERRE, 14, 15, 16, 17, 18, 19, 20, 21, 22, horaCierre])].sort((a, b) => a - b).map((h) => ({ valor: h, texto: `${String(h).padStart(2, '0')}:00` }))}
+        />
       </label>
       {MODO_SERVIDOR && <PreferenciasAvisos vendedor={sesionActual()?.usuario.rol === 'vendedor'} />}
     </div>
@@ -316,9 +316,10 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
             <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} alCambiar={(si) => void cambiarSemanal(si)} />
           </Opcion>
           {prefs?.resumenSemanal && (
-            <select value={diaSemanal} onChange={(e) => void cambiarDiaSemanal(Number(e.target.value))} className={`mt-3 ${claseHora}`} aria-label="Día de tu resumen semanal">
-              {DIAS_SEMANA.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
-            </select>
+            <div className="mt-3 w-fit">
+              <Selector valor={diaSemanal} onCambiar={(d) => void cambiarDiaSemanal(d)} className={claseHora} etiqueta="Día de tu resumen semanal"
+                opciones={DIAS_SEMANA.map((d, i) => ({ valor: i + 1, texto: d }))} />
+            </div>
           )}
         </div>
       )}
@@ -328,13 +329,11 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
         </Opcion>
         {silencio && (
           <div className="mt-3 flex items-center gap-2 text-sm">
-            <select value={silencio.desde} onChange={(e) => { const desde = Number(e.target.value); if (desde !== silencio.hasta) void cambiarSilencio({ ...silencio, desde }) }} className={claseHora} aria-label="Silencio desde">
-              {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.hasta}>{hora(h)}</option>)}
-            </select>
+            <Selector valor={silencio.desde} onCambiar={(desde) => void cambiarSilencio({ ...silencio, desde })} className={claseHora} etiqueta="Silencio desde"
+              opciones={HORAS.map((h) => ({ valor: h, texto: hora(h), deshabilitada: h === silencio.hasta }))} />
             <span className="text-apagado">a</span>
-            <select value={silencio.hasta} onChange={(e) => { const hasta = Number(e.target.value); if (hasta !== silencio.desde) void cambiarSilencio({ ...silencio, hasta }) }} className={claseHora} aria-label="Silencio hasta">
-              {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.desde}>{hora(h)}</option>)}
-            </select>
+            <Selector valor={silencio.hasta} onCambiar={(hasta) => void cambiarSilencio({ ...silencio, hasta })} className={claseHora} etiqueta="Silencio hasta"
+              opciones={HORAS.map((h) => ({ valor: h, texto: hora(h), deshabilitada: h === silencio.desde }))} />
           </div>
         )}
       </div>

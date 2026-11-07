@@ -79,8 +79,16 @@ export async function darDeBaja(id: string) {
 }
 
 // Los meses cerrados en que un vendedor llegó a su meta (trofeo de su ficha).
+export interface Trofeos { meses: { mes: string; ventas: number; meta: number }[]; racha: number }
 export function metasCumplidas(id: string) {
-  return llamarAutenticado<{ meses: { mes: string; ventas: number; meta: number }[] }>(`/usuarios/${id}/metas`)
+  return llamarAutenticado<Trofeos>(`/usuarios/${id}/metas`)
+}
+
+// La misma meta del mes para todos los vendedores activos (null la quita).
+export async function metaParaTodos(metaMensual: number | null) {
+  const r = await llamarAutenticado<{ actualizados: number }>('/usuarios/metas', { metodo: 'POST', cuerpo: { metaMensual } })
+  refrescar()
+  return r.actualizados
 }
 
 // Aviso de prueba a los dispositivos de otra cuenta (api/_lib/notificaciones.ts).

@@ -82,6 +82,16 @@ body {
 .calendario-entrar { animation: calendario-entrar 0.14s ease-out; transform-origin: top right; }
 @media (prefers-reduced-motion: reduce) { .calendario-entrar { animation: none; } }
 
+/* Las listas desplegables (components/Selector.tsx): la lista entra con un desliz corto desde el campo y sus opciones
+   detrás, escalonadas unos milisegundos. Sólo opacity y transform (no recalcula el layout); nada si se pide menos movimiento. */
+@keyframes desplegar { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes desplegar-arriba { from { opacity: 0; transform: translateY(6px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes desplegar-opcion { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.desplegar { animation: desplegar 0.16s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: top; }
+.desplegar.desplegar-arriba { animation-name: desplegar-arriba; transform-origin: bottom; }
+.desplegar-opcion { animation: desplegar-opcion 0.18s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .desplegar, .desplegar-opcion { animation: none; } }
+
 /* Cada «captura» de la Ayuda (views/ayuda) entra con un leve fundido al cambiar de paso. */
 @keyframes ayuda-entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .ayuda-entrar { animation: ayuda-entrar 0.22s ease-out; }

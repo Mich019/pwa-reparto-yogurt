@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Selector } from '../../components/Selector'
 import { ArrowDownUp, ArrowLeft, Building2, CalendarDays, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { usePaginas } from '../../components/Paginas'
@@ -704,9 +705,8 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
           <div className="mt-5 space-y-4">
             <Campo t="Nombre"><input value={f.nombre} onChange={(x) => poner({ nombre: x.target.value })} className={claseInputRecto} placeholder="Ej. Agua La Fuente" maxLength={120} /></Campo>
             <Campo t="Zona horaria (define qué es «hoy» para sus rutas)">
-              <select value={f.zona} onChange={(x) => poner({ zona: x.target.value })} className={claseInputRecto}>
-                {ZONAS.map((z) => <option key={z} value={z}>{z.replace('America/', '').replace('_', ' ')}</option>)}
-              </select>
+              <Selector valor={f.zona} onCambiar={(zona) => poner({ zona })} className={claseInputRecto} etiqueta="Zona horaria"
+                opciones={ZONAS.map((z) => ({ valor: z, texto: z.replace('America/', '').replace('_', ' ') }))} />
             </Campo>
             <div>
               <span className="mb-1.5 block text-xs font-medium text-apagado">Plan</span>

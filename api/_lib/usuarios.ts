@@ -115,6 +115,15 @@ export async function rutasUsuarios(app: FastifyInstance, { db, config }: Contex
     }
   })
 
+  // La misma meta del mes para todos los vendedores activos de un jalón (null se la quita a todos).
+  app.post('/usuarios/metas', { ...pre, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const b = z.object({ metaMensual: z.number().positive().max(999_999_999).nullable() }).strict().safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: 'La meta debe ser un monto mayor a cero' })
+    const n = await tx(db, req.usuario.id, async (c) =>
+      (await c.query(`UPDATE usuarios SET meta_mensual = $1 WHERE rol = 'vendedor' AND activo`, [b.data.metaMensual])).rowCount ?? 0)
+    return { actualizados: n }
+  })
+
   // RF-039: datos de contacto y rol.
   app.patch('/usuarios/:id', pre, async (req, rep) => {
     const p = idUsuario.safeParse(req.params)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { guardarMarca, useMarca } from '../../lib/marca'
 import { aviso, claseInputRecto } from '../../components/ui'
 import { Fila, Seccion } from './Configuracion'
+import { Selector } from '../../components/Selector'
 
 // Configuración → Marca → Zona horaria: define el «hoy» de la empresa (ruta del día, stock, resumen y reportes).
 const ZONAS: [string, string][] = [
@@ -35,9 +36,8 @@ export function ZonaEmpresa() {
   return (
     <Seccion id="zona" titulo="Zona horaria">
       <Fila titulo="Dónde está tu negocio" ayuda="Decide cuándo empieza y termina «hoy» para la ruta, el stock y los reportes.">
-        <select value={zona} disabled={guardando} onChange={(e) => cambiar(e.target.value)} className={claseInputRecto}>
-          {opciones.map(([z, n]) => <option key={z} value={z}>{n}</option>)}
-        </select>
+        <Selector valor={zona} deshabilitado={guardando} onCambiar={(z) => void cambiar(z)} className={claseInputRecto} etiqueta="Zona horaria de tu negocio"
+          opciones={opciones.map(([z, n]) => ({ valor: z, texto: n }))} />
       </Fila>
     </Seccion>
   )

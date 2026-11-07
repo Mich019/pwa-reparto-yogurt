@@ -236,6 +236,16 @@ describe('resumen diario por correo', () => {
     const ver = (s: { token: string }) => app.inject({ method: 'GET', url: `/usuarios/${vend.id}/metas`, headers: { authorization: `Bearer ${s.token}` } })
     assert.deepEqual((await ver(admin)).json().meses.map((m: { mes: string }) => m.mes), ['2026-01'])
     assert.equal((await ver(vend)).statusCode, 403)
+    // Los suyos en su app, y la racha: meses seguidos hacia atrás desde el mes pasado.
+    const suyos = (await app.inject({ method: 'GET', url: '/mi-meta/trofeos', headers: { authorization: `Bearer ${vend.token}` } })).json()
+    assert.equal(suyos.meses.length, 1)
+    const { rows: [{ m1, m2, m3 }] } = await db.query(
+      `SELECT to_char(date_trunc('month', now() AT TIME ZONE zona_horaria) - interval '1 month', 'YYYY-MM-DD') AS m1,
+              to_char(date_trunc('month', now() AT TIME ZONE zona_horaria) - interval '2 month', 'YYYY-MM-DD') AS m2,
+              to_char(date_trunc('month', now() AT TIME ZONE zona_horaria) - interval '3 month', 'YYYY-MM-DD') AS m3 FROM empresas WHERE id_empresa = $1`, [empresa])
+    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $4, now(), '[]'), ($2, 'cerrado', $4, now(), '[]'), ($3, 'cerrado', $5, now(), '[]')
+                    ON CONFLICT (id_empresa, mes) DO UPDATE SET cifras = EXCLUDED.cifras, estado = 'cerrado'`, [m1, m2, m3, cifras(110), cifras(50)])
+    assert.equal((await ver(admin)).json().racha, 2)
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

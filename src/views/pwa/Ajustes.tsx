@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Download, IceCreamBowl, Trash2, Upload } from 'lucide-react'
 import { borrar, db, guardar, guardarVarios, uid, type Producto } from '../../lib/db'
@@ -193,10 +194,8 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
               </div>
             </Campo>
             <Campo etiqueta="Envase">
-              <select className={claseInput} value={tipoEnvase} onChange={(e) => setTipoEnvase(e.target.value)}>
-                <option value="">Sin envase (se vende suelto)</option>
-                {TIPOS_ENVASE.filter((t) => t.tipo !== 'pieza' && t.tipo !== 'granel').map((t) => <option key={t.tipo} value={t.tipo}>{t.nombre}</option>)}
-              </select>
+              <Selector valor={tipoEnvase} onCambiar={setTipoEnvase} className={claseInput} etiqueta="Envase"
+                opciones={[{ valor: '', texto: 'Sin envase (se vende suelto)' }, ...TIPOS_ENVASE.filter((t) => t.tipo !== 'pieza' && t.tipo !== 'granel').map((t) => ({ valor: t.tipo as string, texto: t.nombre }))]} />
             </Campo>
             <Campo etiqueta={`Contenido por envase (en ${unidad || 'la unidad'})`}>
               <input className={claseInput} inputMode="decimal" value={presentacion} onChange={(e) => setPresentacion(e.target.value)} placeholder="Ej. 1, 0.5 o 20" />

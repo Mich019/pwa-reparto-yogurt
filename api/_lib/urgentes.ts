@@ -17,12 +17,15 @@ import type { AvisoPendiente, Despachador } from './notificaciones.js'
 
 const CADA_MS = 2 * 60_000
 
-// `minutos` sólo para pruebas: si no, cuenta lo que eligió cada empresa.
-export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador, minutos: number | null = null): Promise<number> {
+// `minutos` y `esperar` sólo para pruebas: si no, cuenta lo que eligió cada empresa y, si otra instancia ya está
+// revisando, no espera.
+export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador, minutos: number | null = null, esperar = false): Promise<number> {
   const c = await db.connect()
   try {
     await c.query('BEGIN')
-    const { rows: [{ libre }] } = await c.query(`SELECT pg_try_advisory_xact_lock(hashtext('delisy:urgentes')) AS libre`)
+    const { rows: [{ libre }] } = await c.query(esperar
+      ? `SELECT pg_advisory_xact_lock(hashtext('delisy:urgentes')) IS NOT NULL AS libre`
+      : `SELECT pg_try_advisory_xact_lock(hashtext('delisy:urgentes')) AS libre`)
     if (!libre) { await c.query('ROLLBACK'); return 0 }
     // El último aviso de urgente de cada pedido que sigue urgente y pendiente; sin recordatorio desde entonces.
     const { rows } = await c.query(

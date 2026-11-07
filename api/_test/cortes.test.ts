@@ -153,6 +153,11 @@ describe('meta y comisión', () => {
     assert.equal(Object.keys(b).some((k) => /otros|vendedores/.test(k)), false)
     assert.equal((await llamar(x.admin, 'PATCH', `/usuarios/${x.ana.id}`, { metaMensual: null })).status, 200)
     assert.equal((await llamar(x.ana, 'GET', '/mi-meta')).body.meta, null)
+    // La misma meta para todos de un jalón; sólo el administrador.
+    assert.equal((await llamar(x.ana, 'POST', '/usuarios/metas', { metaMensual: 500 })).status, 403)
+    assert.equal((await llamar(x.admin, 'POST', '/usuarios/metas', { metaMensual: 0 })).status, 400)
+    assert.equal((await llamar(x.admin, 'POST', '/usuarios/metas', { metaMensual: 500 })).body.actualizados, 2)
+    assert.equal((await llamar(x.beto, 'GET', '/mi-meta')).body.meta, 500)
   })
 })
 

@@ -34,13 +34,13 @@ describe('urgente sin atender', () => {
     const todos = [admin.id, otroAdmin.id, vend.id]
 
     // Recién marcado: todavía no.
-    await avisarUrgentesSinAtender(db, despachador)
+    await avisarUrgentesSinAtender(db, despachador, null, true)
     assert.equal((await de(todos)).length, 0)
 
     // Pasaron 40 minutos y q ya se entregó: sólo p.
     await db.query(`UPDATE notificaciones SET creado_en = now() - interval '40 minutes' WHERE tipo = 'pedido_urgente' AND id_usuario = $1`, [vend.id])
     await db.query(`UPDATE pedidos SET estado = 'entregado', fecha_entregado_real = now(), metodo_pago = 'efectivo' WHERE id_pedido = $1`, [q.id])
-    await avisarUrgentesSinAtender(db, despachador)
+    await avisarUrgentesSinAtender(db, despachador, null, true)
     const avisos = await de(todos)
     assert.equal(avisos.length, 3)
     assert.deepEqual(new Set(avisos.map((a) => a.id_usuario)), new Set(todos))
@@ -51,7 +51,7 @@ describe('urgente sin atender', () => {
     assert.equal(avisos.find((a) => a.id_usuario === admin.id).datos.url, '/admin')
 
     // Una sola vez.
-    await avisarUrgentesSinAtender(db, despachador)
+    await avisarUrgentesSinAtender(db, despachador, null, true)
     assert.equal((await de(todos)).length, 3)
   })
 
@@ -70,10 +70,10 @@ describe('urgente sin atender', () => {
     await push(admin, [op('pedidos', p.id, p)])
     const hace = (min: number) => db.query(`UPDATE notificaciones SET creado_en = now() - make_interval(mins => $2) WHERE tipo = 'pedido_urgente' AND id_usuario = $1`, [vend.id, min])
     await hace(40)
-    await avisarUrgentesSinAtender(db, despachador)
+    await avisarUrgentesSinAtender(db, despachador, null, true)
     assert.equal((await de([admin.id, vend.id])).length, 0) // a los 40 todavía no: eligió una hora
     await hace(65)
-    await avisarUrgentesSinAtender(db, despachador)
+    await avisarUrgentesSinAtender(db, despachador, null, true)
     assert.equal((await de([admin.id, vend.id])).length, 2)
   })
 
@@ -89,7 +89,7 @@ describe('urgente sin atender', () => {
     const p = { ...pedido(c.id, producto.id, { fecha: hoyEn(config.zonaHoraria), urgente: true }), vendedorId: vend.id }
     await push(admin, [op('pedidos', p.id, p)])
     await db.query(`UPDATE notificaciones SET creado_en = now() - interval '40 minutes' WHERE tipo = 'pedido_urgente' AND id_usuario = $1`, [vend.id])
-    await avisarUrgentesSinAtender(db, despachador)
+    await avisarUrgentesSinAtender(db, despachador, null, true)
     assert.deepEqual((await de([admin.id, vend.id])).map((a) => a.id_usuario), [vend.id])
   })
 })

@@ -457,19 +457,34 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     }
   })
 
-  // Los meses cerrados en que un vendedor llegó a su meta (el trofeo de su ficha en Vendedores). De la foto del cierre.
-  app.get('/usuarios/:id/metas', { preHandler: requiereAdmin }, async (req, rep) => {
-    const p = z.object({ id: z.uuid() }).safeParse(req.params)
-    if (!p.success) return rep.code(400).send({ error: 'Cuenta no válida' })
+  // Los meses cerrados en que un vendedor llegó a su meta (sus trofeos), de la foto de cada cierre, y su racha: cuántos
+  // meses seguidos la alcanzó, contando hacia atrás desde el mes pasado (un mes sin cerrar o sin meta la corta).
+  async function trofeos(id: string) {
     const { rows } = await db.query(
       `SELECT to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
          FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
         WHERE c.estado = 'cerrado' AND v->>'id' = $1 AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
         ORDER BY c.mes DESC LIMIT 36`,
-      [p.data.id],
+      [id],
     )
-    return { meses: rows }
+    const cumplidos = new Set(rows.map((r) => r.mes as string))
+    let [a, m] = (await hoyDe()).slice(0, 7).split('-').map(Number)
+    let racha = 0
+    for (;;) {
+      if (--m === 0) { m = 12; a-- }
+      if (!cumplidos.has(`${a}-${String(m).padStart(2, '0')}`)) break
+      racha++
+    }
+    return { meses: rows as { mes: string; ventas: number; meta: number }[], racha }
+  }
+  // Los del vendedor, en su ficha de Vendedores (administrador)…
+  app.get('/usuarios/:id/metas', { preHandler: requiereAdmin }, async (req, rep) => {
+    const p = z.object({ id: z.uuid() }).safeParse(req.params)
+    if (!p.success) return rep.code(400).send({ error: 'Cuenta no válida' })
+    return trofeos(p.data.id)
   })
+  // …y los propios, en su app (Cuenta).
+  app.get('/mi-meta/trofeos', { preHandler: requiereSesion }, async (req) => trofeos(req.usuario.id))
 
   // ---- cierre de mes
   const mesDeRuta = (req: FastifyRequest) => mesTexto.safeParse((req.params as { mes?: string }).mes)

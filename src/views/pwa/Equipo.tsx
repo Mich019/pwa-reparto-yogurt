@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, BellOff, BellRing, Check, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, BellOff, BellRing, Check, Flame, Target, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
-  avisoDePrueba, cargarEquipo, crearMiembro, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
+  avisoDePrueba, cargarEquipo, crearMiembro, metaParaTodos, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro,
 } from '../../lib/equipo'
 import { hace } from '../../lib/fechas'
@@ -65,6 +66,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const [invitando, setInvitando] = useState(false)
   const [q, setQ] = useState('')
   const [verBaja, setVerBaja] = useState(false)
+  const [metaTodos, setMetaTodos] = useState(false)
 
   async function cargar() {
     setCargando(true)
@@ -112,6 +114,9 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
     <>
       <button onClick={() => setInvitando(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
         <Mail size={18} /> Invitar
+      </button>
+      <button onClick={() => setMetaTodos(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+        <Target size={18} /> Meta para todos
       </button>
       <button onClick={() => setForm('nuevo')} className={panel ? `${botonPanel} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700'}>
         <UserPlus size={18} /> Nueva cuenta
@@ -199,6 +204,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
         />
       )}
       {clave && <ClaveTemporal datos={clave} onCerrar={() => setClave(null)} />}
+      {metaTodos && <MetaParaTodos vendedores={activos.filter((u) => u.rol === 'vendedor')} onCerrar={() => setMetaTodos(false)} />}
       {invitando && <Invitar onCerrar={() => setInvitando(false)} />}
       {cartera && equipo && <ReasignarCartera equipo={equipo.usuarios} sinAsignar={equipo.clientesSinAsignar} desdeInicial={cartera.desde} onCerrar={() => setCartera(null)} />}
     </div>
@@ -235,6 +241,44 @@ function Invitar({ onCerrar }: { onCerrar: () => void }) {
   )
 }
 
+// ------------------------------------------------------------------ la misma meta para todos los vendedores
+function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerrar: () => void }) {
+  const metas = [...new Set(vendedores.map((v) => v.metaMensual))]
+  const [monto, setMonto] = useState(metas.length === 1 && metas[0] ? String(metas[0]) : '')
+  const [guardando, setGuardando] = useState(false)
+  const valor = Number(monto)
+  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor > 0
+  async function aplicar(meta: number | null) {
+    setGuardando(true)
+    try {
+      const n = await metaParaTodos(meta)
+      aviso(meta ? `Meta de $${meta.toLocaleString('es-MX')} para ${plural(n, 'vendedor', 'vendedores')}` : `Se quitó la meta a ${plural(n, 'vendedor', 'vendedores')}`)
+      onCerrar()
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <Hoja abierta onCerrar={onCerrar} titulo="Meta para todos"
+      pie={<Boton className="w-full" onClick={() => void aplicar(valor)} disabled={guardando || !valido || !vendedores.length}>{guardando ? 'Guardando…' : `Poner a ${plural(vendedores.length, 'vendedor', 'vendedores')}`}</Boton>}>
+      <p className="mb-3 text-sm text-apagado">
+        La misma meta de venta del mes para cada vendedor activo. Reemplaza la que tenga cada uno; después puedes cambiar la de alguien en su ficha.
+        {metas.length > 1 && ' Ahora no todos tienen la misma.'}
+      </p>
+      <Campo etiqueta="Meta del mes por vendedor ($)">
+        <input className={claseInput} inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valido && void aplicar(valor)} placeholder="Ej. 20000" />
+      </Campo>
+      {vendedores.some((v) => v.metaMensual) && (
+        <button type="button" onClick={() => void aplicar(null)} disabled={guardando} className="mt-3 text-sm font-semibold text-rojo underline-offset-4 hover:underline disabled:opacity-50">
+          Quitar la meta a todos
+        </button>
+      )}
+    </Hoja>
+  )
+}
+
 // ------------------------------------------------------------------ ficha de una cuenta
 function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }: {
   m: Miembro
@@ -250,10 +294,11 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   const [trabajando, setTrabajando] = useState(false)
   // Trofeo: los meses cerrados en que llegó a su meta.
   const [metas, setMetas] = useState<string[] | null>(null)
+  const [racha, setRacha] = useState(0)
   useEffect(() => {
     if (m.rol !== 'vendedor') return
     let vigente = true
-    metasCumplidas(m.id).then((r) => { if (vigente) setMetas(r.meses.map((x) => x.mes)) }).catch(() => {})
+    metasCumplidas(m.id).then((r) => { if (vigente) { setMetas(r.meses.map((x) => x.mes)); setRacha(r.racha) } }).catch(() => {})
     return () => { vigente = false }
   }, [m.id, m.rol])
   const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
@@ -316,6 +361,11 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
               <Trophy size={14} aria-hidden="true" /> {plural(metas.length, 'meta cumplida', 'metas cumplidas')}
             </span>
           )}
+          {racha >= 2 && (
+            <span title="Meses seguidos llegando a su meta" className="flex items-center gap-1 rounded-md bg-marca/15 px-3 py-1.5 text-xs font-semibold">
+              <Flame size={14} aria-hidden="true" /> {racha} seguidos
+            </span>
+          )}
         </div>
 
         <dl className="space-y-1 rounded-lg bg-niebla p-4 text-sm">
@@ -360,11 +410,8 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
             <p className="text-sm">Deja de entrar al instante, en todos sus teléfonos. Sus clientes y su historial se conservan y puedes reactivarla cuando quieras.</p>
             {m.clientes > 0 && (
               <Campo etiqueta={m.clientes === 1 ? '¿Qué hacemos con su cliente?' : `¿Qué hacemos con sus ${m.clientes} clientes?`}>
-                <select className={claseInput} value={destino} onChange={(e) => setDestino(e.target.value)}>
-                  <option value="">Decidir después</option>
-                  {otros.map((o) => <option key={o.id} value={o.id}>Pasarlos a {o.nombre}</option>)}
-                  <option value={SIN_VENDEDOR}>Dejarlos sin vendedor</option>
-                </select>
+                <Selector valor={destino} onCambiar={setDestino} className={claseInput} etiqueta="Qué hacer con sus clientes"
+                  opciones={[{ valor: '', texto: 'Decidir después' }, ...otros.map((o) => ({ valor: o.id, texto: `Pasarlos a ${o.nombre}` })), { valor: SIN_VENDEDOR, texto: 'Dejarlos sin vendedor' }]} />
               </Campo>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -562,18 +609,20 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
     >
       <div className="space-y-4 pb-4">
         <Campo etiqueta="De">
-          <select className={claseInput} value={desde} onChange={(e) => cambiarOrigen(e.target.value)}>
-            {origenes.map((m) => <option key={m.id} value={m.id}>{m.nombre}{m.activo ? '' : ' (de baja)'} · {plural(m.clientes, 'cliente', 'clientes')}</option>)}
-            {sinAsignar > 0 && <option value={SIN_VENDEDOR}>Sin vendedor · {plural(sinAsignar, 'cliente', 'clientes')}</option>}
-            {!origenes.some((m) => m.id === desde) && desde !== SIN_VENDEDOR && <option value={desde}>{equipo.find((m) => m.id === desde)?.nombre}</option>}
-          </select>
+          <Selector valor={desde} onCambiar={cambiarOrigen} className={claseInput} etiqueta="Pasar la cartera de"
+            opciones={[
+              ...origenes.map((m) => ({ valor: m.id, texto: `${m.nombre}${m.activo ? '' : ' (de baja)'} · ${plural(m.clientes, 'cliente', 'clientes')}` })),
+              ...(sinAsignar > 0 ? [{ valor: SIN_VENDEDOR, texto: `Sin vendedor · ${plural(sinAsignar, 'cliente', 'clientes')}` }] : []),
+              ...(!origenes.some((m) => m.id === desde) && desde !== SIN_VENDEDOR ? [{ valor: desde, texto: equipo.find((m) => m.id === desde)?.nombre ?? '' }] : []),
+            ]} />
         </Campo>
         <Campo etiqueta="A">
-          <select className={claseInput} value={hacia} onChange={(e) => setHacia(e.target.value)}>
-            <option value="">Elige un vendedor…</option>
-            {destinos.map((m) => <option key={m.id} value={m.id}>{m.nombre}{m.rol === 'administrador' ? ' (administrador)' : ''}</option>)}
-            {desde !== SIN_VENDEDOR && <option value={SIN_VENDEDOR}>Sin vendedor (sólo el administrador los ve)</option>}
-          </select>
+          <Selector valor={hacia} onCambiar={setHacia} className={claseInput} etiqueta="Pasar la cartera a"
+            opciones={[
+              { valor: '', texto: 'Elige un vendedor…' },
+              ...destinos.map((m) => ({ valor: m.id, texto: `${m.nombre}${m.rol === 'administrador' ? ' (administrador)' : ''}` })),
+              ...(desde !== SIN_VENDEDOR ? [{ valor: SIN_VENDEDOR, texto: 'Sin vendedor (sólo el administrador los ve)' }] : []),
+            ]} />
         </Campo>
         <Segmentado
           valor={modo} onChange={setModo}

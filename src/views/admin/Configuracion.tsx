@@ -17,6 +17,7 @@ import { activarPush, desactivarPush, enviarPrueba, useEstadoPush } from '../../
 import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
 import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
 import { guardarMarca, useMarca } from '../../lib/marca'
+import { Selector } from '../../components/Selector'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -335,9 +336,8 @@ function MinutosUrgente() {
   return (
     <Seccion id="urgentes" titulo="Pedidos urgentes" descripcion="Vale para toda tu empresa: lo ven igual los demás administradores.">
       <Fila titulo="Recordar si siguen pendientes" ayuda={`Después de ${texto(actual)} se le recuerda al vendedor y te avisa a ti.`}>
-        <select value={actual} disabled={guardando} onChange={(e) => void cambiar(Number(e.target.value))} className={claseInputRecto} aria-label="Tiempo antes de recordar un urgente">
-          {opciones.map((n) => <option key={n} value={n}>{texto(n)}</option>)}
-        </select>
+        <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputRecto} etiqueta="Tiempo antes de recordar un urgente"
+          opciones={opciones.map((n) => ({ valor: n, texto: texto(n) }))} />
       </Fila>
     </Seccion>
   )
@@ -365,9 +365,8 @@ function RitmoMeta() {
   return (
     <Seccion id="metas" titulo="Metas de los vendedores" descripcion="Vale para toda tu empresa. El aviso sale del 15 al 20 de cada mes, una vez por vendedor.">
       <Fila titulo="Avisar si alguien va atrasado" ayuda={`Si lleva menos del ${actual}% de lo que debería a esas alturas. Por ejemplo, a mitad de mes, menos del ${Math.round(actual / 2)}% de su meta.`}>
-        <select value={actual} disabled={guardando} onChange={(e) => void cambiar(Number(e.target.value))} className={claseInputRecto} aria-label="Qué tan atrasado avisar">
-          {opciones.map((n) => <option key={n} value={n}>{`Menos del ${n}%`}</option>)}
-        </select>
+        <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputRecto} etiqueta="Qué tan atrasado avisar"
+          opciones={opciones.map((n) => ({ valor: n, texto: `Menos del ${n}%` }))} />
       </Fila>
     </Seccion>
   )
@@ -419,9 +418,8 @@ function Preferencias() {
         </Fila>
         {prefs?.resumenSemanal && (
           <Fila titulo="Qué día" ayuda="El día que quieres repasar la semana.">
-            <select value={diaSemanal} onChange={(e) => void cambiarDiaSemanal(Number(e.target.value))} className={claseHora} aria-label="Día del resumen semanal">
-              {DIAS_SEMANA.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
-            </select>
+            <Selector valor={diaSemanal} onCambiar={(d) => void cambiarDiaSemanal(d)} className={claseHora} etiqueta="Día del resumen semanal"
+              opciones={DIAS_SEMANA.map((d, i) => ({ valor: i + 1, texto: d }))} />
           </Fila>
         )}
         <Fila titulo="Al cerrar el mes" ayuda={prefs?.resumenMensual ? 'Te llega el informe del mes en PDF cuando alguien lo cierra en Cobranza → Meses.' : 'Apagado.'}>
@@ -448,13 +446,11 @@ function Preferencias() {
           <Fila titulo="Horas" ayuda="Puede pasar de medianoche, por ejemplo de 21:00 a 07:00.">
             <span className="flex items-center gap-2 text-sm">
               <BellOff size={16} aria-hidden="true" className="text-apagado" />
-              <select value={silencio.desde} onChange={(e) => { const desde = Number(e.target.value); if (desde !== silencio.hasta) void cambiarSilencio({ ...silencio, desde }) }} className={claseHora} aria-label="Desde">
-                {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.hasta}>{hora(h)}</option>)}
-              </select>
+              <Selector valor={silencio.desde} onCambiar={(desde) => void cambiarSilencio({ ...silencio, desde })} className={claseHora} etiqueta="Desde"
+                opciones={HORAS.map((h) => ({ valor: h, texto: hora(h), deshabilitada: h === silencio.hasta }))} />
               a
-              <select value={silencio.hasta} onChange={(e) => { const hasta = Number(e.target.value); if (hasta !== silencio.desde) void cambiarSilencio({ ...silencio, hasta }) }} className={claseHora} aria-label="Hasta">
-                {HORAS.map((h) => <option key={h} value={h} disabled={h === silencio.desde}>{hora(h)}</option>)}
-              </select>
+              <Selector valor={silencio.hasta} onCambiar={(hasta) => void cambiarSilencio({ ...silencio, hasta })} className={claseHora} etiqueta="Hasta"
+                opciones={HORAS.map((h) => ({ valor: h, texto: hora(h), deshabilitada: h === silencio.desde }))} />
             </span>
           </Fila>
         )}

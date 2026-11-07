@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Wallet } from 'lucide-react'
+import { ChevronRight, Flame, Trophy, Wallet } from 'lucide-react'
 import { entregarCorte, useServidor, type FilaCorte, type MiMeta } from '../../lib/cobranza'
 import { dinero } from '../../lib/fechas'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
@@ -10,10 +10,14 @@ import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 export function MiDia() {
   const corte = useServidor<{ fecha: string; filas: FilaCorte[] }>('/cortes')
   const meta = useServidor<MiMeta>('/mi-meta')
+  // Sus trofeos: los meses cerrados en que llegó a su meta, y cuántos seguidos.
+  const trofeos = useServidor<{ meses: { mes: string }[]; racha: number }>('/mi-meta/trofeos')
   const [hoja, setHoja] = useState(false)
   const fila = corte.datos?.filas[0]
   const m = meta.datos
-  if (!fila && !(m && m.meta)) return null
+  const t = trofeos.datos
+  const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
+  if (!fila && !(m && m.meta) && !t?.meses.length) return null
   const estado = !fila ? '' : fila.estado === 'confirmado' ? 'Confirmado' : fila.estado === 'pendiente' ? (fila.reabierto ? `Reabierto: ${fila.reabierto.motivo}` : 'Entregado, falta que lo confirmen') : 'Sin entregar'
   return (
     <>
@@ -41,6 +45,16 @@ export function MiDia() {
           </div>
           {m.lugar && m.de > 1 && <p className="mt-2 text-sm text-apagado">Vas en {m.lugar}.º lugar de {m.de} vendedores este mes{m.lugar === 1 ? '. ¡Vas primero!' : ''}</p>}
           {m.comisionPct > 0 && <p className="mt-2 text-sm text-apagado">Comisión de este mes: {dinero(m.comision)}</p>}
+        </div>
+      )}
+      {!!t?.meses.length && (
+        <div className="mt-3 flex items-center gap-3 rounded-lg bg-niebla p-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ambar/40"><Trophy size={20} aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{t.meses.length === 1 ? 'Llegaste a tu meta 1 mes' : `Llegaste a tu meta ${t.meses.length} meses`}</span>
+            <span className="block truncate text-sm text-apagado">{t.meses.slice(0, 4).map((x) => mesCorto(x.mes)).join(' · ')}{t.meses.length > 4 ? ' · …' : ''}</span>
+            {t.racha >= 2 && <span className="mt-1 flex items-center gap-1 text-sm font-semibold"><Flame size={15} aria-hidden="true" className="text-marca" /> Llevas {t.racha} meses seguidos. ¡Que no se corte!</span>}
+          </span>
         </div>
       )}
       {hoja && fila && <HojaCorte fila={fila} onCerrar={() => setHoja(false)} onHecho={corte.recargar} />}
