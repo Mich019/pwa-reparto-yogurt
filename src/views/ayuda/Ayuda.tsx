@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Search, X } from 'lucide-react'
 import { db } from '../../lib/db'
@@ -15,7 +16,6 @@ import { Escena, type Valores } from './Escena'
 // esqueleto. `ir` (panel) lleva a la sección de la guía.
 
 const anillo = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
-const sinAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 function sistema(): 'ios' | 'android' | 'otro' {
   const ua = navigator.userAgent
@@ -75,10 +75,10 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
   const hechos = pendientes.filter((p) => p.hecho).length
 
   const buscadas = useMemo(() => {
-    const t = sinAcentos(q.trim())
+    const t = limpiarBusqueda(q)
     const delTema = tema ? guias.filter((g) => g.tema === tema) : guias
     if (!t) return delTema
-    return delTema.filter((g) => t.split(/\s+/).every((p) => sinAcentos([g.titulo, g.resumen, g.palabras, ...g.pasos.map((x) => x.texto)].join(' ')).includes(p)))
+    return delTema.filter((g) => coincide(t, g.titulo, g.resumen, g.palabras, ...g.pasos.map((x) => x.texto)))
   }, [guias, q, tema])
   const temas = TEMAS.filter((t) => guias.some((g) => g.tema === t.id))
 
@@ -93,7 +93,7 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
     <div className="space-y-7">
       <label className="flex h-11 items-center gap-2 rounded-md bg-niebla px-3 focus-within:outline-2 focus-within:outline-marca">
         <Search size={18} className="shrink-0 text-apagado" aria-hidden="true" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="¿Qué quieres hacer? Ej. cliente, reporte, sin señal" aria-label="Buscar en la ayuda"
+        <input {...propsBuscador} value={q} onChange={(e) => setQ(e.target.value)} placeholder="¿Qué quieres hacer? Ej. cliente, reporte, sin señal" aria-label="Buscar en la ayuda"
           className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-apagado" />
         {q && <button type="button" onClick={() => setQ('')} aria-label="Borrar búsqueda" className={`grid h-7 w-7 place-items-center rounded-full hover:bg-linea ${anillo}`}><X size={16} /></button>}
       </label>

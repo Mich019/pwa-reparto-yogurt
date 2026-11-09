@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Resaltar } from '../../components/Busqueda'
+import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Check, CreditCard, Eye, Nfc, RotateCcw, Search, Unlink } from 'lucide-react'
 import type { Cliente } from '../../lib/db'
 import {
@@ -199,8 +201,8 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
   const [q, setQ] = useState('')
   const [generando, setGenerando] = useState(false)
 
-  const t = q.trim().toLowerCase()
-  const visibles = activos.filter((c) => !t || `${c.nombre} ${c.direccion}`.toLowerCase().includes(t))
+  const t = limpiarBusqueda(q)
+  const visibles = activos.filter((c) => coincide(t, c.nombre, c.direccion))
   const paginas = usePaginas(visibles, 50, t)
   const todosVisibles = visibles.length > 0 && visibles.every((c) => elegidos.has(c.id))
   const alternar = (id: string) => setElegidos((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -235,7 +237,7 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
     >
       <div className="relative mb-2">
         <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente" className={`${claseInput} pl-11`} />
+        <input {...propsBuscador} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente" className={`${claseInput} pl-11`} />
       </div>
       {/* «Elegir todos» toma todos los que coinciden con la búsqueda, no sólo los de esta página. */}
       <button onClick={alternarVisibles} className="mb-1 py-2 text-sm font-semibold text-azul">{todosVisibles ? 'Quitar la selección' : `Elegir todos (${visibles.length})`}</button>
@@ -246,8 +248,8 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
           <button key={c.id} onClick={() => alternar(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3 text-left active:bg-niebla">
             <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${on ? 'border-tinta bg-tinta text-white' : 'border-linea'}`}>{on && <Check size={16} strokeWidth={3} />}</span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{c.nombre}</span>
-              <span className="block truncate text-sm text-apagado">{c.direccion || 'Sin dirección'}</span>
+              <span className="block truncate font-semibold"><Resaltar texto={c.nombre} t={t} /></span>
+              <span className="block truncate text-sm text-apagado">{c.direccion ? <Resaltar texto={c.direccion} t={t} /> : 'Sin dirección'}</span>
             </span>
           </button>
         )

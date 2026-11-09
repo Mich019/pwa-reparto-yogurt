@@ -1,5 +1,7 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { ArrowDownRight, ArrowUpRight, Minus, Search } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { propsBuscador } from '../../lib/busqueda'
+import { Recientes, useRecientes } from '../../components/Busqueda'
+import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus, MoreHorizontal, Search } from 'lucide-react'
 import type { EstadoPedido, Producto } from '../../lib/db'
 import { litrosTxt, type VentaSabor } from '../../lib/admin-datos'
 import { cambio } from '../../lib/reportes'
@@ -57,32 +59,81 @@ export const botonPanelIcono = `grid h-10 w-10 shrink-0 place-items-center round
 
 // Buscador del encabezado: sólo la lupa, del alto de los botones; al tocarla se despliega el campo (anima el ancho de
 // un solo input). Desde 1280 px crece hacia la izquierda por encima del hueco junto al título, sin empujar los
-// botones; en pantalla chica, donde las acciones ya van en su propia fila, ocupa su lugar (en el teléfono, abierto,
-// toma una fila entera). Se queda abierto mientras
-// haya texto; Escape lo borra y lo cierra.
-export function BuscadorDesplegable({ valor, onChange, placeholder }: { valor: string; onChange: (v: string) => void; placeholder: string }) {
+// botones (por eso las acciones de más van en «Más», MenuMas: que quede hueco); en pantalla chica ocupa su lugar
+// (en el teléfono, abierto, toma una fila entera). Se queda abierto mientras haya texto; Escape lo borra y lo cierra. Con `clave`, abierto y vacío, ofrece las últimas búsquedas de este dispositivo.
+export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { valor: string; onChange: (v: string) => void; placeholder: string; clave?: string }) {
   const [abierto, setAbierto] = useState(false)
+  const [foco, setFoco] = useState(false)
   const campo = useRef<HTMLInputElement>(null)
+  const recientes = useRecientes(clave ?? '')
   const visible = abierto || valor !== ''
   return (
     <div className={`relative h-10 xl:w-10 ${visible ? 'max-sm:basis-full' : ''}`}>
-    <div className={`z-10 flex h-10 max-sm:w-full flex-row-reverse items-center rounded-md bg-niebla transition-colors xl:absolute xl:right-0 xl:top-0 ${visible ? '' : 'hover:bg-linea'}`}>
-      <button type="button" aria-label="Buscar" aria-expanded={visible} onClick={() => { setAbierto(true); campo.current?.focus() }}
-        className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${anilloFoco}`}>
-        <Search size={18} aria-hidden="true" />
-      </button>
-      <input
-        ref={campo}
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => { if (!valor) setAbierto(false) }}
-        onKeyDown={(e) => { if (e.key === 'Escape') { onChange(''); setAbierto(false); e.currentTarget.blur() } }}
-        tabIndex={visible ? 0 : -1}
-        aria-label={placeholder}
-        placeholder={placeholder}
-        className={`h-full min-w-0 bg-transparent text-sm outline-none transition-[width,padding] duration-200 ease-out placeholder:text-apagado motion-reduce:transition-none ${visible ? 'w-40 pl-4 max-sm:grow xl:w-52 2xl:w-64' : 'w-0 p-0'}`}
-      />
+      <div className={`z-10 flex h-10 max-sm:w-full flex-row-reverse xl:absolute xl:right-0 xl:top-0 items-center rounded-md bg-niebla transition-colors ${visible ? '' : 'hover:bg-linea'}`}>
+        <button type="button" aria-label="Buscar" aria-expanded={visible} onClick={() => { setAbierto(true); campo.current?.focus() }}
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${anilloFoco}`}>
+          <Search size={18} aria-hidden="true" />
+        </button>
+        <input
+          {...propsBuscador}
+          ref={campo}
+          value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFoco(true)}
+          onBlur={() => { setFoco(false); if (clave) recientes.recordar(valor); if (!valor) setAbierto(false) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && clave) recientes.recordar(valor)
+            if (e.key === 'Escape') { onChange(''); setAbierto(false); e.currentTarget.blur() }
+          }}
+          tabIndex={visible ? 0 : -1}
+          aria-label={placeholder}
+          placeholder={placeholder}
+          className={`h-full min-w-0 bg-transparent text-sm outline-none transition-[width,padding] duration-200 ease-out placeholder:text-apagado motion-reduce:transition-none ${visible ? 'w-40 pl-4 max-sm:grow xl:w-52 2xl:w-64' : 'w-0 p-0'}`}
+        />
+      </div>
+      {clave && foco && !valor && recientes.lista.length > 0 && (
+        <div className="desplegar absolute left-0 top-full z-20 mt-1 xl:left-auto xl:right-0 rounded-md bg-papel p-2 shadow-lg ring-1 ring-linea">
+          <Recientes lista={recientes.lista} onElegir={(t) => onChange(t)} onOlvidar={recientes.olvidar} />
+        </div>
+      )}
     </div>
+  )
+}
+
+// «Más»: las acciones secundarias de un encabezado en un menú, para que la fila no se llene de botones.
+// Se cierra con Escape, al elegir o al tocar fuera; flechas arriba/abajo recorren las opciones.
+export function MenuMas({ opciones }: { opciones: { texto: string; icono: ReactNode; onElegir: () => void }[] }) {
+  const [abierto, setAbierto] = useState(false)
+  const caja = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: PointerEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false) }
+    document.addEventListener('pointerdown', fuera)
+    caja.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus()
+    return () => document.removeEventListener('pointerdown', fuera)
+  }, [abierto])
+  const teclas = (e: React.KeyboardEvent) => {
+    const items = [...(caja.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [])]
+    const i = items.indexOf(document.activeElement as HTMLElement)
+    if (e.key === 'Escape') { setAbierto(false); caja.current?.querySelector<HTMLElement>('button')?.focus() }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus() }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus() }
+  }
+  return (
+    <div ref={caja} className="relative max-sm:grow" onKeyDown={teclas}>
+      <button type="button" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto(!abierto)} className={`${botonPanelSuave} w-full`}>
+        <MoreHorizontal size={18} aria-hidden="true" /> Más <ChevronDown size={16} aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${abierto ? 'rotate-180' : ''}`} />
+      </button>
+      {abierto && (
+        <div role="menu" className="desplegar absolute right-0 top-full z-20 mt-1 min-w-[13rem] rounded-md bg-papel py-1 shadow-lg ring-1 ring-linea">
+          {opciones.map((o) => (
+            <button key={o.texto} type="button" role="menuitem" onClick={() => { setAbierto(false); o.onElegir() }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold hover:bg-niebla focus-visible:bg-niebla focus-visible:outline-none">
+              {o.icono} {o.texto}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

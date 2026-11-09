@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Resaltar } from '../../components/Busqueda'
+import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Selector } from '../../components/Selector'
 import { ArrowDownUp, ArrowLeft, Building2, CalendarDays, Check, ChevronRight, CircleAlert, Copy, Info, LayoutDashboard, LogOut, Mail, Megaphone, RefreshCw, Search, Server, Settings, ShieldCheck, SlidersHorizontal, Store } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
@@ -348,13 +350,13 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]['clave']>('todas')
   const [orden, setOrden] = useState<Orden>('alta')
+  const q = limpiarBusqueda(busca)
   const lista = useMemo(() => {
-    const q = busca.trim().toLowerCase()
     const f = FILTROS.find((x) => x.clave === filtro)!
     return d.empresas
-      .filter((e) => f.cumple(e) && (!q || e.nombre.toLowerCase().includes(q) || (e.contacto ?? '').toLowerCase().includes(q)))
+      .filter((e) => f.cumple(e) && coincide(q, e.nombre, e.contacto))
       .sort((a, b) => orden === 'nombre' ? a.nombre.localeCompare(b.nombre, 'es') : orden === 'pedidos' ? b.pedidos30 - a.pedidos30 : orden === 'clientes' ? b.clientes - a.clientes : b.alta.localeCompare(a.alta))
-  }, [d.empresas, busca, filtro, orden])
+  }, [d.empresas, q, filtro, orden])
   const pagina = usePaginas(lista, 25, `${busca}|${filtro}|${orden}`)
   const columna = (clave: Orden, texto: string, der = false) => (
     <th scope="col" className={`px-4 py-3 font-medium ${der ? 'text-right' : ''}`}>
@@ -373,7 +375,7 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="relative min-w-[16rem] flex-1">
           <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-apagado" aria-hidden="true" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar empresa" className={`${claseInputRecto} pl-11`} />
+          <input {...propsBuscador} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar empresa" className={`${claseInputRecto} pl-11`} />
         </label>
         <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-1.5">
           {FILTROS.map((f) => {
@@ -408,8 +410,8 @@ function Empresas({ d, ir }: { d: Datos; ir: (v: Vista) => void }) {
               <tr key={e.id} onClick={() => ir({ de: 'empresa', id: e.id })} className="cursor-pointer hover:bg-niebla/60">
                 <td className="px-4 py-3">
                   <button type="button" onClick={() => ir({ de: 'empresa', id: e.id })} className={`block text-left ${anillo}`}>
-                    <span className="block font-semibold">{e.nombre}</span>
-                    <span className="block text-xs text-apagado">{e.contacto ?? 'Sin administrador'}</span>
+                    <span className="block font-semibold"><Resaltar texto={e.nombre} t={q} /></span>
+                    <span className="block text-xs text-apagado">{e.contacto ? <Resaltar texto={e.contacto} t={q} /> : 'Sin administrador'}</span>
                   </button>
                 </td>
                 <td className="px-4 py-3"><ChipEstado estado={e.estado} /></td>

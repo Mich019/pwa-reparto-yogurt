@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Resaltar } from '../../components/Busqueda'
+import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowRightLeft, BellOff, BellRing, Check, Crown, Flame, Target, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
@@ -17,7 +19,7 @@ import { Medallas } from '../../components/Medallas'
 import { HistorialMetas } from '../../components/HistorialMetas'
 import { usePaginas } from '../../components/Paginas'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
-import { BuscadorDesplegable, Encabezado, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
+import { BuscadorDesplegable, Encabezado, MenuMas, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
 // M07 · Alta y baja de vendedores y reasignación de clientes (RF-038 a RF-041). Sólo para el administrador.
 
@@ -108,8 +110,8 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const activos = equipo?.usuarios.filter((u) => u.activo) ?? []
   const deBaja = equipo?.usuarios.filter((u) => !u.activo) ?? []
   // Panel: como Clientes, busca por nombre o correo y muestra una lista a la vez (activas o dadas de baja).
-  const t = q.trim().toLowerCase()
-  const lista = (verBaja ? deBaja : activos).filter((m) => !t || `${m.nombre} ${m.correo}`.toLowerCase().includes(t))
+  const t = limpiarBusqueda(q)
+  const lista = (verBaja ? deBaja : activos).filter((m) => coincide(t, m.nombre, m.correo))
   const vista = usePaginas(panel ? lista : activos, 30, `${t}|${verBaja}`)
 
   const fila =(m: Miembro) => (
@@ -117,12 +119,12 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
       <Avatar nombre={m.nombre} foto={m.foto} className={`h-12 w-12 text-lg bg-niebla ${m.activo ? '' : 'text-apagado opacity-60'}`} />
       <div className="min-w-0 flex-1">
         <div className={`truncate text-base leading-5 font-semibold ${m.activo ? '' : 'text-apagado'}`}>
-          {m.nombre}{m.id === yo?.id && <span className="font-medium text-apagado"> (tú)</span>}
+          <Resaltar texto={m.nombre} t={panel ? t : ''} />{m.id === yo?.id && <span className="font-medium text-apagado"> (tú)</span>}
         </div>
         <div className="mt-0.5 flex items-center gap-1 truncate text-sm text-apagado">
           {m.rol === 'administrador' && <ShieldCheck size={14} className="shrink-0" />}
           {m.rol === 'administrador' ? ROL_TEXTO.administrador : plural(m.clientes, 'cliente', 'clientes')}
-          {panel && <span className="truncate"> · {m.correo}</span>}
+          {panel && <span className="truncate"> · <Resaltar texto={m.correo} t={t} /></span>}
         </div>
       </div>
       {m.activo && m.rol === 'vendedor' && !m.dispositivosPush && (
@@ -133,18 +135,19 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
     </button>
   )
 
+  // En la app de reparto (en el panel van en «Más», MenuMas).
   const botones = (
     <>
-      <button onClick={() => setInvitando(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+      <button onClick={() => setInvitando(true)} className="flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
         <Mail size={18} /> Invitar
       </button>
-      <button onClick={() => setMetaTodos(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+      <button onClick={() => setMetaTodos(true)} className="flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
         <Target size={18} /> Meta para todos
       </button>
-      <button onClick={() => setFama(true)} className={panel ? `${botonPanelSuave} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea'}>
+      <button onClick={() => setFama(true)} className="flex items-center gap-2 rounded-md bg-niebla px-4 py-2.5 text-sm font-semibold active:bg-linea">
         <Crown size={18} /> Salón de la fama
       </button>
-      <button onClick={() => setForm('nuevo')} className={panel ? `${botonPanel} max-sm:grow` : 'flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700'}>
+      <button onClick={() => setForm('nuevo')} className="flex items-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white active:bg-neutral-700">
         <UserPlus size={18} /> Nueva cuenta
       </button>
     </>
@@ -155,13 +158,18 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'flex h-full flex-col'}>
       {panel ? (
         <Encabezado titulo="Equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : 'Cargando…'}>
-          <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" />
+          <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" clave="equipo" />
           <div className={grupoPanel} role="group" aria-label="Mostrar">
             <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activas</button>
             <button onClick={() => setVerBaja(true)} aria-pressed={verBaja} className={verBaja ? botonPanel : botonPanelSuave}>Dadas de baja</button>
           </div>
           <Separador />
-          {botones}
+          <MenuMas opciones={[
+            { texto: 'Invitar', icono: <Mail size={18} aria-hidden="true" />, onElegir: () => setInvitando(true) },
+            { texto: 'Meta para todos', icono: <Target size={18} aria-hidden="true" />, onElegir: () => setMetaTodos(true) },
+            { texto: 'Salón de la fama', icono: <Crown size={18} aria-hidden="true" />, onElegir: () => setFama(true) },
+          ]} />
+          <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nueva cuenta</button>
         </Encabezado>
       ) : (
         <div className="px-4 pt-safe">
@@ -737,8 +745,8 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
   const destinos = equipo.filter((m) => m.activo && m.id !== desde)
 
   const delOrigen = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    return locales.filter((c: Cliente) => (c.vendedorId ?? SIN_VENDEDOR) === desde && (!t || `${c.nombre} ${c.direccion}`.toLowerCase().includes(t)))
+    const t = limpiarBusqueda(q)
+    return locales.filter((c: Cliente) => (c.vendedorId ?? SIN_VENDEDOR) === desde && coincide(t, c.nombre, c.direccion))
   }, [locales, desde, q])
   const pagina = usePaginas(delOrigen, 40, `${q}|${desde}`)
 
@@ -803,7 +811,7 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
           <div>
             <div className="relative">
               <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre o calle" className={`${claseInput} pl-11`} />
+              <input {...propsBuscador} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre o calle" className={`${claseInput} pl-11`} />
             </div>
             <div className="mt-2 flex items-center justify-between text-sm">
               <span className="text-apagado">{plural(elegidos.size, 'elegido', 'elegidos')} de {delOrigen.length}</span>
@@ -817,8 +825,8 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
                   <button onClick={() => alternar(c.id)} aria-pressed={elegidos.has(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3 text-left active:bg-niebla">
                     <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${elegidos.has(c.id) ? 'border-tinta bg-tinta text-white' : 'border-linea'}`}>{elegidos.has(c.id) && <Check size={16} />}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{c.nombre}{c.activo ? '' : ' (archivado)'}</span>
-                      <span className="block truncate text-sm text-apagado">{c.direccion}</span>
+                      <span className="block truncate font-semibold"><Resaltar texto={c.nombre} t={limpiarBusqueda(q)} />{c.activo ? '' : ' (archivado)'}</span>
+                      <span className="block truncate text-sm text-apagado"><Resaltar texto={c.direccion} t={limpiarBusqueda(q)} /></span>
                     </span>
                   </button>
                 </li>

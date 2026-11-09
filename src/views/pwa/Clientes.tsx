@@ -1,4 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Recientes, Resaltar, useRecientes } from '../../components/Busqueda'
+import { coincide, digitosBuscados, limpiarBusqueda, normalizar, propsBuscador, telefonoCoincide } from '../../lib/busqueda'
 import { esMio } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
@@ -24,12 +26,11 @@ import { BuscadorDesplegable, Encabezado, Separador, TextoBoton, botonPanel, bot
 
 const Escaner = lazy(() => import('./Escaner'))
 
-const sinAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 // Lo que encuentra el buscador (RF-011): nombre, teléfono, dirección (con su colonia), días o cada cuánto se le surte, y horario.
 function textoBusqueda(c: Cliente) {
   const dias = c.frecuencia.tipo === 'semana' ? c.frecuencia.dias.map((d) => DIAS_LARGOS[d]).join(' ') : ''
-  return sinAcentos(`${c.nombre} ${c.telefono} ${c.telefono.replace(/\D/g, '')} ${c.direccion} ${textoFrecuencia(c.frecuencia)} ${dias} ${c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}`)
+  return normalizar(`${c.nombre} ${c.telefono} ${c.telefono.replace(/\D/g, '')} ${c.direccion} ${textoFrecuencia(c.frecuencia)} ${dias} ${c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}`)
 }
 
 // `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
@@ -39,6 +40,8 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
   const [q, setQ] = useState('')
+  const [enBuscador, setEnBuscador] = useState(false)
+  const recientes = useRecientes('clientes')
   const [verInactivos, setVerInactivos] = useState(false)
   const [form, setForm] = useState<Cliente | 'nuevo' | null>(null)
   const [perfilId, setPerfilId] = useState<string | null>(null)
@@ -72,8 +75,10 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
     return prod.get([...s.sabores.entries()].sort((a, b) => b[1] - a[1])[0][0])
   }
 
-  const t = sinAcentos(q.trim())
-  const lista = clientes.filter((c) => c.activo !== verInactivos && (!t || textoBusqueda(c).includes(t)))
+  const t = limpiarBusqueda(q)
+  // Un número (con espacios, guiones o paréntesis) se compara sólo con los dígitos del teléfono.
+  const digitos = digitosBuscados(t)
+  const lista = clientes.filter((c) => c.activo !== verInactivos && (coincide(t, textoBusqueda(c)) || telefonoCoincide(digitos, c.telefono)))
   const paginas = usePaginas(lista, 40, `${t}|${verInactivos}`)
   const perfil = clientes.find((c) => c.id === perfilId)
 
@@ -81,7 +86,10 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const buscador = (
     <div className="relative mt-4">
       <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta" />
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono, colonia o día" className={`${claseInput} pl-11`} />
+      <input {...propsBuscador} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, teléfono, colonia o día" className={`${claseInput} pl-11`}
+        onFocus={() => setEnBuscador(true)} onBlur={() => { setEnBuscador(false); recientes.recordar(q) }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { recientes.recordar(q); e.currentTarget.blur() } }} />
+      {enBuscador && !q && <Recientes className="mt-2" lista={recientes.lista} onElegir={setQ} onOlvidar={recientes.olvidar} />}
     </div>
   )
 
@@ -91,7 +99,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
         <>
           {/* Una sola fila a la altura del detalle: buscar y filtrar, y luego las acciones; todo de 40 px de alto. */}
           <Encabezado titulo="Clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} archivados` : ''}`}>
-            <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" />
+            <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="clientes" />
             <div className={grupoPanel} role="group" aria-label="Mostrar">
               <button onClick={() => setVerInactivos(false)} aria-pressed={!verInactivos} className={verInactivos ? botonPanelSuave : botonPanel}>Activos</button>
               <button onClick={() => setVerInactivos(true)} aria-pressed={verInactivos} className={verInactivos ? botonPanel : botonPanelSuave}>Archivados</button>
@@ -145,8 +153,9 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
                 {c.nombre.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-base leading-5 font-semibold">{c.nombre}</div>
+                <div className="truncate text-base leading-5 font-semibold"><Resaltar texto={c.nombre} t={t} /></div>
                 <div className="mt-0.5 truncate text-sm text-apagado">
+                  {telefonoCoincide(digitos, c.telefono) && <><b className="font-extrabold text-tinta underline decoration-limon decoration-[3px] underline-offset-2">{c.telefono}</b> · </>}
                   {textoFrecuencia(c.frecuencia)} · {c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}
                   {/* En línea con el texto: si no cabe, se recorta el nombre del sabor y no desaparece entero. */}
                   {fav && <> · <PuntoSabor color={fav.color_hex} className="h-2.5 w-2.5 align-middle" /> {fav.sabor}</>}
