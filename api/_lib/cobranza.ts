@@ -184,7 +184,7 @@ export async function rutasCobranza(app: FastifyInstance, { db, config }: Contex
           nota: (a.anulado_en ? `Anulado: ${a.motivo_anulacion}` : a.nota) as string | null, por: a.cobro as string | null, metodo: a.metodo as string,
         })),
       ].sort((x, y) => (x.fecha < y.fecha ? 1 : x.fecha > y.fecha ? -1 : 0))
-      return { cliente: { id: c.id_cliente, nombre: c.nombre }, fiado: saldo?.fiado ?? 0, abonado: saldo?.abonado ?? 0, saldo: saldo?.saldo ?? 0, desde: saldo?.desde ?? null, movimientos }
+      return { cliente: { id: c.id_cliente, nombre: c.nombre }, fiado: saldo?.fiado ?? 0, abonado: saldo?.abonado ?? 0, saldo: saldo?.saldo ?? 0, desde: saldo?.desde ?? null, limite: saldo?.limite ?? null, movimientos }
     } catch (e) {
       return responder(rep, e)
     }

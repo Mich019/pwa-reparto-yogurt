@@ -5,7 +5,7 @@ import { esMio, reparte } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, WifiOff, X, ArrowRight,
+  Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, TriangleAlert, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
@@ -16,7 +16,7 @@ import { baseDelUltimoPedido } from '../../lib/codigos'
 import { enlaceComprobante } from '../../lib/comprobante'
 import { marcaActual } from '../../lib/marca'
 import { AlertasRuta } from './AlertasRuta'
-import { useServidor, type MiMeta } from '../../lib/cobranza'
+import { pasoSuLimite, useServidor, type Deudor, type MiMeta } from '../../lib/cobranza'
 import { sesionActual } from '../../lib/sesion'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
@@ -170,6 +170,9 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
     setElegido(id)
     setExpandida(false)
   }, [])
+  // Clientes que ya pasaron su límite de fiado (con conexión): se marcan en la ruta antes de llegar con ellos.
+  const cobro = useServidor<{ deudores: Deudor[] }>(MODO_SERVIDOR ? '/cobranza' : null)
+  const pasados = new Set((cobro.datos?.deudores ?? []).filter(pasoSuLimite).map((d) => d.id))
 
   const entregados = (pedidosHoy ?? []).filter((p) => p.estado === 'ENTREGADO')
   const totalDia = entregados.reduce((s, p) => s + p.total, 0)
@@ -325,6 +328,9 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                 <button className="flex w-full items-start gap-3 text-left" onClick={() => setExpandida(!expandida)}>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-2xl leading-8 font-bold tracking-tight">{clienteActivo.nombre}</div>
+                    {pasados.has(clienteActivo.id) && (
+                      <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-rojo"><TriangleAlert size={14} aria-hidden="true" /> Pasó su límite de fiado</div>
+                    )}
                     <div className="mt-1 flex items-center gap-1.5 truncate text-sm text-apagado">
                       {clienteActivo.ventana === 'MAÑANA' ? <Sun size={14} /> : <Moon size={14} />}
                       {clienteActivo.ventana === 'MAÑANA' ? 'Mañana' : 'Tarde'}
@@ -387,6 +393,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                               <button key={id} onClick={() => seleccionar(id)} className="relative flex w-full items-center gap-4 py-2 text-left">
                                 <span className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-niebla text-xs font-semibold ring-4 ring-papel">{orden.indexOf(id) + 1}</span>
                                 <span className="min-w-0 flex-1 truncate font-medium">{c.nombre}</span>
+                                {pasados.has(c.id) && <TriangleAlert size={16} className="shrink-0 text-rojo" aria-label="Pasó su límite de fiado" />}
                                 <span className="text-apagado tabular-nums">{dinero(p.total)}</span>
                               </button>
                             )

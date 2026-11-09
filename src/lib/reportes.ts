@@ -67,6 +67,7 @@ export interface Reporte {
   sabores: SaborVendido[]
   ranking: { estrella: string | null; menorRotacion: string | null }
   vendedores: VendedorRendimiento[]
+  abonos?: number // lo cobrado de fiado en el periodo
 }
 
 // ------------------------------------------------------------------ periodos

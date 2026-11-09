@@ -213,6 +213,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
           <QueSeVendio sabores={reporte.sabores} total={r.ingreso} />
         </div>
       )}
+      <FiadoDelPeriodo fiado={r.credito ?? 0} cobrado={reporte.abonos ?? 0} />
 
       {sinVentas ? (
         <div className="mt-6 border-t border-linea py-10 text-center">
@@ -493,6 +494,32 @@ function HojaVendedor({ vendedor: v, onCerrar, vista, rango, unidades, onElegir 
         </div>
       )}
     </Hoja>
+  )
+}
+
+// Lo que se fió en el periodo contra lo que se cobró de fiado (abonos): si el fiado pendiente crece o baja.
+function FiadoDelPeriodo({ fiado, cobrado }: { fiado: number; cobrado: number }) {
+  if (fiado <= 0 && cobrado <= 0) return null
+  const neto = fiado - cobrado
+  const mayor = Math.max(fiado, cobrado)
+  return (
+    <section className="mt-8 border-t border-linea pt-5" aria-labelledby="fiado-periodo">
+      <h3 id="fiado-periodo" className="font-semibold">Fiado</h3>
+      <p className="mt-1 text-sm text-apagado">
+        {Math.abs(neto) < 0.005 ? 'Se cobró lo mismo que se fió: lo pendiente quedó igual.'
+          : neto > 0 ? `Se fió ${dinero(neto)} más de lo que se cobró: lo pendiente creció.`
+          : `Se cobró ${dinero(-neto)} más de lo que se fió: lo pendiente bajó.`}
+      </p>
+      <dl className="mt-3 max-w-xl space-y-2 text-sm">
+        {[{ t: 'Se fió', n: fiado, color: 'var(--color-apagado)' }, { t: 'Se cobró en abonos', n: cobrado, color: 'var(--color-serie)' }].map((x) => (
+          <div key={x.t} className="grid grid-cols-[9rem_1fr_auto] items-center gap-3">
+            <dt>{x.t}</dt>
+            <dd className="h-2.5 overflow-hidden rounded-full bg-linea" aria-hidden="true"><span className="block h-full rounded-full" style={{ width: `${mayor ? (x.n / mayor) * 100 : 0}%`, backgroundColor: x.color }} /></dd>
+            <dd className="font-semibold tabular-nums">{dinero(x.n)}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   )
 }
 

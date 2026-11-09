@@ -13,6 +13,7 @@ export const pasoSuLimite = (d: Pick<Deudor, 'saldo' | 'limite'>) => d.limite !=
 export interface CuentaCliente {
   cliente: { id: string; nombre: string }
   fiado: number; abonado: number; saldo: number; desde: string | null
+  limite?: number | null // su límite de fiado, o el de la empresa (migración 036)
   movimientos: { tipo: 'venta' | 'abono'; id: string; fecha: string; monto: number; anulado: boolean; nota: string | null; por: string | null; metodo?: string }[]
 }
 export interface EnvasesClientes {

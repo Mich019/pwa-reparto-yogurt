@@ -93,6 +93,14 @@ export function HojaAbono({ cuenta, onCerrar, onHecho }: { cuenta: CuentaCliente
         <Campo etiqueta="Monto">
           <input inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value.replace(',', '.'))} className={claseInput} autoFocus />
         </Campo>
+        {valido && (
+          <p className="text-sm text-apagado">
+            {cuenta.saldo - valor < 0.005 ? 'Con este abono ya no debe nada.' : `Quedaría debiendo ${dinero(cuenta.saldo - valor)}`}
+            {cuenta.limite != null && cuenta.saldo - valor >= 0.005 && (cuenta.saldo - valor > cuenta.limite + 0.004
+              ? <span className="font-semibold text-rojo">, todavía arriba de su límite de {dinero(cuenta.limite)}.</span>
+              : `, ${cuenta.limite > 0 ? `${Math.round(((cuenta.saldo - valor) / cuenta.limite) * 100)}% de` : 'contra'} su límite de ${dinero(cuenta.limite)}.`)}
+          </p>
+        )}
         <Segmentado valor={metodo} onChange={setMetodo} opciones={[{ valor: 'efectivo', texto: 'Efectivo' }, { valor: 'transferencia', texto: 'Transferencia' }]} />
         {abonos.length > 0 && (
           <div>
