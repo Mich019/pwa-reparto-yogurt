@@ -99,7 +99,7 @@ export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; o
            <button type="button" onClick={() => onCliente(p.clienteId)} className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-niebla/40 active:bg-niebla focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold"><Resaltar texto={p.cliente} t={t} /></span>
-              <span className="block truncate text-sm text-apagado">{textoFecha(p.fecha)}{p.vendedorId && vendedor.has(p.vendedorId) && <> · <Resaltar texto={vendedor.get(p.vendedorId)!} t={t} /></>}{p.sabores && <> · <Resaltar texto={p.sabores} t={t} /></>}</span>
+              <span className="block truncate text-sm text-apagado"><Resaltar texto={textoFecha(p.fecha)} t={t} />{p.vendedorId && vendedor.has(p.vendedorId) && <> · <Resaltar texto={vendedor.get(p.vendedorId)!} t={t} /></>}{p.sabores && <> · <Resaltar texto={p.sabores} t={t} /></>}</span>
             </span>
             <span className="font-semibold tabular-nums">{dinero(p.total)}</span>
             <ChipEstado estado={p.estado} />

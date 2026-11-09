@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { descargar, xlsx } from '../../lib/xlsx'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda } from '../../lib/busqueda'
 import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from '../../components/Mensajes'
@@ -78,6 +79,15 @@ function PorCobrar({ q }: { q: string }) {
   const t = limpiarBusqueda(q)
   const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor))
   const vista = usePaginas(filtrados, 30, t)
+  // Los que se ven (con la búsqueda), del que más debe al que menos, como en la lista; en el navegador (lib/xlsx.ts).
+  function exportar() {
+    descargar(xlsx({
+      nombre: 'Por cobrar',
+      columnas: [{ titulo: 'Cliente', ancho: 30 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Debe desde', ancho: 14 }, { titulo: 'Saldo', dinero: true, ancho: 14 }],
+      filas: filtrados.map((d) => [d.nombre, d.vendedor ?? 'Sin vendedor', d.telefono ?? '', d.desde ?? '', d.saldo]),
+      total: ['Total', `${filtrados.length} ${filtrados.length === 1 ? 'cliente' : 'clientes'}`, null, null, filtrados.reduce((s, d) => s + d.saldo, 0)],
+    }), `por-cobrar-${hoy()}.xlsx`)
+  }
   const cobro = useMensaje('cobro')
   const [editar, setEditar] = useState(false)
   const [mandados, setMandados] = useState<Set<string>>(new Set())
@@ -87,7 +97,10 @@ function PorCobrar({ q }: { q: string }) {
         <>
           <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3">
             <p className="text-sm text-apagado">Total por cobrar <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{dinero(lista.datos.total)}</span> · {deudores.length} {deudores.length === 1 ? 'cliente' : 'clientes'}</p>
-            <button type="button" onClick={() => setEditar(!editar)} aria-expanded={editar} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editar ? 'Listo' : 'Mensaje para cobrar'}</button>
+            <span className="flex flex-wrap items-center gap-4">
+              <button type="button" onClick={exportar} disabled={!filtrados.length} className="py-1 text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Bajar a Excel</button>
+              <button type="button" onClick={() => setEditar(!editar)} aria-expanded={editar} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editar ? 'Listo' : 'Mensaje para cobrar'}</button>
+            </span>
           </div>
           {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
           <div className="mb-3">

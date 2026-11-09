@@ -546,17 +546,21 @@ export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: Lo
   if (c.envases.prestados > 0) inf.nota(`Envases retornables prestados al cierre: ${ent(c.envases.prestados)} en ${ent(c.envases.clientes)} ${c.envases.clientes === 1 ? 'cliente' : 'clientes'}.`)
 
   inf.tituloSeccion('Cobranza y comisión por vendedor', 'Ordenado por ventas')
-  const suma = (k: 'ventas' | 'utilidad' | 'efectivo' | 'transferencia' | 'credito' | 'abonos' | 'comision') => din(c.vendedores.reduce((s, v) => s + v[k], 0))
+  // En el total, de un millón para arriba sin centavos: «$2,421,813.00» en negritas no cabe en la columna y se achicaría.
+  const suma = (k: 'ventas' | 'utilidad' | 'efectivo' | 'transferencia' | 'credito' | 'abonos' | 'comision') => {
+    const n = c.vendedores.reduce((s, v) => s + v[k], 0)
+    return Math.abs(n) >= 1_000_000 ? `${n < 0 ? '-' : ''}$${n2(Math.abs(n), 0)}` : din(n)
+  }
   inf.tabla<CifrasMes_Vendedor>([
-    { titulo: 'Vendedor', ancho: 0.19, valor: (v) => v.nombre, detalle: (v) => (v.activo ? null : 'Cuenta dada de baja') },
+    { titulo: 'Vendedor', ancho: 0.2, valor: (v) => v.nombre, detalle: (v) => (v.activo ? null : 'Cuenta dada de baja') },
     { titulo: 'Ventas', ancho: 0.11, der: true, valor: (v) => din(v.ventas) },
     { titulo: 'Utilidad', ancho: 0.11, der: true, valor: (v) => din(v.utilidad), color: (v) => (v.utilidad < 0 ? NEGATIVO : undefined) },
-    { titulo: 'Efectivo', ancho: 0.1, der: true, valor: (v) => din(v.efectivo) },
-    { titulo: 'Transf.', ancho: 0.1, der: true, valor: (v) => din(v.transferencia) },
-    { titulo: 'Fiado', ancho: 0.09, der: true, valor: (v) => din(v.credito) },
-    { titulo: 'Abonos', ancho: 0.09, der: true, valor: (v) => din(v.abonos) },
-    { titulo: 'Meta', ancho: 0.1, der: true, valor: (v) => (v.cumplimientoPct === null ? '-' : `${n2(v.cumplimientoPct, 0)}%`), detalle: (v) => (v.meta === null ? null : `de ${dinCorto(v.meta)}`) },
-    { titulo: 'Comisión', ancho: 0.11, der: true, valor: (v) => din(v.comision), detalle: (v) => (v.comisionPct ? `${n2(v.comisionPct, 1)}%` : null) },
+    { titulo: 'Efectivo', ancho: 0.11, der: true, valor: (v) => din(v.efectivo) },
+    { titulo: 'Transf.', ancho: 0.11, der: true, valor: (v) => din(v.transferencia) },
+    { titulo: 'Fiado', ancho: 0.08, der: true, valor: (v) => din(v.credito) },
+    { titulo: 'Abonos', ancho: 0.08, der: true, valor: (v) => din(v.abonos) },
+    { titulo: 'Meta', ancho: 0.08, der: true, valor: (v) => (v.cumplimientoPct === null ? '-' : `${n2(v.cumplimientoPct, 0)}%`), detalle: (v) => (v.meta === null ? null : `de ${dinCorto(v.meta)}`) },
+    { titulo: 'Comisión', ancho: 0.12, der: true, valor: (v) => din(v.comision), detalle: (v) => (v.comisionPct ? `${n2(v.comisionPct, 1)}%` : null) },
   ], c.vendedores, ['Total', suma('ventas'), suma('utilidad'), suma('efectivo'), suma('transferencia'), suma('credito'), suma('abonos'), '', suma('comision')])
 
   inf.tituloSeccion('Diferencias de los cortes', `${ent(c.cortes.dias)} ${c.cortes.dias === 1 ? 'corte' : 'cortes'} · diferencia total ${din(c.cortes.diferencia)}`)
