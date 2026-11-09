@@ -387,6 +387,19 @@ function LimiteFiadoEmpresa() {
   const t = valor.trim().replace(',', '.')
   const nuevo = t === '' ? null : Number(t)
   const valido = nuevo === null || (Number.isFinite(nuevo) && nuevo >= 0)
+  const [codigo, setCodigo] = useState('')
+  async function guardarCodigo(c: string | null) {
+    setGuardando(true)
+    try {
+      await guardarMarca({ codigoFiado: c })
+      setCodigo('')
+      aviso(c ? 'Código guardado: anótalo, no se vuelve a mostrar' : 'Ya no se pide código')
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
   async function guardar() {
     setGuardando(true)
     try {
@@ -400,13 +413,21 @@ function LimiteFiadoEmpresa() {
     }
   }
   return (
-    <Seccion id="fiado" titulo="Fiado" descripcion="Vale para los clientes que no tienen un límite propio (se pone en la ficha de cada cliente). Sólo avisa: no impide fiar.">
+    <Seccion id="fiado" titulo="Fiado" descripcion="El límite vale para los clientes que no tienen uno propio (se pone en la ficha de cada cliente). Sin código sólo avisa; con código, fiar de más lo necesita.">
       <Fila titulo="Límite de fiado" ayuda={actual === null ? 'Sin límite.' : `Al elegir «Fiado», el teléfono avisa si el cliente pasaría de ${'$'}${actual.toLocaleString('es-MX')}. En Por cobrar sale en rojo quien ya lo pasó.`}>
         <span className="flex items-center gap-2">
           <input inputMode="decimal" value={valor} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-label="Límite de fiado de la empresa" aria-invalid={!valido} className={`${claseInputRecto} w-32`} />
           {valor !== (actual === null ? '' : String(actual)) && (
             <button type="button" onClick={() => void guardar()} disabled={guardando || !valido} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>
           )}
+        </span>
+      </Fila>
+      <Fila titulo="Código para fiar de más" ayuda={marca.codigoFiado ? 'Puesto: el teléfono no deja entregar a «Fiado» a quien pasaría de su límite hasta que el vendedor escribe el código. Escribe otro para cambiarlo.' : 'Sin código: el teléfono sólo avisa. Con uno (de 4 a 8 números), fiar de más lo pide; dáselo al vendedor cuando lo autorices.'}>
+        <span className="flex items-center gap-2">
+          <input type="password" inputMode="numeric" autoComplete="new-password" maxLength={8} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
+            placeholder={marca.codigoFiado ? '••••' : 'Sin código'} aria-label="Código para fiar de más" className={`${claseInputRecto} w-32`} />
+          {codigo.length >= 4 && <button type="button" onClick={() => void guardarCodigo(codigo)} disabled={guardando} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>}
+          {marca.codigoFiado && !codigo && <button type="button" onClick={() => void guardarCodigo(null)} disabled={guardando} className="text-sm font-semibold text-apagado underline-offset-2 hover:underline disabled:opacity-40">Quitar</button>}
         </span>
       </Fila>
     </Seccion>

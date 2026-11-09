@@ -4,7 +4,7 @@ import { coincide, digitosBuscados, limpiarBusqueda, normalizar, propsBuscador, 
 import { esMio } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Printer, QrCode, ScanLine, Search, ShoppingBag, Star, Sun, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react'
+import { BookUser, ChevronRight, NotebookPen, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Printer, QrCode, ScanLine, Search, ShoppingBag, Star, Sun, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Producto, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
@@ -22,7 +22,7 @@ import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { usePaginas } from '../../components/Paginas'
 import { CuentaDelCliente } from '../../components/CuentaDelCliente'
 import { PreciosDelCliente } from '../../components/PreciosDelCliente'
-import { LimiteFiado } from '../../components/LimiteFiado'
+import { HojaLimitesSugeridos, LimiteFiado } from '../../components/LimiteFiado'
 import { useMarca } from '../../lib/marca'
 import { PorCobrar } from '../../components/PorCobrar'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
@@ -60,6 +60,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const [escaner, setEscaner] = useState(false)
   const [imprimir, setImprimir] = useState(false)
   const [libreta, setLibreta] = useState(false)
+  const [sugerir, setSugerir] = useState(false)
   const rol = useRol()
   const equipoNombres = useEquipo()
   const limiteDeEmpresa = useMarca()?.limiteFiado ?? null
@@ -143,7 +144,8 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
               { texto: 'Escanear', icono: <ScanLine size={18} aria-hidden="true" />, onElegir: () => setEscaner(true) },
               { texto: 'Imprimir QR', icono: <Printer size={18} aria-hidden="true" />, onElegir: () => setImprimir(true) },
               { texto: 'Bajar a Excel', icono: <FileSpreadsheet size={18} aria-hidden="true" />, onElegir: () => void exportar() },
-              ...(MODO_SERVIDOR && rol === 'administrador' ? [{ texto: 'Libreta', icono: <BookUser size={18} aria-hidden="true" />, onElegir: () => setLibreta(true) }] : []),
+              ...(MODO_SERVIDOR && rol === 'administrador' ? [{ texto: 'Libreta', icono: <BookUser size={18} aria-hidden="true" />, onElegir: () => setLibreta(true) },
+                { texto: 'Límite sugerido para todos', icono: <NotebookPen size={18} aria-hidden="true" />, onElegir: () => setSugerir(true) }] : []),
             ]} />
             <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nuevo cliente</button>
           </Encabezado>
@@ -213,6 +215,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
 
       {imprimir && <ImpresionMasiva clientes={clientes} onCerrar={() => setImprimir(false)} />}
       <HojaLibreta abierta={libreta} onCerrar={() => setLibreta(false)} />
+      {MODO_SERVIDOR && rol === 'administrador' && <HojaLimitesSugeridos abierta={sugerir} onCerrar={() => setSugerir(false)} />}
       {escaner && (
         <Suspense fallback={null}>
           <Escaner onCliente={(c) => { setEscaner(false); setPerfilId(c.id) }} onCerrar={() => setEscaner(false)} />

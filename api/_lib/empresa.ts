@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { color, logo } from './registro.js'
 import { olvidarZona } from './fechas.js'
+import { createHash, randomBytes } from 'node:crypto'
 
 // Marca de la empresa (Fase 4): nombre, logo y color que ven su panel, su app de reparto y sus PDF; lema y contacto
 // (migración 013) salen en los PDF.
@@ -28,11 +29,13 @@ const bodyMarca = z.object({
   ritmoMetaPct: z.number().int().min(30, 'Mínimo 30%').max(100, 'Máximo 100%').optional(),
   // Límite de fiado de los clientes que no tienen uno propio (migración 036); null lo quita. Sólo avisa al fiar.
   limiteFiado: z.number().finite().min(0, 'El límite no puede ser negativo').max(99999999).nullable().optional(),
+  // Código para fiar de más (migración 037); null lo quita y vuelve a sólo avisar.
+  codigoFiado: z.string().regex(/^\d{4,8}$/, 'El código lleva de 4 a 8 números').nullable().optional(),
 }).refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
 
 export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { requiereSesionAunConPasswordPendiente, requiereAdmin }: { requiereSesionAunConPasswordPendiente: Guardia; requiereAdmin: Guardia }) {
   const leer = async (id: string) => {
-    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente, ritmo_meta_pct, limite_fiado FROM empresas WHERE id_empresa = $1`, [id])
+    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente, ritmo_meta_pct, limite_fiado, codigo_fiado FROM empresas WHERE id_empresa = $1`, [id])
     return {
       nombre: e.nombre as string,
       color: (e.color_marca as string | null) ?? null,
@@ -43,6 +46,9 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
       minutosUrgente: e.minutos_urgente as number,
       ritmoMetaPct: e.ritmo_meta_pct as number,
       limiteFiado: e.limite_fiado === null ? null : Number(e.limite_fiado),
+      // Va a todos los teléfonos para revisarlo sin señal: es un freno para el día a día, no una contraseña (con 4 a 8
+      // números, quien saque esto del teléfono lo adivina probando). Lo serio sigue siendo el aviso al administrador.
+      codigoFiado: (e.codigo_fiado as string | null) ?? null,
     }
   }
 
@@ -52,7 +58,9 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
   app.patch('/empresa', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyMarca.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
-    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente, ritmoMetaPct, limiteFiado } = b.data
+    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente, ritmoMetaPct, limiteFiado, codigoFiado } = b.data
+    const sal = randomBytes(8).toString('hex')
+    const codigo = codigoFiado ? `${sal}:${createHash('sha256').update(`${sal}:${codigoFiado}`).digest('hex')}` : null
     await db.query(
       `UPDATE empresas SET nombre = coalesce($2, nombre),
               color_marca = CASE WHEN $3 THEN $4 ELSE color_marca END,
@@ -63,10 +71,11 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
               minutos_urgente = coalesce($12::smallint, minutos_urgente),
               ritmo_meta_pct = coalesce($13::smallint, ritmo_meta_pct),
               limite_fiado = CASE WHEN $14 THEN $15::numeric ELSE limite_fiado END,
+              codigo_fiado = CASE WHEN $16 THEN $17 ELSE codigo_fiado END,
               actualizado_en = now()
         WHERE id_empresa = $1`,
       [req.usuario.empresa, nombre ?? null, c !== undefined, c ?? null, l !== undefined, l ?? null,
-        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null, ritmoMetaPct ?? null, limiteFiado !== undefined, limiteFiado ?? null],
+        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null, ritmoMetaPct ?? null, limiteFiado !== undefined, limiteFiado ?? null, codigoFiado !== undefined, codigo],
     )
     if (zonaHoraria) olvidarZona(req.usuario.empresa)
     return leer(req.usuario.empresa)

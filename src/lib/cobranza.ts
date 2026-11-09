@@ -87,6 +87,8 @@ const enviar = <T>(ruta: string, cuerpo?: unknown) => llamarAutenticado<T>(ruta,
 
 export const guardarLimiteFiado = (clienteId: string, limite: number | null) =>
   llamarAutenticado<{ limite: number | null }>(`/clientes/${clienteId}/limite-fiado`, { metodo: 'PUT', cuerpo: { limite } })
+export const guardarLimitesFiado = (limites: { clienteId: string; limite: number }[]) =>
+  llamarAutenticado<{ actualizados: number }>('/clientes/limites-fiado', { metodo: 'PUT', cuerpo: { limites } })
 export const registrarAbono = (b: { clienteId: string; monto: number; metodo: 'efectivo' | 'transferencia'; nota?: string }) => enviar<{ id: string; saldo: number }>('/cobranza/abonos', b)
 export const anularAbono = (id: string, motivo: string) => enviar(`/cobranza/abonos/${id}/anular`, { motivo })
 export const registrarRecogida = (b: { clienteId: string; productoId: string; cantidad: number; nota?: string }) => enviar<{ id: string; prestados: number }>('/envases/recogidas', b)

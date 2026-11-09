@@ -162,6 +162,26 @@ export async function rutasCobranza(app: FastifyInstance, { db, config }: Contex
     }
   })
 
+  // Cuántas ventas a crédito de cada vendedor dejaron al cliente arriba de su límite este mes (el límite de hoy: no se
+  // guarda su historia). El saldo tras cada venta = lo fiado hasta ella menos los abonos hasta ese día.
+  app.get('/cobranza/fiado-de-mas', { preHandler: requiereAdmin }, async () => {
+    const hoy = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
+    const { rows } = await db.query(
+      `WITH cred AS (
+         SELECT p.id_cliente, p.id_vendedor, p.fecha,
+                sum(p.total) OVER (PARTITION BY p.id_cliente ORDER BY p.fecha, p.creado_en, p.id_pedido) AS acum
+           FROM pedidos p WHERE p.estado = 'entregado' AND p.metodo_pago = 'credito' AND p.fecha <= $1::date
+       )
+       SELECT c.id_vendedor, count(*)::int AS veces FROM cred c JOIN clientes cl USING (id_cliente)
+        CROSS JOIN LATERAL (SELECT coalesce(cl.limite_fiado, (SELECT e.limite_fiado FROM empresas e WHERE e.id_empresa = cl.id_empresa)) AS limite) l
+        WHERE c.fecha >= date_trunc('month', $1::date)::date AND c.id_vendedor IS NOT NULL AND l.limite IS NOT NULL
+          AND c.acum - (SELECT coalesce(sum(a.monto), 0) FROM abonos a WHERE a.id_cliente = c.id_cliente AND a.anulado_en IS NULL AND a.fecha <= c.fecha) > l.limite + 0.004
+        GROUP BY c.id_vendedor`,
+      [hoy],
+    )
+    return { mes: hoy.slice(0, 7), vendedores: rows.map((r) => ({ id: r.id_vendedor as string, veces: r.veces as number })) }
+  })
+
   // La cuenta de un cliente: saldo y movimientos (cada venta a crédito y cada abono, del más nuevo al más viejo).
   app.get('/cobranza/clientes/:id', { preHandler: requiereSesion }, async (req, rep) => {
     const p = idParam.safeParse(req.params)

@@ -16,6 +16,7 @@ const body = z.object({
 })
 const redondear = (n: number) => Math.round(n * 100) / 100
 const cuerpoLimite = z.object({ limite: z.number().finite().min(0).max(99999999).nullable() }).strict()
+const cuerpoLimites = z.object({ limites: z.array(z.object({ clienteId: z.uuid(), limite: z.number().finite().min(0).max(99999999) }).strict()).min(1).max(1000) }).strict()
 
 export async function rutasPrecios(app: FastifyInstance, { db }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
   const leer = async (idCliente: string) => {
@@ -76,5 +77,17 @@ export async function rutasPrecios(app: FastifyInstance, { db }: Contexto, { req
     const rowCount = await tx(db, req.usuario.id, async (c) => (await c.query(`UPDATE clientes SET limite_fiado = $2, actualizado_en = now() WHERE id_cliente = $1`, [p.data.id, b.data.limite])).rowCount)
     if (!rowCount) return rep.code(404).send({ error: 'Ese cliente no existe' })
     return { limite: b.data.limite }
+  })
+
+  // Varios de una vez («Límite sugerido para todos» en Clientes): el teléfono calcula cada uno y aquí sólo se guardan.
+  app.put('/clientes/limites-fiado', { preHandler: requiereAdmin, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const b = cuerpoLimites.safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: 'Lista de límites no válida' })
+    const actualizados = await tx(db, req.usuario.id, async (c) => (await c.query(
+      `UPDATE clientes cl SET limite_fiado = x.limite, actualizado_en = now()
+         FROM unnest($1::uuid[], $2::numeric[]) AS x(id, limite) WHERE cl.id_cliente = x.id`,
+      [b.data.limites.map((l) => l.clienteId), b.data.limites.map((l) => l.limite)],
+    )).rowCount)
+    return { actualizados }
   })
 }

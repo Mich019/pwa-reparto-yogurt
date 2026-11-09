@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
 import { avisarFiadoAtrasado } from '../_lib/cobranza.js'
@@ -70,6 +70,26 @@ describe('fiado', () => {
     const a = await avisos()
     assert.equal(a.length, 1)
     assert.match(a[0].cuerpo, /le fió a Tienda Fiada: ahora debe \$180\.00 y su límite es \$150\.00/)
+    // La ficha del vendedor cuenta las veces del mes (sólo la segunda venta lo dejó arriba).
+    const deMas = await llamar(x.admin, 'GET', '/cobranza/fiado-de-mas')
+    assert.deepEqual(deMas.body.vendedores, [{ id: x.ana.id, veces: 1 }])
+    assert.equal((await llamar(x.ana, 'GET', '/cobranza/fiado-de-mas')).status, 403)
+  })
+
+  it('límites de varios clientes de una vez y el código para fiar de más', async () => {
+    const x = await escenario()
+    const poner = (s: S, limites: unknown) => app.inject({ method: 'PUT', url: '/clientes/limites-fiado', headers: { authorization: `Bearer ${s.token}` }, payload: { limites } })
+    assert.equal((await poner(x.ana, [{ clienteId: x.c.id, limite: 300 }])).statusCode, 403)
+    assert.equal((await poner(x.admin, [{ clienteId: x.c.id, limite: -1 }])).statusCode, 400)
+    assert.equal((await poner(x.admin, [{ clienteId: x.c.id, limite: 300 }, { clienteId: randomUUID(), limite: 50 }])).json().actualizados, 1)
+    assert.equal((await db.query(`SELECT limite_fiado::float8 AS l FROM clientes WHERE id_cliente = $1`, [x.c.id])).rows[0].l, 300)
+    const empresa = (payload: object) => app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${x.admin.token}` }, payload })
+    assert.equal((await empresa({ codigoFiado: '12' })).statusCode, 400)
+    const guardado = (await empresa({ codigoFiado: '4821' })).json().codigoFiado as string
+    const [sal, hash] = guardado.split(':')
+    assert.equal(createHash('sha256').update(`${sal}:4821`).digest('hex'), hash) // el teléfono lo revisa igual
+    assert.equal((await empresa({ limiteFiado: 100 })).json().codigoFiado, guardado) // cambiar otra cosa no lo toca
+    assert.equal((await empresa({ codigoFiado: null })).json().codigoFiado, null)
   })
 
   it('avisa a los administradores de quien debe desde hace más de un mes, una vez por cliente', async () => {

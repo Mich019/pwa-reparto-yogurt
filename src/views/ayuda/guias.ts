@@ -2,7 +2,7 @@ import {
   ArrowRightLeft, Bell, BellRing, BookUser, Camera, CalendarDays, CircleSlash, CreditCard, Download, Factory, Flame, History,
   IceCreamBowl, KeyRound, LayoutDashboard, LineChart, LogOut, Mail, MapPin, MapPinned, Moon, Package, Pencil, Printer, QrCode,
   RefreshCw, ScanLine, ShieldCheck, ShoppingBag, Smartphone, SwatchBook, TrendingUp, UserCog, UserPlus, UserX, WifiOff,
-  Archive, BadgePercent, Boxes, Crown, HandCoins, Lock, Medal, Target, Trophy, Wallet, type LucideIcon,
+  Archive, BadgePercent, Boxes, Crown, HandCoins, Lock, NotebookPen, Medal, Target, Trophy, Wallet, type LucideIcon,
 } from 'lucide-react'
 
 // El manual de la sección Ayuda: cada guía son unos pasos cortos, y cada paso trae su «captura»: una pantalla de
@@ -173,10 +173,20 @@ export const GUIAS: Guia[] = [
   {
     id: 'cobranza', tema: 'reportes', titulo: 'Ver quién te debe y cobrar', icono: HandCoins, donde: 'panel', para: 'administrador', ir: 'cobranza',
     resumen: 'Todos los saldos por cobrar, del adeudo más viejo al más nuevo, con su abono a un toque.',
-    palabras: 'cobranza fiado deuda debe saldo abono cobrar cuentas por cobrar envases prestados',
+    palabras: 'cobranza fiado deuda debe saldo abono cobrar cuentas por cobrar envases prestados limite pasaron whatsapp excel',
     pasos: [
       { texto: 'En Cobranza, «Por cobrar» lista a quien debe y desde cuándo. «Envases» muestra quién tiene prestados garrafones o botellas.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Por cobrar', primario: true, foco: true }, { texto: 'Envases' }, { texto: 'Cortes' }, { texto: 'Meses' }] }, { t: 'filas', n: 4 }]) },
-      { texto: 'Toca a un cliente para registrar su abono. Si te equivocas, anúlalo con un motivo: no se borra, queda a la vista.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
+      { texto: 'Arriba filtras «Más de un mes» o «Pasaron su límite» (en rojo), mandas WhatsApp de cobro uno por uno o a todos, y lo bajas a Excel. Toca a un cliente para registrar su abono. Si te equivocas, anúlalo con un motivo: no se borra, queda a la vista.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
+    ],
+  },
+  {
+    id: 'limites-fiado', tema: 'reportes', titulo: 'Poner límites de fiado', icono: NotebookPen, donde: 'panel', para: 'administrador', ir: 'preferencias',
+    resumen: 'Hasta cuánto puede deber cada cliente: el teléfono avisa al vendedor, tú te enteras si alguien fía de más y, si quieres, fiar de más pide tu código.',
+    palabras: 'limite fiado credito deuda maximo sugerido codigo bloquear pasar de mas cobrar mejor vendedor',
+    pasos: [
+      { texto: 'En Configuración → Preferencias → «Fiado» pon el límite de la empresa (vale para quien no tiene uno propio). Si además pones un código, el teléfono no deja fiar de más sin él: dáselo al vendedor cuando lo autorices.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Fiado' }, { t: 'campos', items: [{ etiqueta: 'Límite de fiado', valor: '500' }, { etiqueta: 'Código para fiar de más', valor: '••••', foco: true }] }]) },
+      { texto: 'Para un cliente en particular, ábrelo en Clientes y toca «Fiado»: la app te sugiere un límite según lo que compra y lo bien que paga. Con «Más» → «Límite sugerido para todos» se lo pones de una vez a los que no tienen uno.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'menu', items: ['Escanear', 'Imprimir QR', 'Bajar a Excel', 'Libreta', 'Límite sugerido para todos'], foco: 4 }]) },
+      { texto: 'Si un vendedor fía de más te llega «Se fió de más», y su ficha en Vendedores dice cuántas veces pasó en el mes. En Cobranza, «Pasaron su límite» los separa, con su propio mensaje de WhatsApp; en Reportes, «Quién cobra mejor» compara lo que cada vendedor fió con lo que cobró.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Más de un mes' }, { texto: 'Pasaron su límite', primario: true, foco: true }] }, { t: 'filas', n: 3 }]) },
     ],
   },
   {
@@ -382,11 +392,12 @@ export const GUIAS: Guia[] = [
   {
     id: 'fiado', tema: 'pedidos', titulo: 'Vender a fiado y cobrar un abono', icono: HandCoins, donde: 'app', para: 'todos',
     resumen: 'Lo que el cliente se lleva sin pagar queda como saldo; cada abono lo baja. Cobrar un abono necesita conexión.',
-    palabras: 'fiado credito deuda debe abono cobrar saldo cuenta por cobrar pagar despues',
+    palabras: 'fiado credito deuda debe abono cobrar saldo cuenta por cobrar pagar despues limite codigo pasar de mas',
     pasos: [
       { texto: 'Al entregar, elige «Fiado» en lugar de Efectivo o Transfer. No cuenta como cobrado hoy.', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'chips', items: ['Efectivo', 'Transfer', 'Fiado'], elegido: 2, foco: 2 }, { t: 'boton', texto: 'Pedido Realizado' }]) },
+      { texto: 'Si el cliente tiene límite de fiado, abajo dice cuánto le puedes fiar todavía. Si con este pedido lo pasa, sale en rojo; si tu empresa pide código, escribe el que te dé el administrador para poder entregar. En la ruta, un triángulo rojo marca a quien ya lo pasó.', escena: tel('Ruta', [{ t: 'caja', titulo: 'Doña Lupita', texto: '$240 · 4 L' }, { t: 'chips', items: ['Efectivo', 'Transfer', 'Fiado'], elegido: 2 }, { t: 'campos', items: [{ etiqueta: 'Para fiarle de más, pide el código al administrador', valor: '••••', foco: true }] }, { t: 'boton', texto: 'Pedido Realizado' }]) },
       { texto: 'Cuando te pague, abre al cliente (o toca «Por cobrar», arriba de Clientes): dice cuánto debe. Toca ese renglón.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar'] }, { t: 'caja', titulo: '$420', texto: 'Debe desde el mié 28 de oct', icono: HandCoins, foco: true }] }) },
-      { texto: 'Escribe cuánto abona, elige Efectivo o Transferencia y toca «Registrar abono». Entra a tu corte del día.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
+      { texto: 'Escribe cuánto abona, elige Efectivo o Transferencia y toca «Registrar abono»: antes te dice cuánto quedaría debiendo contra su límite. Entra a tu corte del día.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
     ],
   },
   {

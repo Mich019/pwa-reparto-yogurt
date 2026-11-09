@@ -85,6 +85,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
   const [expandida, setExpandida] = useState(false)
   const [modo3D, setModo3D] = useState(true)
   const [pagoElegido, setPagoElegido] = useState<{ pedidoId: string; metodo: MetodoPago } | null>(null)
+  const [fiadoPermitido, setFiadoPermitido] = useState(true) // false: fiaría de más y la empresa pide código (AvisoLimiteFiado)
   const [postEntrega, setPostEntrega] = useState<Pedido | null>(null)
   const [nuevaUbicacion, setNuevaUbicacion] = useState<{ clienteId: string; punto: Punto; metros: number } | null>(null)
   const [paso, setPaso] = useState<'opciones' | 'nuevo'>('opciones')
@@ -181,7 +182,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
   const totalPedidos = (pedidosHoy ?? []).filter((p) => p.estado !== 'RECORDAR_MAS_TARDE').length
 
   async function pedidoRealizado() {
-    if (!activo) return
+    if (!activo || (pago === 'CREDITO' && !fiadoPermitido)) return
     const entregado: Pedido = { ...activo, estado: 'ENTREGADO', metodo_pago: pago, fecha_entregado_real: Date.now() }
     await guardar('pedidos', entregado)
     setElegido(null)
@@ -374,7 +375,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                         { valor: 'CREDITO', texto: <><NotebookPen size={16} /> Fiado</> },
                       ]}
                     />
-                    {pago === 'CREDITO' && <AvisoLimiteFiado cliente={clienteActivo} total={activo.total} />}
+                    {pago === 'CREDITO' && <AvisoLimiteFiado key={activo.id} cliente={clienteActivo} total={activo.total} onPermitir={setFiadoPermitido} />}
                     {clienteActivo.notas && (
                       <div className="mt-4 flex gap-2.5 rounded-md bg-niebla p-3 text-sm">
                         <StickyNote size={18} className="mt-0.5 shrink-0 text-apagado" />
@@ -416,7 +417,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                 >
                   <ChevronUp size={24} className={`transition-transform ${expandida ? 'rotate-180' : ''}`} />
                 </button>
-                <Boton onClick={pedidoRealizado} className="h-14 flex-1 !py-0 text-lg">
+                <Boton onClick={pedidoRealizado} disabled={pago === 'CREDITO' && !fiadoPermitido} className="h-14 flex-1 !py-0 text-lg">
                   <CheckCircle2 size={22} /> Pedido Realizado
                 </Boton>
               </div>
