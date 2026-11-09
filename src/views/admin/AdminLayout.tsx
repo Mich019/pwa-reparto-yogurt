@@ -8,7 +8,7 @@ import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { useConexionEnVivo } from '../../lib/enVivo'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
-import { Cobranza, irACortes } from './Cobranza'
+import { Cobranza, irACortes, marcarCobrarViejos } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { AtajosTeclado, Subrayado, atajoDe } from './piezas'
 import { Equipo, irAEquipo } from '../pwa/Equipo'
@@ -40,6 +40,7 @@ function seccionGuardada(): SeccionAdmin {
   // `?ir=cobrar`: el aviso de fiado de más de un mes abre Cobranza → Por cobrar (con el mensaje de cobro de cada cliente).
   if (new URLSearchParams(location.search).get('ir') === 'cobrar') {
     history.replaceState(history.state, '', location.pathname + location.hash)
+    marcarCobrarViejos()
     return 'cobranza'
   }
   // `?ir=produccion`: el aviso de la tarde de que falta producir para mañana.

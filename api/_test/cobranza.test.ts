@@ -51,8 +51,11 @@ describe('fiado', () => {
     assert.match(a.cuerpo, /^Tienda Fiada debe \$240 desde el /)
     assert.deepEqual(a.datos.clienteIds, [x.c.id])
     assert.equal(a.datos.url, '/admin?ir=cobrar')
-    // Al vendedor no le llega, y otra vuelta del cron no lo repite.
-    assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.ana.id])).rowCount, 0)
+    // A su vendedora le llega el suyo (abre Clientes); al otro vendedor, nada. Otra vuelta del cron no lo repite.
+    const { rows: deAna } = await db.query(`SELECT datos FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.ana.id])
+    assert.equal(deAna.length, 1)
+    assert.deepEqual(deAna[0].datos, { pestana: 'clientes', clienteIds: [x.c.id] })
+    assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.beto.id])).rowCount, 0)
     await avisarFiadoAtrasado(db, despachador)
     assert.equal((await avisos()).length, 1)
   })

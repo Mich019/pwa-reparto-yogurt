@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda } from '../../lib/busqueda'
@@ -26,6 +26,10 @@ import type { SeccionAdmin } from './menu'
 type Parte = 'cobrar' | 'envases' | 'cortes' | 'meses'
 
 // `?ir=cortes` (lo pone el aviso de un corte que ya no cuadra) abre Cobranza → Cortes.
+// `?ir=cobrar` (el aviso de fiado de más de un mes) abre Por cobrar sólo con quienes deben desde hace más de 30 días;
+// AdminLayout quita el parámetro de la dirección y deja la marca aquí.
+let cobrarViejos = false
+export const marcarCobrarViejos = () => { cobrarViejos = true }
 export const irACortes = () => new URLSearchParams(location.search).get('ir') === 'cortes'
 const PARTES: { id: Parte; texto: string }[] = [
   { id: 'cobrar', texto: 'Por cobrar' },
@@ -77,8 +81,12 @@ function PorCobrar({ q }: { q: string }) {
   const [abierto, setAbierto] = useState<string | null>(null)
   const deudores = lista.datos?.deudores ?? []
   const t = limpiarBusqueda(q)
-  const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor))
-  const vista = usePaginas(filtrados, 30, t)
+  // `?ir=cobrar` (el aviso de fiado de más de un mes) abre con «Más de un mes» puesto.
+  const [viejos, setViejos] = useState(() => cobrarViejos)
+  useEffect(() => { cobrarViejos = false }, []) // sólo la primera vez que se abre (no al volver a la sección)
+  const limite = sumarDias(hoy(), -30)
+  const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor) && (!viejos || (!!d.desde && d.desde < limite)))
+  const vista = usePaginas(filtrados, 30, `${t}|${viejos}`)
   // Los que se ven (con la búsqueda), del que más debe al que menos, como en la lista; en el navegador (lib/xlsx.ts).
   function exportar() {
     descargar(xlsx({
@@ -103,7 +111,8 @@ function PorCobrar({ q }: { q: string }) {
             </span>
           </div>
           {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
-          <div className="mb-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${filtrados.length})` : ''}</button>
             <MandarATodos lista={filtrados.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) }) }))}
               mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
           </div>
@@ -224,6 +233,11 @@ function Cortes() {
                 {f.entregado !== null && ` · entregó ${dinero(f.entregado)}`}
                 {f.diferencia !== null && f.diferencia !== 0 && <span className="font-semibold text-rojo"> · {f.diferencia < 0 ? 'faltan' : 'sobran'} {dinero(Math.abs(f.diferencia))}</span>}
               </span>
+              {(f.credito > 0 || f.transferencias > 0) && (
+                <span className="block text-sm text-apagado">
+                  Aparte del efectivo: {f.credito > 0 && <span className="font-semibold text-tinta">fiado {dinero(f.credito)}</span>}{f.credito > 0 && f.transferencias > 0 && ' · '}{f.transferencias > 0 && `transferencias ${dinero(f.transferencias)}`}
+                </span>
+              )}
               {f.nota && <span className="block text-sm text-apagado">“{f.nota}”</span>}
               {f.reabierto && <span className="block text-sm text-apagado">Reabierto: {f.reabierto.motivo}</span>}
               {f.cambioDespues !== null && (

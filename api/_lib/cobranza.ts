@@ -73,7 +73,8 @@ export async function saldos(q: Consulta, f: { clienteId?: string; vendedorId?: 
 // El cliente tiene que ser de quien lo consulta: el administrador ve todos; el vendedor sólo los de su cartera.
 // Cron diario: clientes que deben desde hace más de `dias` días (lo más viejo sin cubrir). A los administradores activos
 // de su empresa les llega `fiado_atrasado` (se puede apagar), que abre Cobranza → Por cobrar, donde está el mensaje de
-// cobro de cada uno. Cada cliente vuelve a avisarse a los `dias` días si sigue debiendo (`datos.clienteIds`).
+// cobro de cada uno; al vendedor de cada cliente, uno sólo con los suyos, que abre Clientes (arriba está su «Por
+// cobrar»). Cada cliente vuelve a avisarse a los `dias` días si sigue debiendo (`datos.clienteIds`).
 // Cruza empresas: la conexión del dueño. shortcut: calcula los saldos de todas las empresas en una consulta; si llegan a
 // ser muchas, recorrerlas una por una.
 export async function avisarFiadoAtrasado(db: Db, despachador: Despachador, dias = 30): Promise<number> {
@@ -91,20 +92,30 @@ export async function avisarFiadoAtrasado(db: Db, despachador: Despachador, dias
   const deudor = new Map(viejos.map((d) => [d.id, d]))
   const porEmpresa = new Map<string, Deudor[]>()
   for (const r of rows) porEmpresa.set(r.id_empresa, [...(porEmpresa.get(r.id_empresa) ?? []), deudor.get(r.id_cliente)!])
-  const { rows: admins } = await db.query(
-    `SELECT id_usuario, id_empresa FROM usuarios WHERE rol = 'administrador' AND activo AND id_empresa = ANY($1::uuid[])`, [[...porEmpresa.keys()]])
+  // Los vendedores (no administradores: esos ya reciben el de toda la empresa) de esos clientes.
+  const { rows: personas } = await db.query(
+    `SELECT id_usuario, id_empresa, rol FROM usuarios
+      WHERE activo AND id_empresa = ANY($1::uuid[]) AND (rol = 'administrador' OR (rol = 'vendedor' AND id_usuario = ANY($2::uuid[])))`,
+    [[...porEmpresa.keys()], [...new Set(viejos.map((d) => d.vendedorId).filter(Boolean))]],
+  )
   const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
   const fecha = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
-  await despachador.despachar([...porEmpresa].flatMap(([empresa, ds]) => {
-    ds.sort((a, b) => b.saldo - a.saldo)
+  const texto = (ds: Deudor[]) => {
     const nombres = ds.slice(0, 3).map((d) => d.nombre).join(', ') + (ds.length > 3 ? ` y ${ds.length - 3} más` : '')
-    const aviso = ds.length === 1
+    return ds.length === 1
       ? { titulo: 'Fiado de más de un mes', cuerpo: `${ds[0].nombre} debe ${pesos(ds[0].saldo)} desde el ${fecha(ds[0].desde!)}` }
       : { titulo: `${ds.length} clientes deben desde hace más de un mes`, cuerpo: `${nombres}: ${pesos(ds.reduce((s, d) => s + d.saldo, 0))} en total` }
-    return admins.filter((a) => a.id_empresa === empresa).map((a) => ({
-      para: a.id_usuario as string, tipo: 'fiado_atrasado' as const, ...aviso,
-      datos: { url: '/admin?ir=cobrar', clienteIds: ds.map((d) => d.id) },
-    }))
+  }
+  await despachador.despachar([...porEmpresa].flatMap(([empresa, ds]) => {
+    ds.sort((a, b) => b.saldo - a.saldo)
+    return personas.filter((p) => p.id_empresa === empresa).flatMap((p) => {
+      const suyos = p.rol === 'administrador' ? ds : ds.filter((d) => d.vendedorId === p.id_usuario)
+      if (!suyos.length) return []
+      return [{
+        para: p.id_usuario as string, tipo: 'fiado_atrasado' as const, ...texto(suyos),
+        datos: p.rol === 'administrador' ? { url: '/admin?ir=cobrar', clienteIds: suyos.map((d) => d.id) } : { pestana: 'clientes' as const, clienteIds: suyos.map((d) => d.id) },
+      }]
+    })
   }))
   return rows.length
 }

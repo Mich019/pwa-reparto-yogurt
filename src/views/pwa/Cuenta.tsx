@@ -305,6 +305,7 @@ const TIPOS_AVISO = [
   { tipo: 'medalla_ganada', titulo: 'Tus medallas', ayuda: 'Cuando llegas a 3, 6 o 12 meses seguidos en tu meta.' },
   { tipo: 'record_personal', titulo: 'Tus récords', ayuda: 'Cuando superas tu mejor racha de meses seguidos.' },
   { tipo: 'racha_en_riesgo', titulo: 'Tu racha en riesgo', ayuda: 'Al final del mes, si llegaste a tu meta el mes pasado y este todavía no.' },
+  { tipo: 'fiado_atrasado', titulo: 'Fiado de más de un mes', ayuda: 'Una vez al día, si alguno de tus clientes debe desde hace más de 30 días.' },
   { tipo: 'ruta_modificada', titulo: 'Cambios en tu ruta', ayuda: 'Pedidos de hoy que se agregan, cambian o quitan, y clientes que pasan a tu cartera.' },
 ] as const
 
