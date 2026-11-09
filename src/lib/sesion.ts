@@ -236,7 +236,7 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
 }
 
 // El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
-export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean }) {
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
   const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
   if (datos.silencio !== undefined) void recordarSilencio(datos.silencio)
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
@@ -251,8 +251,10 @@ const recordarSilencio = (s: { desde: number; hasta: number } | null) => db.meta
 export async function refrescarPerfil() {
   if (!actual) return
   try {
-    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; silencio?: { desde: number; hasta: number } | null }>('/me')
+    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
     if (r.silencio !== undefined) void recordarSilencio(r.silencio)
+    // Los mensajes de WhatsApp viven en la cuenta; el dispositivo guarda una copia para usarlos sin señal.
+    if (r.mensajes) void copiarMensajes(r.mensajes)
     if (actual && (actual.usuario.nombre !== r.nombre || actual.usuario.foto !== r.foto)) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
     // El orden del menú del panel vive en la cuenta; el navegador guarda una copia para pintarlo sin esperar.
     // Sin orden en la cuenta va el de fábrica; sólo la primera vez, este navegador le pasa el que ya tenía de antes de
@@ -264,6 +266,13 @@ export async function refrescarPerfil() {
     if (heredar) void guardarPerfil({ ordenMenu: local }).catch(() => {})
     else cambiarPreferencias({ ordenMenu: r.ordenMenu ?? [] })
   } catch { /* sin conexión */ }
+}
+
+async function copiarMensajes(m: Record<string, string>) {
+  for (const tipo of ['visita', 'cobro']) {
+    if (m[tipo]) await db.meta.put({ clave: `mensaje:${tipo}`, valor: m[tipo] })
+    else await db.meta.delete(`mensaje:${tipo}`)
+  }
 }
 
 // Lo que hay que hacer mientras la sesión sigue abierta, antes de cerrarla (p. ej. dejar de recibir los avisos de la cuenta).

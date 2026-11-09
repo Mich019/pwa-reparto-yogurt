@@ -63,7 +63,13 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
       mostrarPdf(pdf.hojaProduccionPdf(cuando, filas.map((f) => ({
         sabor: f.producto.sabor, color: f.producto.color_hex, pedido: o(f.confirmado, f.producto), estimado: o(f.estimado, f.producto),
         total: l(f.total, f.producto), falta: hayProducido ? o(faltaDe(f), f.producto) : undefined,
-      })), { total: totalProd, falta: hayProducido ? totalFalta : undefined }), `produccion-${pron.desde}.pdf`)
+      })), { total: totalProd, falta: hayProducido ? totalFalta : undefined }, new Date(), horizonte > 1 ? {
+        dias: pron.dias.map((d) => textoFecha(d.fecha)),
+        filas: ((cant) => filas.map((f) => ({
+          sabor: f.producto.sabor, color: f.producto.color_hex,
+          valores: pron.dias.map((d) => { const n = cant.get(`${d.fecha}|${f.producto.id}`) ?? 0; return n > 0 ? l(n, f.producto) : '—' }),
+        })))(cantidadesPorDia(pron.dias, filas)),
+      } : undefined), `produccion-${pron.desde}.pdf`)
     } catch (e) {
       aviso(e instanceof Error ? e.message : 'No se pudo generar')
     } finally {
@@ -313,6 +319,14 @@ function QueTanAtinado({ acierto, corregir, puede, onCorregir }: { acierto: Acie
 // Para la semana o los 3 días: qué se necesita de cada sabor cada día (lo ya pedido más lo estimado, con la corrección
 // si está puesta), para producir cerca del día en que sale. Una tabla: días en columnas, sabores en renglones; cada
 // celda se tiñe del color del sabor según cuánto sale ese día (comparado con su día más fuerte).
+// Cuánto sale de cada sabor cada día (`fecha|productoId`): lo pedido más lo estimado con la corrección del sabor.
+function cantidadesPorDia(dias: { fecha: string; sabores: { productoId: string; confirmado: number; estimado: number }[] }[], filas: { producto: { id: string }; razon: number }[]) {
+  const razon = new Map(filas.map((f) => [f.producto.id, f.razon]))
+  const cantidad = new Map<string, number>()
+  for (const d of dias) for (const x of d.sabores) cantidad.set(`${d.fecha}|${x.productoId}`, Math.ceil((x.confirmado + x.estimado * (razon.get(x.productoId) ?? 1)) * 2) / 2)
+  return cantidad
+}
+
 function DiaPorDia({ dias, filas, productos, l }: {
   dias: { fecha: string; sabores: { productoId: string; confirmado: number; estimado: number }[] }[]
   filas: { producto: Producto; razon: number }[]
@@ -320,9 +334,7 @@ function DiaPorDia({ dias, filas, productos, l }: {
   l: (n: number, p: Producto) => string
 }) {
   const prod = new Map(productos.map((p) => [p.id, p]))
-  const razon = new Map(filas.map((f) => [f.producto.id, f.razon]))
-  const cantidad = new Map<string, number>()
-  for (const d of dias) for (const x of d.sabores) cantidad.set(`${d.fecha}|${x.productoId}`, Math.ceil((x.confirmado + x.estimado * (razon.get(x.productoId) ?? 1)) * 2) / 2)
+  const cantidad = cantidadesPorDia(dias, filas)
   const sabores = filas.map((f) => f.producto).filter((p) => prod.has(p.id))
   if (!dias.length || !sabores.length) return null
   return (

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BotonWhatsApp, EditorMensaje, llenar, useMensaje } from './Mensajes'
+import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from './Mensajes'
 import { esMio } from '../lib/reparto'
 import { ChevronRight, HandCoins } from 'lucide-react'
 import { useServidor, type Deudor } from '../lib/cobranza'
@@ -36,6 +36,10 @@ export function PorCobrar() {
             <summary className="cursor-pointer py-1 text-sm font-semibold">Mensaje para cobrar por WhatsApp</summary>
             <div className="mt-2"><EditorMensaje tipo="cobro" abierto={abierta} /></div>
           </details>
+          <div className="mb-2">
+            <MandarATodos lista={d.deudores.map((x) => ({ id: x.id, nombre: x.nombre, telefono: x.telefono, texto: llenar(cobro, { nombre: x.nombre, saldo: dinero(x.saldo) }) }))}
+              mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
+          </div>
           {d.deudores.map((x) => (
             <div key={x.id} className="flex items-center gap-2 border-b border-linea">
               <button onClick={() => setCliente(x.id)} className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left active:bg-niebla">

@@ -445,7 +445,9 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
 // Hoja de producción (Producción → Pronóstico): una hoja para la cocina con cuánto producir de cada sabor, la parte
 // ya pedida y la estimada, lo que falta si ya se anotó algo en Stock del día, y un espacio para palomear.
 export interface FilaHojaProduccion { sabor: string; color: string; pedido: string; estimado: string; total: string; falta?: string }
-export function hojaProduccionPdf(cuando: string, filas: FilaHojaProduccion[], totales: { total: string; falta?: string }, ahora = new Date()): PdfListo {
+// Con 3 días o la semana, además, qué sale cada día de cada sabor (la tabla «Día por día» de la pantalla).
+export interface DiasHojaProduccion { dias: string[]; filas: { sabor: string; color: string; valores: string[] }[] }
+export function hojaProduccionPdf(cuando: string, filas: FilaHojaProduccion[], totales: { total: string; falta?: string }, ahora = new Date(), porDia?: DiasHojaProduccion): PdfListo {
   const inf = new Informe('Hoja de producción', cuando)
   inf.portada(`Cuánto producir para ${cuando}`, [['Para', cuando], ['Sabores', String(filas.length)]], ahora)
   const conFalta = filas.some((f) => f.falta !== undefined)
@@ -459,6 +461,14 @@ export function hojaProduccionPdf(cuando: string, filas: FilaHojaProduccion[], t
     { titulo: 'Hecho', ancho: 0.12, der: true, valor: () => '______' },
   ], filas, ['Total', '', '', totales.total, ...(conFalta ? [totales.falta ?? ''] : []), ''])
   inf.nota('Ya pedido: pedidos agendados, seguro se entregan. Estimado: lo que suelen pedir los clientes a los que les toca visita y aún no piden. Al terminar un sabor, anótalo en Stock del día.')
+  if (porDia && porDia.dias.length > 1 && porDia.filas.length) {
+    inf.tituloSeccion('Día por día', 'Para producir cada sabor cerca del día en que sale')
+    const ancho = 0.75 / porDia.dias.length
+    inf.tabla<DiasHojaProduccion['filas'][number]>([
+      { titulo: 'Sabor', ancho: 0.25, valor: (f) => f.sabor, muestra: (f) => hex(f.color) },
+      ...porDia.dias.map((d, i) => ({ titulo: d, ancho, der: true, valor: (f: DiasHojaProduccion['filas'][number]) => f.valores[i] })),
+    ], porDia.filas)
+  }
   return inf.listo()
 }
 

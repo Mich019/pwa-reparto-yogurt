@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { BotonWhatsApp, EditorMensaje, llenar, useMensaje } from '../../components/Mensajes'
+import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from '../../components/Mensajes'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
@@ -83,6 +83,10 @@ function PorCobrar() {
             <button type="button" onClick={() => setEditar(!editar)} aria-expanded={editar} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editar ? 'Listo' : 'Mensaje para cobrar'}</button>
           </div>
           {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
+          <div className="mb-3">
+            <MandarATodos lista={deudores.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) }) }))}
+              mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
+          </div>
           <div ref={vista.ancla} className="scroll-mt-4">
             {vista.visibles.map((d) => (
               <div key={d.id} className="flex items-center gap-2">

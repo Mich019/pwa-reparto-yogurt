@@ -408,3 +408,17 @@ describe('reasignar clientes (RF-041)', () => {
     assert.equal(malo.body.resultados[0].retirado, undefined)
   })
 })
+
+describe('mensajes de WhatsApp en la cuenta', () => {
+  it('se guardan en la cuenta, se cambian por separado y null vuelve al de fábrica', async () => {
+    const v = await sesion('vendedor', 'tel-msj')
+    assert.deepEqual((await llamar(v, 'GET', '/me')).body.mensajes, {})
+    assert.deepEqual((await llamar(v, 'PATCH', '/me', { mensajes: { visita: 'Hola {nombre}, ¿pasamos?' } })).body.mensajes, { visita: 'Hola {nombre}, ¿pasamos?' })
+    await llamar(v, 'PATCH', '/me', { mensajes: { cobro: 'Debes {saldo}' } })
+    assert.deepEqual((await llamar(v, 'GET', '/me')).body.mensajes, { visita: 'Hola {nombre}, ¿pasamos?', cobro: 'Debes {saldo}' })
+    await llamar(v, 'PATCH', '/me', { mensajes: { visita: null } })
+    assert.deepEqual((await llamar(v, 'GET', '/me')).body.mensajes, { cobro: 'Debes {saldo}' })
+    assert.equal((await llamar(v, 'PATCH', '/me', { mensajes: { otro: 'x' } })).status, 400)
+    assert.equal((await llamar(v, 'PATCH', '/me', { mensajes: { cobro: 'x'.repeat(501) } })).status, 400)
+  })
+})
