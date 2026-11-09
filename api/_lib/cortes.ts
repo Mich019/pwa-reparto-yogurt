@@ -320,12 +320,19 @@ export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fa
 // mes a mes, el mes más vendido, el vendedor del año (el que más vendió sumando sus meses), la mejor racha dentro del año
 // y, por vendedor, lo suyo (para su resumen en Cuenta).
 export async function resumenDelAnio(db: Consulta, anio: number, idEmpresa: string | null = null) {
-  const { rows } = await db.query(
+  const { rows: todos } = await db.query(
     `SELECT to_char(mes, 'YYYY-MM') AS mes, (cifras->'ventas'->>'ingreso')::float8 AS ventas, cifras->'vendedores' AS vendedores
-       FROM cierres_mes WHERE estado = 'cerrado' AND extract(year FROM mes) = $1 AND ($2::uuid IS NULL OR id_empresa = $2) ORDER BY mes`,
+       FROM cierres_mes WHERE estado = 'cerrado' AND extract(year FROM mes)::int IN ($1::int, $1::int - 1) AND ($2::uuid IS NULL OR id_empresa = $2) ORDER BY mes`,
     [anio, idEmpresa],
   )
+  const rows = todos.filter((r) => r.mes.startsWith(`${anio}-`))
   const meses = rows.map((r) => ({ mes: r.mes as string, ventas: redondear(r.ventas ?? 0) }))
+  // Contra el año anterior, con los mismos meses cerrados en los dos (enero a octubre contra enero a octubre).
+  const antes = new Map(todos.filter((r) => r.mes.startsWith(`${anio - 1}-`)).map((r) => [r.mes.slice(5), redondear(r.ventas ?? 0)]))
+  const comunes = meses.filter((m) => antes.has(m.mes.slice(5)))
+  const anterior = comunes.length
+    ? { anio: anio - 1, meses: comunes.length, total: redondear(comunes.reduce((s, m) => s + antes.get(m.mes.slice(5))!, 0)), actual: redondear(comunes.reduce((s, m) => s + m.ventas, 0)) }
+    : null
   const porVendedor = new Map<string, { nombre: string; ventas: number; cumplidos: string[]; mejorMes: { mes: string; ventas: number } | null }>()
   for (const r of rows) {
     for (const v of (r.vendedores ?? []) as { id: string; nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[]) {
@@ -345,6 +352,7 @@ export async function resumenDelAnio(db: Consulta, anio: number, idEmpresa: stri
     mesMasVendido: tope && tope.ventas > 0 ? tope : null,
     vendedorDelAnio: delAnio && delAnio.ventas > 0 ? { id: delAnio.id, nombre: delAnio.nombre, ventas: delAnio.ventas } : null,
     mejorRacha: racha && racha.mejorRacha > 0 ? { id: racha.id, nombre: racha.nombre, meses: racha.mejorRacha } : null,
+    anterior,
     vendedores,
   }
 }

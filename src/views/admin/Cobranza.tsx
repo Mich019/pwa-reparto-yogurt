@@ -11,6 +11,7 @@ import { CuentaAbierta } from '../../components/CuentaDelCliente'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
 import { Selector } from '../../components/Selector'
+import { mostrarPdf } from '../../components/VisorPdf'
 import { AnioEnNumeros, type ResumenAnio } from './AdminDashboard'
 import { abrirFicha } from '../pwa/Equipo'
 import type { SeccionAdmin } from './menu'
@@ -299,15 +300,35 @@ function ElAnio({ anios, onNavegar }: { anios: number[]; onNavegar?: (s: Seccion
   const [anio, setAnio] = useState<number | null>(null)
   const elegido = anio ?? anios[0] ?? null
   const r = useServidor<ResumenAnio>(elegido ? `/cierres/anio/${elegido}` : null)
+  const [generando, setGenerando] = useState(false)
+  async function pdfDelAnio(datos: ResumenAnio) {
+    setGenerando(true)
+    try {
+      const pdf = await import('../../lib/reportePdf')
+      await pdf.prepararLogoPdf()
+      mostrarPdf(pdf.informeAnualPdf(datos), `informe-anual-${datos.anio}.pdf`)
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo generar')
+    } finally {
+      setGenerando(false)
+    }
+  }
   if (!elegido) return null
   return (
     <section className="mt-8" aria-labelledby="el-anio">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="el-anio" className="text-lg font-semibold">El año en números</h2>
-        {anios.length > 1 && (
-          <Selector valor={elegido} onCambiar={setAnio} etiqueta="Año" className={`${claseInput} w-32`}
-            opciones={anios.map((a) => ({ valor: a, texto: String(a) }))} />
-        )}
+        <div className="flex items-center gap-2">
+          {anios.length > 1 && (
+            <Selector valor={elegido} onCambiar={setAnio} etiqueta="Año" className={`${claseInput} w-32`}
+              opciones={anios.map((a) => ({ valor: a, texto: String(a) }))} />
+          )}
+          {!!r.datos?.meses.length && (
+            <button type="button" onClick={() => void pdfDelAnio(r.datos!)} disabled={generando} className={botonPanelSuave}>
+              <FileText size={16} aria-hidden="true" /> {generando ? 'Generando…' : 'Descargar PDF'}
+            </button>
+          )}
+        </div>
       </div>
       <p className="mt-1 text-sm text-apagado">Sólo cuentan los meses cerrados.</p>
       <div className="mt-2 rounded-2xl bg-niebla p-4">

@@ -92,6 +92,16 @@ body {
 .desplegar-opcion { animation: desplegar-opcion 0.18s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .desplegar, .desplegar-opcion { animation: none; } }
 
+/* Producción (views/pwa/Pronostico.tsx): lo estimado va rayado en el color del sabor (lo ya pedido, lleno), y las barras
+   crecen desde la izquierda al cambiar de horizonte. */
+.relleno-estimado {
+  --estimado: var(--color-marca);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--estimado) 55%, transparent) 0 3px, color-mix(in srgb, var(--estimado) 22%, transparent) 3px 6px);
+}
+@keyframes barra-crece { from { transform: scaleX(0); } to { transform: none; } }
+.barra-crece { transform-origin: left; animation: barra-crece 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .barra-crece { animation: none; } }
+
 /* Medalla nueva en Cuenta (views/pwa/MiDia.tsx): la tarjeta salta un poco y el trofeo gira y brilla, una sola vez. */
 @keyframes medalla-nueva { 0% { transform: scale(0.96); } 45% { transform: scale(1.03); } 100% { transform: none; } }
 @keyframes medalla-nueva-icono {

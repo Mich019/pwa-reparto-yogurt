@@ -255,11 +255,13 @@ export interface CifrasAnio {
   mesMasVendido: { mes: string; ventas: number } | null
   vendedorDelAnio: { nombre: string; ventas: number } | null
   mejorRacha: { nombre: string; meses: number } | null
+  anterior?: { anio: number; meses: number; total: number; actual: number } | null
 }
 export function correoAnual(nombre: string, empresa: string, c: CifrasAnio, url: string) {
   const nombreMes = (mes: string) => { const [a, m] = mes.split('-').map(Number); return new Date(Date.UTC(a, m - 1, 15)).toLocaleDateString('es-MX', { month: 'long', timeZone: 'UTC' }) }
   const renglones: [string, string][] = [
     ['Vendido en el año', `${pesos(c.total)} en ${veces(c.meses.length, 'mes cerrado', 'meses cerrados')}`],
+    ...(c.anterior && c.anterior.total > 0 ? [['Contra ' + c.anterior.anio, `${c.anterior.actual >= c.anterior.total ? '+' : ''}${Math.round(((c.anterior.actual - c.anterior.total) / c.anterior.total) * 100)}% (${veces(c.anterior.meses, 'mes', 'mismos meses')})`] as [string, string]] : []),
     ...(c.mesMasVendido ? [['Mes más vendido', `${nombreMes(c.mesMasVendido.mes)}: ${pesos(c.mesMasVendido.ventas)}`] as [string, string]] : []),
     ...(c.vendedorDelAnio ? [['Vendedor del año', `${c.vendedorDelAnio.nombre}: ${pesos(c.vendedorDelAnio.ventas)}`] as [string, string]] : []),
     ...(c.mejorRacha ? [['Mejor racha', `${c.mejorRacha.nombre}: ${veces(c.mejorRacha.meses, 'mes', 'meses seguidos')} en su meta`] as [string, string]] : []),

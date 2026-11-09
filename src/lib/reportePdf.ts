@@ -442,6 +442,40 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
 // Ventas y utilidad del mes, cobranza y comisión por vendedor y las diferencias de los cortes. Si el mes está cerrado
 // son las cifras congeladas al cerrarlo (api/_lib/cortes.ts).
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+// El año en números (Cobranza → Meses): sus meses cerrados, el mes más vendido, el vendedor del año, la mejor racha y
+// la comparación con el año anterior en los mismos meses.
+export interface AnioPdf {
+  anio: number
+  meses: { mes: string; ventas: number }[]
+  total: number
+  mesMasVendido: { mes: string; ventas: number } | null
+  vendedorDelAnio: { nombre: string; ventas: number } | null
+  mejorRacha: { nombre: string; meses: number } | null
+  anterior: { anio: number; meses: number; total: number; actual: number } | null
+}
+export function informeAnualPdf(r: AnioPdf, ahora = new Date()): PdfListo {
+  const inf = new Informe('Informe anual', String(r.anio))
+  const nombreMes = (mes: string) => MESES[Number(mes.slice(5, 7)) - 1]
+  inf.portada(`Resultados de ${r.anio}`, [['Año', String(r.anio)], ['Meses cerrados', String(r.meses.length)]], ahora)
+  inf.tituloSeccion('El año en números', 'Sólo meses cerrados')
+  const variacion = r.anterior && r.anterior.total > 0 ? Math.round(((r.anterior.actual - r.anterior.total) / r.anterior.total) * 100) : null
+  inf.nota([
+    `Vendido en el año: ${din(r.total)}.`,
+    variacion !== null && r.anterior ? `Contra ${r.anterior.anio} en los mismos ${r.anterior.meses} meses: ${variacion > 0 ? '+' : ''}${variacion}% (${din(r.anterior.actual)} contra ${din(r.anterior.total)}).` : '',
+    r.mesMasVendido ? `Mes más vendido: ${nombreMes(r.mesMasVendido.mes)} con ${din(r.mesMasVendido.ventas)}.` : '',
+    r.vendedorDelAnio ? `Vendedor del año: ${r.vendedorDelAnio.nombre} con ${din(r.vendedorDelAnio.ventas)}.` : '',
+    r.mejorRacha ? `Mejor racha: ${r.mejorRacha.nombre}, ${r.mejorRacha.meses} ${r.mejorRacha.meses === 1 ? 'mes' : 'meses seguidos'} en su meta.` : '',
+  ].filter(Boolean).join(' '))
+  inf.tituloSeccion('Lo vendido mes a mes')
+  const tope = Math.max(1, ...r.meses.map((m) => m.ventas))
+  inf.tabla<{ mes: string; ventas: number }>([
+    { titulo: 'Mes', ancho: 0.3, valor: (m) => nombreMes(m.mes).charAt(0).toUpperCase() + nombreMes(m.mes).slice(1) },
+    { titulo: 'Vendido', ancho: 0.3, der: true, valor: (m) => din(m.ventas) },
+    { titulo: 'Del mejor mes', ancho: 0.4, der: true, valor: (m) => pct((m.ventas / tope) * 100) },
+  ], r.meses, ['Total', din(r.total), ''])
+  return inf.listo()
+}
+
 // Lo de metas que va al final del informe mensual (lib/cobranza.ts `logrosDelMes`, de GET /usuarios/rachas): medallas
 // ganadas con ese mes y las mejores rachas de todos los tiempos (a la fecha en que se genera).
 export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fama: { nombre: string; mejorRacha: number; cumplidos: number; racha: number }[] }

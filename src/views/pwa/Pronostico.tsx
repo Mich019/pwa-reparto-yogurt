@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Factory } from 'lucide-react'
+import { ArrowRight, Factory } from 'lucide-react'
 import { db } from '../../lib/db'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { PuntoSabor, Segmentado } from '../../components/ui'
@@ -9,14 +9,23 @@ import { formato, sumaPorUnidad, unidadDe } from '../../lib/unidades'
 import { Encabezado } from '../admin/piezas'
 
 const PERIODOS = { hoy: 'Hoy', semana: '7 días', mes: '30 días' } as const
+// Para cuántos días producir: mañana, los próximos 3 o la semana (desde mañana).
+const HORIZONTES = { 1: 'Mañana', 3: '3 días', 7: 'Semana' } as const
+type Horizonte = keyof typeof HORIZONTES
 
-export function Pronostico({ selector, conVentas = true, panel = false }: { selector?: ReactNode; conVentas?: boolean; panel?: boolean }) {
+// `onRegistrar`: lleva a «Stock del día» para anotar lo que ya se produjo.
+export function Pronostico({ selector, conVentas = true, panel = false, onRegistrar }: { selector?: ReactNode; conVentas?: boolean; panel?: boolean; onRegistrar?: () => void }) {
   const clientes = useLiveQuery(() => db.clientes.toArray(), []) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
   const [periodo, setPeriodo] = useState<keyof typeof PERIODOS>('hoy')
+  const [horizonte, setHorizonte] = useState<Horizonte>(() => { try { return (Number(localStorage.getItem('delisy:horizonte')) || 7) as Horizonte } catch { return 7 } })
+  const elegirHorizonte = (h: Horizonte) => { setHorizonte(h); try { localStorage.setItem('delisy:horizonte', String(h)) } catch { /* sin almacenamiento */ } }
 
-  const pron = useMemo(() => pronosticoSemanal(clientes, pedidos, productos), [clientes, pedidos, productos])
+  const pron = useMemo(() => pronosticoSemanal(clientes, pedidos, productos, undefined, horizonte), [clientes, pedidos, productos, horizonte])
+  const totalConf = sumaPorUnidad(pron.filas.filter((f) => f.confirmado > 0).map((f) => ({ unidad: f.producto.unidad, cantidad: f.confirmado })))
+  const totalEst = sumaPorUnidad(pron.filas.filter((f) => f.estimado > 0).map((f) => ({ unidad: f.producto.unidad, cantidad: f.estimado })))
+  const cuando = horizonte === 1 ? `mañana, ${textoFecha(pron.desde)}` : `de ${textoFecha(pron.desde)} a ${textoFecha(pron.hasta)}`
   const desde = periodo === 'hoy' ? hoy() : sumarDias(hoy(), periodo === 'semana' ? -6 : -29)
   const ventas = useMemo(() => resumenVentas(pedidos, productos, desde, hoy()), [pedidos, productos, desde])
   // Catálogo flexible: cada sabor en su unidad, los totales por unidad («40 L + 10 kg») y cada barra comparada sólo
@@ -36,7 +45,7 @@ export function Pronostico({ selector, conVentas = true, panel = false }: { sele
   return (
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
       {panel ? (
-        <Encabezado titulo={conVentas ? 'Producción y ventas' : 'Producción'} detalle={`Para la próxima semana · ${textoFecha(pron.desde)} a ${textoFecha(pron.hasta)}`}>
+        <Encabezado titulo={conVentas ? 'Producción y ventas' : 'Producción'} detalle="Cuánto producir de cada sabor para cubrir lo que viene">
           {selector}
         </Encabezado>
       ) : (
@@ -48,37 +57,83 @@ export function Pronostico({ selector, conVentas = true, panel = false }: { sele
 
       <section className={panel ? '' : 'mt-4'}>
         {!panel && (
-          <>
-            <div className="flex items-center gap-2 text-sm font-medium text-apagado">
-              <Factory size={18} /> Producción para la próxima semana
-            </div>
-            <div className="text-xs text-apagado">{textoFecha(pron.desde)} a {textoFecha(pron.hasta)}</div>
-          </>
+          <div className="flex items-center gap-2 text-sm font-medium text-apagado">
+            <Factory size={18} /> Cuánto producir de cada sabor
+          </div>
         )}
-        <div className="mt-2 text-5xl leading-none font-bold tracking-tight tabular-nums">{totalProd}</div>
-        {pron.filas.length === 0 && <div className="mt-3 text-sm text-apagado">Aún no hay pedidos agendados ni historial para proyectar.</div>}
-        <div className="mt-5 divide-y divide-linea">
-          {pron.filas.map((f) => (
-            <div key={f.producto.id} className="flex items-center gap-3 py-3">
-              <PuntoSabor color={f.producto.color_hex} className="h-5 w-5" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between">
-                  <span className="font-semibold">{f.producto.sabor}</span>
-                  <span className="text-lg font-semibold tabular-nums">{l(f.total, f.producto)}</span>
-                </div>
-                <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-niebla">
-                  <div className="h-full bg-tinta" style={{ width: `${(f.confirmado / maxProdDe(f.producto)) * 100}%` }} />
-                  <div className="h-full bg-tinta/30" style={{ width: `${(f.estimado / maxProdDe(f.producto)) * 100}%` }} />
-                </div>
-                {f.confirmado > 0 && <div className="mt-1 text-[11px] text-apagado">{l(f.confirmado, f.producto)} agendados</div>}
+        {/* Para cuándo: cambia todo lo de abajo */}
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <span className="text-sm text-apagado">Producir para</span>
+          <Segmentado valor={String(horizonte) as `${Horizonte}`} onChange={(v) => elegirHorizonte(Number(v) as Horizonte)}
+            opciones={(Object.keys(HORIZONTES) as `${Horizonte}`[]).map((k) => ({ valor: k, texto: HORIZONTES[Number(k) as Horizonte] }))} />
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[auto_1fr] lg:items-end">
+          <div>
+            <p className="text-sm text-apagado">Total a producir para {cuando}</p>
+            <div key={horizonte} className="desplegar mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums">{totalProd}</div>
+          </div>
+          {/* Las dos partes del total, que son también la leyenda de las barras */}
+          {pron.filas.length > 0 && (
+            <div className="grid gap-2 sm:grid-cols-2 lg:justify-self-end">
+              <div className="flex items-start gap-2.5 rounded-xl bg-niebla p-3">
+                <span className="mt-1 h-3 w-5 shrink-0 rounded-sm bg-marca" aria-hidden="true" />
+                <span className="text-sm">
+                  <span className="block font-semibold tabular-nums">{totalConf || '0'} ya pedidos</span>
+                  <span className="block text-xs text-apagado">{pron.pedidosConfirmados} {pron.pedidosConfirmados === 1 ? 'pedido agendado' : 'pedidos agendados'}: seguro se entregan</span>
+                </span>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-xl bg-niebla p-3">
+                <span className="relleno-estimado mt-1 h-3 w-5 shrink-0 rounded-sm" aria-hidden="true" />
+                <span className="text-sm">
+                  <span className="block font-semibold tabular-nums">{totalEst || '0'} estimados</span>
+                  <span className="block text-xs text-apagado">
+                    {pron.clientesEstimados
+                      ? `Lo que suelen pedir ${pron.clientesEstimados} ${pron.clientesEstimados === 1 ? 'cliente al que le toca' : 'clientes a los que les toca'} visita y aún no ${pron.clientesEstimados === 1 ? 'pide' : 'piden'}`
+                      : 'Nadie más tiene visita sin pedido'}
+                  </span>
+                </span>
               </div>
             </div>
-          ))}
+          )}
         </div>
-        {pron.clientesEstimados > 0 && (
-          <div className="mt-2 text-xs text-apagado">
-            Lo gris es estimado por historial ({pron.clientesEstimados} cliente{pron.clientesEstimados > 1 ? 's' : ''} sin pedido confirmado).
+
+        {pron.filas.length === 0 && (
+          <div className="mt-5 rounded-xl bg-niebla p-4 text-sm text-apagado">
+            No hay nada que producir para {cuando}: no hay pedidos agendados ni clientes con visita e historial para estimar.
           </div>
+        )}
+        <div key={`filas-${horizonte}`} className="mt-5 divide-y divide-linea">
+          {pron.filas.map((f, i) => {
+            const max = maxProdDe(f.producto)
+            return (
+              <div key={f.producto.id} className="flex items-center gap-3 py-3.5">
+                <PuntoSabor color={f.producto.color_hex} className="h-5 w-5" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-semibold">{f.producto.sabor}</span>
+                    <span className="text-right">
+                      <span className="text-lg font-semibold tabular-nums">{l(f.total, f.producto)}</span>
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-niebla" role="img"
+                    aria-label={`${f.producto.sabor}: ${l(f.confirmado, f.producto)} ya pedidos y ${l(f.estimado, f.producto)} estimados`}>
+                    {f.confirmado > 0 && <div className="barra-crece h-full rounded-full" style={{ width: `${(f.confirmado / max) * 100}%`, backgroundColor: f.producto.color_hex, animationDelay: `${i * 40}ms` }} />}
+                    {f.estimado > 0 && <div className="barra-crece relleno-estimado h-full rounded-full" style={{ width: `${(f.estimado / max) * 100}%`, ['--estimado' as string]: f.producto.color_hex, animationDelay: `${i * 40 + 80}ms` }} />}
+                  </div>
+                  <div className="mt-1 text-xs text-apagado tabular-nums">
+                    {[f.confirmado > 0 && `${l(f.confirmado, f.producto)} ya pedidos`, f.estimado > 0 && `${l(f.estimado, f.producto)} estimados`].filter(Boolean).join(' + ')}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {onRegistrar && pron.filas.length > 0 && (
+          <button type="button" onClick={onRegistrar}
+            className="mt-4 flex items-center gap-2 rounded-md py-1 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
+            ¿Ya lo produjiste? Anótalo en «Stock del día» <ArrowRight size={16} aria-hidden="true" />
+          </button>
         )}
       </section>
 

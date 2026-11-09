@@ -22,5 +22,5 @@ export function Produccion({ panel = false }: { panel?: boolean } = {}) {
   ) : (
     <Segmentado valor={vista} onChange={setVista} opciones={[...opciones]} />
   )
-  return vista === 'stock' ? <StockAdmin selector={selector} panel={panel} /> : <Pronostico selector={selector} conVentas={false} panel={panel} />
+  return vista === 'stock' ? <StockAdmin selector={selector} panel={panel} /> : <Pronostico selector={selector} conVentas={false} panel={panel} onRegistrar={() => setVista('stock')} />
 }

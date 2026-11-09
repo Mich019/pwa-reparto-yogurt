@@ -373,6 +373,7 @@ export interface ResumenAnio {
   mesMasVendido: { mes: string; ventas: number } | null
   vendedorDelAnio: { id: string; nombre: string; ventas: number } | null
   mejorRacha: { id: string; nombre: string; meses: number } | null
+  anterior: { anio: number; meses: number; total: number; actual: number } | null
 }
 export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: string) => void }) {
   const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
@@ -385,6 +386,15 @@ export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: st
         <div className={dato}>
           <p className="text-xs text-apagado">Vendido en el año</p>
           <p className="mt-1 text-xl font-bold tabular-nums">{dinero(r.total)}</p>
+          {r.anterior && r.anterior.total > 0 && (() => {
+            const pct = Math.round(((r.anterior.actual - r.anterior.total) / r.anterior.total) * 100)
+            return (
+              <p className="mt-0.5 text-xs" title={`${dinero(r.anterior.actual)} contra ${dinero(r.anterior.total)} en los mismos ${r.anterior.meses} meses de ${r.anterior.anio}`}>
+                <span className={`font-semibold ${pct > 0 ? 'text-verde' : pct < 0 ? 'text-rojo' : ''}`}>{pct > 0 ? '+' : ''}{pct}%</span>
+                <span className="text-apagado"> contra {r.anterior.anio}</span>
+              </p>
+            )
+          })()}
         </div>
         {r.mesMasVendido && (
           <div className={dato} style={{ animationDelay: '40ms' }}>
@@ -410,10 +420,16 @@ export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: st
           </button>
         )}
       </div>
-      <ol className="mt-4 flex h-20 items-end gap-1" aria-label="Lo vendido en cada mes cerrado">
+      <ol className="mt-10 flex h-20 items-end gap-1" aria-label="Lo vendido en cada mes cerrado">
         {r.meses.map((x) => (
-          <li key={x.mes} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${nombreMes(x.mes)}: ${dinero(x.ventas)}`}>
-            <span className={`w-full max-w-8 rounded-t-md ${x.mes === r.mesMasVendido?.mes ? 'bg-marca' : 'bg-marca/40'}`} style={{ height: `${Math.max(3, (x.ventas / tope) * 100)}%` }} />
+          // Al pasar el mouse (o al enfocarla con el teclado o tocarla) sale un globito con el mes y la cifra.
+          <li key={x.mes} tabIndex={0} className="group relative flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-marca">
+            <span role="tooltip" className="pointer-events-none absolute bottom-full z-10 mb-1 translate-y-1 whitespace-nowrap rounded-lg bg-tinta px-2.5 py-1.5 text-center text-xs text-papel opacity-0 shadow-tarjeta transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus:translate-y-0 group-focus:opacity-100 motion-reduce:transition-none"
+              style={{ bottom: `${Math.max(3, (x.ventas / tope) * 100)}%` }}>
+              <span className="block capitalize">{nombreMes(x.mes)}</span>
+              <span className="block font-semibold tabular-nums">{dinero(x.ventas)}</span>
+            </span>
+            <span className={`w-full max-w-8 rounded-t-md transition-[filter] duration-150 group-hover:brightness-110 ${x.mes === r.mesMasVendido?.mes ? 'bg-marca' : 'bg-marca/40'}`} style={{ height: `${Math.max(3, (x.ventas / tope) * 100)}%` }} />
             <span className="text-[10px] capitalize text-apagado">{nombreMes(x.mes).slice(0, 3)}</span>
             <span className="sr-only">{dinero(x.ventas)}</span>
           </li>

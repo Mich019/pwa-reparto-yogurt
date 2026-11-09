@@ -269,6 +269,8 @@ describe('resumen diario por correo', () => {
 
     // El resumen del año: aviso a los administradores, una vez por año y empresa.
     const anuales = async () => (await db.query(`SELECT titulo FROM notificaciones WHERE tipo = 'resumen_anual' AND id_usuario = $1`, [admin.id])).rows
+    // La base de pruebas sobrevive entre corridas: sin esto, la marca «ya se mandó este año» de una corrida anterior lo salta.
+    await db.query(`DELETE FROM notificaciones WHERE tipo = 'resumen_anual' AND id_empresa = (SELECT id_empresa FROM usuarios WHERE id_usuario = $1)`, [admin.id])
     await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial)
                     VALUES (date_trunc('year', now()) - interval '1 year' + interval '2 month', 'cerrado', $1, now(), '[]')
                     ON CONFLICT (id_empresa, mes) DO NOTHING`,
@@ -282,6 +284,8 @@ describe('resumen diario por correo', () => {
     assert.match(c.asunto, /Lácteos Año: tu 2026 en números/)
     assert.match(c.texto, /Vendedor del año: Beto: \$5,000\.00/)
     assert.match(c.texto, /Mes más vendido: marzo/)
+    const c2 = correoAnual('Ana', 'X', { anio: 2026, meses: [], total: 0, mesMasVendido: null, vendedorDelAnio: null, mejorRacha: null, anterior: { anio: 2025, meses: 2, total: 1000, actual: 1180 } }, 'https://x.test')
+    assert.match(c2.texto, /Contra 2025: \+18% \(2 mismos meses\)/)
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

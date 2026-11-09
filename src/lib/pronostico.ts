@@ -11,8 +11,8 @@ export interface FilaPronostico {
 // Demanda en litros por sabor para los próximos 7 días (a partir de mañana):
 // confirmada = pedidos PENDIENTE ya agendados; estimada = clientes a los que les toca visita
 // ese día y aún no tienen pedido, con su promedio histórico por sabor.
-export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], productos: Producto[], desde = sumarDias(hoy(), 1)) {
-  const hasta = sumarDias(desde, 6)
+export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], productos: Producto[], desde = sumarDias(hoy(), 1), dias = 7) {
+  const hasta = sumarDias(desde, dias - 1)
   const confirmado = new Map<string, number>()
   const estimado = new Map<string, number>()
   const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v)
@@ -32,6 +32,7 @@ export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], produc
     entregadosPorCliente.set(p.clienteId, l)
   }
 
+  const pedidosConfirmados = pedidos.filter((p) => p.estado === 'PENDIENTE' && p.fecha >= desde && p.fecha <= hasta).length
   let clientesEstimados = 0
   for (const c of clientes) {
     if (!c.activo) continue
@@ -60,7 +61,7 @@ export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], produc
     .filter((f) => f.total > 0)
     .sort((a, b) => b.total - a.total)
 
-  return { desde, hasta, filas, clientesEstimados }
+  return { desde, hasta, filas, clientesEstimados, pedidosConfirmados }
 }
 
 export interface ResumenVentas {

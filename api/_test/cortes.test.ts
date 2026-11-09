@@ -212,6 +212,13 @@ describe('cierre de mes', () => {
     assert.ok(anio.meses.some((m: { mes: string }) => m.mes === MES))
     assert.equal((await llamar(x.ana, 'GET', `/cierres/anio/${MES.slice(0, 4)}`)).status, 403)
     assert.equal(anio.vendedores, undefined) // el detalle por vendedor no sale
+    // Contra el año anterior: mismos meses cerrados en los dos años.
+    await db.query(`INSERT INTO cierres_mes (id_empresa, mes, estado, cifras, cerrado_en, historial) VALUES ($3, $1, 'cerrado', $2, now(), '[]')
+       ON CONFLICT (id_empresa, mes) DO UPDATE SET estado = 'cerrado', cifras = EXCLUDED.cifras`,
+      [`${Number(MES.slice(0, 4)) - 1}-${MES.slice(5)}-01`, JSON.stringify({ ventas: { ingreso: 60 }, vendedores: [] }), x.empresa])
+    const conAnterior = (await llamar(x.admin, 'GET', `/cierres/anio/${MES.slice(0, 4)}`)).body.anterior
+    assert.ok(conAnterior)
+    assert.equal(conAnterior.total, 60)
     // Ana ve sólo lo suyo del año.
     const suyo = (await llamar(x.ana, 'GET', `/mi-meta/anio/${MES.slice(0, 4)}`)).body
     assert.ok(suyo.ventas >= 120)
