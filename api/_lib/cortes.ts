@@ -316,6 +316,40 @@ const ordenFama = (a: { mejorRacha: number; cumplidos: number; nombre: string },
 
 // Para la hoja «Medallas» del Excel del informe: las ganadas con `mes` y las 5 mejores rachas (a la fecha).
 export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fama: { nombre: string; mejorRacha: number; cumplidos: number; racha: number }[] }
+// Los meses cerrados de `anio` (de una empresa: `idEmpresa` hace falta con la conexión del dueño, el cron): lo vendido
+// mes a mes, el mes más vendido, el vendedor del año (el que más vendió sumando sus meses), la mejor racha dentro del año
+// y, por vendedor, lo suyo (para su resumen en Cuenta).
+export async function resumenDelAnio(db: Consulta, anio: number, idEmpresa: string | null = null) {
+  const { rows } = await db.query(
+    `SELECT to_char(mes, 'YYYY-MM') AS mes, (cifras->'ventas'->>'ingreso')::float8 AS ventas, cifras->'vendedores' AS vendedores
+       FROM cierres_mes WHERE estado = 'cerrado' AND extract(year FROM mes) = $1 AND ($2::uuid IS NULL OR id_empresa = $2) ORDER BY mes`,
+    [anio, idEmpresa],
+  )
+  const meses = rows.map((r) => ({ mes: r.mes as string, ventas: redondear(r.ventas ?? 0) }))
+  const porVendedor = new Map<string, { nombre: string; ventas: number; cumplidos: string[]; mejorMes: { mes: string; ventas: number } | null }>()
+  for (const r of rows) {
+    for (const v of (r.vendedores ?? []) as { id: string; nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[]) {
+      const x = porVendedor.get(v.id) ?? { nombre: v.nombre, ventas: 0, cumplidos: [], mejorMes: null }
+      x.ventas += v.ventas
+      if (v.meta && (v.cumplimientoPct ?? 0) >= 100) x.cumplidos.push(r.mes)
+      if (v.ventas > 0 && (!x.mejorMes || v.ventas > x.mejorMes.ventas)) x.mejorMes = { mes: r.mes, ventas: redondear(v.ventas) }
+      porVendedor.set(v.id, x)
+    }
+  }
+  const vendedores = [...porVendedor].map(([id, v]) => ({ id, nombre: v.nombre, ventas: redondear(v.ventas), mejorRacha: mejorDe(v.cumplidos), cumplidos: v.cumplidos.length, mejorMes: v.mejorMes }))
+  const delAnio = [...vendedores].sort((a, b) => b.ventas - a.ventas)[0]
+  const racha = [...vendedores].sort(ordenFama)[0]
+  const tope = [...meses].sort((a, b) => b.ventas - a.ventas)[0]
+  return {
+    anio, meses, total: redondear(meses.reduce((s, m) => s + m.ventas, 0)),
+    mesMasVendido: tope && tope.ventas > 0 ? tope : null,
+    vendedorDelAnio: delAnio && delAnio.ventas > 0 ? { id: delAnio.id, nombre: delAnio.nombre, ventas: delAnio.ventas } : null,
+    mejorRacha: racha && racha.mejorRacha > 0 ? { id: racha.id, nombre: racha.nombre, meses: racha.mejorRacha } : null,
+    vendedores,
+  }
+}
+const anioDeRuta = z.object({ anio: z.coerce.number().int().min(2020).max(2100) })
+
 export async function logrosDelMes(db: Consulta, zonaRespaldo: string, mes: string): Promise<LogrosMes> {
   const todos = Object.values(await rachasDe(db, mesAnterior(hoyEn(await zonaDeEmpresa(db, zonaRespaldo)))))
   return {
@@ -567,32 +601,20 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   // Resumen del año (panel, diciembre y enero): con los meses cerrados de `anio`, lo vendido mes a mes, el mes más
   // vendido, el vendedor del año (el que más vendió sumando sus meses) y la mejor racha dentro del año.
   app.get('/cierres/anio/:anio', { preHandler: requiereAdmin }, async (req, rep) => {
-    const p = z.object({ anio: z.coerce.number().int().min(2020).max(2100) }).safeParse(req.params)
+    const p = anioDeRuta.safeParse(req.params)
     if (!p.success) return rep.code(400).send({ error: 'El año no es válido' })
-    const { rows } = await db.query(
-      `SELECT to_char(mes, 'YYYY-MM') AS mes, (cifras->'ventas'->>'ingreso')::float8 AS ventas, cifras->'vendedores' AS vendedores
-         FROM cierres_mes WHERE estado = 'cerrado' AND extract(year FROM mes) = $1 ORDER BY mes`,
-      [p.data.anio],
-    )
-    const meses = rows.map((r) => ({ mes: r.mes as string, ventas: redondear(r.ventas ?? 0) }))
-    const porVendedor = new Map<string, { nombre: string; ventas: number; cumplidos: string[] }>()
-    for (const r of rows) {
-      for (const v of (r.vendedores ?? []) as { id: string; nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[]) {
-        const x = porVendedor.get(v.id) ?? { nombre: v.nombre, ventas: 0, cumplidos: [] }
-        x.ventas += v.ventas
-        if (v.meta && (v.cumplimientoPct ?? 0) >= 100) x.cumplidos.push(r.mes)
-        porVendedor.set(v.id, x)
-      }
-    }
-    const vendedores = [...porVendedor].map(([id, v]) => ({ id, nombre: v.nombre, ventas: redondear(v.ventas), mejorRacha: mejorDe(v.cumplidos), cumplidos: v.cumplidos.length }))
-    const delAnio = [...vendedores].sort((a, b) => b.ventas - a.ventas)[0]
-    const racha = [...vendedores].sort(ordenFama)[0]
-    const tope = [...meses].sort((a, b) => b.ventas - a.ventas)[0]
+    const { vendedores: _, ...r } = await resumenDelAnio(db, p.data.anio)
+    return r
+  })
+  // El del vendedor (Cuenta, diciembre y enero): sólo sus cifras, nunca las de los demás.
+  app.get('/mi-meta/anio/:anio', { preHandler: requiereSesion }, async (req, rep) => {
+    const p = anioDeRuta.safeParse(req.params)
+    if (!p.success) return rep.code(400).send({ error: 'El año no es válido' })
+    const r = await resumenDelAnio(db, p.data.anio)
+    const yo = r.vendedores.find((v) => v.id === req.usuario.id)
     return {
-      anio: p.data.anio, meses, total: redondear(meses.reduce((s, m) => s + m.ventas, 0)),
-      mesMasVendido: tope && tope.ventas > 0 ? tope : null,
-      vendedorDelAnio: delAnio && delAnio.ventas > 0 ? { id: delAnio.id, nombre: delAnio.nombre, ventas: delAnio.ventas } : null,
-      mejorRacha: racha && racha.mejorRacha > 0 ? { id: racha.id, nombre: racha.nombre, meses: racha.mejorRacha } : null,
+      anio: r.anio, mesesCerrados: r.meses.length, ventas: yo?.ventas ?? 0, cumplidos: yo?.cumplidos ?? 0, mejorRacha: yo?.mejorRacha ?? 0,
+      mejorMes: yo?.mejorMes ?? null, vendedorDelAnio: !!yo && r.vendedorDelAnio?.id === yo.id,
     }
   })
 

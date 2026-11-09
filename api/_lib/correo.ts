@@ -247,6 +247,35 @@ export function correoMensual(nombre: string, empresa: string, mes: string, c: C
   }
 }
 
+// El 1 de enero: el año que terminó en números (sólo meses cerrados), a los administradores que piden el informe mensual.
+export interface CifrasAnio {
+  anio: number
+  meses: { mes: string; ventas: number }[]
+  total: number
+  mesMasVendido: { mes: string; ventas: number } | null
+  vendedorDelAnio: { nombre: string; ventas: number } | null
+  mejorRacha: { nombre: string; meses: number } | null
+}
+export function correoAnual(nombre: string, empresa: string, c: CifrasAnio, url: string) {
+  const nombreMes = (mes: string) => { const [a, m] = mes.split('-').map(Number); return new Date(Date.UTC(a, m - 1, 15)).toLocaleDateString('es-MX', { month: 'long', timeZone: 'UTC' }) }
+  const renglones: [string, string][] = [
+    ['Vendido en el año', `${pesos(c.total)} en ${veces(c.meses.length, 'mes cerrado', 'meses cerrados')}`],
+    ...(c.mesMasVendido ? [['Mes más vendido', `${nombreMes(c.mesMasVendido.mes)}: ${pesos(c.mesMasVendido.ventas)}`] as [string, string]] : []),
+    ...(c.vendedorDelAnio ? [['Vendedor del año', `${c.vendedorDelAnio.nombre}: ${pesos(c.vendedorDelAnio.ventas)}`] as [string, string]] : []),
+    ...(c.mejorRacha ? [['Mejor racha', `${c.mejorRacha.nombre}: ${veces(c.mejorRacha.meses, 'mes', 'meses seguidos')} en su meta`] as [string, string]] : []),
+  ]
+  const celda = 'padding:8px 0;border-top:1px solid #eee'
+  const tabla = `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${renglones
+    .map(([k, v]) => `<tr><td style="${celda};color:#6b6b6b">${escapar(k)}</td><td align="right" style="${celda};font-weight:600">${escapar(v)}</td></tr>`).join('')}</table></td></tr>`
+  const pie = 'Lo recibes porque pediste el informe de cada mes en Configuración → Preferencias. Ahí mismo lo apagas.'
+  return {
+    asunto: `${empresa}: tu ${c.anio} en números`,
+    texto: `Hola ${nombre}:\n\nAsí le fue a ${empresa} en ${c.anio}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}\n\n¡Feliz año nuevo! Entra a Delisy: ${url}\n\n${pie}`,
+    html: marco(parrafo(`Hola ${primerNombre(nombre)}, así le fue a <strong>${escapar(empresa)}</strong> en ${c.anio}:`) + tabla
+      + parrafo('¡Feliz año nuevo!') + boton(url, 'Abrir el panel') + nota(pie)),
+  }
+}
+
 // Constancia de que la cuenta se eliminó (derecho de cancelación): sale al correo que tenía antes de anonimizarla.
 export function correoCuentaEliminada(nombre: string, empresa: string) {
   return {

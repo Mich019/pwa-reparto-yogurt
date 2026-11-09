@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { correoMensual, correoResumen, correoVendedor } from '../_lib/correo.js'
-import { avisarMetasAtrasadas, avisarRachasEnRiesgo, felicitarMeta, rachaDesde, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
+import { avisarMetasAtrasadas, avisarRachasEnRiesgo, mandarResumenAnual, felicitarMeta, rachaDesde, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
 import { xlsxDelMes } from '../_lib/cortes.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
+import { correoAnual } from '../_lib/correo.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
 
 // Resumen diario por correo para el administrador (resumen.ts) y lo que el equipo muestra de los avisos de cada quien.
@@ -265,6 +266,22 @@ describe('resumen diario por correo', () => {
     assert.equal(r.length, 1)
     assert.match(r[0].cuerpo, /Llevas 2 meses seguidos llegando a tu meta\. Te faltan \$1,000 este mes/)
     assert.equal(r[0].datos.pestana, 'cuenta')
+
+    // El resumen del año: aviso a los administradores, una vez por año y empresa.
+    const anuales = async () => (await db.query(`SELECT titulo FROM notificaciones WHERE tipo = 'resumen_anual' AND id_usuario = $1`, [admin.id])).rows
+    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial)
+                    VALUES (date_trunc('year', now()) - interval '1 year' + interval '2 month', 'cerrado', $1, now(), '[]')
+                    ON CONFLICT (id_empresa, mes) DO NOTHING`,
+      [JSON.stringify({ ventas: { ingreso: 5000 }, vendedores: [{ id: vend.id, nombre: 'Beto', ventas: 5000, meta: 1000, cumplimientoPct: 500 }] })])
+    await mandarResumenAnual(db, config, despachador, log, true)
+    await mandarResumenAnual(db, config, despachador, log, true)
+    const a = await anuales()
+    assert.equal(a.length, 1)
+    assert.match(a[0].titulo, /^Tu \d{4} en números$/)
+    const c = correoAnual('Ana López', 'Lácteos Año', { anio: 2026, meses: [{ mes: '2026-03', ventas: 5000 }], total: 5000, mesMasVendido: { mes: '2026-03', ventas: 5000 }, vendedorDelAnio: { nombre: 'Beto', ventas: 5000 }, mejorRacha: { nombre: 'Beto', meses: 1 } }, 'https://ejemplo.test/admin')
+    assert.match(c.asunto, /Lácteos Año: tu 2026 en números/)
+    assert.match(c.texto, /Vendedor del año: Beto: \$5,000\.00/)
+    assert.match(c.texto, /Mes más vendido: marzo/)
   })
 
   it('el equipo muestra en cuántos dispositivos tiene los avisos cada quien y cuáles apagó', async () => {

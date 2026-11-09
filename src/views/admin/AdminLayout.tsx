@@ -230,7 +230,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'equipo' && <Equipo panel />}
           {seccion === 'clientes' && <Clientes panel />}
           {seccion === 'produccion' && <Produccion panel />}
-          {seccion === 'cobranza' && <Cobranza />}
+          {seccion === 'cobranza' && <Cobranza onNavegar={setSeccion} />}
           {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>

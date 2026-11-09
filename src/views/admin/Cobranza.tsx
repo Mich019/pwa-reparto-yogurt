@@ -10,6 +10,10 @@ import { usePaginas } from '../../components/Paginas'
 import { CuentaAbierta } from '../../components/CuentaDelCliente'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
+import { Selector } from '../../components/Selector'
+import { AnioEnNumeros, type ResumenAnio } from './AdminDashboard'
+import { abrirFicha } from '../pwa/Equipo'
+import type { SeccionAdmin } from './menu'
 
 // Cobranza del panel: quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
 // informe. Todo viene del servidor y necesita conexión.
@@ -25,7 +29,7 @@ const PARTES: { id: Parte; texto: string }[] = [
   { id: 'meses', texto: 'Meses' },
 ]
 
-export function Cobranza() {
+export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void } = {}) {
   const [parte, setParte] = useState<Parte>(() => {
     if (!irACortes()) return 'cobrar'
     history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
@@ -43,7 +47,7 @@ export function Cobranza() {
       {parte === 'cobrar' && <PorCobrar />}
       {parte === 'envases' && <Envases />}
       {parte === 'cortes' && <Cortes />}
-      {parte === 'meses' && <Meses />}
+      {parte === 'meses' && <Meses onNavegar={onNavegar} />}
     </div>
   )
 }
@@ -269,7 +273,7 @@ function HojaCaptura({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: (
 // ---- Meses
 const ETIQUETA_MES = { abierto: 'Abierto', cerrado: 'Cerrado', reabierto: 'Reabierto' } as const
 
-function Meses() {
+function Meses({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void }) {
   const lista = useServidor<{ meses: MesCierre[] }>('/cierres')
   const [mes, setMes] = useState<string | null>(null)
   const meses = lista.datos?.meses ?? []
@@ -285,7 +289,34 @@ function Meses() {
         ))}
       </div>
       {elegido && <DetalleMes key={elegido} mes={elegido} actual={!!meses.find((m) => m.mes === elegido)?.actual} onCambio={lista.recargar} />}
+      <ElAnio anios={[...new Set(meses.map((m) => Number(m.mes.slice(0, 4))))]} onNavegar={onNavegar} />
     </Estado>
+  )
+}
+
+// El año en números, cualquier año con ventas (en el inicio sólo sale en diciembre y enero).
+function ElAnio({ anios, onNavegar }: { anios: number[]; onNavegar?: (s: SeccionAdmin) => void }) {
+  const [anio, setAnio] = useState<number | null>(null)
+  const elegido = anio ?? anios[0] ?? null
+  const r = useServidor<ResumenAnio>(elegido ? `/cierres/anio/${elegido}` : null)
+  if (!elegido) return null
+  return (
+    <section className="mt-8" aria-labelledby="el-anio">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="el-anio" className="text-lg font-semibold">El año en números</h2>
+        {anios.length > 1 && (
+          <Selector valor={elegido} onCambiar={setAnio} etiqueta="Año" className={`${claseInput} w-32`}
+            opciones={anios.map((a) => ({ valor: a, texto: String(a) }))} />
+        )}
+      </div>
+      <p className="mt-1 text-sm text-apagado">Sólo cuentan los meses cerrados.</p>
+      <div className="mt-2 rounded-2xl bg-niebla p-4">
+        {r.error && !r.datos ? <p className="text-sm text-rojo">{r.error}</p>
+          : !r.datos ? <p className="text-sm text-apagado">Cargando…</p>
+          : !r.datos.meses.length ? <p className="text-sm text-apagado">Ese año todavía no tiene meses cerrados.</p>
+          : <AnioEnNumeros r={r.datos} onFicha={(id) => { abrirFicha(id); onNavegar?.('equipo') }} />}
+      </div>
+    </section>
   )
 }
 

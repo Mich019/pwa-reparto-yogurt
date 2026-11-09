@@ -169,6 +169,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
   const paginaActual = Math.min(pagina, paginas - 1)
   const visibles = ordenados.slice(paginaActual * SABORES_POR_PAGINA, (paginaActual + 1) * SABORES_POR_PAGINA)
   const corto = (f: string) => (f === dia ? 'Hoy' : f === sumarDias(dia, -1) ? 'Ayer' : desdeIso(f).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', ''))
+  const pedidosRecientes = <PedidosRecientes recientes={recientes} corto={corto} onNavegar={onNavegar} />
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
@@ -228,13 +229,16 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
         </button>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-2 xl:grid-rows-[auto_1fr]">
+      {/* Dos columnas que se apilan cada una por su lado (en pantallas chicas, una sola): así ninguna tarjeta se estira
+          para igualar el alto de la otra columna ni queda un hueco al lado de la última. */}
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <div className="grid gap-4">
         {/* Los sabores son los productos: se ordenan por los litros que vendieron en 30 días */}
         <Tarjeta
           id="t-sabores"
           titulo="Sabores más vendidos"
           subtitulo={(p?.unidades ?? ['L']).some((u) => u !== 'L') ? 'Lo entregado en los últimos 30 días' : 'Litros entregados en los últimos 30 días'}
-          className="flex flex-col xl:row-span-2"
+          className="flex flex-col"
           accion={paginas > 1 && (
             <div className="flex gap-2">
               <button type="button" aria-label="Sabores anteriores" disabled={paginaActual === 0} onClick={() => setPagina(paginaActual - 1)} className={botonRedondo}><ArrowLeft size={18} /></button>
@@ -245,7 +249,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           {productos && !ordenados.length ? (
             <Vacio>Todavía no hay sabores. Agrégalos en la sección Sabores.</Vacio>
           ) : (
-            <ul className="mt-5 grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3 xl:grid-rows-2">
+            <ul className="mt-5 grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3">
               {visibles.map((x) => (
                 <li key={x.producto.id}>
                   <TarjetaSabor producto={x.producto} venta={x.venta} posicion={x.posicion} frasco="h-28 xl:h-36" onAbrir={() => ficha.abrir(x.producto.id)} />
@@ -254,7 +258,10 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             </ul>
           )}
         </Tarjeta>
+        {pedidosRecientes}
+        </div>
 
+        <div className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Tarjeta id="t-semana" titulo="Ventas por día" subtitulo={reporte ? `${dinero(totalSemana)} en los últimos 7 días` : 'Últimos 7 días'}>
             <div className="mt-5">
@@ -294,7 +301,16 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
         <ResumenDelAnio onNavegar={onNavegar} />
         <MedallasDelMes onNavegar={onNavegar} />
         <RankingMes onNavegar={onNavegar} />
+        </div>
+      </div>
 
+      {ficha.panel}
+    </div>
+  )
+}
+
+function PedidosRecientes({ recientes, corto, onNavegar }: { recientes: ReturnType<typeof usePedidosRecientes>; corto: (f: string) => string; onNavegar: (seccion: SeccionAdmin) => void }) {
+  return (
         <Tarjeta
           id="t-pedidos"
           titulo="Pedidos recientes"
@@ -328,18 +344,29 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             </table>
           )}
         </Tarjeta>
-      </div>
-
-      {ficha.panel}
-    </div>
   )
 }
 
 // Vendedores del mes, de quien más vendió a quien menos, con su avance contra la meta. Sólo el administrador ve esta
 // pantalla; las cifras son las del cierre de mes en vivo (GET /cierres/:mes).
-// En diciembre (el año en curso) y en enero (el que acaba de terminar): el año en números con sus meses cerrados — lo
-// vendido mes a mes, el mes más vendido, el vendedor del año y la mejor racha (GET /cierres/anio/:anio).
-interface ResumenAnio {
+// En diciembre (el año en curso) y en enero (el que acaba de terminar): el año en números (AnioEnNumeros, también en
+// Cobranza → Meses para cualquier año).
+function ResumenDelAnio({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
+  const [a, m] = hoy().slice(0, 7).split('-').map(Number)
+  const anio = m === 12 ? a : m === 1 ? a - 1 : null
+  const r = useServidor<ResumenAnio>(anio ? `/cierres/anio/${anio}` : null, 'cobranza').datos
+  if (!anio || !r || !r.meses.length) return null
+  return (
+    <Tarjeta id="t-anio" titulo={`Tu ${anio} en números`} subtitulo={`Con ${r.meses.length} ${r.meses.length === 1 ? 'mes cerrado' : 'meses cerrados'}${m === 12 ? '; diciembre se suma al cerrarlo' : ''}`}
+      accion={<CalendarHeart size={20} className="text-marca" aria-hidden="true" />}>
+      <AnioEnNumeros r={r} onFicha={(id) => { abrirFicha(id); onNavegar('equipo') }} />
+    </Tarjeta>
+  )
+}
+
+// Las cifras del año (GET /cierres/anio/:anio): lo vendido mes a mes, el mes más vendido, el vendedor del año y la mejor
+// racha. Tocar a una persona abre su ficha.
+export interface ResumenAnio {
   anio: number
   meses: { mes: string; ventas: number }[]
   total: number
@@ -347,18 +374,13 @@ interface ResumenAnio {
   vendedorDelAnio: { id: string; nombre: string; ventas: number } | null
   mejorRacha: { id: string; nombre: string; meses: number } | null
 }
-function ResumenDelAnio({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
-  const [a, m] = hoy().slice(0, 7).split('-').map(Number)
-  const anio = m === 12 ? a : m === 1 ? a - 1 : null
-  const r = useServidor<ResumenAnio>(anio ? `/cierres/anio/${anio}` : null, 'cobranza').datos
-  if (!anio || !r || !r.meses.length) return null
+export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: string) => void }) {
   const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
   const tope = Math.max(1, ...r.meses.map((x) => x.ventas))
-  const ficha = (id: string) => { abrirFicha(id); onNavegar('equipo') }
+  const ficha = onFicha
   const dato = 'desplegar-opcion rounded-xl bg-papel p-3'
   return (
-    <Tarjeta id="t-anio" titulo={`Tu ${anio} en números`} subtitulo={`Con ${r.meses.length} ${r.meses.length === 1 ? 'mes cerrado' : 'meses cerrados'}${m === 12 ? '; diciembre se suma al cerrarlo' : ''}`}
-      accion={<CalendarHeart size={20} className="text-marca" aria-hidden="true" />}>
+    <>
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
         <div className={dato}>
           <p className="text-xs text-apagado">Vendido en el año</p>
@@ -397,7 +419,7 @@ function ResumenDelAnio({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => v
           </li>
         ))}
       </ol>
-    </Tarjeta>
+    </>
   )
 }
 

@@ -211,6 +211,14 @@ describe('cierre de mes', () => {
     assert.equal(anio.vendedorDelAnio?.id ?? x.ana.id, x.ana.id)
     assert.ok(anio.meses.some((m: { mes: string }) => m.mes === MES))
     assert.equal((await llamar(x.ana, 'GET', `/cierres/anio/${MES.slice(0, 4)}`)).status, 403)
+    assert.equal(anio.vendedores, undefined) // el detalle por vendedor no sale
+    // Ana ve sólo lo suyo del año.
+    const suyo = (await llamar(x.ana, 'GET', `/mi-meta/anio/${MES.slice(0, 4)}`)).body
+    assert.ok(suyo.ventas >= 120)
+    assert.equal(suyo.vendedorDelAnio, true)
+    assert.ok(suyo.mejorMes)
+    const beto = (await llamar(x.beto, 'GET', `/mi-meta/anio/${MES.slice(0, 4)}`)).body
+    assert.deepEqual([beto.ventas, beto.vendedorDelAnio, beto.mejorMes], [0, false, null])
     // Reabrir y volver a cerrar no la repite.
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/reabrir`, { motivo: 'Corrección de prueba' })).status, 200)
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)

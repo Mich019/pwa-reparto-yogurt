@@ -2,8 +2,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Config } from './config.js'
-import { correoMensual, correoResumen, correoVendedor, enviarCorreos, type CifrasResumen, type CifrasVendedor } from './correo.js'
-import { logrosDelMes, xlsxDelMes } from './cortes.js'
+import { correoAnual, correoMensual, correoResumen, correoVendedor, enviarCorreos, type CifrasResumen, type CifrasVendedor } from './correo.js'
+import { logrosDelMes, resumenDelAnio, xlsxDelMes } from './cortes.js'
 import type { Despachador } from './notificaciones.js'
 import type { Db } from './db.js'
 
@@ -151,6 +151,40 @@ export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dia
     datos: { url: `/admin?ir=equipo&persona=${r.id_usuario}`, vendedorIds: [r.id_usuario as string] },
   }))))
   return atrasados.length
+}
+
+// Cron diario, el 1 de enero en la zona de cada empresa: el año que terminó en números. A cada administrador activo le
+// llega el aviso `resumen_anual` (abre el panel) y, si pidió el informe de cada mes, también por correo. Una vez por año
+// y empresa: el aviso guardado cuenta (no se puede apagar, para que sirva de marca). Sin meses cerrados no sale nada.
+// `cualquierDia` sólo para pruebas.
+export async function mandarResumenAnual(db: Db, config: Config, despachador: Despachador | null, log: Log, cualquierDia = false): Promise<number> {
+  const { rows: empresas } = await db.query(
+    `SELECT e.id_empresa, e.nombre, extract(year FROM now() AT TIME ZONE e.zona_horaria)::int - 1 AS anio
+       FROM empresas e
+      WHERE e.activa AND NOT e.interna
+        AND ($1 OR to_char(now() AT TIME ZONE e.zona_horaria, 'MM-DD') = '01-01')
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n WHERE n.id_empresa = e.id_empresa AND n.tipo = 'resumen_anual'
+                         AND n.creado_en >= date_trunc('year', now() AT TIME ZONE e.zona_horaria) AT TIME ZONE e.zona_horaria)`,
+    [cualquierDia],
+  )
+  let mandados = 0
+  for (const e of empresas) {
+    const r = await resumenDelAnio(db, e.anio, e.id_empresa)
+    if (!r.meses.length) continue
+    const { rows: admins } = await db.query(
+      `SELECT id_usuario, nombre, correo, resumen_mensual FROM usuarios WHERE id_empresa = $1 AND rol = 'administrador' AND activo`, [e.id_empresa])
+    if (!admins.length) continue
+    const pesos = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`
+    await despachador?.despachar(admins.map((a) => ({
+      para: a.id_usuario as string, tipo: 'resumen_anual' as const, titulo: `Tu ${r.anio} en números`,
+      cuerpo: `Vendiste ${pesos(r.total)} en ${r.anio}${r.vendedorDelAnio ? `; vendedor del año: ${r.vendedorDelAnio.nombre}` : ''}. ¡Feliz año nuevo!`,
+      datos: { url: '/admin' },
+    })))
+    const correos = admins.filter((a) => a.resumen_mensual && a.correo)
+      .map((a) => ({ para: a.correo as string, ...correoAnual(a.nombre, e.nombre, r, `${config.urlApp}/admin`) }))
+    if (correos.length) mandados += await enviarCorreos(config, correos, log)
+  }
+  return mandados
 }
 
 // Cron diario, al final del mes (del 25 en adelante en la zona de cada empresa): al vendedor que llegó a su meta el mes

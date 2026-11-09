@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useSesion } from '../../lib/sesion'
 import { Medallas } from '../../components/Medallas'
 import { HistorialMetas, type MesDeMeta } from '../../components/HistorialMetas'
-import { ChevronRight, Crown, Flame, Trophy, Wallet } from 'lucide-react'
+import { CalendarHeart, ChevronRight, Crown, Flame, Trophy, Wallet } from 'lucide-react'
 import { entregarCorte, useServidor, type FilaCorte, type MiMeta } from '../../lib/cobranza'
-import { dinero } from '../../lib/fechas'
+import { dinero, hoy } from '../../lib/fechas'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 
 // Mi cuenta (vendedor): el corte del día (cuánto efectivo debe entregar y lo que entregó) y el avance contra su meta
@@ -92,9 +92,31 @@ export function MiDia() {
           </span>
         </div>
       )}
+      <MiAnio />
       {!!t?.historial?.length && <HistorialMetas historial={t.historial} titulo="Tus metas de los meses pasados" className="mt-3" />}
       {hoja && fila && <HojaCorte fila={fila} onCerrar={() => setHoja(false)} onHecho={corte.recargar} />}
     </>
+  )
+}
+
+// Su año en números (diciembre: el que va; enero: el que terminó), sólo con sus cifras y los meses cerrados.
+function MiAnio() {
+  const [a, m] = hoy().slice(0, 7).split('-').map(Number)
+  const anio = m === 12 ? a : m === 1 ? a - 1 : null
+  const r = useServidor<{ anio: number; mesesCerrados: number; ventas: number; cumplidos: number; mejorRacha: number; mejorMes: { mes: string; ventas: number } | null; vendedorDelAnio: boolean }>(anio ? `/mi-meta/anio/${anio}` : null).datos
+  if (!r || !r.mesesCerrados || !r.ventas) return null
+  const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
+  return (
+    <div className="medalla-nueva mt-3 rounded-lg bg-niebla p-4">
+      <p className="flex items-center gap-2 font-semibold"><CalendarHeart size={18} aria-hidden="true" className="text-marca" /> Tu {r.anio} en números</p>
+      {r.vendedorDelAnio && <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-marca"><Crown size={15} aria-hidden="true" /> ¡Eres el vendedor del año!</p>}
+      <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Vendiste</dt><dd className="font-semibold tabular-nums">{dinero(r.ventas)}</dd></div>
+        {r.mejorMes && <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Tu mejor mes</dt><dd className="font-semibold capitalize">{nombreMes(r.mejorMes.mes)}</dd></div>}
+        <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Metas cumplidas</dt><dd className="font-semibold tabular-nums">{r.cumplidos} de {r.mesesCerrados}</dd></div>
+        <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Mejor racha</dt><dd className="font-semibold tabular-nums">{r.mejorRacha} {r.mejorRacha === 1 ? 'mes' : 'meses'}</dd></div>
+      </dl>
+    </div>
   )
 }
 
