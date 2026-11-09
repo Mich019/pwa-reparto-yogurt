@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { abrirCliente } from '../pwa/Clientes'
 import { BuscarPedidos } from './BuscarPedidos'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarHeart, ChevronRight, Crown, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -403,7 +404,7 @@ function PedidosRecientes({ recientes, corto, onNavegar }: { recientes: ReturnTy
             <button type="button" onClick={() => onNavegar('reportes')} className={enlace}>Ver reportes</button>
           </span>}
         >
-          {buscar && <BuscarPedidos onCerrar={() => setBuscar(false)} />}
+          {buscar && <BuscarPedidos onCerrar={() => setBuscar(false)} onCliente={(id) => { setBuscar(false); abrirCliente(id); onNavegar('clientes') }} />}
           {recientes && !recientes.length ? (
             <Vacio>Cuando haya pedidos aparecen aquí.</Vacio>
           ) : (

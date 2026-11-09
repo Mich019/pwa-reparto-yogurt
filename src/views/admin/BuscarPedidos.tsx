@@ -18,7 +18,8 @@ const FILTROS: { clave: EstadoPedido | 'todos'; texto: string }[] = [
   { clave: 'OMITIDO', texto: 'Sin venta' },
 ]
 
-export function BuscarPedidos({ onCerrar }: { onCerrar: () => void }) {
+// `onCliente`: tocar un pedido abre la ficha de su cliente (en Clientes).
+export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; onCliente: (id: string) => void }) {
   const [q, setQ] = useState('')
   const [estado, setEstado] = useState<EstadoPedido | 'todos'>('todos')
   const [enBuscador, setEnBuscador] = useState(false)
@@ -57,13 +58,15 @@ export function BuscarPedidos({ onCerrar }: { onCerrar: () => void }) {
       <p className="mt-3 text-sm text-apagado" aria-live="polite">{datos ? `${lista.length} ${lista.length === 1 ? 'pedido' : 'pedidos'}` : 'Cargando…'}</p>
       <ul ref={pagina.ancla} className="mt-1 scroll-mt-4 divide-y divide-linea border-y border-linea">
         {pagina.visibles.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 py-3">
+          <li key={p.id}>
+           <button type="button" onClick={() => onCliente(p.clienteId)} className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-niebla/40 active:bg-niebla focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold"><Resaltar texto={p.cliente} t={t} /></span>
               <span className="block truncate text-sm text-apagado">{textoFecha(p.fecha)}{p.sabores && <> · <Resaltar texto={p.sabores} t={t} /></>}</span>
             </span>
             <span className="font-semibold tabular-nums">{dinero(p.total)}</span>
             <ChipEstado estado={p.estado} />
+           </button>
           </li>
         ))}
         {datos && !lista.length && <li className="py-8 text-center text-sm text-apagado">{t ? 'Ningún pedido coincide con la búsqueda.' : 'No hay pedidos con ese estado.'}</li>}

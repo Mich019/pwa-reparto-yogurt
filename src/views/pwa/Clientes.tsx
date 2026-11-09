@@ -33,6 +33,13 @@ function textoBusqueda(c: Cliente) {
   return normalizar(`${c.nombre} ${c.telefono} ${c.telefono.replace(/\D/g, '')} ${c.direccion} ${textoFrecuencia(c.frecuencia)} ${dias} ${c.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}`)
 }
 
+// `abrirCliente` (panel: «Buscar pedidos» del inicio) deja pedida la ficha de un cliente; se llama justo antes de ir a
+// Clientes, que la abre al montarse (como abrirFicha en Equipo).
+let clientePedido: string | null = null
+export function abrirCliente(id: string) {
+  clientePedido = id
+}
+
 // `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
 export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   // En la app de reparto, el administrador ve su cartera y la que no tiene vendedor (lib/reparto.ts); en el panel, todo.
@@ -44,7 +51,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const recientes = useRecientes('clientes')
   const [verInactivos, setVerInactivos] = useState(false)
   const [form, setForm] = useState<Cliente | 'nuevo' | null>(null)
-  const [perfilId, setPerfilId] = useState<string | null>(null)
+  const [perfilId, setPerfilId] = useState<string | null>(() => { const c = clientePedido; clientePedido = null; return c })
   const [escaner, setEscaner] = useState(false)
   const [imprimir, setImprimir] = useState(false)
   const [libreta, setLibreta] = useState(false)

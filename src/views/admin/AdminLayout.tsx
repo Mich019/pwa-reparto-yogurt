@@ -10,7 +10,7 @@ import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
 import { Cobranza, irACortes } from './Cobranza'
 import { LogoEmpresa } from './marca'
-import { Subrayado } from './piezas'
+import { AtajosTeclado, Subrayado } from './piezas'
 import { Equipo, irAEquipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
@@ -236,6 +236,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>
+      <AtajosTeclado />
 
       {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono.
           Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}

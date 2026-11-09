@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { Resaltar } from '../../components/Busqueda'
+import { coincide, limpiarBusqueda } from '../../lib/busqueda'
 import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from '../../components/Mensajes'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
@@ -10,7 +12,7 @@ import { textoPorUnidad } from '../../lib/unidades'
 import { usePaginas } from '../../components/Paginas'
 import { CuentaAbierta } from '../../components/CuentaDelCliente'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
-import { Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
+import { BuscadorDesplegable, Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
 import { Selector } from '../../components/Selector'
 import { mostrarPdf } from '../../components/VisorPdf'
 import { AnioEnNumeros, type ResumenAnio } from './AdminDashboard'
@@ -37,16 +39,18 @@ export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void 
     history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
     return 'cortes'
   })
+  const [q, setQ] = useState('')
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
       <Encabezado titulo="Cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">
+        {parte === 'cobrar' && <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="cobranza" />}
         <div className={grupoPanel} role="group" aria-label="Apartado">
           {PARTES.map((p) => (
             <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={`${parte === p.id ? botonPanel : botonPanelSuave} max-sm:px-3`}>{p.texto}</button>
           ))}
         </div>
       </Encabezado>
-      {parte === 'cobrar' && <PorCobrar />}
+      {parte === 'cobrar' && <PorCobrar q={q} />}
       {parte === 'envases' && <Envases />}
       {parte === 'cortes' && <Cortes />}
       {parte === 'meses' && <Meses onNavegar={onNavegar} />}
@@ -66,11 +70,14 @@ const Fila = ({ onClick, children }: { onClick?: () => void; children: ReactNode
 )
 
 // ---- Por cobrar
-function PorCobrar() {
+// `q`: el buscador del encabezado (cliente o vendedor); el total sigue siendo el de todos.
+function PorCobrar({ q }: { q: string }) {
   const lista = useServidor<{ total: number; deudores: Deudor[] }>('/cobranza')
   const [abierto, setAbierto] = useState<string | null>(null)
   const deudores = lista.datos?.deudores ?? []
-  const vista = usePaginas(deudores, 30)
+  const t = limpiarBusqueda(q)
+  const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor))
+  const vista = usePaginas(filtrados, 30, t)
   const cobro = useMensaje('cobro')
   const [editar, setEditar] = useState(false)
   const [mandados, setMandados] = useState<Set<string>>(new Set())
@@ -84,7 +91,7 @@ function PorCobrar() {
           </div>
           {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
           <div className="mb-3">
-            <MandarATodos lista={deudores.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) }) }))}
+            <MandarATodos lista={filtrados.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) }) }))}
               mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
           </div>
           <div ref={vista.ancla} className="scroll-mt-4">
@@ -93,8 +100,8 @@ function PorCobrar() {
                 <div className="min-w-0 flex-1">
                   <Fila onClick={() => setAbierto(d.id)}>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{d.nombre}</span>
-                      <span className="block truncate text-sm text-apagado">{d.vendedor ?? 'Sin vendedor'}{d.desde && ` · desde el ${textoFecha(d.desde).toLowerCase()}`}</span>
+                      <span className="block truncate font-semibold"><Resaltar texto={d.nombre} t={t} /></span>
+                      <span className="block truncate text-sm text-apagado">{d.vendedor ? <Resaltar texto={d.vendedor} t={t} /> : 'Sin vendedor'}{d.desde && ` · desde el ${textoFecha(d.desde).toLowerCase()}`}</span>
                     </span>
                     <span className="font-semibold tabular-nums">{dinero(d.saldo)}</span>
                     <ChevronRight size={18} className="shrink-0 text-apagado/60" />
@@ -103,6 +110,7 @@ function PorCobrar() {
                 {d.telefono && <BotonWhatsApp chico telefono={d.telefono} texto={llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) })} enviado={mandados.has(d.id)} onEnviar={() => setMandados((m) => new Set(m).add(d.id))} />}
               </div>
             ))}
+            {t && !filtrados.length && <p className="py-8 text-center text-sm text-apagado">Nadie coincide con la búsqueda.</p>}
             {vista.control}
           </div>
         </>

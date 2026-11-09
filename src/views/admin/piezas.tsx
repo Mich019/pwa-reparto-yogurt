@@ -9,6 +9,7 @@ import { dinero } from '../../lib/fechas'
 import { presentacionDe, unidadDe } from '../../lib/unidades'
 import { AveEmpresa, Frasco, useLogoEtiqueta } from './marca'
 import { DibujoEnvase } from '../registro/dibujos'
+import { Hoja } from '../../components/ui'
 
 // Cambio contra el periodo anterior, con signo y flecha (nunca sólo con color). null = no hay con qué comparar.
 export function Delta({ valor, className = 'text-xs' }: { valor: number | null; className?: string }) {
@@ -70,10 +71,7 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
   // «/» abre el buscador de la sección (como en GitHub o Gmail), salvo cuando ya se escribe en un campo o hay una hoja abierta.
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return
-      const el = e.target as HTMLElement | null
-      if (el?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role=dialog]')) return
-      if (document.querySelector('[role=dialog][aria-modal=true]')) return
+      if (e.key !== '/' || !teclaLibre(e)) return
       e.preventDefault()
       setAbierto(true)
       campo.current?.focus()
@@ -112,6 +110,42 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
         </div>
       )}
     </div>
+  )
+}
+
+// «?» muestra los atajos de teclado del panel (montado una vez en AdminLayout). Mismas reglas que «/»: no mientras
+// se escribe en un campo ni con una hoja abierta.
+const ATAJOS: [string, string][] = [
+  ['/', 'Buscar en la sección (Clientes, Vendedores, Cobranza)'],
+  ['Esc', 'Borrar la búsqueda y cerrar el buscador, o cerrar un menú'],
+  ['↑ ↓', 'Moverse entre las opciones de un menú'],
+  ['?', 'Ver estos atajos'],
+]
+export function teclaLibre(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return false
+  const el = e.target as HTMLElement | null
+  if (el?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role=dialog]')) return false
+  return !document.querySelector('[role=dialog][aria-modal=true]')
+}
+export function AtajosTeclado() {
+  const [abierta, setAbierta] = useState(false)
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => { if (e.key === '?' && teclaLibre(e)) { e.preventDefault(); setAbierta(true) } }
+    document.addEventListener('keydown', tecla)
+    return () => document.removeEventListener('keydown', tecla)
+  }, [])
+  if (!abierta) return null
+  return (
+    <Hoja abierta onCerrar={() => setAbierta(false)} titulo="Atajos de teclado">
+      <dl className="divide-y divide-linea border-y border-linea mb-4">
+        {ATAJOS.map(([k, texto]) => (
+          <div key={k} className="flex items-center gap-4 py-3">
+            <dt className="w-14 shrink-0"><kbd className="rounded-md bg-niebla px-2 py-1 font-sans text-sm font-semibold">{k}</kbd></dt>
+            <dd className="text-sm">{texto}</dd>
+          </div>
+        ))}
+      </dl>
+    </Hoja>
   )
 }
 
