@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarHeart, ChevronRight, Crown, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
 import { Medallas } from '../../components/Medallas'
 import type { Rachas } from '../../lib/equipo'
 import { abrirFicha } from '../pwa/Equipo'
@@ -291,6 +291,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           </Tarjeta>
         </div>
 
+        <ResumenDelAnio onNavegar={onNavegar} />
         <MedallasDelMes onNavegar={onNavegar} />
         <RankingMes onNavegar={onNavegar} />
 
@@ -336,6 +337,70 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
 
 // Vendedores del mes, de quien más vendió a quien menos, con su avance contra la meta. Sólo el administrador ve esta
 // pantalla; las cifras son las del cierre de mes en vivo (GET /cierres/:mes).
+// En diciembre (el año en curso) y en enero (el que acaba de terminar): el año en números con sus meses cerrados — lo
+// vendido mes a mes, el mes más vendido, el vendedor del año y la mejor racha (GET /cierres/anio/:anio).
+interface ResumenAnio {
+  anio: number
+  meses: { mes: string; ventas: number }[]
+  total: number
+  mesMasVendido: { mes: string; ventas: number } | null
+  vendedorDelAnio: { id: string; nombre: string; ventas: number } | null
+  mejorRacha: { id: string; nombre: string; meses: number } | null
+}
+function ResumenDelAnio({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
+  const [a, m] = hoy().slice(0, 7).split('-').map(Number)
+  const anio = m === 12 ? a : m === 1 ? a - 1 : null
+  const r = useServidor<ResumenAnio>(anio ? `/cierres/anio/${anio}` : null, 'cobranza').datos
+  if (!anio || !r || !r.meses.length) return null
+  const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
+  const tope = Math.max(1, ...r.meses.map((x) => x.ventas))
+  const ficha = (id: string) => { abrirFicha(id); onNavegar('equipo') }
+  const dato = 'desplegar-opcion rounded-xl bg-papel p-3'
+  return (
+    <Tarjeta id="t-anio" titulo={`Tu ${anio} en números`} subtitulo={`Con ${r.meses.length} ${r.meses.length === 1 ? 'mes cerrado' : 'meses cerrados'}${m === 12 ? '; diciembre se suma al cerrarlo' : ''}`}
+      accion={<CalendarHeart size={20} className="text-marca" aria-hidden="true" />}>
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <div className={dato}>
+          <p className="text-xs text-apagado">Vendido en el año</p>
+          <p className="mt-1 text-xl font-bold tabular-nums">{dinero(r.total)}</p>
+        </div>
+        {r.mesMasVendido && (
+          <div className={dato} style={{ animationDelay: '40ms' }}>
+            <p className="text-xs text-apagado">Mes más vendido</p>
+            <p className="mt-1 font-semibold capitalize">{nombreMes(r.mesMasVendido.mes)}</p>
+            <p className="text-sm tabular-nums text-apagado">{dinero(r.mesMasVendido.ventas)}</p>
+          </div>
+        )}
+        {r.vendedorDelAnio && (
+          <button type="button" onClick={() => ficha(r.vendedorDelAnio!.id)} style={{ animationDelay: '80ms' }}
+            className={`${dato} text-left transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100`}>
+            <p className="flex items-center gap-1 text-xs text-apagado"><Crown size={13} aria-hidden="true" className="text-marca" /> Vendedor del año</p>
+            <p className="mt-1 truncate font-semibold">{r.vendedorDelAnio.nombre}</p>
+            <p className="text-sm tabular-nums text-apagado">{dinero(r.vendedorDelAnio.ventas)}</p>
+          </button>
+        )}
+        {r.mejorRacha && (
+          <button type="button" onClick={() => ficha(r.mejorRacha!.id)} style={{ animationDelay: '120ms' }}
+            className={`${dato} text-left transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100`}>
+            <p className="flex items-center gap-1 text-xs text-apagado"><Flame size={13} aria-hidden="true" className="text-marca" /> Mejor racha</p>
+            <p className="mt-1 truncate font-semibold">{r.mejorRacha.nombre}</p>
+            <p className="text-sm text-apagado">{r.mejorRacha.meses} {r.mejorRacha.meses === 1 ? 'mes' : 'meses seguidos'} en su meta</p>
+          </button>
+        )}
+      </div>
+      <ol className="mt-4 flex h-20 items-end gap-1" aria-label="Lo vendido en cada mes cerrado">
+        {r.meses.map((x) => (
+          <li key={x.mes} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${nombreMes(x.mes)}: ${dinero(x.ventas)}`}>
+            <span className={`w-full max-w-8 rounded-t-md ${x.mes === r.mesMasVendido?.mes ? 'bg-marca' : 'bg-marca/40'}`} style={{ height: `${Math.max(3, (x.ventas / tope) * 100)}%` }} />
+            <span className="text-[10px] capitalize text-apagado">{nombreMes(x.mes).slice(0, 3)}</span>
+            <span className="sr-only">{dinero(x.ventas)}</span>
+          </li>
+        ))}
+      </ol>
+    </Tarjeta>
+  )
+}
+
 // Quién ganó una medalla con el mes pasado (3, 6 o 12 meses seguidos en su meta): sólo aparece si alguien la ganó, es
 // decir, una vez cerrado ese mes. Tocar a alguien abre su ficha, desde donde se le puede felicitar.
 function MedallasDelMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {

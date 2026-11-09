@@ -77,6 +77,16 @@ export function MiDia() {
                 {t.fama.lugar === 1 ? `¡Eres el mejor de todos los tiempos en tu equipo!` : `Vas en ${t.fama.lugar}.º lugar de todos los tiempos (de ${t.fama.de})`}
               </span>
             )}
+            {(() => {
+              const siguiente = [3, 6, 12].find((n) => n > t.mejorRacha)
+              if (!siguiente) return null
+              const falta = siguiente - t.racha
+              return (
+                <span className="mt-1 block text-sm text-apagado">
+                  {falta === 1 ? 'Te falta 1 mes' : `Te faltan ${falta} meses`} seguidos para la medalla de {siguiente === 12 ? 'un año' : `${siguiente} meses`}
+                </span>
+              )
+            })()}
             {celebrar && <span className="mt-1 block text-sm font-semibold text-marca" role="status">¡Medalla nueva de {mejor === 12 ? 'un año' : `${mejor} meses`}!</span>}
             <span className="mt-2 block"><Medallas mejorRacha={t.mejorRacha} todas /></span>
           </span>

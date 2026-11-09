@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Contexto } from './app.js'
 import type { Config } from './config.js'
 import { correoMensual, correoResumen, correoVendedor, enviarCorreos, type CifrasResumen, type CifrasVendedor } from './correo.js'
-import { xlsxDelMes } from './cortes.js'
+import { logrosDelMes, xlsxDelMes } from './cortes.js'
 import type { Despachador } from './notificaciones.js'
 import type { Db } from './db.js'
 
@@ -307,7 +307,7 @@ export async function rutasResumen(app: FastifyInstance, { db, config }: Context
     }
     const adjuntos = [
       { nombre: `informe-mensual-${m.data.mes}.pdf`, base64: b.data.pdf },
-      { nombre: `informe-mensual-${m.data.mes}.xlsx`, base64: xlsxDelMes(f, m.data.mes, 'Mes cerrado').toString('base64') },
+      { nombre: `informe-mensual-${m.data.mes}.xlsx`, base64: xlsxDelMes(f, m.data.mes, 'Mes cerrado', await logrosDelMes(db, config.zonaHoraria, m.data.mes).catch(() => undefined)).toString('base64') },
     ]
     const enviados = await enviarCorreos(config, para.map((u) => ({ para: u.correo as string, ...correoMensual(u.nombre, u.empresa, m.data.mes, cifras, `${config.urlApp}/admin`), adjuntos })), req.log)
     return { enviados }

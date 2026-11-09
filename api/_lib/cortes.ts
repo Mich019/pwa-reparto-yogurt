@@ -5,7 +5,7 @@ import type { Contexto } from './app.js'
 import { comoFalla, Falla, redondear, saldos } from './cobranza.js'
 import { saldosEnvases } from './envases.js'
 import { tx, type Cx, type Db } from './db.js'
-import { aXlsx, type Tabla } from './exportar.js'
+import { aXlsx, type Tabla, type Valor } from './exportar.js'
 import { hoyEn, zonaDeEmpresa } from './fechas.js'
 import type { Despachador } from './notificaciones.js'
 
@@ -221,7 +221,23 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
 // El Excel del informe: una hoja con las cifras del mes, otra por vendedor y otra con los cortes.
 const pesos = (v: number | null) => ({ v, t: 'dinero' as const })
 // El Excel del informe mensual: el de GET /cierres/:mes/informe y el que va adjunto al correo del cierre (resumen.ts).
-export const xlsxDelMes = (cifras: CifrasMes, mes: string, subtitulo: string) => aXlsx(hojas(cifras), { titulo: `Informe mensual ${mes}`, subtitulo })
+export const xlsxDelMes = (cifras: CifrasMes, mes: string, subtitulo: string, logros?: LogrosMes) =>
+  aXlsx([...hojas(cifras), ...(logros && (logros.medallas.length || logros.fama.length) ? [hojaMedallas(logros)] : [])], { titulo: `Informe mensual ${mes}`, subtitulo })
+
+function hojaMedallas(l: LogrosMes): Tabla {
+  const textoMedalla = (n: number) => (n === 12 ? '1 año' : `${n} meses`)
+  return {
+    nombre: 'Medallas',
+    columnas: [
+      { titulo: 'Lugar', tipo: 'texto', ancho: 12 }, { titulo: 'Vendedor', tipo: 'texto', ancho: 26 }, { titulo: 'Mejor racha (meses)', tipo: 'entero' },
+      { titulo: 'Medalla', tipo: 'texto', ancho: 14 }, { titulo: 'Metas cumplidas', tipo: 'entero' }, { titulo: 'Racha actual', tipo: 'entero' },
+    ],
+    filas: [
+      ...l.medallas.map((m) => ['Ganó este mes', m.nombre, m.medalla, textoMedalla(m.medalla), null, null] as Valor[]),
+      ...l.fama.map((f, k) => [`${k + 1}.º de todos`, f.nombre, f.mejorRacha, f.mejorRacha >= 3 ? textoMedalla([12, 6, 3].find((n) => f.mejorRacha >= n)!) : '', f.cumplidos, f.racha] as Valor[]),
+    ],
+  }
+}
 
 function hojas(x: CifrasMes): Tabla[] {
   const resumen: Tabla = {
@@ -255,6 +271,58 @@ function hojas(x: CifrasMes): Tabla[] {
 }
 
 type Historial = { accion: 'cerrado' | 'reabierto'; por: string; en: string; motivo?: string }[]
+
+// ---- metas: rachas, medallas y salón de la fama (de las fotos de los cierres de mes)
+
+const mesAnterior = (hoy: string) => {
+  let [a, m] = hoy.slice(0, 7).split('-').map(Number)
+  if (--m === 0) { m = 12; a-- }
+  return `${a}-${String(m).padStart(2, '0')}`
+}
+// Los meses cerrados en que cada vendedor llegó a su meta (`id` = uno; null = todos), el más nuevo primero.
+async function mesesCumplidosDe(db: Consulta, id: string | null) {
+  const { rows } = await db.query(
+    `SELECT v->>'id' AS id, v->>'nombre' AS nombre, to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
+       FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
+      WHERE c.estado = 'cerrado' AND ($1::text IS NULL OR v->>'id' = $1) AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
+      ORDER BY c.mes DESC`,
+    [id],
+  )
+  return rows as { id: string; nombre: string; mes: string; ventas: number; meta: number }[]
+}
+// La mejor racha que ha tenido: las medallas de 3, 6 y 12 meses seguidos se quedan aunque después se corte.
+const mejorDe = (meses: string[]) => Math.max(0, ...meses.map((x) => rachaDesde(meses, x)))
+// Racha (hasta `pasado`, el mes pasado) y mejor racha de cada vendedor con al menos un mes cumplido, en qué mes ganó
+// cada medalla (el primero en que su racha llegó a 3, 6 o 12) y cuántos meses ha cumplido en total (`cumplidos`, para el
+// salón de la fama). Incluye a los que ya se fueron: el nombre viene de la foto de cada cierre.
+async function rachasDe(db: Consulta, pasado: string) {
+  const porVendedor = new Map<string, { nombre: string; meses: string[] }>()
+  for (const r of await mesesCumplidosDe(db, null)) {
+    const v = porVendedor.get(r.id) ?? { nombre: r.nombre, meses: [] }
+    v.meses.push(r.mes)
+    porVendedor.set(r.id, v)
+  }
+  return Object.fromEntries([...porVendedor].map(([id, { nombre, meses }]) => {
+    const subiendo = [...meses].sort()
+    const medallas = [3, 6, 12].flatMap((n) => {
+      const mes = subiendo.find((x) => rachaDesde(meses, x) >= n)
+      return mes ? [{ medalla: n, mes }] : []
+    })
+    return [id, { nombre, racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses), medallas, cumplidos: meses.length }]
+  }))
+}
+const ordenFama = (a: { mejorRacha: number; cumplidos: number; nombre: string }, b: { mejorRacha: number; cumplidos: number; nombre: string }) =>
+  b.mejorRacha - a.mejorRacha || b.cumplidos - a.cumplidos || a.nombre.localeCompare(b.nombre)
+
+// Para la hoja «Medallas» del Excel del informe: las ganadas con `mes` y las 5 mejores rachas (a la fecha).
+export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fama: { nombre: string; mejorRacha: number; cumplidos: number; racha: number }[] }
+export async function logrosDelMes(db: Consulta, zonaRespaldo: string, mes: string): Promise<LogrosMes> {
+  const todos = Object.values(await rachasDe(db, mesAnterior(hoyEn(await zonaDeEmpresa(db, zonaRespaldo)))))
+  return {
+    medallas: todos.flatMap((v) => v.medallas.filter((m) => m.mes === mes).map((m) => ({ nombre: v.nombre, medalla: m.medalla }))),
+    fama: [...todos].sort(ordenFama).slice(0, 5).map(({ nombre, mejorRacha, cumplidos, racha }) => ({ nombre, mejorRacha, cumplidos, racha })),
+  }
+}
 
 export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto, { requiereSesion, requiereAdmin }: { requiereSesion: Guardia; requiereAdmin: Guardia }, despachador?: Despachador) {
   const hoyDe = async () => hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
@@ -460,24 +528,9 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
 
   // Los meses cerrados en que un vendedor llegó a su meta (sus trofeos), de la foto de cada cierre, y su racha: cuántos
   // meses seguidos la alcanzó, contando hacia atrás desde el mes pasado (un mes sin cerrar o sin meta la corta), y la mejor.
-  // `id` = uno; sin él, todos los vendedores (ranking del panel, medallas al cerrar el mes).
-  async function mesesCumplidos(id: string | null) {
-    const { rows } = await db.query(
-      `SELECT v->>'id' AS id, v->>'nombre' AS nombre, to_char(c.mes, 'YYYY-MM') AS mes, (v->>'ventas')::float8 AS ventas, (v->>'meta')::float8 AS meta
-         FROM cierres_mes c, jsonb_array_elements(c.cifras->'vendedores') v
-        WHERE c.estado = 'cerrado' AND ($1::text IS NULL OR v->>'id' = $1) AND (v->>'meta')::float8 > 0 AND (v->>'cumplimientoPct')::float8 >= 100
-        ORDER BY c.mes DESC`,
-      [id],
-    )
-    return rows as { id: string; nombre: string; mes: string; ventas: number; meta: number }[]
-  }
-  async function mesPasado() {
-    let [a, m] = (await hoyDe()).slice(0, 7).split('-').map(Number)
-    if (--m === 0) { m = 12; a-- }
-    return `${a}-${String(m).padStart(2, '0')}`
-  }
-  // La mejor racha que ha tenido: las medallas de 3, 6 y 12 meses seguidos se quedan aunque después se corte.
-  const mejorDe = (meses: string[]) => Math.max(0, ...meses.map((x) => rachaDesde(meses, x)))
+  const mesesCumplidos = (id: string | null) => mesesCumplidosDe(db, id)
+  const mesPasado = async () => mesAnterior(await hoyDe())
+  const rachas = async () => rachasDe(db, await mesPasado())
   async function trofeos(id: string) {
     const filas = (await mesesCumplidos(id)).slice(0, 36)
     const meses = filas.map((r) => r.mes)
@@ -497,30 +550,9 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   }
   // Su lugar en el salón de la fama (mismo orden que SalonDeLaFama en Equipo.tsx): sólo el número, nunca lo de los demás.
   async function lugarEnFama(id: string) {
-    const orden = Object.entries(await rachas())
-      .sort(([, a], [, b]) => b.mejorRacha - a.mejorRacha || b.cumplidos - a.cumplidos || a.nombre.localeCompare(b.nombre))
+    const orden = Object.entries(await rachas()).sort(([, a], [, b]) => ordenFama(a, b))
     const i = orden.findIndex(([x]) => x === id)
     return i < 0 ? null : { lugar: i + 1, de: orden.length }
-  }
-  // Racha y mejor racha de cada vendedor con al menos un mes cumplido, y en qué mes ganó cada medalla (el primero en que
-  // su racha llegó a 3, 6 o 12) y cuántos meses ha cumplido en total (`cumplidos`, para el salón de la fama). Incluye a
-  // los que ya se fueron: el nombre viene de la foto de cada cierre.
-  async function rachas() {
-    const porVendedor = new Map<string, { nombre: string; meses: string[] }>()
-    for (const r of await mesesCumplidos(null)) {
-      const v = porVendedor.get(r.id) ?? { nombre: r.nombre, meses: [] }
-      v.meses.push(r.mes)
-      porVendedor.set(r.id, v)
-    }
-    const pasado = await mesPasado()
-    return Object.fromEntries([...porVendedor].map(([id, { nombre, meses }]) => {
-      const subiendo = [...meses].sort()
-      const medallas = [3, 6, 12].flatMap((n) => {
-        const mes = subiendo.find((x) => rachaDesde(meses, x) >= n)
-        return mes ? [{ medalla: n, mes }] : []
-      })
-      return [id, { nombre, racha: rachaDesde(meses, pasado), mejorRacha: mejorDe(meses), medallas, cumplidos: meses.length }]
-    }))
   }
   app.get('/usuarios/rachas', { preHandler: requiereAdmin }, async () => rachas())
   // Los del vendedor, en su ficha de Vendedores (administrador)…
@@ -531,6 +563,38 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   })
   // …y los propios, en su app (Cuenta).
   app.get('/mi-meta/trofeos', { preHandler: requiereSesion }, async (req) => ({ ...(await trofeos(req.usuario.id)), fama: await lugarEnFama(req.usuario.id) }))
+
+  // Resumen del año (panel, diciembre y enero): con los meses cerrados de `anio`, lo vendido mes a mes, el mes más
+  // vendido, el vendedor del año (el que más vendió sumando sus meses) y la mejor racha dentro del año.
+  app.get('/cierres/anio/:anio', { preHandler: requiereAdmin }, async (req, rep) => {
+    const p = z.object({ anio: z.coerce.number().int().min(2020).max(2100) }).safeParse(req.params)
+    if (!p.success) return rep.code(400).send({ error: 'El año no es válido' })
+    const { rows } = await db.query(
+      `SELECT to_char(mes, 'YYYY-MM') AS mes, (cifras->'ventas'->>'ingreso')::float8 AS ventas, cifras->'vendedores' AS vendedores
+         FROM cierres_mes WHERE estado = 'cerrado' AND extract(year FROM mes) = $1 ORDER BY mes`,
+      [p.data.anio],
+    )
+    const meses = rows.map((r) => ({ mes: r.mes as string, ventas: redondear(r.ventas ?? 0) }))
+    const porVendedor = new Map<string, { nombre: string; ventas: number; cumplidos: string[] }>()
+    for (const r of rows) {
+      for (const v of (r.vendedores ?? []) as { id: string; nombre: string; ventas: number; meta: number | null; cumplimientoPct: number | null }[]) {
+        const x = porVendedor.get(v.id) ?? { nombre: v.nombre, ventas: 0, cumplidos: [] }
+        x.ventas += v.ventas
+        if (v.meta && (v.cumplimientoPct ?? 0) >= 100) x.cumplidos.push(r.mes)
+        porVendedor.set(v.id, x)
+      }
+    }
+    const vendedores = [...porVendedor].map(([id, v]) => ({ id, nombre: v.nombre, ventas: redondear(v.ventas), mejorRacha: mejorDe(v.cumplidos), cumplidos: v.cumplidos.length }))
+    const delAnio = [...vendedores].sort((a, b) => b.ventas - a.ventas)[0]
+    const racha = [...vendedores].sort(ordenFama)[0]
+    const tope = [...meses].sort((a, b) => b.ventas - a.ventas)[0]
+    return {
+      anio: p.data.anio, meses, total: redondear(meses.reduce((s, m) => s + m.ventas, 0)),
+      mesMasVendido: tope && tope.ventas > 0 ? tope : null,
+      vendedorDelAnio: delAnio && delAnio.ventas > 0 ? { id: delAnio.id, nombre: delAnio.nombre, ventas: delAnio.ventas } : null,
+      mejorRacha: racha && racha.mejorRacha > 0 ? { id: racha.id, nombre: racha.nombre, meses: racha.mejorRacha } : null,
+    }
+  })
 
   // ---- cierre de mes
   const mesDeRuta = (req: FastifyRequest) => mesTexto.safeParse((req.params as { mes?: string }).mes)
@@ -673,7 +737,8 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     if (f.data.formato === 'json') return mes
     const generado = new Date().toLocaleString('es-MX', { timeZone: await zonaDeEmpresa(db, config.zonaHoraria), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const estado = mes.estado === 'cerrado' ? 'Mes cerrado' : mes.estado === 'reabierto' ? 'Mes reabierto (cifras al momento de generarlo)' : 'Mes abierto (cifras al momento de generarlo)'
-    const datos = xlsxDelMes(mes.cifras, m.data, `${estado} · Generado el ${generado}`)
+    const logros = await logrosDelMes(db, config.zonaHoraria, m.data).catch(() => undefined)
+    const datos = xlsxDelMes(mes.cifras, m.data, `${estado} · Generado el ${generado}`, logros)
     return rep
       .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .header('content-disposition', `attachment; filename="informe-mensual-${m.data}.xlsx"`)

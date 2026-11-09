@@ -204,6 +204,13 @@ describe('cierre de mes', () => {
     // Su lugar en el salón de la fama (sólo el número) y, sin medalla nueva, el récord personal no aplica todavía.
     assert.deepEqual((await llamar(x.ana, 'GET', '/mi-meta/trofeos')).body.fama, { lugar: 1, de: 1 })
     assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'record_personal'  AND id_usuario = $1`, [x.ana.id])).rowCount, 0)
+    // El Excel del informe lleva la hoja «Medallas»; el resumen del año, a Ana como vendedora del año y su racha.
+    const xlsx = await llamar(x.admin, 'GET', `/cierres/${MES}/informe?formato=xlsx`)
+    assert.ok(xlsx.bruto.toString('latin1').includes('xl/worksheets/sheet4.xml')) // la cuarta hoja: Medallas
+    const anio = (await llamar(x.admin, 'GET', `/cierres/anio/${MES.slice(0, 4)}`)).body
+    assert.equal(anio.vendedorDelAnio?.id ?? x.ana.id, x.ana.id)
+    assert.ok(anio.meses.some((m: { mes: string }) => m.mes === MES))
+    assert.equal((await llamar(x.ana, 'GET', `/cierres/anio/${MES.slice(0, 4)}`)).status, 403)
     // Reabrir y volver a cerrar no la repite.
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/reabrir`, { motivo: 'Corrección de prueba' })).status, 200)
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
