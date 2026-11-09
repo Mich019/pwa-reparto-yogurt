@@ -82,17 +82,19 @@ function PorCobrar({ q }: { q: string }) {
   const t = limpiarBusqueda(q)
   // `?ir=cobrar` (el aviso de fiado de más de un mes) abre con «Más de un mes» puesto.
   const [viejos, setViejos] = useState(() => cobrarViejos)
+  const [pasados, setPasados] = useState(false)
   useEffect(() => { cobrarViejos = false }, []) // sólo la primera vez que se abre (no al volver a la sección)
   const limite = sumarDias(hoy(), -30)
-  const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor) && (!viejos || (!!d.desde && d.desde < limite)))
-  const vista = usePaginas(filtrados, 30, `${t}|${viejos}`)
+  const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor) && (!viejos || (!!d.desde && d.desde < limite)) && (!pasados || pasoSuLimite(d)))
+  const vista = usePaginas(filtrados, 30, `${t}|${viejos}|${pasados}`)
+  const hayPasados = deudores.some(pasoSuLimite)
   // Los que se ven (con la búsqueda), del que más debe al que menos, como en la lista; en el navegador (lib/xlsx.ts).
   function exportar() {
     descargar(xlsx({
       nombre: 'Por cobrar',
-      columnas: [{ titulo: 'Cliente', ancho: 30 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Debe desde', ancho: 14 }, { titulo: 'Saldo', dinero: true, ancho: 14 }],
-      filas: filtrados.map((d) => [d.nombre, d.vendedor ?? 'Sin vendedor', d.telefono ?? '', d.desde ?? '', d.saldo]),
-      total: ['Total', `${filtrados.length} ${filtrados.length === 1 ? 'cliente' : 'clientes'}`, null, null, filtrados.reduce((s, d) => s + d.saldo, 0)],
+      columnas: [{ titulo: 'Cliente', ancho: 30 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Debe desde', ancho: 14 }, { titulo: 'Saldo', dinero: true, ancho: 14 }, { titulo: 'Límite de fiado', dinero: true, ancho: 14 }, { titulo: 'Pasó su límite', ancho: 12 }],
+      filas: filtrados.map((d) => [d.nombre, d.vendedor ?? 'Sin vendedor', d.telefono ?? '', d.desde ?? '', d.saldo, d.limite ?? null, d.limite == null ? 'Sin límite' : pasoSuLimite(d) ? 'Sí' : 'No']),
+      total: ['Total', `${filtrados.length} ${filtrados.length === 1 ? 'cliente' : 'clientes'}`, null, null, filtrados.reduce((s, d) => s + d.saldo, 0), null, `${filtrados.filter(pasoSuLimite).length} lo pasaron`],
     }), `por-cobrar-${hoy()}.xlsx`)
   }
   const cobro = useMensaje('cobro')
@@ -112,6 +114,7 @@ function PorCobrar({ q }: { q: string }) {
           {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${filtrados.length})` : ''}</button>
+            {(hayPasados || pasados) && <button type="button" onClick={() => setPasados(!pasados)} aria-pressed={pasados} className={pasados ? botonPanel : botonPanelSuave}>Pasaron su límite{pasados ? ` (${filtrados.length})` : ''}</button>}
             <MandarATodos lista={filtrados.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) }) }))}
               mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
           </div>

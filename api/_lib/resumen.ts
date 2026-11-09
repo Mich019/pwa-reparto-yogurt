@@ -83,7 +83,15 @@ export async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise
             (SELECT count(*)::int FROM pedidos p WHERE p.id_empresa = $1 AND p.fecha BETWEEN d.desde AND d.hasta AND p.estado = 'pendiente') AS sin_atender,
             (SELECT count(*)::int FROM cortes_dia c WHERE c.id_empresa = $1 AND c.estado = 'pendiente' AND c.fecha <= d.hasta) AS cortes_por_confirmar,
             (SELECT count(DISTINCT coalesce(n.datos->>'pedidoId', n.datos->'pedidoIds'->>0))::int FROM notificaciones n
-              WHERE n.id_empresa = $1 AND n.tipo = 'urgente_sin_atender' AND (n.creado_en AT TIME ZONE d.zona)::date BETWEEN d.desde AND d.hasta) AS urgentes
+              WHERE n.id_empresa = $1 AND n.tipo = 'urgente_sin_atender' AND (n.creado_en AT TIME ZONE d.zona)::date BETWEEN d.desde AND d.hasta) AS urgentes,
+            -- Clientes que al terminar el periodo debían más que su límite (el suyo o el de la empresa, migración 036).
+            (SELECT count(*)::int FROM (
+               SELECT coalesce(cl.limite_fiado, e.limite_fiado) AS limite,
+                      (SELECT coalesce(sum(p.total), 0) FROM pedidos p WHERE p.id_cliente = cl.id_cliente AND p.estado = 'entregado' AND p.metodo_pago = 'credito' AND p.fecha <= d.hasta)
+                      - (SELECT coalesce(sum(a.monto), 0) FROM abonos a WHERE a.id_cliente = cl.id_cliente AND a.anulado_en IS NULL AND a.fecha <= d.hasta) AS saldo
+                 FROM clientes cl JOIN empresas e ON e.id_empresa = cl.id_empresa
+                WHERE cl.id_empresa = $1 AND coalesce(cl.limite_fiado, e.limite_fiado) IS NOT NULL
+             ) x WHERE x.saldo > x.limite + 0.004) AS pasaron_limite
        FROM d`,
     [idEmpresa, dias],
   )
@@ -91,7 +99,7 @@ export async function cifrasDe(db: Db, idEmpresa: string, dias: number): Promise
     desde: r.desde as string, dia: r.hasta as string, vendidoAntes: dias > 1 ? r.vendido_antes : null,
     semana: dias > 1 ? await detalleDeLaSemana(db, idEmpresa, r.desde, r.hasta) : null,
     entregados: r.entregados, vendido: r.vendido, efectivo: r.efectivo, transferencia: r.transferencia, fiado: r.fiado,
-    abonos: r.abonos, sinAtender: r.sin_atender, cortesPorConfirmar: r.cortes_por_confirmar, urgentes: r.urgentes,
+    abonos: r.abonos, sinAtender: r.sin_atender, cortesPorConfirmar: r.cortes_por_confirmar, urgentes: r.urgentes, pasaronLimite: r.pasaron_limite,
   }
 }
 

@@ -136,6 +136,7 @@ export interface CifrasResumen {
   dia: string // AAAA-MM-DD, ayer en la zona de la empresa (el último día que cuenta)
   entregados: number; vendido: number; efectivo: number; transferencia: number; fiado: number; abonos: number
   sinAtender: number; cortesPorConfirmar: number; urgentes: number
+  pasaronLimite: number // clientes que al terminar el periodo deben más que su límite de fiado (el suyo o el de la empresa)
   vendidoAntes: number | null // semanal: lo vendido los siete días anteriores; null en el diario
   // Sólo el semanal: el mejor día, lo que más se vendió y cada vendedor contra su meta del mes.
   semana: {
@@ -206,6 +207,7 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
     c.cortesPorConfirmar ? `${veces(c.cortesPorConfirmar, 'corte', 'cortes')} por confirmar` : '',
     c.sinAtender ? `${veces(c.sinAtender, 'pedido quedó', 'pedidos quedaron')} sin atender` : '',
     c.urgentes ? `${veces(c.urgentes, 'urgente tardó', 'urgentes tardaron')} en atenderse` : '',
+    c.pasaronLimite ? `${veces(c.pasaronLimite, 'cliente pasó', 'clientes pasaron')} su límite de fiado` : '',
   ].filter(Boolean)
   const celda = 'padding:8px 0;border-top:1px solid #eee'
   const aTabla = (filas: [string, string][]) => `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${filas

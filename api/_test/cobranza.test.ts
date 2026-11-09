@@ -4,6 +4,8 @@ import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
 import { avisarFiadoAtrasado } from '../_lib/cobranza.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
+import { cifrasDeAyer } from '../_lib/resumen.js'
+import { correoResumen } from '../_lib/correo.js'
 import { app, cliente, config, crearEmpresa, db, op, pedido, push, sesion } from './ayuda.js'
 
 // Fiado: lo vendido a crédito suma a lo que debe el cliente, los abonos lo bajan.
@@ -50,6 +52,10 @@ describe('fiado', () => {
     await avisarFiadoAtrasado(db, crearDespachador(db, null, { error: () => {} }))
     const { rows: [a] } = await db.query(`SELECT cuerpo FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.admin.id])
     assert.match(a.cuerpo, /y ya pasó su límite de \$100$/)
+    // El resumen diario cuenta a quien ya debía de más al terminar ayer.
+    const cifras = await cifrasDeAyer(db, x.empresa)
+    assert.equal(cifras.pasaronLimite, 1)
+    assert.match(correoResumen('Ana', 'X', cifras, 'u').texto, /1 cliente pasó su límite de fiado/)
     assert.equal((await empresa({ limiteFiado: null })).json().limiteFiado, null)
     assert.equal((await deudor()).limite, null)
   })
