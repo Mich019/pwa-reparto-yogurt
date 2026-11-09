@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { BotonWhatsApp, EditorMensaje, llenar, useMensaje } from '../../components/Mensajes'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
@@ -70,21 +71,33 @@ function PorCobrar() {
   const [abierto, setAbierto] = useState<string | null>(null)
   const deudores = lista.datos?.deudores ?? []
   const vista = usePaginas(deudores, 30)
+  const cobro = useMensaje('cobro')
+  const [editar, setEditar] = useState(false)
+  const [mandados, setMandados] = useState<Set<string>>(new Set())
   return (
     <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !deudores.length ? 'Nadie te debe nada.' : undefined}>
       {lista.datos && (
         <>
-          <p className="pb-3 text-sm text-apagado">Total por cobrar <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{dinero(lista.datos.total)}</span> · {deudores.length} {deudores.length === 1 ? 'cliente' : 'clientes'}</p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3">
+            <p className="text-sm text-apagado">Total por cobrar <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{dinero(lista.datos.total)}</span> · {deudores.length} {deudores.length === 1 ? 'cliente' : 'clientes'}</p>
+            <button type="button" onClick={() => setEditar(!editar)} aria-expanded={editar} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editar ? 'Listo' : 'Mensaje para cobrar'}</button>
+          </div>
+          {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
           <div ref={vista.ancla} className="scroll-mt-4">
             {vista.visibles.map((d) => (
-              <Fila key={d.id} onClick={() => setAbierto(d.id)}>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{d.nombre}</span>
-                  <span className="block truncate text-sm text-apagado">{d.vendedor ?? 'Sin vendedor'}{d.desde && ` · desde el ${textoFecha(d.desde).toLowerCase()}`}</span>
-                </span>
-                <span className="font-semibold tabular-nums">{dinero(d.saldo)}</span>
-                <ChevronRight size={18} className="shrink-0 text-apagado/60" />
-              </Fila>
+              <div key={d.id} className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <Fila onClick={() => setAbierto(d.id)}>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{d.nombre}</span>
+                      <span className="block truncate text-sm text-apagado">{d.vendedor ?? 'Sin vendedor'}{d.desde && ` · desde el ${textoFecha(d.desde).toLowerCase()}`}</span>
+                    </span>
+                    <span className="font-semibold tabular-nums">{dinero(d.saldo)}</span>
+                    <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+                  </Fila>
+                </div>
+                {d.telefono && <BotonWhatsApp chico telefono={d.telefono} texto={llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) })} enviado={mandados.has(d.id)} onEnviar={() => setMandados((m) => new Set(m).add(d.id))} />}
+              </div>
             ))}
             {vista.control}
           </div>
@@ -331,7 +344,7 @@ function ElAnio({ anios, onNavegar }: { anios: number[]; onNavegar?: (s: Seccion
         </div>
       </div>
       <p className="mt-1 text-sm text-apagado">Sólo cuentan los meses cerrados.</p>
-      <div className="mt-2 rounded-2xl bg-niebla p-4">
+      <div className="mt-3 border-t border-linea pt-4">
         {r.error && !r.datos ? <p className="text-sm text-rojo">{r.error}</p>
           : !r.datos ? <p className="text-sm text-apagado">Cargando…</p>
           : !r.datos.meses.length ? <p className="text-sm text-apagado">Ese año todavía no tiene meses cerrados.</p>
@@ -343,7 +356,7 @@ function ElAnio({ anios, onNavegar }: { anios: number[]; onNavegar?: (s: Seccion
 
 function Dato({ titulo, valor, detalle }: { titulo: string; valor: string; detalle?: string }) {
   return (
-    <div className="rounded-lg bg-niebla p-4">
+    <div className="border-l-2 border-linea py-1 pl-3">
       <div className="text-sm text-apagado">{titulo}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{valor}</div>
       {detalle && <div className="mt-0.5 text-xs text-apagado">{detalle}</div>}

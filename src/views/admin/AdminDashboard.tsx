@@ -14,7 +14,9 @@ import type { SeccionAdmin } from './AdminLayout'
 import { BarraSegmentada, BarrasPeriodo } from './graficas'
 import { useFichaSabor } from './PanelSabor'
 import { textoPorUnidad } from '../../lib/unidades'
-import { useServidor, type CifrasMes } from '../../lib/cobranza'
+import { useServidor, type CifrasMes, type Deudor, type FilaCorte } from '../../lib/cobranza'
+import { useProducido } from '../../lib/stock'
+import { unidadDe } from '../../lib/unidades'
 import { ChipEstado, Delta, Subrayado, TarjetaSabor, Vacio } from './piezas'
 
 export interface DashboardStats {
@@ -53,14 +55,15 @@ export interface DashboardStats {
 }
 
 const SABORES_POR_PAGINA = 6
-const botonRedondo = 'grid h-10 w-10 shrink-0 place-items-center rounded-full bg-papel text-tinta transition-colors hover:bg-linea/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40 disabled:hover:bg-papel'
+const botonRedondo = 'grid h-10 w-10 shrink-0 place-items-center rounded-full bg-niebla text-tinta transition-colors hover:bg-linea focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca disabled:opacity-40 disabled:hover:bg-niebla'
 
+// Una sección del resumen, sin caja (sin tarjetas): una línea fina arriba, el título y su acción a la derecha.
 function Tarjeta({ id, titulo, subtitulo, accion, className = '', children }: { id: string; titulo: string; subtitulo?: ReactNode; accion?: ReactNode; className?: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className={`rounded-[28px] bg-niebla p-5 sm:p-6 ${className}`}>
+    <section aria-labelledby={id} className={`min-w-0 border-t border-linea pt-6 ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={id} className="text-lg font-semibold leading-tight">{titulo}</h2>
+          <h2 id={id} className="text-xl font-semibold leading-tight tracking-tight">{titulo}</h2>
           {subtitulo && <p className="mt-1 text-[13px] text-apagado">{subtitulo}</p>}
         </div>
         {accion}
@@ -79,6 +82,69 @@ function Cifra({ etiqueta, valor, pie }: { etiqueta: string; valor: string; pie?
         <span className="mt-2 flex min-h-5 items-center gap-1.5 whitespace-nowrap text-xs text-apagado">{pie}</span>
       </dd>
     </div>
+  )
+}
+
+// Lo urgente del día en dos o tres renglones, cada uno con su enlace. Sólo sale lo que de verdad hay que atender: si no
+// hay nada, no se muestra. Urgentes y producción salen de los datos del teléfono (Dexie); los cortes, del servidor.
+function QueHacerHoy({ sinVendedor, onNavegar }: { sinVendedor: number; onNavegar: (seccion: SeccionAdmin) => void }) {
+  const dia = hoy()
+  const manana = sumarDias(dia, 1)
+  const urgentes = useLiveQuery(() => db.pedidos.where('fecha').belowOrEqual(dia).filter((p) => !!p.urgente && p.estado === 'PENDIENTE').count(), [dia]) ?? 0
+  const porProducir = useLiveQuery(async () => {
+    const pedidos = await db.pedidos.where('fecha').equals(manana).filter((p) => p.estado === 'PENDIENTE').toArray()
+    const m = new Map<string, number>()
+    for (const p of pedidos) for (const it of p.items) m.set(it.productoId, (m.get(it.productoId) ?? 0) + it.litros)
+    return m
+  }, [manana])
+  const productos = useLiveQuery(() => db.productos.toArray(), [])
+  const producido = useProducido(manana, manana, true)
+  const cortes = useServidor<{ filas: FilaCorte[] }>(`/cortes?fecha=${dia}`).datos
+  const descuadres = useServidor<{ cortes: unknown[] }>('/cortes/descuadres').datos
+  const deudores = useServidor<{ deudores: Deudor[] }>('/cobranza').datos
+
+  // Lo que falta producir para mañana: pedidos confirmados menos lo ya anotado en Stock del día (sin red, sin descontar).
+  const faltan = [...(porProducir ?? [])]
+    .map(([id, pedido]) => ({ producto: productos?.find((x) => x.id === id), falta: pedido - (producido?.get(id) ?? 0) }))
+    .filter((x) => x.producto && x.falta > 0.0001)
+    .sort((a, b) => b.falta - a.falta)
+  const porConfirmar = (cortes?.filas ?? []).filter((c) => c.estado === 'pendiente').length
+  const descuadrados = descuadres?.cortes.length ?? 0
+  // Fiado vencido: lo más viejo que deben pasa de 30 días y no han abonado en ese tiempo.
+  const hace30 = sumarDias(dia, -30)
+  const vencidos = (deudores?.deudores ?? []).filter((d) => d.saldo > 0 && d.desde && d.desde < hace30 && (!d.ultimoAbono || d.ultimoAbono.slice(0, 10) < hace30))
+  const aCobrar = () => onNavegar('cobranza') // abre en «Por cobrar»
+  const aCortes = () => { history.replaceState(history.state, '', `${location.pathname}?ir=cortes${location.hash}`); onNavegar('cobranza') }
+
+  const renglones: { clave: string; texto: string; enlace: string; ir: () => void }[] = []
+  if (urgentes) renglones.push({ clave: 'urgentes', texto: urgentes === 1 ? 'Un pedido urgente sin entregar' : `${urgentes} pedidos urgentes sin entregar`, enlace: 'Ver clientes', ir: () => onNavegar('clientes') })
+  if (faltan.length) {
+    const lista = faltan.slice(0, 2).map((x) => `${litrosTxt(x.falta, unidadDe(x.producto))} de ${x.producto!.sabor.toLowerCase()}`).join(' y ')
+    renglones.push({ clave: 'produccion', texto: `Falta producir ${lista}${faltan.length > 2 ? ` y ${faltan.length - 2} sabor${faltan.length > 3 ? 'es' : ''} más` : ''} para mañana`, enlace: 'Ver producción', ir: () => onNavegar('produccion') })
+  }
+  if (porConfirmar) renglones.push({ clave: 'cortes', texto: porConfirmar === 1 ? 'Un corte por confirmar' : `${porConfirmar} cortes por confirmar`, enlace: 'Ver cortes', ir: aCortes })
+  if (descuadrados) renglones.push({ clave: 'descuadres', texto: descuadrados === 1 ? 'Un corte confirmado ya no cuadra' : `${descuadrados} cortes confirmados ya no cuadran`, enlace: 'Ver cortes', ir: aCortes })
+  if (vencidos.length) {
+    const debe = vencidos.reduce((s, d) => s + d.saldo, 0)
+    renglones.push({ clave: 'fiado', texto: `${vencidos.length === 1 ? 'Un cliente debe' : `${vencidos.length} clientes deben`} ${dinero(debe)} de fiado sin abonar en más de 30 días`, enlace: 'Ver por cobrar', ir: aCobrar })
+  }
+  if (sinVendedor) renglones.push({ clave: 'sinvendedor', texto: sinVendedor === 1 ? 'Un cliente sin vendedor (no sale en ninguna ruta)' : `${sinVendedor} clientes sin vendedor (no salen en ninguna ruta)`, enlace: 'Asignar', ir: () => onNavegar('clientes') })
+  if (!renglones.length) return null
+
+  return (
+    <section aria-labelledby="t-hoy" className="mb-10">
+      <h2 id="t-hoy" className="flex items-center gap-2 text-sm font-semibold"><TriangleAlert size={16} className="text-ambar" aria-hidden="true" /> Qué hacer hoy</h2>
+      <ul className="mt-2 divide-y divide-linea border-y border-linea">
+        {renglones.map((x) => (
+          <li key={x.clave}>
+            <button type="button" onClick={x.ir} className="group flex w-full items-center gap-3 py-3 text-left text-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
+              <span className="min-w-0 flex-1">{x.texto}</span>
+              <span className="flex shrink-0 items-center text-sm font-semibold group-hover:underline">{x.enlace} <ChevronRight size={16} aria-hidden="true" /></span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -145,12 +211,12 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
   const reporte = ventas.reporte
   const crecimiento = reporte ? cambio(reporte.resumen.ingreso, reporte.anterior?.resumen.ingreso) : null
   const porDia = new Map((reporte?.periodos ?? []).map((x) => [x.periodo, x]))
-  const semana = Array.from({ length: 7 }, (_, i) => {
-    const f = sumarDias(dia, i - 6)
+  const semana = Array.from({ length: 14 }, (_, i) => {
+    const f = sumarDias(dia, i - 13)
     const d = desdeIso(f)
     return {
       clave: f,
-      eje: f === dia ? 'Hoy' : DIAS_CORTOS[d.getDay()],
+      eje: f === dia ? 'Hoy' : `${DIAS_CORTOS[d.getDay()]} ${d.getDate()}`,
       nombre: d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }),
       valor: porDia.get(f)?.ingreso ?? 0,
       actual: f === dia,
@@ -165,9 +231,11 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
     { nombre: 'Sin venta', n: p?.omitidos ?? 0, color: '#8a9186' },
   ]
 
-  const paginas = Math.max(1, Math.ceil(ordenados.length / SABORES_POR_PAGINA))
+  const vendidos = ordenados.filter((x) => x.venta.litros > 0)
+  const sinVenta = ventasSabor ? ordenados.filter((x) => x.venta.litros <= 0) : []
+  const paginas = Math.max(1, Math.ceil(vendidos.length / SABORES_POR_PAGINA))
   const paginaActual = Math.min(pagina, paginas - 1)
-  const visibles = ordenados.slice(paginaActual * SABORES_POR_PAGINA, (paginaActual + 1) * SABORES_POR_PAGINA)
+  const visibles = vendidos.slice(paginaActual * SABORES_POR_PAGINA, (paginaActual + 1) * SABORES_POR_PAGINA)
   const corto = (f: string) => (f === dia ? 'Hoy' : f === sumarDias(dia, -1) ? 'Ayer' : desdeIso(f).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', ''))
   const pedidosRecientes = <PedidosRecientes recientes={recientes} corto={corto} onNavegar={onNavegar} />
 
@@ -213,64 +281,22 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
         </div>
       )}
 
-      {!!stats?.clientes.sinVendedor && (
-        <button
-          onClick={() => onNavegar('clientes')}
-          className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-ambar/25 p-4 text-left text-sm transition-colors hover:bg-ambar/35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
-        >
-          <TriangleAlert size={20} className="shrink-0" aria-hidden="true" />
-          <span className="flex-1">
-            <strong className="font-semibold">
-              {stats.clientes.sinVendedor === 1 ? 'Un cliente no tiene vendedor' : `${stats.clientes.sinVendedor} clientes no tienen vendedor`}
-            </strong>{' '}
-            y no aparece en ninguna ruta.
-          </span>
-          <span className="flex items-center font-semibold">Asignar <ChevronRight size={16} aria-hidden="true" /></span>
-        </button>
-      )}
+      <QueHacerHoy sinVendedor={stats?.clientes.sinVendedor ?? 0} onNavegar={onNavegar} />
 
-      {/* Dos columnas que se apilan cada una por su lado (en pantallas chicas, una sola): así ninguna tarjeta se estira
-          para igualar el alto de la otra columna ni queda un hueco al lado de la última. */}
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <div className="grid gap-4">
-        {/* Los sabores son los productos: se ordenan por los litros que vendieron en 30 días */}
-        <Tarjeta
-          id="t-sabores"
-          titulo="Sabores más vendidos"
-          subtitulo={(p?.unidades ?? ['L']).some((u) => u !== 'L') ? 'Lo entregado en los últimos 30 días' : 'Litros entregados en los últimos 30 días'}
-          className="flex flex-col"
-          accion={paginas > 1 && (
-            <div className="flex gap-2">
-              <button type="button" aria-label="Sabores anteriores" disabled={paginaActual === 0} onClick={() => setPagina(paginaActual - 1)} className={botonRedondo}><ArrowLeft size={18} /></button>
-              <button type="button" aria-label="Más sabores" disabled={paginaActual === paginas - 1} onClick={() => setPagina(paginaActual + 1)} className={botonRedondo}><ArrowRight size={18} /></button>
-            </div>
-          )}
-        >
-          {productos && !ordenados.length ? (
-            <Vacio>Todavía no hay sabores. Agrégalos en la sección Sabores.</Vacio>
-          ) : (
-            <ul className="mt-5 grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3">
-              {visibles.map((x) => (
-                <li key={x.producto.id}>
-                  <TarjetaSabor producto={x.producto} venta={x.venta} posicion={x.posicion} frasco="h-28 xl:h-36" onAbrir={() => ficha.abrir(x.producto.id)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Tarjeta>
-        {pedidosRecientes}
-        </div>
-
-        <div className="grid gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Tarjeta id="t-semana" titulo="Ventas por día" subtitulo={reporte ? `${dinero(totalSemana)} en los últimos 7 días` : 'Últimos 7 días'}>
-            <div className="mt-5">
+      {/* Filas que llenan el ancho, de lo más importante a lo menos: las ventas (grande) con el avance de hoy, los sabores
+          en una sola fila, y los pedidos recientes junto a los vendedores del mes. Sin cajas: secciones con una línea arriba. */}
+      <div className="space-y-12 pb-14">
+        <div className="grid gap-x-12 gap-y-12 lg:grid-cols-3">
+          <Tarjeta id="t-semana" titulo="Ventas por día" className="lg:col-span-2"
+            subtitulo={reporte ? `${dinero(totalSemana)} en los últimos 14 días` : 'Últimos 14 días'}
+            accion={<button type="button" onClick={() => onNavegar('reportes')} className="whitespace-nowrap rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver reportes</button>}>
+            <div className="mt-6">
               {ventas.error && !reporte ? (
                 <p className="rounded-2xl bg-rojo/10 p-3 text-sm font-medium text-rojo">
                   No se pudieron traer las ventas. <button className="font-semibold underline underline-offset-2" onClick={recargarVentas}>Reintentar</button>
                 </p>
               ) : !reporte ? esperando : (
-                <BarrasPeriodo datos={semana} formato={dinero} descripcion="Ventas entregadas de cada uno de los últimos 7 días" leyenda={['Días previos', 'Hoy']} />
+                <BarrasPeriodo datos={semana} formato={dinero} alto={190} descripcion="Ventas entregadas de cada uno de los últimos 14 días" leyenda={['Días previos', 'Hoy']} />
               )}
             </div>
           </Tarjeta>
@@ -281,14 +307,14 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             subtitulo="Pedidos atendidos"
             accion={<button type="button" aria-label="Abrir los reportes" title="Reportes" onClick={() => onNavegar('reportes')} className={botonRedondo}><ArrowUpRight size={18} /></button>}
           >
-            <p className="cifra mt-4 text-[3rem]">{stats ? `${avance}%` : '—'}</p>
-            <p className="mt-2 text-[13px] text-apagado">{stats ? (porAtender ? `${atendidos} de ${porAtender} pedidos` : 'No hay pedidos agendados para hoy') : 'Cargando…'}</p>
-            <div className="mt-5">
+            <p className="cifra mt-5 text-[3.5rem] leading-none">{stats ? `${avance}%` : '—'}</p>
+            <p className="mt-3 text-[13px] text-apagado">{stats ? (porAtender ? `${atendidos} de ${porAtender} pedidos` : 'No hay pedidos agendados para hoy') : 'Cargando…'}</p>
+            <div className="mt-6">
               <BarraSegmentada segmentos={segmentos} descripcion={segmentos.map((s) => `${s.nombre}: ${s.n}`).join(', ')} />
             </div>
-            <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[13px]">
+            <ul className="mt-5 divide-y divide-linea text-sm">
               {segmentos.map((s) => (
-                <li key={s.nombre} className="flex items-center gap-2">
+                <li key={s.nombre} className="flex items-center gap-2.5 py-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden="true" />
                   <span className="text-apagado">{s.nombre}</span>
                   <span className="ml-auto font-semibold tabular-nums">{stats ? s.n : '—'}</span>
@@ -298,10 +324,65 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           </Tarjeta>
         </div>
 
-        <ResumenDelAnio onNavegar={onNavegar} />
-        <MedallasDelMes onNavegar={onNavegar} />
-        <RankingMes onNavegar={onNavegar} />
+        {/* Los sabores son los productos: se ordenan por los litros que vendieron en 30 días */}
+        <Tarjeta
+          id="t-sabores"
+          titulo="Sabores más vendidos"
+          subtitulo={(p?.unidades ?? ['L']).some((u) => u !== 'L') ? 'Lo entregado en los últimos 30 días' : 'Litros entregados en los últimos 30 días'}
+          accion={paginas > 1 && (
+            <div className="flex gap-2">
+              <button type="button" aria-label="Sabores anteriores" disabled={paginaActual === 0} onClick={() => setPagina(paginaActual - 1)} className={botonRedondo}><ArrowLeft size={18} /></button>
+              <button type="button" aria-label="Más sabores" disabled={paginaActual === paginas - 1} onClick={() => setPagina(paginaActual + 1)} className={botonRedondo}><ArrowRight size={18} /></button>
+            </div>
+          )}
+        >
+          {productos && !ordenados.length ? (
+            <Vacio>Todavía no hay sabores. Agrégalos en la sección Sabores.</Vacio>
+          ) : (
+            <>
+              {vendidos.length ? (
+                <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  {visibles.map((x) => (
+                    <li key={x.producto.id}>
+                      <TarjetaSabor producto={x.producto} venta={x.venta} posicion={x.posicion} frasco="h-24 xl:h-28" onAbrir={() => ficha.abrir(x.producto.id)} />
+                    </li>
+                  ))}
+                </ul>
+              ) : ventasSabor && <p className="mt-6 text-sm text-apagado">Ningún sabor se entregó en los últimos 30 días.</p>}
+              {/* Para decidir si se dejan de producir: los que nadie pidió en 30 días, en su propio renglón */}
+              {sinVenta.length > 0 && vendidos.length > 0 && (
+                <div className="mt-6 border-t border-linea pt-4">
+                  <p className="text-sm">
+                    <span className="font-semibold">Sin ventas en 30 días</span>
+                    <span className="text-apagado"> · si siguen así, puedes dejar de producirlos</span>
+                  </p>
+                  <ul className="mt-3 flex flex-wrap gap-2">
+                    {sinVenta.map((x) => (
+                      <li key={x.producto.id}>
+                        <button type="button" onClick={() => ficha.abrir(x.producto.id)}
+                          className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pl-2.5 pr-3.5 text-sm transition-colors hover:bg-linea focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: x.producto.color_hex }} aria-hidden="true" />
+                          {x.producto.sabor}
+                          {x.venta.litrosAntes > 0 && <span className="text-xs text-apagado">vendía {litrosTxt(x.venta.litrosAntes, unidadDe(x.producto))} antes</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </Tarjeta>
+
+        <div className="grid items-start gap-x-12 gap-y-12 lg:grid-cols-2">
+          {pedidosRecientes}
+          <div className="space-y-12">
+            <RankingMes onNavegar={onNavegar} />
+            <MedallasDelMes onNavegar={onNavegar} />
+          </div>
         </div>
+
+        <ResumenDelAnio onNavegar={onNavegar} />
       </div>
 
       {ficha.panel}
@@ -379,10 +460,10 @@ export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: st
   const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
   const tope = Math.max(1, ...r.meses.map((x) => x.ventas))
   const ficha = onFicha
-  const dato = 'desplegar-opcion rounded-xl bg-papel p-3'
+  const dato = 'desplegar-opcion rounded-md border-l-2 border-linea py-1 pl-3'
   return (
     <>
-      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
         <div className={dato}>
           <p className="text-xs text-apagado">Vendido en el año</p>
           <p className="mt-1 text-xl font-bold tabular-nums">{dinero(r.total)}</p>
@@ -405,7 +486,7 @@ export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: st
         )}
         {r.vendedorDelAnio && (
           <button type="button" onClick={() => ficha(r.vendedorDelAnio!.id)} style={{ animationDelay: '80ms' }}
-            className={`${dato} text-left transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100`}>
+            className={`${dato} text-left transition-[transform,background-color] duration-150 hover:bg-niebla active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100`}>
             <p className="flex items-center gap-1 text-xs text-apagado"><Crown size={13} aria-hidden="true" className="text-marca" /> Vendedor del año</p>
             <p className="mt-1 truncate font-semibold">{r.vendedorDelAnio.nombre}</p>
             <p className="text-sm tabular-nums text-apagado">{dinero(r.vendedorDelAnio.ventas)}</p>
@@ -413,7 +494,7 @@ export function AnioEnNumeros({ r, onFicha }: { r: ResumenAnio; onFicha: (id: st
         )}
         {r.mejorRacha && (
           <button type="button" onClick={() => ficha(r.mejorRacha!.id)} style={{ animationDelay: '120ms' }}
-            className={`${dato} text-left transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100`}>
+            className={`${dato} text-left transition-[transform,background-color] duration-150 hover:bg-niebla active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100`}>
             <p className="flex items-center gap-1 text-xs text-apagado"><Flame size={13} aria-hidden="true" className="text-marca" /> Mejor racha</p>
             <p className="mt-1 truncate font-semibold">{r.mejorRacha.nombre}</p>
             <p className="text-sm text-apagado">{r.mejorRacha.meses} {r.mejorRacha.meses === 1 ? 'mes' : 'meses seguidos'} en su meta</p>
@@ -453,7 +534,7 @@ function MedallasDelMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => v
         {ganadas.map((g, i) => (
           <li key={`${g.id}-${g.medalla}`} className="medalla-nueva" style={{ animationDelay: `${i * 60}ms` }}>
             <button type="button" onClick={() => { abrirFicha(g.id); onNavegar('equipo') }}
-              className="flex items-center gap-2 rounded-full bg-papel py-1.5 pl-1.5 pr-3.5 text-sm transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100">
+              className="flex items-center gap-2 rounded-full bg-niebla py-1.5 pl-1.5 pr-3.5 text-sm transition-[transform,background-color] duration-150 hover:bg-linea active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca motion-reduce:active:scale-100">
               <Medallas mejorRacha={g.medalla} soloMejor />
               <span className="font-semibold">{g.nombre}</span>
               <span className="text-apagado">{g.medalla === 12 ? '1 año' : `${g.medalla} meses`}</span>
@@ -481,7 +562,7 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
   const rachas = useServidor<Rachas>('/usuarios/rachas', 'cobranza').datos ?? {}
   const filas = (r.datos?.cifras.mes === mes ? r.datos.cifras.vendedores : []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
   const nombreMes = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', atras ? { month: 'long', year: 'numeric' } : { month: 'long' })
-  const flecha = `grid h-8 w-8 place-items-center rounded-full transition-colors hover:bg-papel disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca`
+  const flecha = `grid h-8 w-8 place-items-center rounded-full transition-colors hover:bg-niebla disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca`
   return (
     <Tarjeta
       id="t-ranking"
@@ -491,7 +572,7 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => setAtras(atras + 1)} disabled={atras >= MESES_ATRAS} aria-label="Mes anterior" title="Mes anterior" className={flecha}><ArrowLeft size={16} /></button>
           <button type="button" onClick={() => setAtras(atras - 1)} disabled={atras === 0} aria-label="Mes siguiente" title="Mes siguiente" className={flecha}><ArrowRight size={16} /></button>
-          <button type="button" onClick={() => onNavegar('equipo')} className="ml-2 rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver vendedores</button>
+          <button type="button" onClick={() => onNavegar('equipo')} className="ml-2 whitespace-nowrap rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver vendedores</button>
         </div>
       }
     >
@@ -507,7 +588,7 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
             const pct = v.meta ? Math.round(v.cumplimientoPct ?? 0) : null
             return (
               <li key={v.id} className="flex items-center gap-3 py-3">
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 && v.ventas > 0 ? 'bg-marca text-white' : 'bg-papel text-apagado'}`}>{i + 1}</span>
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 && v.ventas > 0 ? 'bg-marca text-white' : 'bg-niebla text-apagado'}`}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="flex min-w-0 items-center gap-1.5">
@@ -523,7 +604,7 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
                   </div>
                   {pct !== null ? (
                     <div className="mt-1.5 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-linea" role="progressbar" aria-label={`${v.nombre}: ${pct}% de su meta`} aria-valuenow={Math.min(100, pct)} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-niebla" role="progressbar" aria-label={`${v.nombre}: ${pct}% de su meta`} aria-valuenow={Math.min(100, pct)} aria-valuemin={0} aria-valuemax={100}>
                         <div className={`h-full rounded-full ${pct >= 100 ? 'bg-verde' : 'bg-marca'}`} style={{ width: `${Math.min(100, pct)}%` }} />
                       </div>
                       <span className="w-24 shrink-0 text-right text-xs text-apagado tabular-nums">{pct}% de {dinero(v.meta!)}</span>

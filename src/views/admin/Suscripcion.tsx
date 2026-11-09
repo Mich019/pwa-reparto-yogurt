@@ -103,7 +103,7 @@ export function SeccionSuscripcion({ s }: { s: Suscripcion }) {
   const fin = new Date(s.pruebaHasta).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
   return (
     <div className="space-y-4">
-      <div className="rounded-lg bg-niebla p-4">
+      <div className="border-y border-linea py-4">
         <div className="font-semibold">
           {s.estado === 'activa' ? 'Suscripción activa'
             : s.estado === 'prueba' ? (s.suscripcion === 'pending' ? 'Prueba gratis · pago en proceso' : `Prueba gratis · ${s.diasPrueba ? `quedan ${dias(s.diasPrueba)}` : 'termina hoy'}`)

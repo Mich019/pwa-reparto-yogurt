@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import { reparte } from '../../lib/reparto'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, BellRing, ChevronRight, CloudOff, Eye, EyeOff, Flame, LifeBuoy, LockKeyhole, LogOut, MapPin, Package, RefreshCw, ShieldCheck, TriangleAlert, Wallet, CreditCard, type LucideIcon } from 'lucide-react'
 import { db, type Aviso, type PestanaAviso, type TipoAviso } from '../../lib/db'
 import { ErrorApi, ErrorRed, MODO_SERVIDOR } from '../../lib/api'
 import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
-import { hace } from '../../lib/fechas'
+import { dinero, hace } from '../../lib/fechas'
+import { fijarMiMeta, useServidor, type MiMeta } from '../../lib/cobranza'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
 import { cambiarPassword, cerrarSesion, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
@@ -157,21 +159,21 @@ function Avisos({ irA }: { irA?: (p: PestanaAviso) => void }) {
   }
 
   return (
-    <div className="mt-3 rounded-lg bg-niebla p-4">
+    <div className="mt-6 border-t border-linea pt-4">
       <div className="flex items-center gap-2 font-semibold">
         <BellRing size={18} /> Avisos
         {sinLeer.length > 0 && <span className="rounded-md bg-tinta px-2 py-0.5 text-xs font-bold text-white">{sinLeer.length}</span>}
-        {sinLeer.length > 0 && <button onClick={() => void leerTodo()} className="ml-auto rounded-md bg-papel px-3 py-1 text-xs font-semibold">Marcar leídos</button>}
+        {sinLeer.length > 0 && <button onClick={() => void leerTodo()} className="ml-auto rounded-md bg-niebla px-3 py-1 text-xs font-semibold">Marcar leídos</button>}
       </div>
       {avisos.length === 0 ? (
         <p className="mt-1 text-sm text-apagado">Aquí verás los pedidos urgentes, los cambios de tu ruta y las alertas de stock.</p>
       ) : (
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-2 divide-y divide-linea">
           {avisos.map((a) => {
             const Icono = ICONO_AVISO[a.tipo] ?? Bell
             return (
               <li key={a.id}>
-                <button onClick={() => void abrir(a)} className="flex w-full items-start gap-3 rounded-md bg-papel p-3 text-left active:bg-linea" data-aviso={a.tipo}>
+                <button onClick={() => void abrir(a)} className="flex w-full items-start gap-3 py-3 text-left active:bg-niebla" data-aviso={a.tipo}>
                   <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-niebla"><Icono size={16} /></span>
                   <span className="min-w-0 flex-1">
                     <span className={`block text-sm ${a.leida ? 'font-medium' : 'font-bold'}`}>{a.titulo}</span>
@@ -228,7 +230,7 @@ function Notificaciones() {
   const activo = !!estado?.suscrito && estado.permiso === 'granted'
 
   return (
-    <div className="mt-3 rounded-lg bg-niebla p-4">
+    <div className="mt-6 border-t border-linea pt-4">
       <div className="flex items-center gap-2 font-semibold"><Bell size={18} /> Preferencias</div>
       <div className="mt-3 text-sm font-semibold">Notificaciones en este teléfono</div>
       <p className="mt-0.5 text-sm text-apagado" data-estado-push={activo ? 'activo' : 'inactivo'}>{texto}</p>
@@ -236,8 +238,8 @@ function Notificaciones() {
         <div className="mt-3 flex gap-2">
           {activo ? (
             <>
-              <Boton variante="secundario" className="flex-1 bg-papel !py-3 text-sm" onClick={() => void probar()} disabled={ocupado}>Enviar prueba</Boton>
-              <Boton variante="secundario" className="flex-1 bg-papel !py-3 text-sm" onClick={() => void apagar()} disabled={ocupado}>Desactivar</Boton>
+              <Boton variante="secundario" className="flex-1 !py-3 text-sm" onClick={() => void probar()} disabled={ocupado}>Enviar prueba</Boton>
+              <Boton variante="secundario" className="flex-1 !py-3 text-sm" onClick={() => void apagar()} disabled={ocupado}>Desactivar</Boton>
             </>
           ) : (
             <Boton className="w-full !py-3 text-sm" onClick={() => void activar()} disabled={ocupado}>Activar avisos</Boton>
@@ -249,12 +251,46 @@ function Notificaciones() {
         <Selector
           valor={horaCierre}
           onCambiar={(h) => void cambiarHora(h)}
-          className="rounded-md bg-papel px-3 py-2 text-sm font-semibold"
+          className="rounded-md bg-niebla px-3 py-2 text-sm font-semibold"
           etiqueta="Hora a partir de la cual avisar de ventas sin enviar"
           opciones={[...new Set([HORA_CIERRE, 14, 15, 16, 17, 18, 19, 20, 21, 22, horaCierre])].sort((a, b) => a - b).map((h) => ({ valor: h, texto: `${String(h).padStart(2, '0')}:00` }))}
         />
       </label>
       {MODO_SERVIDOR && <PreferenciasAvisos vendedor={sesionActual()?.usuario.rol === 'vendedor'} />}
+      {MODO_SERVIDOR && sesionActual()?.usuario.rol === 'administrador' && reparte() && <MiMetaPropia />}
+    </div>
+  )
+}
+
+// El administrador que también reparte pone su meta del mes (a un vendedor se la pone él en su ficha de Vendedores).
+function MiMetaPropia() {
+  const r = useServidor<MiMeta>('/mi-meta')
+  const [texto, setTexto] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const valor = texto ?? (r.datos?.meta ? String(r.datos.meta) : '')
+  async function guardar() {
+    const n = valor.trim() ? Number(valor.replace(/[$,\s]/g, '')) : null
+    if (n !== null && !(n > 0)) return aviso('Escribe un monto mayor a cero, o déjalo vacío para no tener meta')
+    setGuardando(true)
+    try {
+      await fijarMiMeta(n)
+      setTexto(null)
+      r.recargar()
+      aviso(n ? `Tu meta del mes: ${dinero(n)}` : 'Ya no tienes meta del mes')
+    } catch (e) {
+      aviso(mensajeError(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <div className="mt-5 border-t border-linea pt-4">
+      <label htmlFor="mi-meta" className="text-sm font-semibold">Mi meta del mes</label>
+      <p className="mt-0.5 text-sm text-apagado">Como también repartes: lo que quieres vender cada mes. Se ve en tu Ruta y aquí en Cuenta.</p>
+      <div className="mt-3 flex gap-2">
+        <input id="mi-meta" inputMode="decimal" placeholder="Sin meta" value={valor} onChange={(e) => setTexto(e.target.value)} className={`${claseInput} flex-1`} />
+        <Boton className="!py-3 text-sm" onClick={() => void guardar()} disabled={guardando || texto === null}>Guardar</Boton>
+      </div>
     </div>
   )
 }
@@ -298,7 +334,7 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
   const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarSemanal, cambiarDiaSemanal } = usePreferenciasAvisos((e) => aviso(mensajeError(e)))
   const diaSemanal = prefs?.resumenSemanalDia ?? 1
   const silencio = prefs?.silencio ?? null
-  const claseHora = 'rounded-md bg-papel px-3 py-2 text-sm font-semibold'
+  const claseHora = 'rounded-md bg-niebla px-3 py-2 text-sm font-semibold'
   return (
     <>
       {sinSenal && <p className="mt-4 border-t border-linea pt-3 text-xs text-apagado">Sin conexión: lo de abajo se puede cambiar cuando haya señal.</p>}
@@ -369,7 +405,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Mi cuenta</h1>
 
-      <div className="mt-4 flex items-center gap-3 rounded-lg bg-niebla p-4">
+      <div className="mt-4 flex items-center gap-3 border-y border-linea py-4">
         <FotoPerfil tamano="h-12 w-12 text-lg" compacto />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{u.nombre}</div>
@@ -378,9 +414,9 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
         <span className="flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} />{ROL[u.rol]}</span>
       </div>
 
-      {MODO_SERVIDOR && u.rol === 'vendedor' && <MiDia />}
+      {MODO_SERVIDOR && reparte() && <MiDia />}
 
-      <div className="mt-3 rounded-lg bg-niebla p-4">
+      <div className="mt-6 border-t border-linea pt-4">
         <div className="flex items-center gap-2 font-semibold">
           {sync.error ? <CloudOff size={18} className="text-ambar" /> : <RefreshCw size={18} className={aMano ? 'animate-spin' : ''} />}
           Sincronización
@@ -412,14 +448,14 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
         </div>
       )}
 
-      <button onClick={() => setAyuda(true)} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-niebla p-4 text-left active:bg-linea">
+      <button onClick={() => setAyuda(true)} className="mt-6 flex w-full items-center gap-3 border-y border-linea py-4 text-left active:bg-niebla">
         <LifeBuoy size={20} className="shrink-0" />
         <span className="min-w-0 flex-1"><span className="block font-semibold">Ayuda</span><span className="block text-sm text-apagado">Guías paso a paso: pedidos, entregas, clientes…</span></span>
         <ChevronRight size={18} className="shrink-0 text-apagado" />
       </button>
 
       {MODO_SERVIDOR && (
-        <button onClick={() => setPrivacidad(true)} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-niebla p-4 text-left active:bg-linea">
+        <button onClick={() => setPrivacidad(true)} className="mt-6 flex w-full items-center gap-3 border-y border-linea py-4 text-left active:bg-niebla">
           <LockKeyhole size={20} className="shrink-0" />
           <span className="min-w-0 flex-1"><span className="block font-semibold">Privacidad y datos</span><span className="block text-sm text-apagado">Descargar tus datos, eliminar tu cuenta, aviso de privacidad</span></span>
           <ChevronRight size={18} className="shrink-0 text-apagado" />

@@ -1,4 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { EditorMensaje, enlaceWhatsApp, llenar, useMensaje } from '../../components/Mensajes'
+import { esMio, reparte } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
@@ -65,9 +67,9 @@ const Urgente = ({ className = '' }: { className?: string }) => (
   <span className={`inline-flex items-center gap-1 rounded-md bg-rojo px-2 py-0.5 text-[11px] font-bold tracking-wide text-white ${className}`}><Flame size={11} />URGENTE</span>
 )
 
-export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irAStock?: () => void }) {
+export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => void; irAStock?: () => void; irACuenta?: () => void }) {
   const fecha = hoy()
-  const pedidosHoy = useLiveQuery(() => db.pedidos.where('fecha').equals(fecha).toArray(), [fecha])
+  const pedidosHoy = useLiveQuery(() => db.pedidos.where('fecha').equals(fecha).filter((p) => esMio(p.vendedorId)).toArray(), [fecha])
   const clientes = useLiveQuery(() => db.clientes.toArray(), [])
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
   const recordatorios = useLiveQuery(() => db.recordatorios.filter((r) => !r.hecho).toArray(), []) ?? []
@@ -292,7 +294,7 @@ export function Ruta({ irAClientes, irAStock }: { irAClientes: () => void; irASt
           </div>
         )}
 
-        <AlertasRuta irAStock={irAStock} />
+        <AlertasRuta irAStock={irAStock} irAClientes={irAClientes} irACuenta={irACuenta} onUrgente={() => { const u = pendientes.find((p) => p.urgente); if (u) seleccionar(u.id) }} />
 
         {ruta && !ruta.porCalles && orden.length > 0 && (
           <div className="pointer-events-auto mt-2 rounded-md bg-ambar px-3 py-2 text-xs font-semibold text-tinta">
@@ -545,20 +547,21 @@ function Recordatorios({ abierta, onCerrar, porId, onPedido }: {
   onPedido: (c: Cliente) => void
 }) {
   const lista = useLiveQuery(() => db.recordatorios.filter((r) => !r.hecho).toArray(), []) ?? []
+  const plantilla = useMensaje('visita') // el mismo mensaje que el repartidor escribió para las visitas
   return (
     <Hoja abierta={abierta} onCerrar={onCerrar} titulo="Por confirmar">
       {lista.length === 0 && <div className="py-10 text-center text-apagado">Nada pendiente</div>}
+      {lista.length > 0 && <details className="mb-3"><summary className="cursor-pointer py-1 text-sm font-semibold">Cambiar el mensaje de WhatsApp</summary><div className="mt-2"><EditorMensaje tipo="visita" abierto={abierta} /></div></details>}
       <div className="space-y-2.5 pb-3">
         {lista.map((r) => {
           const c = porId.get(r.clienteId)
           if (!c) return null
-          const msg = encodeURIComponent(`Hola ${c.nombre}, ¿qué sabores de yogurt te llevo en la próxima visita? 🍓`)
           return (
-            <div key={r.id} className="rounded-lg bg-niebla p-4">
+            <div key={r.id} className="border-t border-linea pt-4">
               <div className="text-lg font-semibold">{c.nombre}</div>
               <div className="text-sm text-apagado">Desde {textoFecha(iso(new Date(r.creado))).toLowerCase()}</div>
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <a href={`https://wa.me/${telLimpio(c.telefono)}?text=${msg}`} target="_blank" className="rounded-md bg-verde py-3 text-center text-sm font-semibold text-white">WhatsApp</a>
+                <a href={enlaceWhatsApp(c.telefono, llenar(plantilla, c)) ?? undefined} target="_blank" rel="noopener noreferrer" className="rounded-md bg-verde py-3 text-center text-sm font-semibold text-white">WhatsApp</a>
                 <button onClick={() => onPedido(c)} className="rounded-md bg-tinta py-3 text-sm font-semibold text-white">Pedido</button>
                 <button onClick={() => guardar('recordatorios', { ...r, hecho: true })} className="rounded-md bg-linea py-3 text-sm font-semibold">Listo</button>
               </div>
@@ -589,8 +592,8 @@ function Dato({ valor, etiqueta }: { valor: string; etiqueta: string }) {
 
 function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: ReactNode; titulo: string; sub: string; destacada?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-lg bg-niebla p-4 text-left transition-colors active:bg-linea">
-      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${destacada ? 'bg-tinta text-white' : 'bg-papel'}`}>{icono}</div>
+    <button onClick={onClick} className="flex w-full items-center gap-4 border-y border-linea py-4 text-left transition-colors active:bg-niebla">
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${destacada ? 'bg-tinta text-white' : 'bg-niebla'}`}>{icono}</div>
       <div className="min-w-0 flex-1">
         <div className="text-lg font-semibold">{titulo}</div>
         <div className="truncate text-sm text-apagado">{sub}</div>
@@ -604,7 +607,7 @@ function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: React
 // tocarla dice las cifras. El avance se guarda en este teléfono para verlo también sin señal.
 const CLAVE_META = 'meta-del-mes'
 function BarraMeta() {
-  const vendedor = MODO_SERVIDOR && sesionActual()?.usuario.rol === 'vendedor'
+  const vendedor = MODO_SERVIDOR && reparte()
   const r = useServidor<MiMeta>(vendedor ? '/mi-meta' : null, ['datos', 'cobranza'])
   let m = r.datos
   try {

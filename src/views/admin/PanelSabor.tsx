@@ -86,9 +86,11 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
   const primero = posicion === 1 && venta.litros > 0
   const dif = cambio(venta.litros, venta.litrosAntes)
 
+  // Nadie lo pidió en 30 días: el botón propone dejar de producirlo (lo mismo que «sin stock»: deja de ofrecerse).
+  const sinPedir = p.disponible && venta.litros <= 0
   async function alternarDisponible() {
     await guardar('productos', { ...p, disponible: !p.disponible })
-    aviso(p.disponible ? `${p.sabor} quedó sin stock` : `${p.sabor} vuelve a estar a la venta`)
+    aviso(p.disponible ? (sinPedir ? `${p.sabor} ya no se ofrece. Puedes volver a ponerlo a la venta cuando quieras.` : `${p.sabor} quedó sin stock`) : `${p.sabor} vuelve a estar a la venta`)
   }
 
   return (
@@ -144,6 +146,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
           />
         </div>
 
+        {sinPedir && <p className="px-6 pt-3 text-sm text-apagado">No se vendió en los últimos 30 días. Si lo dejas de producir, ya no se ofrece en los pedidos.</p>}
         <div className="flex gap-2.5 px-6 pb-6 pt-3">
           <button
             type="button"
@@ -157,7 +160,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
             onClick={() => void alternarDisponible()}
             className="flex-1 rounded-md border border-tinta/25 bg-papel/60 px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-papel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
           >
-            {p.disponible ? 'Marcar sin stock' : 'Poner a la venta'}
+            {sinPedir ? 'Dejar de producir' : p.disponible ? 'Marcar sin stock' : 'Poner a la venta'}
           </button>
         </div>
       </aside>

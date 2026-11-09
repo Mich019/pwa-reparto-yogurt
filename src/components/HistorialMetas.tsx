@@ -43,15 +43,15 @@ export function HistorialMetas({ historial, titulo = 'Historial de metas', class
   const [abierto, setAbierto] = useState(false)
   if (!historial.length) return null
   return (
-    <div className={`rounded-lg bg-niebla ${className}`}>
+    <div className={`border-y border-linea ${className}`}>
       <button type="button" onClick={() => setAbierto(!abierto)} aria-expanded={abierto}
-        className="flex w-full items-center justify-between gap-2 p-4 text-left text-sm font-semibold">
+        className="flex w-full items-center justify-between gap-2 py-4 text-left text-sm font-semibold">
         {titulo}
         <ChevronRight size={16} aria-hidden="true" className={`text-apagado transition-transform duration-200 ${abierto ? 'rotate-90' : ''}`} />
       </button>
       {abierto && historial.length >= 2 && <Tendencia historial={historial} />}
       {abierto && (
-        <ul className="desplegar space-y-2.5 px-4 pb-4 text-sm">
+        <ul className="desplegar space-y-2.5 pb-4 text-sm">
           {historial.map((h) => {
             const pct = h.meta ? Math.round(h.cumplimientoPct ?? 0) : null
             return (

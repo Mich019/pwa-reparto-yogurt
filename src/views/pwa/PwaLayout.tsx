@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fijarReparto } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { BarChart3, IceCreamBowl, Map, Package, User, Users } from 'lucide-react'
 import { Ruta } from './Ruta'
@@ -40,9 +41,14 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   const sesion = useSesion()
   const esAdmin = sesion?.usuario.rol === 'administrador'
   const visibles = PESTANAS_PWA.filter((p) =>
-    p.solo === 'vendedor' ? MODO_SERVIDOR && !esAdmin : p.solo === 'servidor' ? MODO_SERVIDOR : p.solo === 'sinServidor' ? !MODO_SERVIDOR : true)
+    p.solo === 'vendedor' ? MODO_SERVIDOR : p.solo === 'servidor' ? MODO_SERVIDOR : p.solo === 'sinServidor' ? !MODO_SERVIDOR : true)
   const actual = visibles.some((p) => p.id === pestana) ? pestana : 'ruta'
   const irA = (p: PestanaPwa) => { if (visibles.some((v) => v.id === p)) setPestana(p) }
+
+  // Aquí se reparte: el administrador también, como un vendedor con su cartera (lib/reparto.ts). Se fija antes de que
+  // las pestañas lean la base; al salir al panel se quita.
+  fijarReparto(MODO_SERVIDOR && sesion ? sesion.usuario.id : null, esAdmin)
+  useEffect(() => () => fijarReparto(null), [])
 
   useEffect(() => iniciarSincronizacionAutomatica(), [])
   useConexionEnVivo() // una conexión para toda la app; los datos llegan a cada pestaña por Dexie (lib/enVivo.ts)
@@ -100,7 +106,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
 
       {/* Contenido principal móvil */}
       <main className="relative min-h-0 flex-1">
-        {actual === 'ruta' && <Ruta irAClientes={() => setPestana('clientes')} irAStock={visibles.some((p) => p.id === 'stock') ? () => setPestana('stock') : undefined} />}
+        {actual === 'ruta' && <Ruta irAClientes={() => setPestana('clientes')} irAStock={visibles.some((p) => p.id === 'stock') ? () => setPestana('stock') : undefined} irACuenta={() => setPestana('cuenta')} />}
         {actual === 'clientes' && <Clientes />}
         {actual === 'stock' && <Stock />}
         {actual === 'produccion' && <Produccion />}

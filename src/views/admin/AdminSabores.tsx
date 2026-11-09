@@ -24,7 +24,7 @@ export function AdminSabores() {
         </button>
       </Encabezado>
 
-      <section aria-label="Sabores" className="rounded-lg bg-niebla p-3 sm:p-5">
+      <section aria-label="Sabores" className="border-t border-linea pt-5">
         {productos && !ordenados.length ? (
           <Vacio>Todavía no hay sabores. Agrega el primero con «Nuevo sabor».</Vacio>
         ) : (

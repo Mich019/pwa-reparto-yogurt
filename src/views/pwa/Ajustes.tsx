@@ -21,9 +21,9 @@ export function Ajustes() {
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Sabores y datos</h1>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 divide-y divide-linea border-y border-linea">
         {productos.map((p) => (
-          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 rounded-lg bg-niebla p-3 text-left ${p.disponible ? '' : 'opacity-50'}`}>
+          <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 py-3 text-left active:bg-niebla ${p.disponible ? '' : 'opacity-50'}`}>
             <PuntoSabor color={p.color_hex} className="h-11 w-11" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{p.sabor} {!p.disponible && <span className="text-xs font-normal text-apagado">(sin stock)</span>}</div>

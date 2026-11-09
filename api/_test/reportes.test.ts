@@ -210,6 +210,17 @@ describe('reportes de ventas (RF-043 a RF-047)', () => {
     })
   })
 
+  it('se puede pedir sólo lo de un vendedor (su hoja en Reportes)', async () => {
+    await escenario(async ({ srv, admin, ana, beto }) => {
+      const { body } = await json(srv, admin, `/reportes/ventas?${OCTUBRE}&agrupar=dia&vendedor=${ana.id}`)
+      assert.deepEqual([body.resumen.ingreso, body.resumen.pedidos, body.resumen.clientes], [805, 3, 2])
+      assert.equal(body.periodos.reduce((s: number, p: any) => s + p.ingreso, 0), 805)
+      assert.equal(body.anterior.resumen.ingreso, 60) // su venta del 20 de septiembre
+      assert.equal((await json(srv, admin, `/reportes/ventas?${OCTUBRE}&vendedor=${beto.id}`)).body.resumen.pedidos, 0)
+      assert.equal((await json(srv, admin, `/reportes/ventas?${OCTUBRE}&vendedor=no-es-un-id`)).status, 400)
+    })
+  })
+
   it('un cliente que compra a dos vendedores cuenta una sola vez en el total del periodo', async () => {
     await escenario(async ({ srv, pool, admin, beto, c1, vainilla }) => {
       await vender(pool, { vendedor: beto.id, cliente: c1, fecha: '2026-10-09', lineas: [{ producto: vainilla, litros: 1, precio: 55, costo: 20 }] })

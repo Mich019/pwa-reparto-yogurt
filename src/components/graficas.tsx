@@ -30,7 +30,7 @@ export function Columnas({ titulo, barras, color, formato, formatoEje, total }: 
   const actual = barras.find((b) => b.clave === elegida)
 
   return (
-    <figure className="rounded-lg bg-niebla p-3 pb-2" onMouseLeave={() => setElegida(null)}>
+    <figure className="border-t border-linea pt-4" onMouseLeave={() => setElegida(null)}>
       <figcaption className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold">{titulo}</span>
         <span className="min-w-0 truncate text-xs text-apagado tabular-nums" aria-live="polite">

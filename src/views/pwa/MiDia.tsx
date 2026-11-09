@@ -30,7 +30,7 @@ export function MiDia() {
     setCelebrar(true)
     try { localStorage.setItem(llave, String(mejor)) } catch { /* nada */ }
   }, [id, llave, mejor])
-  const fila = corte.datos?.filas[0]
+  const fila = corte.datos?.filas.find((f) => f.vendedorId === id) // el administrador recibe las de todos
   const m = meta.datos
   const t = trofeos.datos
   const mesCorto = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' })
@@ -39,7 +39,7 @@ export function MiDia() {
   return (
     <>
       {fila && (
-        <button onClick={() => fila.estado !== 'confirmado' && setHoja(true)} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-niebla p-4 text-left active:bg-linea">
+        <button onClick={() => fila.estado !== 'confirmado' && setHoja(true)} className="mt-6 flex w-full items-center gap-3 border-y border-linea py-4 text-left active:bg-niebla">
           <Wallet size={20} className="shrink-0" />
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">Corte de hoy</span>
@@ -52,7 +52,7 @@ export function MiDia() {
         </button>
       )}
       {m && m.meta && (
-        <div className="mt-3 rounded-lg bg-niebla p-4">
+        <div className="mt-6 border-t border-linea pt-4">
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-semibold">Meta del mes</span>
             <span className="text-sm tabular-nums text-apagado">{dinero(m.ventas)} de {dinero(m.meta)}</span>
@@ -65,7 +65,7 @@ export function MiDia() {
         </div>
       )}
       {!!t?.meses.length && (
-        <div className={`mt-3 flex items-center gap-3 rounded-lg bg-niebla p-4 ${celebrar ? 'medalla-nueva' : ''}`}>
+        <div className={`mt-6 flex items-center gap-3 border-t border-linea pt-4 ${celebrar ? 'medalla-nueva' : ''}`}>
           <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ambar/40 ${celebrar ? 'medalla-nueva-icono' : ''}`}><Trophy size={20} aria-hidden="true" /></span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">{t.meses.length === 1 ? 'Llegaste a tu meta 1 mes' : `Llegaste a tu meta ${t.meses.length} meses`}</span>
@@ -107,14 +107,14 @@ function MiAnio() {
   if (!r || !r.mesesCerrados || !r.ventas) return null
   const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', { month: 'long' })
   return (
-    <div className="medalla-nueva mt-3 rounded-lg bg-niebla p-4">
+    <div className="medalla-nueva mt-6 border-t border-linea pt-4">
       <p className="flex items-center gap-2 font-semibold"><CalendarHeart size={18} aria-hidden="true" className="text-marca" /> Tu {r.anio} en números</p>
       {r.vendedorDelAnio && <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-marca"><Crown size={15} aria-hidden="true" /> ¡Eres el vendedor del año!</p>}
-      <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Vendiste</dt><dd className="font-semibold tabular-nums">{dinero(r.ventas)}</dd></div>
-        {r.mejorMes && <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Tu mejor mes</dt><dd className="font-semibold capitalize">{nombreMes(r.mejorMes.mes)}</dd></div>}
-        <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Metas cumplidas</dt><dd className="font-semibold tabular-nums">{r.cumplidos} de {r.mesesCerrados}</dd></div>
-        <div className="rounded-md bg-papel p-2.5"><dt className="text-xs text-apagado">Mejor racha</dt><dd className="font-semibold tabular-nums">{r.mejorRacha} {r.mejorRacha === 1 ? 'mes' : 'meses'}</dd></div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+        <div className="border-l-2 border-linea pl-3"><dt className="text-xs text-apagado">Vendiste</dt><dd className="font-semibold tabular-nums">{dinero(r.ventas)}</dd></div>
+        {r.mejorMes && <div className="border-l-2 border-linea pl-3"><dt className="text-xs text-apagado">Tu mejor mes</dt><dd className="font-semibold capitalize">{nombreMes(r.mejorMes.mes)}</dd></div>}
+        <div className="border-l-2 border-linea pl-3"><dt className="text-xs text-apagado">Metas cumplidas</dt><dd className="font-semibold tabular-nums">{r.cumplidos} de {r.mesesCerrados}</dd></div>
+        <div className="border-l-2 border-linea pl-3"><dt className="text-xs text-apagado">Mejor racha</dt><dd className="font-semibold tabular-nums">{r.mejorRacha} {r.mejorRacha === 1 ? 'mes' : 'meses'}</dd></div>
       </dl>
     </div>
   )

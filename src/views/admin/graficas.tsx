@@ -15,17 +15,22 @@ export interface BarraDato {
   actual?: boolean // el periodo que todavía no termina
 }
 
-export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112, ejeEn = 1 }: {
+// `previo`: una segunda serie (p. ej. el mismo periodo hace un año), alineada por posición: una barra delgada en gris
+// junto a cada barra, con su valor en el globo y en la tabla.
+export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112, ejeEn = 1, textoActual = 'en curso', onElegir, previo }: {
   datos: BarraDato[]
   formato: (n: number) => string // valor exacto
   descripcion: string // lo que mide, para lectores de pantalla y encabezado de la tabla
   leyenda: [string, string] // [barras normales, periodo en curso]
   alto?: number
   ejeEn?: number // cada cuántas barras se escribe su nombre en el eje
+  textoActual?: string // cómo se llama la barra resaltada en el globo y la tabla
+  onElegir?: (clave: string) => void // al tocar una barra (p. ej. ir a ese periodo)
+  previo?: { valores: (number | undefined)[]; nombres: (string | undefined)[]; leyenda: string }
 }) {
   const [tabla, setTabla] = useState(false)
   const [activa, setActiva] = useState<string | null>(null)
-  const maximo = techo(Math.max(0, ...datos.map((d) => d.valor)))
+  const maximo = techo(Math.max(0, ...datos.map((d) => d.valor), ...(previo?.valores ?? []).map((v) => v ?? 0)))
   const hayActual = datos.some((d) => d.actual)
 
   return (
@@ -38,13 +43,15 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
               <tr className="text-xs text-apagado">
                 <th scope="col" className="px-3 py-2 font-medium">Periodo</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">Valor</th>
+                {previo && <th scope="col" className="px-3 py-2 text-right font-medium">{previo.leyenda}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-linea">
-              {datos.map((d) => (
+              {datos.map((d, i) => (
                 <tr key={d.clave}>
-                  <th scope="row" className="px-3 py-1.5 font-normal first-letter:uppercase">{d.nombre}{d.actual && <span className="text-apagado"> (en curso)</span>}</th>
+                  <th scope="row" className="px-3 py-1.5 font-normal first-letter:uppercase">{d.nombre}{d.actual && <span className="text-apagado"> ({textoActual})</span>}</th>
                   <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{formato(d.valor)}</td>
+                  {previo && <td className="px-3 py-1.5 text-right tabular-nums text-apagado">{previo.valores[i] === undefined ? '—' : formato(previo.valores[i]!)}</td>}
                 </tr>
               ))}
             </tbody>
@@ -65,30 +72,50 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
               <div className="absolute inset-0 flex">
                 {datos.map((d, i) => {
                   const pct = (d.valor / maximo) * 100
+                  const antes = previo?.valores[i]
+                  const pctAntes = ((antes ?? 0) / maximo) * 100
+                  const arriba = Math.max(pct, pctAntes)
                   const lado = i < 2 ? 'left-0' : i > datos.length - 3 ? 'right-0' : 'left-1/2 -translate-x-1/2'
                   return (
                     <button
                       key={d.clave}
                       type="button"
-                      aria-label={`${d.nombre}${d.actual ? ' (en curso)' : ''}: ${formato(d.valor)}`}
+                      aria-label={`${d.nombre}${d.actual ? ` (${textoActual})` : ''}: ${formato(d.valor)}${antes !== undefined ? `; ${previo!.leyenda.toLowerCase()}: ${formato(antes)}` : ''}${onElegir ? '. Ver ese periodo' : ''}`}
+                      onClick={onElegir ? () => onElegir(d.clave) : undefined}
                       onMouseEnter={() => setActiva(d.clave)}
                       onFocus={() => setActiva(d.clave)}
                       onBlur={() => setActiva(null)}
-                      className="group relative flex min-w-0 flex-1 items-end justify-center outline-none"
+                      className={`group relative flex min-w-0 flex-1 items-end justify-center outline-none ${onElegir ? 'cursor-pointer' : 'cursor-default'}`}
                     >
-                      <span
-                        className={`block w-full max-w-5 rounded-t-[4px] transition-[filter] group-focus-visible:ring-2 group-focus-visible:ring-tinta ${d.actual ? 'bg-oro' : 'bg-serie'} ${activa === d.clave ? 'brightness-110' : ''}`}
-                        style={{ height: d.valor > 0 ? `max(3px, ${pct}%)` : 0 }}
-                      />
+                      {previo ? (
+                        <span className="flex h-full w-full max-w-7 items-end justify-center gap-0.5">
+                          <span className="block w-2/5 rounded-t-[3px] bg-apagado/45" style={{ height: (antes ?? 0) > 0 ? `max(2px, ${pctAntes}%)` : 0 }} />
+                          <span
+                            className={`block w-3/5 rounded-t-[4px] transition-[filter] group-focus-visible:ring-2 group-focus-visible:ring-tinta ${d.actual ? 'bg-oro' : 'bg-serie'} ${activa === d.clave ? 'brightness-110' : ''}`}
+                            style={{ height: d.valor > 0 ? `max(3px, ${pct}%)` : 0 }}
+                          />
+                        </span>
+                      ) : (
+                        <span
+                          className={`block w-full max-w-5 rounded-t-[4px] transition-[filter] group-focus-visible:ring-2 group-focus-visible:ring-tinta ${d.actual ? 'bg-oro' : 'bg-serie'} ${activa === d.clave ? 'brightness-110' : ''}`}
+                          style={{ height: d.valor > 0 ? `max(3px, ${pct}%)` : 0 }}
+                        />
+                      )}
                       {d.actual && d.valor > 0 && activa !== d.clave && (
                         <span aria-hidden="true" className="pointer-events-none absolute z-10 -translate-x-1/2 left-1/2 whitespace-nowrap text-[11px] font-semibold leading-none tabular-nums" style={{ bottom: `calc(${pct}% + 6px)` }}>
                           {compacto(d.valor)}
                         </span>
                       )}
                       {activa === d.clave && (
-                        <span aria-hidden="true" className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-lg bg-(--globo-fondo) px-2.5 py-1.5 text-left text-xs leading-tight text-(--globo-texto) shadow-lg ${lado}`} style={{ bottom: `calc(${pct}% + 8px)` }}>
+                        <span aria-hidden="true" className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-lg bg-(--globo-fondo) px-2.5 py-1.5 text-left text-xs leading-tight text-(--globo-texto) shadow-lg ${lado}`} style={{ bottom: `calc(${arriba}% + 8px)` }}>
                           <span className="block text-sm font-semibold tabular-nums">{formato(d.valor)}</span>
-                          <span className="block opacity-75 first-letter:uppercase">{d.nombre}{d.actual && ' · en curso'}</span>
+                          <span className="block opacity-75 first-letter:uppercase">{d.nombre}{d.actual && ` · ${textoActual}`}</span>
+                          {antes !== undefined && (
+                            <span className="mt-1 block border-t border-current/20 pt-1 tabular-nums">
+                              <span className="opacity-75">{previo!.nombres[i] ?? previo!.leyenda}: </span>{formato(antes)}
+                              {antes > 0 && <span className="font-semibold"> ({d.valor >= antes ? '+' : '−'}{Math.round(Math.abs((d.valor - antes) / antes) * 100)}%)</span>}
+                            </span>
+                          )}
                         </span>
                       )}
                     </button>
@@ -113,6 +140,7 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-serie" aria-hidden="true" />{leyenda[0]}</span>
           {hayActual && <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-oro" aria-hidden="true" />{leyenda[1]}</span>}
+          {previo && <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-apagado/45" aria-hidden="true" />{previo.leyenda}</span>}
         </span>
         <button
           type="button"

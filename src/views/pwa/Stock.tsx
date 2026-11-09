@@ -39,22 +39,22 @@ export function Stock() {
       {filas === undefined ? (
         <div className="mt-10 text-center text-apagado">Cargando…</div>
       ) : filas.length === 0 ? (
-        <div className="mt-6 rounded-lg bg-niebla p-6 text-center">
-          <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-papel"><Package size={26} /></span>
+        <div className="mt-6 border-t border-linea py-10 text-center">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-niebla"><Package size={26} /></span>
           <div className="mt-3 text-lg font-semibold">Aún no tienes carga asignada hoy</div>
           <p className="mt-1 text-sm text-apagado">Cuando el administrador registre lo que llevas, aparecerá aquí y te llegará un aviso.</p>
-          <Boton variante="secundario" className="mx-auto mt-4 bg-papel" onClick={() => void sincronizar()} disabled={sync.sincronizando}>
+          <Boton variante="secundario" className="mx-auto mt-4" onClick={() => void sincronizar()} disabled={sync.sincronizando}>
             <RefreshCw size={18} className={sync.sincronizando ? 'animate-spin' : ''} /> Buscar mi carga
           </Boton>
           {sync.error && <p className="mt-3 text-xs text-apagado">{sync.error}</p>}
         </div>
       ) : (
         <>
-          <section className="mt-4 rounded-lg bg-niebla p-4" aria-label="Resumen de la carga">
+          <section className="mt-4 border-y border-linea py-5" aria-label="Resumen de la carga">
             <div className="text-sm font-medium text-apagado">Te quedan</div>
             <div className="mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums">{total((f) => f.restante)}</div>
             <div className="mt-1 text-sm text-apagado">de {total((f) => f.asignada)} que llevabas</div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-papel" role="img" aria-label={`Entregaste ${total((f) => Math.min(f.entregado, f.asignada))} de ${total((f) => f.asignada)}`}>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-niebla" role="img" aria-label={`Entregaste ${total((f) => Math.min(f.entregado, f.asignada))} de ${total((f) => f.asignada)}`}>
               <div className="h-full rounded-md bg-tinta transition-[width]" style={{ width: `${asignada ? Math.min(100, (entregado / asignada) * 100) : 0}%` }} />
             </div>
             <div className="mt-2 flex justify-between text-xs text-apagado">

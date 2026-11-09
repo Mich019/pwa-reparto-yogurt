@@ -13,7 +13,9 @@ process.env.AUTH_PEPPER_SECRET ??= 'p'.repeat(40)
 process.env.DATABASE_URL ??= 'postgres://postgres:test@localhost:5432/reparto_yogurt_test'
 
 export const PASSWORD = 'Yogurt2026!'
-export const config = leerConfig()
+// Sin el aviso de producción de la tarde en segundo plano: avisaría a toda la base mientras corren las demás pruebas
+// (urgentes.test lo prueba llamándolo directo).
+export const config = { ...leerConfig(), horaAvisoProduccion: null }
 
 // Multiempresa: las pruebas preparan sus datos directo en la base, como el dueño (sin reglas por filas). Esa conexión
 // trae por omisión la primera empresa (la crea 03_datos_iniciales.sql), así los INSERT de siempre tienen dueño. La API,

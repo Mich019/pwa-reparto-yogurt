@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { esMio } from './reparto'
 import { useEnVivo } from './enVivo'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ErrorRed } from './api'
@@ -17,7 +18,7 @@ import { llamarAutenticado } from './sesion'
 export function useStockDeHoy(): SaborEnRuta[] | undefined {
   const fecha = hoy()
   return useLiveQuery(async () => {
-    const [stock, pedidos] = await Promise.all([db.stock.where('fecha').equals(fecha).toArray(), db.pedidos.where('fecha').equals(fecha).toArray()])
+    const [stock, pedidos] = await Promise.all([db.stock.where('fecha').equals(fecha).toArray(), db.pedidos.where('fecha').equals(fecha).filter((p) => esMio(p.vendedorId)).toArray()])
     return calcularStock(fecha, stock, pedidos).sort((a, b) => PESO_NIVEL[a.nivel] - PESO_NIVEL[b.nivel])
   }, [fecha])
 }

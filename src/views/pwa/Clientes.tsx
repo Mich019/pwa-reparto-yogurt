@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { esMio } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
 import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Printer, QrCode, ScanLine, Search, ShoppingBag, Star, Sun, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react'
@@ -33,7 +34,8 @@ function textoBusqueda(c: Cliente) {
 
 // `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
 export function Clientes({ panel = false }: { panel?: boolean } = {}) {
-  const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), []) ?? []
+  // En la app de reparto, el administrador ve su cartera y la que no tiene vendedor (lib/reparto.ts); en el panel, todo.
+  const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').filter((c) => panel || esMio(c.vendedorId)).toArray(), [panel]) ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
   const [q, setQ] = useState('')

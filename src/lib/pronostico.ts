@@ -18,10 +18,19 @@ export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], produc
   const estimado = new Map<string, number>()
   const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v)
 
+  // Lo mismo, día por día (para producir cada sabor cerca del día en que sale).
+  const porDia = new Map<string, Map<string, { confirmado: number; estimado: number }>>()
+  const deDia = (d: string, id: string) => {
+    const m = porDia.get(d) ?? porDia.set(d, new Map()).get(d)!
+    return m.get(id) ?? m.set(id, { confirmado: 0, estimado: 0 }).get(id)!
+  }
+
+  // Un sabor que se dejó de producir (sin stock) ya no se estima; lo que ya pidieron sí cuenta.
+  const fuera = new Set(productos.filter((p) => !p.disponible).map((p) => p.id))
   const agendados = new Set<string>()
   for (const p of pedidos) {
     if (p.fecha < desde || p.fecha > hasta) continue
-    if (p.estado === 'PENDIENTE') p.items.forEach((i) => add(confirmado, i.productoId, i.litros))
+    if (p.estado === 'PENDIENTE') p.items.forEach((i) => { add(confirmado, i.productoId, i.litros); deDia(p.fecha, i.productoId).confirmado += i.litros })
     if (p.estado === 'PENDIENTE' || p.estado === 'ENTREGADO') agendados.add(`${p.clienteId}|${p.fecha}`)
   }
 
@@ -40,14 +49,14 @@ export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], produc
     const hist = (entregadosPorCliente.get(c.id) ?? []).sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 8)
     if (!hist.length) continue
     const promedio = new Map<string, number>()
-    hist.forEach((p) => p.items.forEach((i) => add(promedio, i.productoId, i.litros / hist.length)))
+    hist.forEach((p) => p.items.forEach((i) => { if (!fuera.has(i.productoId)) add(promedio, i.productoId, i.litros / hist.length) }))
     let ultima = hist[0].fecha
     let contado = false
     for (let d = desde; d <= hasta; d = sumarDias(d, 1)) {
       if (!tocaVisita(c.frecuencia, d, ultima)) continue
       if (c.frecuencia.tipo === 'intervalo') ultima = d
       if (agendados.has(`${c.id}|${d}`)) continue
-      promedio.forEach((v, k) => add(estimado, k, v))
+      promedio.forEach((v, k) => { add(estimado, k, v); deDia(d, k).estimado += v })
       contado = true
     }
     if (contado) clientesEstimados++
@@ -62,7 +71,9 @@ export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], produc
     .filter((f) => f.total > 0)
     .sort((a, b) => b.total - a.total)
 
-  return { desde, hasta, filas, clientesEstimados, pedidosConfirmados }
+  const porDias = [...porDia].sort(([a], [b]) => a.localeCompare(b))
+    .map(([fecha, m]) => ({ fecha, sabores: [...m].map(([productoId, x]) => ({ productoId, ...x })) }))
+  return { desde, hasta, filas, clientesEstimados, pedidosConfirmados, dias: porDias }
 }
 
 // Qué tan atinado fue el pronóstico en los últimos días: cada día se rehace con lo que se sabía la víspera (el historial

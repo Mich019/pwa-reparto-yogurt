@@ -200,6 +200,9 @@ export function leerConfig() {
     // «Authorization: Bearer <CRON_SECRET>». Sin él esa ruta no existe y los avisos programados siguen saliendo al
     // pasar alguien por la app.
     cronSecret: process.env.CRON_SECRET?.trim() ?? '',
+    // HORA_AVISO_PRODUCCION: desde qué hora (0–23, en la zona de cada empresa) se avisa que falta producir para mañana
+    // (produccion.ts). Vacío: 18. «no»: no se avisa (las pruebas lo apagan para no avisar a toda la base).
+    horaAvisoProduccion: ((v) => (v === 'no' ? null : /^\d{1,2}$/.test(v) && Number(v) <= 23 ? Number(v) : 18))(process.env.HORA_AVISO_PRODUCCION?.trim() ?? '') as number | null,
     // SENTRY_DSN: errores internos del servidor a Sentry (o GlitchTip). Sin él no se reporta nada.
     sentryDsn: process.env.SENTRY_DSN?.trim() ?? '',
     urlApp: (process.env.APP_URL?.trim() || corsOrigins[0]

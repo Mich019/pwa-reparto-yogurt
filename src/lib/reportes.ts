@@ -137,28 +137,30 @@ export function cambio(actual: number, antes: number | undefined): number | null
 // ------------------------------------------------------------------ datos
 
 // `comparar`: el periodo con el que se contrasta. Sin él, el servidor usa el de la misma duración justo antes.
-export function rutaReporte(r: Rango, agrupar: Agrupar, comparar?: Rango) {
-  return `/reportes/ventas?desde=${r.desde}&hasta=${r.hasta}&agrupar=${agrupar}${comparar ? `&compararDesde=${comparar.desde}&compararHasta=${comparar.hasta}` : ''}`
+export function rutaReporte(r: Rango, agrupar: Agrupar, comparar?: Rango, vendedor?: string) {
+  return `/reportes/ventas?desde=${r.desde}&hasta=${r.hasta}&agrupar=${agrupar}${comparar ? `&compararDesde=${comparar.desde}&compararHasta=${comparar.hasta}` : ''}${vendedor ? `&vendedor=${vendedor}` : ''}`
 }
 
 // Pide el reporte al servidor cada vez que cambia el periodo. Mientras llega el nuevo, se queda el anterior a la vista.
-export function useReporte(rango: Rango, agrupar: Agrupar, comparar?: Rango) {
+// `vendedor`: sólo sus ventas. `activo` = false: no pide nada (un segundo reporte que sólo a veces hace falta).
+export function useReporte(rango: Rango, agrupar: Agrupar, comparar?: Rango, { vendedor, activo = true }: { vendedor?: string; activo?: boolean } = {}) {
   const [reporte, setReporte] = useState<Reporte | null>(null)
   const [error, setError] = useState<{ texto: string; sinRed: boolean } | null>(null)
   const [cargando, setCargando] = useState(true)
   const pedido = useRef(0)
 
   const pedir = useCallback((callado: boolean) => {
+    if (!activo) return
     const mio = ++pedido.current
     if (!callado) setCargando(true)
-    llamarAutenticado<Reporte>(rutaReporte(rango, agrupar, comparar))
+    llamarAutenticado<Reporte>(rutaReporte(rango, agrupar, comparar, vendedor))
       .then((r) => { if (mio === pedido.current) { setReporte(r); setError(null) } })
       .catch((e: Error) => {
         if (mio !== pedido.current || callado) return
         setError({ texto: e.message, sinRed: e instanceof ErrorRed })
       })
       .finally(() => { if (mio === pedido.current && !callado) setCargando(false) })
-  }, [rango.desde, rango.hasta, agrupar, comparar?.desde, comparar?.hasta])
+  }, [rango.desde, rango.hasta, agrupar, comparar?.desde, comparar?.hasta, vendedor, activo])
   const cargar = useCallback(() => pedir(false), [pedir])
 
   useEffect(() => { cargar() }, [cargar])

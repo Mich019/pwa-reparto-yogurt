@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { AvisoPendiente, Despachador } from './notificaciones.js'
+import { avisarProduccionPendiente } from './produccion.js'
 
 // Pedido urgente sin atender (RF-054). Si un pedido marcado urgente sigue pendiente los minutos de su empresa
 // (`empresas.minutos_urgente`, 30 de fábrica; Configuración → Preferencias) después del aviso al
@@ -12,6 +13,7 @@ import type { AvisoPendiente, Despachador } from './notificaciones.js'
 // No hay un reloj fino: el cron de Vercel Hobby es diario. Lo despiertan
 //   · la conexión en vivo (envivo.ts): mientras alguien tiene la app o el panel abiertos, a lo más cada 2 minutos;
 //   · GET /cron/urgentes con CRON_SECRET, para un despertador externo (.github/workflows/despertador.yml).
+// Los mismos despiertan el aviso de producción pendiente de la tarde (produccion.ts).
 // Cruza empresas: corre con la conexión del dueño de la base. Un candado de la base evita que dos instancias avisen
 // lo mismo a la vez.
 
@@ -79,10 +81,11 @@ export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador,
 
 // Desde la conexión en vivo: a lo más cada 2 minutos por instancia, sin esperar ni tumbar nada.
 let ultimaVez = 0
-export function revisarDeVezEnCuando(db: Db, despachador: Despachador, log: { error: (e: unknown, m?: string) => void }) {
+export function revisarDeVezEnCuando(db: Db, despachador: Despachador, log: { error: (e: unknown, m?: string) => void }, horaProduccion: number | null) {
   if (Date.now() - ultimaVez < CADA_MS) return
   ultimaVez = Date.now()
   void avisarUrgentesSinAtender(db, despachador).catch((e) => log.error(e, 'No se pudieron revisar los urgentes sin atender'))
+  if (horaProduccion !== null) void avisarProduccionPendiente(db, despachador, { horaDesde: horaProduccion }).catch((e) => log.error(e, 'No se pudo revisar la producción de mañana'))
 }
 
 // El secreto del cron (CRON_SECRET, al menos 24 caracteres) comparado sin dar pistas por el tiempo de respuesta.
@@ -100,6 +103,6 @@ export async function rutasUrgentes(app: FastifyInstance, db: Db, config: Config
     const ok = cronAutorizado(config, req)
     if (ok === null) return rep.code(404).send({ error: 'No encontrado' })
     if (!ok) return rep.code(401).send({ error: 'No autorizado' })
-    return { ok: true, avisados: await avisarUrgentesSinAtender(db, despachador) }
+    return { ok: true, avisados: await avisarUrgentesSinAtender(db, despachador), produccion: config.horaAvisoProduccion === null ? 0 : await avisarProduccionPendiente(db, despachador, { horaDesde: config.horaAvisoProduccion }) }
   })
 }

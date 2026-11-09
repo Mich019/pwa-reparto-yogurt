@@ -115,7 +115,7 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
         </div>
 
         {modo.t === 'reponer' ? (
-          <div className="space-y-3 rounded-lg bg-niebla p-4">
+          <div className="space-y-3 border-t border-linea pt-4">
             <div className="font-semibold">¿Generar un QR nuevo?</div>
             <div className="text-sm text-apagado">El QR de ahora deja de funcionar en todos los teléfonos. Tendrás que imprimir el nuevo y cambiar el imán de {cliente.nombre}.</div>
             <div className="grid grid-cols-2 gap-2">
@@ -132,9 +132,9 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
 
         <div>
           <div className="mb-2 text-lg font-semibold tracking-tight">Tarjeta NFC</div>
-          <div className="rounded-lg bg-niebla p-4">
+          <div className="border-t border-linea pt-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-papel"><CreditCard size={22} /></span>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-niebla"><CreditCard size={22} /></span>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">{cliente.nfc_uid ? 'Tarjeta vinculada' : 'Sin tarjeta'}</div>
                 <div className="truncate font-mono text-xs text-apagado">{cliente.nfc_uid ?? 'Acerca el imán o tarjeta para vincularla'}</div>
@@ -143,7 +143,7 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
 
             {modo.t === 'leyendo' && (
               <div className="mt-4 space-y-3">
-                <div className="flex items-center gap-2 rounded-md bg-papel p-3 text-sm font-semibold"><Nfc size={20} className="animate-pulse" /> Acerca la tarjeta a la parte trasera del teléfono…</div>
+                <div className="flex items-center gap-2 rounded-md bg-niebla p-3 text-sm font-semibold"><Nfc size={20} className="animate-pulse" /> Acerca la tarjeta a la parte trasera del teléfono…</div>
                 <Boton variante="secundario" className="w-full" onClick={cancelar}>Cancelar</Boton>
               </div>
             )}

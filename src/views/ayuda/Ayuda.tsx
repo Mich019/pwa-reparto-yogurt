@@ -134,13 +134,13 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
       {grupos.map(({ titulo, lista }) => lista.length > 0 && (
         <section key={titulo} aria-label={titulo}>
           {grupos.length > 1 && <h3 className="mb-3 text-base font-semibold">{titulo}</h3>}
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid border-b border-linea sm:grid-cols-2 sm:gap-x-8">
             {lista.map((g) => {
               const Icono = g.icono
               return (
                 <li key={g.id}>
-                  <button type="button" onClick={() => setAbierta(g.id)} className={`group flex h-full w-full items-start gap-3 rounded-lg bg-niebla p-4 text-left transition-colors hover:bg-linea/70 ${anillo}`}>
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-papel"><Icono size={18} aria-hidden="true" /></span>
+                  <button type="button" onClick={() => setAbierta(g.id)} className={`group flex h-full w-full items-start gap-3 border-t border-linea py-4 text-left transition-colors hover:bg-niebla/60 ${anillo}`}>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-niebla"><Icono size={18} aria-hidden="true" /></span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold">{g.titulo}</span>
                       <span className="mt-0.5 block text-xs text-apagado">{g.resumen}</span>

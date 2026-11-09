@@ -682,7 +682,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
         <section className="max-w-2xl border-t border-linea pt-6">
           <h2 className="text-lg font-semibold">Enlace de la invitación</h2>
           <p className="mt-1 text-sm text-apagado">Si no le llega el correo, mándale este enlace por WhatsApp. Vence en {hecha.dias} días y sirve una sola vez.</p>
-          <div className="mt-4 flex items-center gap-2 rounded-lg bg-niebla p-3">
+          <div className="mt-4 flex items-center gap-2 border-y border-linea py-3">
             <code className="min-w-0 flex-1 truncate text-sm">{hecha.enlace}</code>
             <button type="button" onClick={() => void copiarDelicado(hecha.enlace).then(() => aviso('Enlace copiado'), () => {})} className={botonSuave}><Copy size={15} aria-hidden="true" /> Copiar</button>
           </div>
@@ -802,7 +802,7 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
           {creada ? (
             <div className="mt-4 space-y-3 text-sm">
               <p>Compártele estos datos por un medio seguro. Al entrar se le pide cambiar la contraseña y activar la verificación en dos pasos.</p>
-              <div className="space-y-2 rounded-lg bg-niebla p-4">
+              <div className="space-y-2 border-y border-linea py-3">
                 <div><span className="text-apagado">Correo:</span> <b>{creada.correo}</b></div>
                 <div className="flex items-center gap-2">
                   <span className="text-apagado">Contraseña temporal:</span> <b className="font-mono">{creada.passwordTemporal}</b>

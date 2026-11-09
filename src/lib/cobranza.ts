@@ -78,6 +78,8 @@ export function useServidor<T>(ruta: string | null, enVivo: AreaEnVivo | AreaEnV
   return { datos, error, cargando, recargar: cargar }
 }
 
+// Sólo el administrador que también reparte: su propia meta del mes (null = sin meta).
+export const fijarMiMeta = (metaMensual: number | null) => llamarAutenticado<{ metaMensual: number | null }>('/mi-meta', { metodo: 'PATCH', cuerpo: { metaMensual } })
 const enviar = <T>(ruta: string, cuerpo?: unknown) => llamarAutenticado<T>(ruta, { metodo: 'POST', cuerpo: cuerpo ?? {} })
 
 export const registrarAbono = (b: { clienteId: string; monto: number; metodo: 'efectivo' | 'transferencia'; nota?: string }) => enviar<{ id: string; saldo: number }>('/cobranza/abonos', b)

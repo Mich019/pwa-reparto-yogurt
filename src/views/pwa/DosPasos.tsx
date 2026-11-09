@@ -48,7 +48,7 @@ export function DosPasos() {
   const cerrar = () => { setPaso({ t: 'reposo' }); cargar() }
 
   return (
-    <div className="mt-3 rounded-lg bg-niebla p-4">
+    <div className="mt-6 border-t border-linea pt-4">
       <div className="flex items-center gap-2 font-semibold">
         {estado?.activa ? <ShieldCheck size={18} className="text-verde" /> : <ShieldAlert size={18} className={rol === 'administrador' ? 'text-ambar' : ''} />}
         Verificación en dos pasos
@@ -162,7 +162,7 @@ function CodigosRespaldo({ codigos, onCerrar }: { codigos: string[]; onCerrar: (
           Si pierdes el teléfono, entra con uno de estos códigos. Cada uno sirve una sola vez y <b>no se volverán a mostrar</b>.
           Guárdalos fuera de este teléfono (impresos o en tu gestor de contraseñas).
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-niebla p-4 font-mono text-base">
+        <div className="mt-3 grid grid-cols-2 gap-2 border-y border-linea py-4 font-mono text-base">
           {codigos.map((c) => <span key={c} className="text-center">{c}</span>)}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">

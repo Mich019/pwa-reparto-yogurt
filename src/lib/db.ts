@@ -1,3 +1,4 @@
+import { repartidorAdmin } from './reparto'
 import Dexie, { type EntityTable } from 'dexie'
 
 // Modelo local (IndexedDB). Sigue CONTEXTO_ARTQUITECTURA.md; Detalle_Pedido va embebido en Pedido.items.
@@ -166,7 +167,9 @@ const encolar = (tabla: Tabla, registroId: string, op: Cambio['op'], version?: n
 // Lo que el servidor puso en el registro no se pierde si la pantalla arma un objeto nuevo al editar.
 async function conservarDelServidor<T extends { id: string; version?: number; vendedorId?: string }>(tabla: Tabla, r: T): Promise<T> {
   const previo = (await db.table(tabla).get(r.id)) as T | undefined
-  if (!previo) return r
+  // Nuevo cliente o pedido del administrador en la app de reparto: a su nombre, como el de un vendedor (lib/reparto.ts).
+  const yo = repartidorAdmin()
+  if (!previo) return yo && !r.vendedorId && (tabla === 'clientes' || tabla === 'pedidos') ? { ...r, vendedorId: yo } : r
   return { ...r, version: r.version ?? previo.version, vendedorId: r.vendedorId ?? previo.vendedorId }
 }
 

@@ -1,3 +1,4 @@
+import { vende } from './vende.js'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
@@ -54,7 +55,7 @@ export async function leerDia(q: Consulta, fecha: string): Promise<DiaStock> {
     q.query(`SELECT id_producto, litros::float8 AS litros FROM produccion_diaria WHERE fecha = $1 ORDER BY id_producto`, [fecha]),
     q.query(
       `SELECT u.id_usuario, u.nombre, u.activo FROM usuarios u
-        WHERE u.rol = 'vendedor' AND (u.activo OR EXISTS (SELECT 1 FROM stock_diario s WHERE s.id_vendedor = u.id_usuario AND s.fecha = $1))
+        WHERE (${vende('u')} OR EXISTS (SELECT 1 FROM stock_diario s WHERE s.id_vendedor = u.id_usuario)) AND (u.activo OR EXISTS (SELECT 1 FROM stock_diario s WHERE s.id_vendedor = u.id_usuario AND s.fecha = $1))
         ORDER BY lower(u.nombre), u.id_usuario`,
       [fecha],
     ),
@@ -165,7 +166,7 @@ export async function rutasStock(app: FastifyInstance, { db, config }: Contexto,
     let avisos: AvisoPendiente[] = []
     try {
       await tx(db, req.usuario.id, async (c) => {
-        const { rows: [v] } = await c.query(`SELECT activo FROM usuarios WHERE id_usuario = $1 AND rol = 'vendedor' FOR UPDATE`, [p.data.id])
+        const { rows: [v] } = await c.query(`SELECT activo FROM usuarios WHERE id_usuario = $1 AND ${vende()} FOR UPDATE`, [p.data.id])
         if (!v) throw new Falla(404, 'Ese vendedor no existe')
         await existenProductos(c, lineas.map((l) => l.productoId))
 
@@ -222,7 +223,7 @@ export async function rutasStock(app: FastifyInstance, { db, config }: Contexto,
         `INSERT INTO stock_diario (fecha, id_producto, id_vendedor, cantidad_asignada)
          SELECT $2::date, s.id_producto, s.id_vendedor, s.cantidad_asignada
            FROM stock_diario s
-           JOIN usuarios u ON u.id_usuario = s.id_vendedor AND u.activo AND u.rol = 'vendedor'
+           JOIN usuarios u ON u.id_usuario = s.id_vendedor AND u.activo
            JOIN productos pr ON pr.id_producto = s.id_producto AND pr.disponible
           WHERE s.fecha = $1 AND s.cantidad_asignada > 0
          ON CONFLICT (fecha, id_producto, id_vendedor) DO NOTHING

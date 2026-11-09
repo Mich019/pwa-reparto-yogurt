@@ -45,7 +45,7 @@ const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHast
 // Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
 const NOMBRE_AVISO: Record<string, string> = {
   stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
-  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas', record_personal: 'récords',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas', record_personal: 'récords', produccion_pendiente: 'producción pendiente',
 }
 function textoAvisos(m: Miembro) {
   const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'
@@ -283,7 +283,7 @@ function SalonDeLaFama({ onCerrar, onAbrir }: { onCerrar: () => void; onAbrir: (
       <p className="mb-3 text-sm text-apagado">Las mejores rachas de meses seguidos llegando a la meta, de todos los meses cerrados.</p>
       {r.error && !r.datos ? <p className="text-sm text-rojo">{r.error}</p>
         : !r.datos ? <p className="text-sm text-apagado">Cargando…</p>
-        : !lista.length ? <p className="rounded-lg bg-niebla p-4 text-sm text-apagado">Todavía nadie llega a su meta en un mes cerrado. Al cerrar el primero aparecen aquí.</p>
+        : !lista.length ? <p className="border-t border-linea pt-4 text-sm text-apagado">Todavía nadie llega a su meta en un mes cerrado. Al cerrar el primero aparecen aquí.</p>
         : (
           <ol className="space-y-1.5">
             {lista.map((v, i) => {
@@ -517,7 +517,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           <Medallas mejorRacha={mejorRacha} />
         </div>
 
-        <dl className="space-y-1 rounded-lg bg-niebla p-4 text-sm">
+        <dl className="space-y-1 border-y border-linea py-3 text-sm">
           <Linea t="Correo" v={m.correo} />
           <Linea t="Teléfono" v={m.telefono || '—'} />
           <Linea t="Último acceso" v={m.ultimoAcceso ? hace(new Date(m.ultimoAcceso).getTime()) : 'Todavía no ha entrado'} />
@@ -564,7 +564,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
         )}
 
         {confirmar === 'password' && (
-          <div className="space-y-3 rounded-lg bg-niebla p-4">
+          <div className="space-y-3 border-t border-linea pt-4">
             <p className="font-semibold">¿Restablecer la contraseña de {m.nombre}?</p>
             <p className="text-sm text-apagado">Se cierran sus sesiones en todos sus teléfonos y, al entrar con la contraseña temporal, tendrá que elegir una propia.</p>
             <div className="grid grid-cols-2 gap-2">

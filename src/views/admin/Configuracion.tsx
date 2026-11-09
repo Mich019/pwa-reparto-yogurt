@@ -305,6 +305,7 @@ function AvisosPush() {
 const TIPOS_AVISO = [
   { tipo: 'corte_entregado', titulo: 'Corte por confirmar', ayuda: 'Un vendedor entregó o corrigió su corte del día.' },
   { tipo: 'corte_descuadrado', titulo: 'Corte que ya no cuadra', ayuda: 'Llegó una venta en efectivo de un día con el corte ya confirmado.' },
+  { tipo: 'produccion_pendiente', titulo: 'Falta producir para mañana', ayuda: 'Desde las 6 de la tarde, si hay pedidos de mañana sin producción anotada en Stock del día.' },
   { tipo: 'urgente_sin_atender', titulo: 'Urgente sin atender', ayuda: 'Un pedido urgente sigue pendiente después del tiempo que elijas abajo.' },
   { tipo: 'vendedor_en_meta', titulo: 'Vendedor que llegó a su meta', ayuda: 'El día que alguien alcanza su meta del mes.' },
   { tipo: 'medalla_ganada', titulo: 'Medalla de un vendedor', ayuda: 'Al cerrar el mes, si alguien llega a 3, 6 o 12 meses seguidos en su meta.' },

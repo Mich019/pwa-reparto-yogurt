@@ -37,6 +37,8 @@ const IR_SUSCRIPCION = irASuscripcion()
 function seccionGuardada(): SeccionAdmin {
   if (irACortes()) return 'cobranza'
   if (irAEquipo()) return 'equipo'
+  // `?ir=produccion`: el aviso de la tarde de que falta producir para mañana.
+  if (new URLSearchParams(location.search).get('ir') === 'produccion') return 'produccion'
   if (IR_SUSCRIPCION) return 'configuracion'
   try {
     const s = sessionStorage.getItem(CLAVE_SECCION)

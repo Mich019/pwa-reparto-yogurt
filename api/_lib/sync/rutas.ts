@@ -87,17 +87,16 @@ export async function rutasSync(
         for (const r of retiros) eliminados.push({ tabla: r.tabla, id: r.id_registro })
       }
 
-      // RF-037: el vendedor recibe su stock de los últimos días; el administrador lo maneja por /stock.
-      const { rows: filasStock } = vendedor
-        ? await c.query(
+      // RF-037: cada quien recibe su stock de los últimos días (el administrador que también reparte, el suyo); el
+      // administrador maneja el de todos por /stock.
+      const { rows: filasStock } = await c.query(
             `SELECT id_stock, fecha, id_producto, cantidad_asignada::float8 AS asignada, cantidad_devuelta::float8 AS devuelta, version
                FROM stock_diario
               WHERE id_vendedor = $1 AND fecha >= (now() AT TIME ZONE (SELECT zona_horaria FROM empresas))::date - $2::int
                 AND ($3::bigint IS NULL OR actualizado_en > to_timestamp(($3::bigint) / 1000.0))
               ORDER BY fecha, id_producto`,
-            [vendedor, DIAS_DE_STOCK, desde ?? null],
+            [u.id, DIAS_DE_STOCK, desde ?? null],
           )
-        : { rows: [] }
       const stock = filasStock.map((r) => ({ id: r.id_stock, fecha: r.fecha, productoId: r.id_producto, asignada: r.asignada, devuelta: r.devuelta, version: r.version }))
 
       // RF-054: sus avisos nuevos. En la primera descarga, los de los últimos días.

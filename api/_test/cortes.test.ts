@@ -135,6 +135,44 @@ describe('corte del día', () => {
   })
 })
 
+describe('el administrador que también reparte', () => {
+  it('con un cliente a su nombre sale en los cortes, entrega el suyo y recibe su stock al sincronizar', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const s = sabor()
+    await push(admin, [op('productos', s.id, s)])
+    const sinNada = (await llamar(admin, 'GET', '/cortes')).body
+    assert.equal(sinNada.filas.length, 0) // todavía no vende: no aparece
+    // Desde la app de reparto lo que crea va a su nombre (vendedorId), como el de un vendedor.
+    const c = cliente({ nombre: 'Tienda del Dueño', vendedorId: admin.id })
+    await push(admin, [op('clientes', c.id, c)])
+    const p = pedido(c.id, s.id, { fecha: hoy, estado: 'ENTREGADO', metodo_pago: 'EFECTIVO', fecha_entregado_real: Date.now(), vendedorId: admin.id, items: [{ productoId: s.id, litros: 2, precio_litro: 60 }] })
+    assert.equal((await push(admin, [op('pedidos', p.id, p)])).body.resultados[0].estado, 'aplicada')
+    const fila = (await llamar(admin, 'GET', '/cortes')).body.filas.find((f: { vendedorId: string }) => f.vendedorId === admin.id)
+    assert.equal(fila?.esperado, 120)
+    const r = await llamar(admin, 'POST', '/cortes', { efectivoEntregado: 120 })
+    assert.equal(r.status, 201)
+    assert.equal(r.body.diferencia, 0)
+    // Su carga del día le llega por sync como a un vendedor.
+    const asignar = await app.inject({ method: 'PUT', url: `/stock/vendedor/${admin.id}`, headers: { authorization: `Bearer ${admin.token}` }, payload: { fecha: hoy, lineas: [{ productoId: s.id, asignada: 5, devuelta: 0 }] } })
+    assert.equal(asignar.statusCode, 200, asignar.body)
+    const { body } = await app.inject({ method: 'GET', url: '/sync/pull?desde=0', headers: { authorization: `Bearer ${admin.token}` } }).then((x) => ({ body: x.json() }))
+    assert.equal(body.stock.filter((x: { productoId: string }) => x.productoId === s.id)[0]?.asignada, 5)
+  })
+
+  it('pone su propia meta del mes; un vendedor no puede', async () => {
+    const empresa = await crearEmpresa()
+    const admin = await sesion('administrador', 'tel-a', empresa)
+    const ana = await sesion('vendedor', 'tel-v', empresa)
+    assert.equal((await llamar(admin, 'PATCH', '/mi-meta', { metaMensual: 0 })).status, 400)
+    assert.equal((await llamar(admin, 'PATCH', '/mi-meta', { metaMensual: 8000 })).status, 200)
+    assert.equal((await llamar(admin, 'GET', '/mi-meta')).body.meta, 8000)
+    assert.equal((await llamar(ana, 'PATCH', '/mi-meta', { metaMensual: 1 })).status, 403)
+    assert.equal((await llamar(admin, 'PATCH', '/mi-meta', { metaMensual: null })).status, 200)
+    assert.equal((await llamar(admin, 'GET', '/mi-meta')).body.meta, null)
+  })
+})
+
 describe('meta y comisión', () => {
   it('el vendedor ve su avance contra su meta y la comisión; el administrador las fija', async () => {
     const x = await escenario()

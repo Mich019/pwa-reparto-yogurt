@@ -19,7 +19,7 @@ const MAX_RENGLONES_HISTORIAL = 100_000
 const UNIDAD = { dia: 'day', semana: 'week', mes: 'month' } as const // las semanas empiezan en lunes
 
 const fecha = z.iso.date()
-const consulta = z.object({
+const base = z.object({
   desde: fecha,
   hasta: fecha,
   agrupar: z.enum(['dia', 'semana', 'mes']).default('dia'),
@@ -27,7 +27,9 @@ const consulta = z.object({
   compararDesde: fecha.optional(),
   compararHasta: fecha.optional(),
 })
-const consultaExportar = consulta.extend({
+// `vendedor`: sólo sus ventas (la hoja de cada vendedor en Reportes). La exportación siempre es de todos.
+const consulta = base.extend({ vendedor: z.uuid().optional() })
+const consultaExportar = base.extend({
   formato: z.enum(['xlsx', 'csv']).default('xlsx'),
   tabla: z.enum(['ventas', 'periodos', 'sabores', 'vendedores']).default('ventas'),
 })
@@ -158,7 +160,8 @@ const filas = (sql: string, orden?: string) => `(SELECT coalesce(json_agg(x${ord
 const VENTAS = (desde: string, hasta: string) => `MATERIALIZED (
     SELECT pe.id_pedido, pe.id_cliente, pe.id_vendedor, pe.fecha, pe.metodo_pago, d.id_producto, pr.unidad,
            d.subtotal, d.cantidad * d.costo_unitario AS costo, d.costo_unitario, ${LITROS} AS litros
-      ${DE_VENTAS} WHERE pe.estado = 'entregado' AND pe.fecha BETWEEN ${desde}::date AND ${hasta}::date)`
+      ${DE_VENTAS} WHERE pe.estado = 'entregado' AND pe.fecha BETWEEN ${desde}::date AND ${hasta}::date
+       AND ($5::uuid IS NULL OR pe.id_vendedor = $5::uuid))`
 
 const resumenSql = (t: string) => `SELECT sum(subtotal) AS ingreso, sum(costo) AS costo, sum(litros) AS litros,
          count(DISTINCT id_pedido) AS pedidos, count(DISTINCT id_cliente) AS clientes,
@@ -284,7 +287,7 @@ export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
             ${filas(periodosSql(u), 'x.periodo')} AS periodos, ${filas(periodosUnidadesSql(u))} AS periodos_u,
             ${filas(SABORES, 'x.litros DESC, x.ingreso DESC, x.sabor, x.id_producto')} AS sabores,
             ${filas(VENDEDORES)} AS vendedores, ${filas(VENDEDORES_UNIDADES)} AS vendedores_u, ${filas(GENTE)} AS gente`,
-    [q.desde, q.hasta, antes.desde, antes.hasta],
+    [q.desde, q.hasta, antes.desde, antes.hasta, ('vendedor' in q && q.vendedor) || null],
   )
   const r = resumen(f.resumen, f.resumen_u)
   const ant = resumen(f.anterior, f.anterior_u)

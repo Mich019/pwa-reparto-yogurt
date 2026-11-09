@@ -1,3 +1,4 @@
+import { vende } from './vende.js'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { rachaDesde } from './resumen.js'
 import { z } from 'zod'
@@ -151,7 +152,7 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
       `SELECT id_vendedor, metodo, sum(monto)::float8 AS n FROM abonos WHERE anulado_en IS NULL AND fecha BETWEEN $1 AND $2 GROUP BY 1, 2`,
       [desde, hasta],
     ),
-    q.query(`SELECT id_usuario, nombre, activo, comision_pct::float8 AS pct, meta_mensual::float8 AS meta FROM usuarios WHERE rol = 'vendedor'`),
+    q.query(`SELECT id_usuario, nombre, activo, comision_pct::float8 AS pct, meta_mensual::float8 AS meta FROM usuarios WHERE ${vende()}`),
     q.query(
       `SELECT c.fecha::text, u.nombre, c.efectivo_esperado::float8 AS esperado, c.efectivo_entregado::float8 AS entregado, c.diferencia::float8 AS diferencia, c.estado
          FROM cortes_dia c JOIN usuarios u ON u.id_usuario = c.id_vendedor WHERE c.fecha BETWEEN $1 AND $2 ORDER BY c.fecha, lower(u.nombre)`,
@@ -383,7 +384,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     const esAdmin = req.usuario.rol === 'administrador'
     const { rows: vend } = await db.query(
       `SELECT u.id_usuario, u.nombre FROM usuarios u
-        WHERE u.rol = 'vendedor' AND ($2::uuid IS NULL OR u.id_usuario = $2)
+        WHERE ${vende('u')} AND ($2::uuid IS NULL OR u.id_usuario = $2)
           AND (u.activo OR EXISTS (SELECT 1 FROM cortes_dia c WHERE c.id_vendedor = u.id_usuario AND c.fecha = $1)
                OR EXISTS (SELECT 1 FROM pedidos p WHERE p.id_vendedor = u.id_usuario AND p.fecha = $1 AND p.estado = 'entregado'))
         ORDER BY lower(u.nombre)`,
@@ -449,7 +450,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       const fecha = b.data.fecha ?? hoy
       if (fecha > hoy) throw new Falla(400, 'No puedes hacer el corte de un día que no ha pasado')
       const r = await tx(db, req.usuario.id, async (c) => {
-        const { rows: [u] } = await c.query(`SELECT 1 AS ok FROM usuarios WHERE id_usuario = $1 AND rol = 'vendedor'`, [vendedor])
+        const { rows: [u] } = await c.query(`SELECT 1 AS ok FROM usuarios WHERE id_usuario = $1 AND ${vende()}`, [vendedor])
         if (!u) throw new Falla(404, 'Ese vendedor no existe')
         const x = await cifrasDelDia(c, fecha, vendedor)
         const { rows: [ex] } = await c.query(`SELECT id_corte, estado FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 FOR UPDATE`, [fecha, vendedor])
@@ -554,7 +555,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
            FROM usuarios u
            LEFT JOIN pedidos pe ON pe.id_vendedor = u.id_usuario AND pe.estado = 'entregado' AND pe.fecha BETWEEN $2 AND $3
            LEFT JOIN detalle_pedido d ON d.id_pedido = pe.id_pedido
-          WHERE u.rol = 'vendedor' AND u.activo
+          WHERE ${vende('u')} AND u.activo
           GROUP BY u.id_usuario
        )
        SELECT (SELECT count(*)::int FROM v) AS de,
@@ -605,6 +606,14 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
   })
   // …y los propios, en su app (Cuenta).
   app.get('/mi-meta/trofeos', { preHandler: requiereSesion }, async (req) => ({ ...(await trofeos(req.usuario.id)), fama: await lugarEnFama(req.usuario.id) }))
+  // El administrador que también reparte pone su propia meta (Cuenta → Preferencias en la app de reparto). La de un
+  // vendedor no: se la pone el administrador en su ficha.
+  app.patch('/mi-meta', { preHandler: requiereAdmin }, async (req, rep) => {
+    const b = z.object({ metaMensual: z.number().positive().max(999_999_999).nullable() }).strict().safeParse(req.body)
+    if (!b.success) return rep.code(400).send({ error: 'La meta debe ser un monto mayor a cero' })
+    await tx(db, req.usuario.id, (c) => c.query(`UPDATE usuarios SET meta_mensual = $2 WHERE id_usuario = $1`, [req.usuario.id, b.data.metaMensual]))
+    return { metaMensual: b.data.metaMensual }
+  })
 
   // Resumen del año (panel, diciembre y enero): con los meses cerrados de `anio`, lo vendido mes a mes, el mes más
   // vendido, el vendedor del año (el que más vendió sumando sus meses) y la mejor racha dentro del año.

@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
 import { dinero, hoy, sumarDias } from '../../lib/fechas'
+import { useEquipo } from '../../lib/equipo'
+import { Avatar } from '../../components/Avatar'
 import {
   agrupacionesPosibles, agrupacionSugerida, cambio, diasDelRango, exportarReporte, mover, rangoDe, TABLAS_CSV, textoPeriodo, textoRango, useReporte,
   type Agrupar, type Formato, type Rango, type Reporte, type TablaCsv, type Vista,
@@ -8,6 +10,7 @@ import {
 import { aviso, Boton, claseInput, Hoja, PuntoSabor, Segmentado } from '../../components/ui'
 import { textoPorUnidad, tituloUnidad } from '../../lib/unidades'
 import { Columnas } from '../../components/graficas'
+import { BarraSegmentada, BarrasPeriodo } from '../admin/graficas'
 import { SelectorRango, textoRangoCorto } from '../../components/Calendario'
 import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
@@ -37,6 +40,7 @@ export function Reportes({ panel = false }: { panel?: boolean } = {}) {
   const [libre, setLibre] = useState<Rango>(() => ({ desde: sumarDias(hoy(), -29), hasta: hoy() }))
   const [elegida, setElegida] = useState<Agrupar | null>(null)
   const [exportando, setExportando] = useState(false)
+  const [vendedorAbierto, setVendedorAbierto] = useState<Reporte['vendedores'][number] | null>(null)
 
   const rango = vista === 'rango' ? libre : rangoDe(vista, ancla)
   const posibles = agrupacionesPosibles(rango)
@@ -123,12 +127,15 @@ export function Reportes({ panel = false }: { panel?: boolean } = {}) {
               agrupar={agrupar}
               onAgrupar={setElegida}
               exportar={panel ? undefined : () => setExportando(true)}
+              tendencia={vista !== 'rango' && <Tendencia vista={vista} rango={rango} unidades={reporte.unidades} onElegir={setAncla} />}
+              onVendedor={setVendedorAbierto}
             />
           </div>
         )}
       </div>
 
       {reporte && <HojaExportar abierta={exportando} onCerrar={() => setExportando(false)} reporte={reporte} />}
+      <HojaVendedor vendedor={vendedorAbierto} onCerrar={() => setVendedorAbierto(null)} vista={vista} rango={rango} unidades={reporte?.unidades} onElegir={setAncla} />
     </div>
   )
 }
@@ -146,7 +153,7 @@ function Fallo({ error, reintentar, chico }: { error: { texto: string; sinRed: b
   )
 }
 
-function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, exportar }: {
+function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, exportar, tendencia, onVendedor }: {
   reporte: Reporte
   vista: Vista
   enCurso: boolean
@@ -154,6 +161,8 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
   agrupar: Agrupar
   onAgrupar: (a: Agrupar) => void
   exportar?: () => void // sin él (panel) Exportar va en el encabezado
+  tendencia?: ReactNode // las gráficas de los periodos de alrededor (Día, Semana, Mes)
+  onVendedor?: (v: Reporte['vendedores'][number]) => void // abre su hoja (gráfica y meta)
 }) {
   const { resumen: r, anterior } = reporte
   const comparar = !enCurso && anterior
@@ -184,7 +193,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-y-6 border-y border-linea py-6 sm:grid-cols-4 sm:divide-x sm:divide-linea">
         <Tarjeta etiqueta="Recaudado" valor={dinero(r.ingreso)} cambio={comparar ? cambio(r.ingreso, anterior.resumen.ingreso) : null} />
         <Tarjeta etiqueta="Utilidad neta" valor={dinero(r.utilidad)} acento pie={`Margen ${porcentaje(r.margenPct)}`} cambio={comparar ? cambio(r.utilidad, anterior.resumen.utilidad) : null} />
         <Tarjeta etiqueta={varias ? 'Entregado' : `${tituloUnidad(u0)} entregados`} valor={cantidad(r.porUnidad, r.litros)} cambio={comparar && !varias ? cambio(r.litros, anterior.resumen.litros) : null} />
@@ -197,8 +206,16 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
         </p>
       )}
 
+      {tendencia}
+      {!sinVentas && (
+        <div className="mt-8 grid gap-x-10 gap-y-8 lg:grid-cols-2">
+          <ComoPagaron r={r} />
+          <QueSeVendio sabores={reporte.sabores} total={r.ingreso} />
+        </div>
+      )}
+
       {sinVentas ? (
-        <div className="mt-8 rounded-lg bg-niebla p-6 text-center">
+        <div className="mt-6 border-t border-linea py-10 text-center">
           <div className="font-semibold">Sin ventas entregadas en este periodo</div>
           <div className="mt-1 text-sm text-apagado">Cuando se entreguen pedidos aparecerán aquí.</div>
         </div>
@@ -212,11 +229,11 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                   <Segmentado valor={agrupar} onChange={onAgrupar} opciones={posibles.map((a) => ({ valor: a, texto: AGRUPAR[a] }))} className="[&>button]:px-3 [&>button]:py-2" />
                 )}
               </div>
-              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              <div className="mt-3 grid gap-x-10 gap-y-6 lg:grid-cols-2">
                 <Columnas titulo="Ingresos" barras={barras((p) => p.ingreso)} color="bg-azul" formato={dinero} formatoEje={dineroEje} total={dinero(r.ingreso)} />
                 {!varias && <Columnas titulo={tituloUnidad(u0)} barras={barras((p) => p.litros)} color="bg-tinta" formato={(n) => litros(n, u0)} formatoEje={ejeLitros} total={litros(r.litros, u0)} />}
               </div>
-              <details className="mt-2 rounded-lg bg-niebla px-4 py-3 text-sm">
+              <details className="mt-4 border-t border-linea py-3 text-sm">
                 <summary className="cursor-pointer font-semibold">Ver como tabla</summary>
                 <div className="mt-2 overflow-x-auto">
                   <table className="w-full min-w-[26rem] text-left tabular-nums">
@@ -240,13 +257,13 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
             <section>
               <h2 className="text-2xl font-bold tracking-tight">Sabores</h2>
               {estrella && menor && estrella.id !== menor.id && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-niebla p-3">
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <div className="border-l-2 border-verde pl-3">
                     <div className="flex items-center gap-1 text-xs font-medium text-verde"><TrendingUp size={14} /> Sabor estrella</div>
                     <div className="mt-1 font-semibold">{estrella.sabor}</div>
                     <div className="text-xs text-apagado tabular-nums">{litros(estrella.litros, estrella.unidad)}</div>
                   </div>
-                  <div className="rounded-lg bg-niebla p-3">
+                  <div className="border-l-2 border-rojo pl-3">
                     <div className="flex items-center gap-1 text-xs font-medium text-rojo"><TrendingDown size={14} /> Menor rotación</div>
                     <div className="mt-1 font-semibold">{menor.sabor}</div>
                     <div className="text-xs text-apagado tabular-nums">{litros(menor.litros, menor.unidad)}</div>
@@ -292,7 +309,9 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
               <h2 className="text-2xl font-bold tracking-tight">Vendedores</h2>
               <div className="mt-2 divide-y divide-linea">
                 {reporte.vendedores.map((v) => (
-                  <div key={v.id ?? 'sin'} className="flex items-center gap-3 py-3">
+                  <button key={v.id ?? 'sin'} type="button" disabled={!v.id || !onVendedor} onClick={() => onVendedor?.(v)}
+                    aria-label={v.id ? `Ver la gráfica y la meta de ${v.nombre}` : undefined}
+                    className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-3 text-left transition-colors enabled:hover:bg-niebla/70 focus-visible:outline-2 focus-visible:outline-marca disabled:cursor-default">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tinta text-sm font-bold text-white" aria-hidden>{v.nombre.charAt(0).toUpperCase()}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
@@ -314,7 +333,8 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
                         {v.omitidos > 0 && <span>{v.omitidos} {v.omitidos === 1 ? 'visita sin venta' : 'visitas sin venta'}</span>}
                       </div>
                     </div>
-                  </div>
+                    {v.id && onVendedor && <ChevronRight size={18} className="shrink-0 text-apagado" aria-hidden="true" />}
+                  </button>
                 ))}
                 {reporte.vendedores.length === 0 && <div className="py-4 text-sm text-apagado">Todavía no hay vendedores dados de alta.</div>}
               </div>
@@ -326,13 +346,215 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
   )
 }
 
+// ------------------------------------------------------------------ estadísticas
+
+// La tendencia alrededor del periodo que se ve: los últimos 14 días, 8 semanas o 12 meses, con el que se ve en dorado.
+// Tocar una barra lleva a ese periodo. Se puede cambiar lo que mide (ingresos, utilidad, cantidad, pedidos).
+type Medida = 'ingreso' | 'utilidad' | 'litros' | 'pedidos'
+const CONTEXTO: Record<Exclude<Vista, 'rango'>, { titulo: string; agrupar: Agrupar; n: number; otros: string; este: string }> = {
+  dia: { titulo: 'Últimos 14 días', agrupar: 'dia', n: 14, otros: 'Otros días', este: 'El día que ves' },
+  semana: { titulo: 'Últimas 8 semanas', agrupar: 'semana', n: 8, otros: 'Otras semanas', este: 'La semana que ves' },
+  mes: { titulo: 'Últimos 12 meses', agrupar: 'mes', n: 12, otros: 'Otros meses', este: 'El mes que ves' },
+}
+// Con «Comparar con hace un año», junto a cada barra va la del mismo periodo un año antes: el mismo día de la semana
+// (364 días antes) para días y semanas, el mismo mes para meses. `vendedor`: sólo sus ventas (su hoja).
+function Tendencia({ vista, rango, unidades, onElegir, vendedor, chico }: { vista: Exclude<Vista, 'rango'>; rango: Rango; unidades?: string[]; onElegir: (ancla: string) => void; vendedor?: string; chico?: boolean }) {
+  const c = CONTEXTO[vista]
+  const id = useId()
+  const contexto = { desde: rangoDe(vista, mover(vista, rango.desde, 1 - c.n)).desde, hasta: rango.hasta }
+  const { reporte } = useReporte(contexto, c.agrupar, undefined, { vendedor })
+  const [comparar, setComparar] = useState(() => { try { return localStorage.getItem('delisy:comparar-anio') === '1' } catch { return false } })
+  const elegirComparar = (si: boolean) => { setComparar(si); try { localStorage.setItem('delisy:comparar-anio', si ? '1' : '0') } catch { /* sin almacenamiento */ } }
+  const haceUnAnio = vista === 'mes'
+    ? { desde: mover('mes', contexto.desde, -12), hasta: rangoDe('mes', mover('mes', contexto.hasta, -12)).hasta }
+    : { desde: sumarDias(contexto.desde, -364), hasta: sumarDias(contexto.hasta, -364) }
+  const { reporte: antes } = useReporte(haceUnAnio, c.agrupar, undefined, { vendedor, activo: comparar })
+  const [medida, setMedida] = useState<Medida>('ingreso')
+  const u = unidades?.length === 1 ? unidades[0] : null // con varias unidades no se suman litros con kilos
+  const medidas: { valor: Medida; texto: string }[] = [
+    { valor: 'ingreso', texto: 'Ingresos' }, { valor: 'utilidad', texto: 'Utilidad' },
+    ...(u ? [{ valor: 'litros' as const, texto: tituloUnidad(u) }] : []), { valor: 'pedidos', texto: 'Pedidos' },
+  ]
+  const m = medidas.some((x) => x.valor === medida) ? medida : 'ingreso'
+  const formato = m === 'pedidos' ? (n: number) => `${num(n, 0)} ${n === 1 ? 'pedido' : 'pedidos'}` : m === 'litros' ? (n: number) => litros(n, u ?? 'L') : dinero
+  if (!reporte || reporte.desde !== contexto.desde || reporte.hasta !== contexto.hasta) {
+    return <div className="mt-7 h-56 animate-pulse rounded-lg bg-niebla" aria-label="Cargando la tendencia" />
+  }
+  const variosAnios = reporte.desde.slice(0, 4) !== reporte.hasta.slice(0, 4)
+  const datos = reporte.periodos.map((p) => ({
+    clave: p.inicio, eje: textoPeriodo(p, c.agrupar, false, variosAnios), nombre: textoPeriodo(p, c.agrupar, true),
+    valor: Math.max(0, p[m]), actual: p.inicio <= rango.desde && rango.desde <= p.fin,
+  }))
+  const conVentas = reporte.periodos.filter((p) => p.pedidos > 0)
+  const promedio = conVentas.length ? conVentas.reduce((s, p) => s + p[m], 0) / conVentas.length : 0
+  const mejor = [...reporte.periodos].sort((a, b) => b[m] - a[m])[0]
+  const previoListo = comparar && antes && antes.desde === haceUnAnio.desde && antes.hasta === haceUnAnio.hasta
+  const total = reporte.periodos.reduce((s, p) => s + p[m], 0)
+  const totalAntes = previoListo ? antes.periodos.reduce((s, p) => s + p[m], 0) : 0
+  const previo = previoListo ? {
+    valores: reporte.periodos.map((_, i) => (antes.periodos[i] ? Math.max(0, antes.periodos[i][m]) : undefined)),
+    nombres: reporte.periodos.map((_, i) => (antes.periodos[i] ? textoPeriodo(antes.periodos[i], c.agrupar, true, true) : undefined)),
+    leyenda: 'Hace un año',
+  } : undefined
+  return (
+    <section className={chico ? 'mt-6' : 'mt-7'} aria-labelledby={id}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id={id} className={chico ? 'text-lg font-semibold' : 'text-2xl font-bold tracking-tight'}>{c.titulo}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => elegirComparar(!comparar)} aria-pressed={comparar}
+            className={`${comparar ? botonPanel : botonPanelSuave} !px-3 !py-2 text-sm`}>
+            {comparar ? 'Quitar hace un año' : 'Comparar con hace un año'}
+          </button>
+          <Segmentado valor={m} onChange={setMedida} opciones={medidas} className="[&>button]:px-3 [&>button]:py-2" />
+        </div>
+      </div>
+      <div className="mt-4">
+        <div className="mb-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+          <div><div className="text-xs text-apagado">Total</div><div className="font-semibold tabular-nums">{formato(total)}
+            {previoListo && totalAntes > 0 && <span className={`ml-1.5 text-xs ${total >= totalAntes ? 'text-verde' : 'text-rojo'}`}>{total >= totalAntes ? '+' : '−'}{num(Math.abs((total - totalAntes) / totalAntes) * 100, 0)}% vs hace un año</span>}
+            {previoListo && totalAntes === 0 && <span className="ml-1.5 text-xs font-normal text-apagado">sin ventas hace un año</span>}
+          </div></div>
+          <div><div className="text-xs text-apagado">Promedio con ventas</div><div className="font-semibold tabular-nums">{conVentas.length ? formato(promedio) : '—'}</div></div>
+          <div className="col-span-2 sm:col-span-1"><div className="text-xs text-apagado">Mejor</div><div className="font-semibold tabular-nums">{mejor && mejor[m] > 0 ? <>{formato(mejor[m])} <span className="font-normal text-apagado first-letter:uppercase">· {textoPeriodo(mejor, c.agrupar, true)}</span></> : '—'}</div></div>
+        </div>
+        <BarrasPeriodo key={m} datos={datos} formato={formato} alto={150} descripcion={`${medidas.find((x) => x.valor === m)?.texto}: ${c.titulo.toLowerCase()}`}
+          leyenda={[c.otros, c.este]} textoActual="el que ves" onElegir={onElegir} previo={previo} />
+        {comparar && !previoListo && <p className="mt-2 text-xs text-apagado">Cargando hace un año…</p>}
+        <p className="mt-2 text-xs text-apagado">Toca una barra para ver ese periodo.</p>
+      </div>
+    </section>
+  )
+}
+
+// La hoja de un vendedor: lo suyo en el periodo que se ve, su avance hacia la meta del mes (lo entregado, como en
+// GET /mi-meta) con el ritmo al que va, y su gráfica de los periodos de alrededor (con la comparación de hace un año).
+function HojaVendedor({ vendedor: v, onCerrar, vista, rango, unidades, onElegir }: {
+  vendedor: Reporte['vendedores'][number] | null
+  onCerrar: () => void
+  vista: Vista
+  rango: Rango
+  unidades?: string[]
+  onElegir: (ancla: string) => void
+}) {
+  const miembro = useEquipo()?.usuarios.find((u) => u.id === v?.id)
+  const mes = rangoDe('mes', rango.desde)
+  const { reporte: delMes } = useReporte(mes, 'dia', undefined, { vendedor: v?.id ?? undefined, activo: !!v?.id })
+  const meta = miembro?.metaMensual ?? null
+  const vendido = delMes && delMes.desde === mes.desde && v?.id ? delMes.resumen.ingreso : null
+  const enCursoMes = mes.hasta >= hoy()
+  const diasMes = diasDelRango(mes)
+  const pasados = enCursoMes ? diasDelRango({ desde: mes.desde, hasta: hoy() }) : diasMes
+  const ritmo = vendido !== null && enCursoMes && pasados > 0 ? (vendido / pasados) * diasMes : null
+  const pctMeta = meta && vendido !== null ? (vendido / meta) * 100 : null
+  const nombreMes = textoRango('mes', mes).toLowerCase()
+  return (
+    <Hoja abierta={!!v} onCerrar={onCerrar} alto className="sm:max-w-3xl"
+      titulo={v && <span className="flex items-center gap-3"><Avatar nombre={v.nombre} foto={miembro?.foto} className="h-11 w-11 bg-tinta text-base text-white" />{v.nombre}</span>}>
+      {v && (
+        <div className="pb-6">
+          <p className="text-sm text-apagado">{textoRango(vista, rango)}{!v.activo && ' · dado de baja'}</p>
+          <div className="mt-3 grid grid-cols-2 gap-y-5 border-y border-linea py-5 sm:grid-cols-4 sm:divide-x sm:divide-linea">
+            <Tarjeta etiqueta="Vendido" valor={dinero(v.ingreso)} />
+            <Tarjeta etiqueta="Utilidad" valor={dinero(v.utilidad)} acento />
+            <Tarjeta etiqueta="Pedidos" valor={String(v.pedidos)} pie={`${v.clientes} ${v.clientes === 1 ? 'cliente' : 'clientes'}`} />
+            <Tarjeta etiqueta="Ticket promedio" valor={v.ticketPromedio === null ? '—' : dinero(v.ticketPromedio)} pie={v.omitidos ? `${v.omitidos} sin venta` : undefined} />
+          </div>
+
+          <section className="mt-6" aria-label="Meta del mes">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-lg font-semibold">Meta de {nombreMes}</h3>
+              {meta && pctMeta !== null && <span className="text-sm font-semibold tabular-nums">{num(pctMeta, 0)}%</span>}
+            </div>
+            {!meta ? (
+              <p className="mt-1 text-sm text-apagado">No tiene meta mensual. Se le pone en Vendedores, en su ficha.</p>
+            ) : vendido === null ? (
+              <div className="mt-3 h-3 animate-pulse rounded-full bg-niebla" />
+            ) : (
+              <>
+                <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-niebla" role="img" aria-label={`${dinero(vendido)} de ${dinero(meta)}`}>
+                  <div className="barra-crece h-full rounded-full bg-serie" style={{ width: `${Math.min(100, pctMeta ?? 0)}%` }} />
+                  {ritmo !== null && ritmo < meta * 1.5 && (
+                    <div className="absolute inset-y-0 w-0.5 bg-tinta/60" style={{ left: `${Math.min(99.5, (ritmo / meta) * 100)}%` }} title="A dónde llegaría a este ritmo" />
+                  )}
+                </div>
+                <p className="mt-2 text-sm">
+                  <span className="font-semibold tabular-nums">{dinero(vendido)}</span> de {dinero(meta)}
+                  {vendido >= meta
+                    ? <span className="text-verde"> · ¡ya llegó a su meta!</span>
+                    : enCursoMes
+                      ? <> · le faltan <span className="font-semibold tabular-nums">{dinero(meta - vendido)}</span>{ritmo !== null && <> · a este ritmo cerraría en <span className="font-semibold tabular-nums">{dinero(ritmo)}</span> ({num((ritmo / meta) * 100, 0)}%)</>}</>
+                      : <span className="text-apagado"> · se quedó a {dinero(meta - vendido)}</span>}
+                </p>
+              </>
+            )}
+          </section>
+
+          {vista !== 'rango' && v.id && <Tendencia vista={vista} rango={rango} unidades={unidades} onElegir={onElegir} vendedor={v.id} chico />}
+        </div>
+      )}
+    </Hoja>
+  )
+}
+
+// Cómo se cobró lo vendido: efectivo, transferencia y fiado, cada uno con su monto y su parte.
+function ComoPagaron({ r }: { r: Reporte['resumen'] }) {
+  const total = r.efectivo + r.transferencia + (r.credito ?? 0)
+  const partes = [
+    { nombre: 'Efectivo', n: r.efectivo, color: 'var(--color-serie)' },
+    { nombre: 'Transferencia', n: r.transferencia, color: 'var(--color-oro)' },
+    { nombre: 'Fiado', n: r.credito ?? 0, color: 'var(--color-apagado)' },
+  ].filter((p) => p.n > 0)
+  return (
+    <section className="border-t border-linea pt-5" aria-labelledby="como-pagaron">
+      <h3 id="como-pagaron" className="font-semibold">Cómo te pagaron</h3>
+      <div className="mt-3"><BarraSegmentada segmentos={partes} descripcion={partes.map((p) => `${p.nombre}: ${dinero(p.n)}`).join(', ')} /></div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {partes.map((p) => (
+          <li key={p.nombre} className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: p.color }} aria-hidden="true" />
+            <span className="flex-1">{p.nombre}</span>
+            <span className="font-semibold tabular-nums">{dinero(p.n)}</span>
+            <span className="w-12 text-right text-xs text-apagado tabular-nums">{total ? `${num((p.n / total) * 100, 0)}%` : ''}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// De qué se vendió más (en dinero): los 5 primeros sabores con su color y el resto junto.
+function QueSeVendio({ sabores, total }: { sabores: Reporte['sabores']; total: number }) {
+  const vendidos = [...sabores].filter((s) => s.ingreso > 0).sort((a, b) => b.ingreso - a.ingreso)
+  const partes = [
+    ...vendidos.slice(0, 5).map((s) => ({ nombre: s.sabor, n: s.ingreso, color: s.color })),
+    ...(vendidos.length > 5 ? [{ nombre: `Otros ${vendidos.length - 5}`, n: vendidos.slice(5).reduce((x, s) => x + s.ingreso, 0), color: 'var(--color-apagado)' }] : []),
+  ]
+  return (
+    <section className="border-t border-linea pt-5" aria-labelledby="que-se-vendio">
+      <h3 id="que-se-vendio" className="font-semibold">De qué se vendió más</h3>
+      <div className="mt-3"><BarraSegmentada segmentos={partes} descripcion={partes.map((p) => `${p.nombre}: ${dinero(p.n)}`).join(', ')} /></div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {partes.map((p) => (
+          <li key={p.nombre} className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-tinta/15" style={{ backgroundColor: p.color }} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">{p.nombre}</span>
+            <span className="font-semibold tabular-nums">{dinero(p.n)}</span>
+            <span className="w-12 text-right text-xs text-apagado tabular-nums">{total ? `${num((p.n / total) * 100, 0)}%` : ''}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// Una cifra del resumen, sin caja: la etiqueta, el número grande y debajo el detalle y el cambio.
 function Tarjeta({ etiqueta, valor, acento, pie, cambio: c }: { etiqueta: string; valor: string; acento?: boolean; pie?: string; cambio?: number | null }) {
   return (
-    <div className="rounded-lg bg-niebla p-3">
-      <div className={`text-2xl font-semibold tracking-tight tabular-nums ${acento ? 'text-verde' : ''}`}>{valor}</div>
-      <div className="text-xs text-apagado">{etiqueta}</div>
+    <div className="min-w-0 pr-4 sm:px-6 sm:first:pl-0 sm:last:pr-0">
+      <div className="text-sm text-apagado">{etiqueta}</div>
+      <div className={`mt-1 truncate text-3xl font-bold tracking-tight tabular-nums sm:text-4xl ${acento ? 'text-verde' : ''}`}>{valor}</div>
       {(pie || (c !== null && c !== undefined)) && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-apagado">
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-apagado">
           {pie && <span>{pie}</span>}
           {c !== null && c !== undefined && <Cambio valor={c} />}
         </div>
