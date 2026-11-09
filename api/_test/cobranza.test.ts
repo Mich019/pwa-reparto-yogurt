@@ -141,5 +141,11 @@ describe('fiado', () => {
     assert.equal(r.status, 200)
     assert.equal(r.body.resumen.credito, 180)
     assert.equal(r.body.resumen.efectivo, 60)
+    // Fiado del periodo contra abonos, y por vendedor: Ana fió 180 y cobró 50; el administrador cobró 20 sin fiar.
+    assert.equal((await llamar(x.ana, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 50, metodo: 'efectivo' })).status, 201)
+    assert.equal((await llamar(x.admin, 'POST', '/cobranza/abonos', { clienteId: x.c.id, monto: 20, metodo: 'transferencia' })).status, 201)
+    const r2 = (await llamar(x.admin, 'GET', `/reportes/ventas?desde=${x.hoy}&hasta=${x.hoy}`)).body
+    assert.equal(r2.abonos, 70)
+    assert.deepEqual(r2.fiadoPorVendedor.map((v: { id: string; fiado: number; abonos: number }) => [v.id, v.fiado, v.abonos]), [[x.admin.id, 0, 20], [x.ana.id, 180, 50]])
   })
 })

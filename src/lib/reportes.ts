@@ -68,6 +68,7 @@ export interface Reporte {
   ranking: { estrella: string | null; menorRotacion: string | null }
   vendedores: VendedorRendimiento[]
   abonos?: number // lo cobrado de fiado en el periodo
+  fiadoPorVendedor?: { id: string | null; nombre: string; fiado: number; abonos: number }[] // de quien más bajó lo pendiente a quien más lo subió
 }
 
 // ------------------------------------------------------------------ periodos

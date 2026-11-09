@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda } from '../../lib/busqueda'
-import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from '../../components/Mensajes'
+import { BotonWhatsApp, EditorMensaje, MandarATodos, textoCobro, useMensaje } from '../../components/Mensajes'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
@@ -98,6 +98,7 @@ function PorCobrar({ q }: { q: string }) {
     }), `por-cobrar-${hoy()}.xlsx`)
   }
   const cobro = useMensaje('cobro')
+  const msjLimite = useMensaje('limite')
   const [editar, setEditar] = useState(false)
   const [mandados, setMandados] = useState<Set<string>>(new Set())
   return (
@@ -111,11 +112,11 @@ function PorCobrar({ q }: { q: string }) {
               <button type="button" onClick={() => setEditar(!editar)} aria-expanded={editar} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editar ? 'Listo' : 'Mensaje para cobrar'}</button>
             </span>
           </div>
-          {editar && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="cobro" /></div>}
+          {editar && <div className="desplegar mb-4 max-w-xl space-y-4"><EditorMensaje tipo="cobro" />{hayPasados && <EditorMensaje tipo="limite" />}</div>}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${filtrados.length})` : ''}</button>
             {(hayPasados || pasados) && <button type="button" onClick={() => setPasados(!pasados)} aria-pressed={pasados} className={pasados ? botonPanel : botonPanelSuave}>Pasaron su límite{pasados ? ` (${filtrados.length})` : ''}</button>}
-            <MandarATodos lista={filtrados.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) }) }))}
+            <MandarATodos lista={filtrados.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: textoCobro(d, cobro, msjLimite, pasoSuLimite(d), dinero) }))}
               mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
           </div>
           <div ref={vista.ancla} className="scroll-mt-4">
@@ -132,7 +133,7 @@ function PorCobrar({ q }: { q: string }) {
                     <ChevronRight size={18} className="shrink-0 text-apagado/60" />
                   </Fila>
                 </div>
-                {d.telefono && <BotonWhatsApp chico telefono={d.telefono} texto={llenar(cobro, { nombre: d.nombre, saldo: dinero(d.saldo) })} enviado={mandados.has(d.id)} onEnviar={() => setMandados((m) => new Set(m).add(d.id))} />}
+                {d.telefono && <BotonWhatsApp chico telefono={d.telefono} texto={textoCobro(d, cobro, msjLimite, pasoSuLimite(d), dinero)} enviado={mandados.has(d.id)} onEnviar={() => setMandados((m) => new Set(m).add(d.id))} />}
               </div>
             ))}
             {t && !filtrados.length && <p className="py-8 text-center text-sm text-apagado">Nadie coincide con la búsqueda.</p>}

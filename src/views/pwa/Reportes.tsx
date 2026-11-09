@@ -213,7 +213,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
           <QueSeVendio sabores={reporte.sabores} total={r.ingreso} />
         </div>
       )}
-      <FiadoDelPeriodo fiado={r.credito ?? 0} cobrado={reporte.abonos ?? 0} />
+      <FiadoDelPeriodo fiado={r.credito ?? 0} cobrado={reporte.abonos ?? 0} porVendedor={reporte.fiadoPorVendedor ?? []} />
 
       {sinVentas ? (
         <div className="mt-6 border-t border-linea py-10 text-center">
@@ -498,7 +498,7 @@ function HojaVendedor({ vendedor: v, onCerrar, vista, rango, unidades, onElegir 
 }
 
 // Lo que se fió en el periodo contra lo que se cobró de fiado (abonos): si el fiado pendiente crece o baja.
-function FiadoDelPeriodo({ fiado, cobrado }: { fiado: number; cobrado: number }) {
+function FiadoDelPeriodo({ fiado, cobrado, porVendedor }: { fiado: number; cobrado: number; porVendedor: NonNullable<Reporte['fiadoPorVendedor']> }) {
   if (fiado <= 0 && cobrado <= 0) return null
   const neto = fiado - cobrado
   const mayor = Math.max(fiado, cobrado)
@@ -519,6 +519,31 @@ function FiadoDelPeriodo({ fiado, cobrado }: { fiado: number; cobrado: number })
           </div>
         ))}
       </dl>
+      {porVendedor.length > 1 && (
+        <div className="mt-5 max-w-2xl overflow-x-auto">
+          <h4 className="text-sm font-semibold">Quién cobra mejor</h4>
+          <table className="mt-2 w-full text-sm">
+            <thead className="text-left text-xs text-apagado">
+              <tr className="border-b border-linea"><th className="py-1.5 pr-3 font-medium">Vendedor</th><th className="py-1.5 pr-3 text-right font-medium">Fió</th><th className="py-1.5 pr-3 text-right font-medium">Cobró</th><th className="py-1.5 text-right font-medium">Lo pendiente</th></tr>
+            </thead>
+            <tbody>
+              {porVendedor.map((v) => {
+                const n = v.fiado - v.abonos
+                return (
+                  <tr key={v.id ?? 'sin'} className="border-b border-linea/60">
+                    <td className="py-2 pr-3">{v.nombre}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{dinero(v.fiado)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{dinero(v.abonos)}</td>
+                    <td className={`py-2 text-right font-semibold tabular-nums ${n > 0.004 ? 'text-rojo' : n < -0.004 ? 'text-verde' : 'text-apagado'}`}>
+                      {Math.abs(n) < 0.005 ? 'Igual' : n > 0 ? `Subió ${dinero(n)}` : `Bajó ${dinero(-n)}`}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }

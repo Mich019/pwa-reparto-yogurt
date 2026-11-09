@@ -146,6 +146,7 @@ export interface Reporte {
   ranking: { estrella: string | null; menorRotacion: string | null }
   vendedores: Vendedor[] // de más a menos ingreso
   abonos: number // lo cobrado de fiado en el periodo (abonos no anulados, por su fecha); con `resumen.credito` dice si el fiado crece o baja
+  fiadoPorVendedor: { id: string | null; nombre: string; fiado: number; abonos: number }[] // de quien más bajó lo pendiente a quien más lo subió
 }
 
 // ------------------------------------------------------------------ consultas
@@ -202,6 +203,15 @@ const VENDEDORES = `SELECT id_vendedor, sum(ingreso) AS ingreso, sum(costo) AS c
       SELECT pe.id_vendedor, 0, 0, 0, 0, 0, count(*)
         FROM pedidos pe WHERE pe.estado = 'omitido' AND pe.fecha BETWEEN $1::date AND $2::date GROUP BY pe.id_vendedor
     ) x GROUP BY id_vendedor`
+// Lo que fió cada quien (sus ventas a crédito) y lo que cobró de fiado (los abonos que registró), en el periodo.
+const FIADO_VENDEDORES = `SELECT x.id_vendedor, coalesce(u.nombre, 'Sin vendedor') AS nombre, sum(x.fiado) AS fiado, sum(x.abonos) AS abonos
+    FROM (
+      SELECT id_vendedor, sum(subtotal) AS fiado, 0 AS abonos FROM ventas WHERE metodo_pago = 'credito' GROUP BY id_vendedor
+      UNION ALL
+      SELECT id_vendedor, 0, sum(monto) FROM abonos
+       WHERE anulado_en IS NULL AND fecha BETWEEN $1::date AND $2::date AND ($5::uuid IS NULL OR id_vendedor = $5::uuid) GROUP BY id_vendedor
+    ) x LEFT JOIN usuarios u ON u.id_usuario = x.id_vendedor
+   GROUP BY x.id_vendedor, u.nombre`
 const VENDEDORES_UNIDADES = `SELECT id_vendedor, unidad, sum(litros) AS n FROM ventas GROUP BY 1, 2`
 // Todo el equipo activo aparece, aunque no haya vendido (un cero también es un dato), y quien vendió aunque ya no esté.
 const GENTE = `SELECT id_usuario, nombre, activo FROM usuarios
@@ -287,7 +297,7 @@ export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
             ${filas(resumenSql('anteriores'))} AS anterior, ${filas(resumenUnidadesSql('anteriores'))} AS anterior_u,
             ${filas(periodosSql(u), 'x.periodo')} AS periodos, ${filas(periodosUnidadesSql(u))} AS periodos_u,
             ${filas(SABORES, 'x.litros DESC, x.ingreso DESC, x.sabor, x.id_producto')} AS sabores,
-            ${filas(VENDEDORES)} AS vendedores, ${filas(VENDEDORES_UNIDADES)} AS vendedores_u, ${filas(GENTE)} AS gente,
+            ${filas(VENDEDORES)} AS vendedores, ${filas(VENDEDORES_UNIDADES)} AS vendedores_u, ${filas(GENTE)} AS gente, ${filas(FIADO_VENDEDORES)} AS fiado_vendedores,
             (SELECT coalesce(sum(monto), 0)::float8 FROM abonos WHERE anulado_en IS NULL AND fecha BETWEEN $1::date AND $2::date
                 AND ($5::uuid IS NULL OR id_vendedor = $5::uuid)) AS abonos`,
     [q.desde, q.hasta, antes.desde, antes.hasta, ('vendedor' in q && q.vendedor) || null],
@@ -316,6 +326,9 @@ export async function armarReporte(db: Db, q: Consulta): Promise<Reporte> {
     },
     vendedores: ven,
     abonos: num(f.abonos),
+    fiadoPorVendedor: (f.fiado_vendedores as Filas)
+      .map((x) => ({ id: x.id_vendedor ?? null, nombre: x.nombre, fiado: num(x.fiado), abonos: num(x.abonos) }))
+      .sort((a, b) => (b.abonos - b.fiado) - (a.abonos - a.fiado) || b.abonos - a.abonos || a.nombre.localeCompare(b.nombre, 'es')),
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from './Mensajes'
+import { BotonWhatsApp, EditorMensaje, MandarATodos, textoCobro, useMensaje } from './Mensajes'
 import { esMio } from '../lib/reparto'
 import { ChevronRight, HandCoins } from 'lucide-react'
 import { useServidor, type Deudor, pasoSuLimite } from '../lib/cobranza'
@@ -15,6 +15,7 @@ export function PorCobrar() {
   const [abierta, setAbierta] = useState(false)
   const [cliente, setCliente] = useState<string | null>(null)
   const cobro = useMensaje('cobro')
+  const msjLimite = useMensaje('limite')
   const [mandados, setMandados] = useState<Set<string>>(new Set())
   const [ver, setVer] = useState<'todos' | 'pasados'>('todos')
   // El administrador en la app de reparto cobra lo de su cartera y lo que no tiene vendedor (lib/reparto.ts).
@@ -39,13 +40,14 @@ export function PorCobrar() {
           <details className="mb-2">
             <summary className="cursor-pointer py-1 text-sm font-semibold">Mensaje para cobrar por WhatsApp</summary>
             <div className="mt-2"><EditorMensaje tipo="cobro" abierto={abierta} /></div>
+            {pasados.length > 0 && <div className="mt-4"><EditorMensaje tipo="limite" abierto={abierta} /></div>}
           </details>
           {pasados.length > 0 && (
             <Segmentado className="mb-3" valor={ver} onChange={setVer}
               opciones={[{ valor: 'todos', texto: `Todos (${d.deudores.length})` }, { valor: 'pasados', texto: `Pasaron su límite (${pasados.length})` }]} />
           )}
           <div className="mb-2">
-            <MandarATodos lista={vistos.map((x) => ({ id: x.id, nombre: x.nombre, telefono: x.telefono, texto: llenar(cobro, { nombre: x.nombre, saldo: dinero(x.saldo) }) }))}
+            <MandarATodos lista={vistos.map((x) => ({ id: x.id, nombre: x.nombre, telefono: x.telefono, texto: textoCobro(x, cobro, msjLimite, pasoSuLimite(x), dinero) }))}
               mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
           </div>
           {vistos.map((x) => (
@@ -59,7 +61,7 @@ export function PorCobrar() {
                 <span className={`font-semibold tabular-nums ${pasoSuLimite(x) ? 'text-rojo' : ''}`}>{dinero(x.saldo)}</span>
                 <ChevronRight size={18} className="shrink-0 text-apagado/60" />
               </button>
-              {x.telefono && <BotonWhatsApp chico telefono={x.telefono} texto={llenar(cobro, { nombre: x.nombre, saldo: dinero(x.saldo) })} enviado={mandados.has(x.id)} onEnviar={() => setMandados((m) => new Set(m).add(x.id))} />}
+              {x.telefono && <BotonWhatsApp chico telefono={x.telefono} texto={textoCobro(x, cobro, msjLimite, pasoSuLimite(x), dinero)} enviado={mandados.has(x.id)} onEnviar={() => setMandados((m) => new Set(m).add(x.id))} />}
             </div>
           ))}
         </div>

@@ -72,11 +72,16 @@ export function AvisoLimiteFiado({ cliente, total }: { cliente: Cliente; total: 
   const debe = cuenta.datos?.saldo
   if (debe === undefined) return <p className="mt-2 text-sm text-apagado">Su límite de fiado es {dinero(limite)}.</p>
   const quedaria = debe + total
-  if (quedaria <= limite + 0.004) return <p className="mt-2 text-sm text-apagado">Con este pedido debería {dinero(quedaria)} de {dinero(limite)} de límite.</p>
+  const disponible = Math.max(0, limite - debe)
+  if (quedaria <= limite + 0.004) return (
+    <p className="mt-2 text-sm text-apagado">
+      Le puedes fiar hasta <b className="font-semibold text-tinta">{dinero(disponible)}</b>{debe > 0 ? ` (ya debe ${dinero(debe)})` : ''}. Con este pedido debería {dinero(quedaria)} de {dinero(limite)}.
+    </p>
+  )
   return (
     <p role="alert" className="mt-2 flex gap-2 text-sm font-semibold text-rojo">
       <TriangleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
-      Con este pedido debería {dinero(quedaria)} y su límite es {dinero(limite)}. {debe > 0 ? `Ya debe ${dinero(debe)}.` : ''}
+      Con este pedido debería {dinero(quedaria)} y su límite es {dinero(limite)}. {debe > 0 ? `Ya debe ${dinero(debe)}.` : ''} {disponible > 0 ? `Sólo le puedes fiar ${dinero(disponible)}.` : 'Ya no le queda fiado disponible.'}
     </p>
   )
 }
