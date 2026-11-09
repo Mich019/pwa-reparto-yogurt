@@ -31,6 +31,8 @@ export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie, c
         onClick={onCerrar}
       />
       <div
+        role="dialog"
+        aria-modal="true"
         className={`relative mx-auto flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-[28px] bg-papel text-tinta shadow-hoja transition-transform duration-250 ease-out ${alto ? 'h-[92dvh]' : ''} ${visible ? 'translate-y-0' : 'translate-y-full'} ${className}`}
       >
         <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-linea" />

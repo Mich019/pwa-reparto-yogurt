@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { BuscarPedidos } from './BuscarPedidos'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarHeart, ChevronRight, Crown, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
 import { Medallas } from '../../components/Medallas'
@@ -391,12 +392,18 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
 }
 
 function PedidosRecientes({ recientes, corto, onNavegar }: { recientes: ReturnType<typeof usePedidosRecientes>; corto: (f: string) => string; onNavegar: (seccion: SeccionAdmin) => void }) {
+  const [buscar, setBuscar] = useState(false)
+  const enlace = 'rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca'
   return (
         <Tarjeta
           id="t-pedidos"
           titulo="Pedidos recientes"
-          accion={<button type="button" onClick={() => onNavegar('reportes')} className="rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver reportes</button>}
+          accion={<span className="flex gap-4">
+            <button type="button" onClick={() => setBuscar(true)} className={enlace}>Buscar pedidos</button>
+            <button type="button" onClick={() => onNavegar('reportes')} className={enlace}>Ver reportes</button>
+          </span>}
         >
+          {buscar && <BuscarPedidos onCerrar={() => setBuscar(false)} />}
           {recientes && !recientes.length ? (
             <Vacio>Cuando haya pedidos aparecen aquí.</Vacio>
           ) : (

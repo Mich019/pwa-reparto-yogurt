@@ -67,10 +67,24 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
   const campo = useRef<HTMLInputElement>(null)
   const recientes = useRecientes(clave ?? '')
   const visible = abierto || valor !== ''
+  // «/» abre el buscador de la sección (como en GitHub o Gmail), salvo cuando ya se escribe en un campo o hay una hoja abierta.
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return
+      const el = e.target as HTMLElement | null
+      if (el?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role=dialog]')) return
+      if (document.querySelector('[role=dialog][aria-modal=true]')) return
+      e.preventDefault()
+      setAbierto(true)
+      campo.current?.focus()
+    }
+    document.addEventListener('keydown', tecla)
+    return () => document.removeEventListener('keydown', tecla)
+  }, [])
   return (
     <div className={`relative h-10 xl:w-10 ${visible ? 'max-sm:basis-full' : ''}`}>
       <div className={`z-10 flex h-10 max-sm:w-full flex-row-reverse xl:absolute xl:right-0 xl:top-0 items-center rounded-md bg-niebla transition-colors ${visible ? '' : 'hover:bg-linea'}`}>
-        <button type="button" aria-label="Buscar" aria-expanded={visible} onClick={() => { setAbierto(true); campo.current?.focus() }}
+        <button type="button" aria-label="Buscar" title="Buscar (tecla /)" aria-expanded={visible} onClick={() => { setAbierto(true); campo.current?.focus() }}
           className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${anilloFoco}`}>
           <Search size={18} aria-hidden="true" />
         </button>
@@ -87,6 +101,7 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
           }}
           tabIndex={visible ? 0 : -1}
           aria-label={placeholder}
+          aria-keyshortcuts="/"
           placeholder={placeholder}
           className={`h-full min-w-0 bg-transparent text-sm outline-none transition-[width,padding] duration-200 ease-out placeholder:text-apagado motion-reduce:transition-none ${visible ? 'w-40 pl-4 max-sm:grow xl:w-52 2xl:w-64' : 'w-0 p-0'}`}
         />

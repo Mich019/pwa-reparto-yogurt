@@ -22,7 +22,7 @@ import { PreciosDelCliente } from '../../components/PreciosDelCliente'
 import { PorCobrar } from '../../components/PorCobrar'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
-import { BuscadorDesplegable, Encabezado, Separador, TextoBoton, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
+import { BuscadorDesplegable, Encabezado, MenuMas, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -105,9 +105,11 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
               <button onClick={() => setVerInactivos(true)} aria-pressed={verInactivos} className={verInactivos ? botonPanel : botonPanelSuave}>Archivados</button>
             </div>
             <Separador />
-            <button onClick={() => setEscaner(true)} className={`${botonPanelSuave} max-sm:w-10 max-sm:px-0`}><ScanLine size={18} /> <TextoBoton>Escanear</TextoBoton></button>
-            <button onClick={() => setImprimir(true)} className={`${botonPanelSuave} max-sm:w-10 max-sm:px-0`}><Printer size={18} /> <TextoBoton>Imprimir QR</TextoBoton></button>
-            {MODO_SERVIDOR && rol === 'administrador' && <button onClick={() => setLibreta(true)} className={`${botonPanelSuave} max-sm:w-10 max-sm:px-0`}><BookUser size={18} /> <TextoBoton>Libreta</TextoBoton></button>}
+            <MenuMas opciones={[
+              { texto: 'Escanear', icono: <ScanLine size={18} aria-hidden="true" />, onElegir: () => setEscaner(true) },
+              { texto: 'Imprimir QR', icono: <Printer size={18} aria-hidden="true" />, onElegir: () => setImprimir(true) },
+              ...(MODO_SERVIDOR && rol === 'administrador' ? [{ texto: 'Libreta', icono: <BookUser size={18} aria-hidden="true" />, onElegir: () => setLibreta(true) }] : []),
+            ]} />
             <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nuevo cliente</button>
           </Encabezado>
         </>
