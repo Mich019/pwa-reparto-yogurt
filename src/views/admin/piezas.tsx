@@ -106,7 +106,7 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
         />
       </div>
       {clave && foco && !valor && recientes.lista.length > 0 && (
-        <div className="desplegar absolute left-0 top-full z-20 mt-1 xl:left-auto xl:right-0 rounded-md bg-papel p-2 shadow-lg ring-1 ring-linea">
+        <div className="desplegar absolute left-0 top-full z-20 mt-1 w-64 max-w-[85vw] xl:left-auto xl:right-0 rounded-md bg-papel p-2 shadow-lg ring-1 ring-linea">
           <Recientes lista={recientes.lista} onElegir={(t) => onChange(t)} onOlvidar={recientes.olvidar} />
         </div>
       )}

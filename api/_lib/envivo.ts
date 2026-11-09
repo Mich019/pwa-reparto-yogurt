@@ -11,7 +11,8 @@ import type { Db } from './db.js'
 // (Vercel corta las funciones largas) y el navegador vuelve a conectarse.
 
 export const AREAS = ['datos', 'cobranza', 'equipo'] as const
-export interface OpcionesEnVivo { intervaloMs: number; duracionMs: number; latidoMs: number }
+// `alConectar` (sólo pruebas): ya se leyó el punto de partida, así que un cambio de aquí en adelante se avisará.
+export interface OpcionesEnVivo { intervaloMs: number; duracionMs: number; latidoMs: number; alConectar?: () => void }
 export const EN_VIVO: OpcionesEnVivo = { intervaloMs: 3000, duracionMs: 240_000, latidoMs: 20_000 }
 
 type Guardia = (req: FastifyRequest, rep: FastifyReply) => Promise<unknown>
@@ -47,6 +48,7 @@ export async function rutasEnVivo(app: FastifyInstance, db: Db, { requiereSesion
     const enviar = (evento: string, datos: unknown) => res.write(`event: ${evento}\ndata: ${JSON.stringify(datos)}\n\n`)
     res.write('retry: 2000\n\n')
     enviar('hola', { areas: AREAS })
+    opciones.alConectar?.()
 
     let cerrado = false
     let ultimoEnvio = Date.now()

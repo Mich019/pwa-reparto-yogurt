@@ -400,13 +400,14 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
   inf.tabla<SaborVendido>([
     { titulo: 'Sabor', ancho: 0.18, valor: (s) => s.sabor, muestra: (s) => hex(s.color) },
     { titulo: tituloCant, ancho: 0.1, der: true, valor: (s) => lit(s.litros, s.unidad) },
-    { titulo: 'Part.', ancho: 0.08, der: true, valor: (s) => (!varias && x.litros ? `${n2((s.litros / x.litros) * 100, 1)}%` : '-') },
+    // Participación: del volumen con una sola unidad; con litros y kilos juntos no se pueden sumar, así que de los ingresos.
+    { titulo: varias ? 'Part. $' : 'Part.', ancho: 0.08, der: true, valor: (s) => (!varias ? (x.litros ? `${n2((s.litros / x.litros) * 100, 1)}%` : '-') : x.ingreso ? `${n2((s.ingreso / x.ingreso) * 100, 1)}%` : '-') },
     { titulo: 'Ingresos', ancho: 0.13, der: true, valor: (s) => din(s.ingreso) },
     { titulo: 'Costo', ancho: 0.13, der: true, valor: (s) => din(s.costo) },
     { titulo: 'Utilidad', ancho: 0.13, der: true, valor: (s) => din(s.utilidad), color: (s) => signo(s.utilidad) },
     { titulo: 'Margen', ancho: 0.09, der: true, valor: (s) => pct(s.margenPct) },
     { titulo: 'Observación', ancho: 0.16, valor: nota, color: (s) => (s.sinCosto ? NEGATIVO : TENUE) },
-  ], r.sabores, ['Total', varias ? '' : lit(x.litros, unidades[0]), !varias && x.litros ? '100.0%' : '-', din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct), ''])
+  ], r.sabores, ['Total', varias ? '' : lit(x.litros, unidades[0]), (varias ? x.ingreso : x.litros) ? '100.0%' : '-', din(x.ingreso), din(x.costo), din(x.utilidad), pct(x.margenPct), ''])
 
   inf.tituloSeccion('Desempeño por vendedor', 'Ordenado por ingresos')
   inf.tabla<VendedorRendimiento>([
