@@ -15,6 +15,7 @@ const body = z.object({
   precios: z.array(z.object({ productoId: z.uuid(), precioLitro: z.number().finite().positive().max(99999999).nullable() })).min(1).max(500),
 })
 const redondear = (n: number) => Math.round(n * 100) / 100
+const cuerpoLimite = z.object({ limite: z.number().finite().min(0).max(99999999).nullable() }).strict()
 
 export async function rutasPrecios(app: FastifyInstance, { db }: Contexto, { requiereAdmin }: { requiereAdmin: Guardia }) {
   const leer = async (idCliente: string) => {
@@ -65,5 +66,15 @@ export async function rutasPrecios(app: FastifyInstance, { db }: Contexto, { req
     if (ok === 404) return rep.code(404).send({ error: 'Ese cliente no existe' })
     if (ok === 400) return rep.code(400).send({ error: 'Alguno de los productos no existe' })
     return { precios: await leer(p.data.id) }
+  })
+
+  // Límite de fiado del cliente (null = sin límite). Sólo avisa en el teléfono al fiar; no impide nada.
+  app.put('/clientes/:id/limite-fiado', { preHandler: requiereAdmin, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, rep) => {
+    const p = idParam.safeParse(req.params)
+    const b = cuerpoLimite.safeParse(req.body)
+    if (!p.success || !b.success) return rep.code(400).send({ error: 'Indica un límite de 0 o más, o déjalo sin límite' })
+    const rowCount = await tx(db, req.usuario.id, async (c) => (await c.query(`UPDATE clientes SET limite_fiado = $2, actualizado_en = now() WHERE id_cliente = $1`, [p.data.id, b.data.limite])).rowCount)
+    if (!rowCount) return rep.code(404).send({ error: 'Ese cliente no existe' })
+    return { limite: b.data.limite }
   })
 }

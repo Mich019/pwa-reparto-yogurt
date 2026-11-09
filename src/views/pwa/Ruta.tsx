@@ -1,3 +1,4 @@
+import { AvisoLimiteFiado } from '../../components/LimiteFiado'
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { EditorMensaje, enlaceWhatsApp, llenar, useMensaje } from '../../components/Mensajes'
 import { esMio, reparte } from '../../lib/reparto'
@@ -367,6 +368,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                         { valor: 'CREDITO', texto: <><NotebookPen size={16} /> Fiado</> },
                       ]}
                     />
+                    {pago === 'CREDITO' && <AvisoLimiteFiado cliente={clienteActivo} total={activo.total} />}
                     {clienteActivo.notas && (
                       <div className="mt-4 flex gap-2.5 rounded-md bg-niebla p-3 text-sm">
                         <StickyNote size={18} className="mt-0.5 shrink-0 text-apagado" />

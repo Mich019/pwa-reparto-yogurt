@@ -74,6 +74,7 @@ describe('resumen diario por correo', () => {
     assert.equal((await cifrasDeAyer(db, empresa)).vendidoAntes, null)
     assert.equal((await cifrasDeAyer(db, empresa)).semana, null)
     assert.equal(semana.semana?.sabor?.nombre, 'Mango')
+    assert.equal(semana.semana?.porCobrar, 0) // aquí nadie quedó a deber
     assert.equal(semana.semana?.mejorDia?.vendido, semana.vendido)
     // El de hace 9 días cae en la semana anterior: mismo pedido, misma venta.
     assert.equal(semana.vendidoAntes, semana.vendido)

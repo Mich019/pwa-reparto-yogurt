@@ -22,6 +22,7 @@ import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { usePaginas } from '../../components/Paginas'
 import { CuentaDelCliente } from '../../components/CuentaDelCliente'
 import { PreciosDelCliente } from '../../components/PreciosDelCliente'
+import { LimiteFiado } from '../../components/LimiteFiado'
 import { PorCobrar } from '../../components/PorCobrar'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
@@ -292,6 +293,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
           </button>
         )}
         {gestiona && <PreciosDelCliente clienteId={cliente.id} nombre={cliente.nombre} />}
+        {gestiona && <LimiteFiado cliente={cliente} />}
         <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
         {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} />}
 

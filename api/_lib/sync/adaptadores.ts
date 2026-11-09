@@ -133,7 +133,7 @@ const clientes: Adaptador<ClienteWire> = {
         latitud: num(r.latitud), longitud: num(r.longitud), telefono: r.telefono ?? '',
         frecuencia: r.frecuencia_tipo === 'intervalo' ? { tipo: 'intervalo' as const, cada: r.cada_dias } : { tipo: 'semana' as const, dias: r.dias_semana },
         ventana: r.ventana_horario === 'tarde' ? ('TARDE' as const) : ('MAÑANA' as const),
-        qr_uuid: r.qr_uuid, nfc_uid: r.nfc_uid ?? undefined, ...(precios.has(r.id_cliente) ? { precios: precios.get(r.id_cliente) } : {}), activo: r.activo,
+        qr_uuid: r.qr_uuid, nfc_uid: r.nfc_uid ?? undefined, ...(precios.has(r.id_cliente) ? { precios: precios.get(r.id_cliente) } : {}), ...(r.limite_fiado != null ? { limiteFiado: Number(r.limite_fiado) } : {}), activo: r.activo,
         creado: r.creado_ms, actualizado: r.act_ms, vendedorId: r.id_vendedor ?? undefined, version: r.version,
       },
       version: r.version, actualizadoMs: r.act_ms, actualizadoUs: r.act_us, final: false, dueno: r.id_vendedor,

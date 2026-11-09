@@ -277,7 +277,7 @@ async function detalleDeLaSemana(db: Db, idEmpresa: string, desde: string, hasta
   const entregados = `SELECT p.id_pedido, p.total, p.id_vendedor, (p.fecha_entregado_real AT TIME ZONE e.zona_horaria)::date AS dia
                         FROM pedidos p JOIN empresas e ON e.id_empresa = p.id_empresa
                        WHERE p.id_empresa = $1 AND p.estado = 'entregado'`
-  const [dia, sabor, vendedores] = await Promise.all([
+  const [dia, sabor, vendedores, cobro] = await Promise.all([
     db.query(`SELECT to_char(dia, 'YYYY-MM-DD') AS dia, sum(total)::float8 AS vendido FROM (${entregados}) v
                WHERE dia BETWEEN $2::date AND $3::date GROUP BY dia ORDER BY 2 DESC, 1 LIMIT 1`, [idEmpresa, desde, hasta]),
     db.query(`SELECT pr.sabor AS nombre, sum(dp.subtotal)::float8 AS vendido FROM (${entregados}) v
@@ -291,11 +291,15 @@ async function detalleDeLaSemana(db: Db, idEmpresa: string, desde: string, hasta
                GROUP BY u.id_usuario, u.nombre, u.meta_mensual
               HAVING coalesce(sum(v.total) FILTER (WHERE v.dia BETWEEN $2::date AND $3::date), 0) > 0 OR u.meta_mensual IS NOT NULL
                ORDER BY 3 DESC, 1`, [idEmpresa, desde, hasta]),
+    // Lo fiado (hasta el último día) menos los abonos no anulados: los abonos nunca pasan del saldo de cada cliente.
+    db.query(`SELECT (SELECT coalesce(sum(total), 0) FROM pedidos WHERE id_empresa = $1 AND estado = 'entregado' AND metodo_pago = 'credito' AND fecha <= $2::date)
+                   - (SELECT coalesce(sum(monto), 0) FROM abonos WHERE id_empresa = $1 AND anulado_en IS NULL AND fecha <= $2::date) AS saldo`, [idEmpresa, hasta]),
   ])
   return {
     mejorDia: dia.rows[0] ? { dia: dia.rows[0].dia, vendido: dia.rows[0].vendido } : null,
     sabor: sabor.rows[0] ? { nombre: sabor.rows[0].nombre, vendido: sabor.rows[0].vendido } : null,
     vendedores: vendedores.rows.map((v) => ({ nombre: v.nombre, semana: v.semana, mes: v.mes, meta: v.meta })),
+    porCobrar: Math.max(0, Math.round(Number(cobro.rows[0].saldo) * 100) / 100),
   }
 }
 

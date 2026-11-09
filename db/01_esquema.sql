@@ -262,6 +262,7 @@ CREATE TABLE clientes (
   ventana_horario  ventana_horario NOT NULL DEFAULT 'manana',   -- RF-029
   qr_uuid          uuid NOT NULL DEFAULT gen_random_uuid(),     -- RF-015 / RF-018 (regenerable)
   nfc_uid          varchar(64),                                 -- RF-019
+  limite_fiado     numeric(12, 2) CONSTRAINT clientes_limite_fiado_valido CHECK (limite_fiado IS NULL OR limite_fiado >= 0), -- migración 036: sólo avisa al fiar
   activo           boolean NOT NULL DEFAULT true,               -- RF-010 baja lógica
   creado_en        timestamptz NOT NULL DEFAULT now(),
   actualizado_en   timestamptz NOT NULL DEFAULT now(),

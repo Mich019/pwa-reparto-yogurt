@@ -82,6 +82,8 @@ export function useServidor<T>(ruta: string | null, enVivo: AreaEnVivo | AreaEnV
 export const fijarMiMeta = (metaMensual: number | null) => llamarAutenticado<{ metaMensual: number | null }>('/mi-meta', { metodo: 'PATCH', cuerpo: { metaMensual } })
 const enviar = <T>(ruta: string, cuerpo?: unknown) => llamarAutenticado<T>(ruta, { metodo: 'POST', cuerpo: cuerpo ?? {} })
 
+export const guardarLimiteFiado = (clienteId: string, limite: number | null) =>
+  llamarAutenticado<{ limite: number | null }>(`/clientes/${clienteId}/limite-fiado`, { metodo: 'PUT', cuerpo: { limite } })
 export const registrarAbono = (b: { clienteId: string; monto: number; metodo: 'efectivo' | 'transferencia'; nota?: string }) => enviar<{ id: string; saldo: number }>('/cobranza/abonos', b)
 export const anularAbono = (id: string, motivo: string) => enviar(`/cobranza/abonos/${id}/anular`, { motivo })
 export const registrarRecogida = (b: { clienteId: string; productoId: string; cantidad: number; nota?: string }) => enviar<{ id: string; prestados: number }>('/envases/recogidas', b)

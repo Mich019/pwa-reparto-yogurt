@@ -27,6 +27,26 @@ async function escenario() {
 }
 const precioDeLinea = async (idPedido: string) => Number((await db.query(`SELECT precio_unitario FROM detalle_pedido WHERE id_pedido = $1`, [idPedido])).rows[0].precio_unitario)
 
+describe('límite de fiado por cliente', () => {
+  it('lo pone el administrador, viaja con el cliente al teléfono y null lo quita', async () => {
+    const x = await escenario()
+    assert.equal((await llamar(x.ana, 'PUT', `/clientes/${x.mayorista.id}/limite-fiado`, { limite: 500 })).status, 403)
+    assert.equal((await llamar(x.admin, 'PUT', `/clientes/${x.mayorista.id}/limite-fiado`, { limite: -1 })).status, 400)
+    assert.equal((await llamar(x.admin, 'PUT', `/clientes/${randomUUID()}/limite-fiado`, { limite: 1 })).status, 404)
+    const r = await llamar(x.admin, 'PUT', `/clientes/${x.mayorista.id}/limite-fiado`, { limite: 500 })
+    assert.equal(r.status, 200)
+    const delTelefono = async (id: string) => (await pull(x.ana)).body.clientes.find((c: { id: string }) => c.id === id)
+    assert.equal((await delTelefono(x.mayorista.id)).limiteFiado, 500)
+    assert.equal((await delTelefono(x.normal.id)).limiteFiado, undefined)
+    // Lo que el teléfono sube no lo cambia.
+    const editado = { ...(await delTelefono(x.mayorista.id)), limiteFiado: 99999, nombre: 'Mayorista Centro' }
+    assert.equal((await push(x.ana, [op('clientes', editado.id, editado)])).body.resultados[0].estado, 'aplicada')
+    assert.equal((await delTelefono(x.mayorista.id)).limiteFiado, 500)
+    await llamar(x.admin, 'PUT', `/clientes/${x.mayorista.id}/limite-fiado`, { limite: null })
+    assert.equal((await delTelefono(x.mayorista.id)).limiteFiado, undefined)
+  })
+})
+
 describe('precio especial por cliente', () => {
   it('el pedido nuevo del cliente sale con su precio; el de otro cliente, con el de lista', async () => {
     const x = await escenario()

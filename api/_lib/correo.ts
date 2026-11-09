@@ -142,6 +142,7 @@ export interface CifrasResumen {
     mejorDia: { dia: string; vendido: number } | null
     sabor: { nombre: string; vendido: number } | null
     vendedores: { nombre: string; semana: number; mes: number; meta: number | null }[]
+    porCobrar: number // todo lo fiado que sigue sin cobrarse, al terminar la semana
   } | null
 }
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -197,6 +198,7 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
   if (c.semana?.sabor) renglones.push(['Lo que más se vendió', `${c.semana.sabor.nombre} · ${pesos(c.semana.sabor.vendido)}`])
   if (c.fiado) renglones.push(['Fiado', pesos(c.fiado)])
   if (c.abonos) renglones.push(['Abonos cobrados', pesos(c.abonos)])
+  if (c.semana?.porCobrar) renglones.push(['Queda por cobrar', pesos(c.semana.porCobrar)])
   // Cada vendedor: lo de la semana y, si tiene meta, cómo va el mes.
   const vendedores: [string, string][] = (c.semana?.vendedores ?? []).map((v) => [v.nombre,
     `${pesos(v.semana)}${v.meta ? ` · mes: ${pesos(v.mes)} de ${pesos(v.meta)} (${Math.round((v.mes / v.meta) * 100)}%)` : ''}`])

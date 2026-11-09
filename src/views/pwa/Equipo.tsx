@@ -10,8 +10,8 @@ import {
   avisoDePrueba, cargarEquipo, crearMiembro, metaParaTodos, ventasMesPasado, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro, type Rachas, type Trofeos,
 } from '../../lib/equipo'
-import { useServidor, type CifrasMes } from '../../lib/cobranza'
-import { hace, hoy } from '../../lib/fechas'
+import { useServidor, type CifrasMes, type Deudor } from '../../lib/cobranza'
+import { dinero, hace, hoy, textoFecha } from '../../lib/fechas'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { llamarAutenticado, useSesion, type Rol } from '../../lib/sesion'
@@ -463,6 +463,11 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   onCartera: () => void
 }) {
   const [confirmar, setConfirmar] = useState<'password' | 'baja' | null>(null)
+  // Lo fiado que sus clientes siguen debiendo (la misma lista de Cobranza → Por cobrar, filtrada a su cartera).
+  const cobro = useServidor<{ deudores: Deudor[] }>(m.rol === 'vendedor' ? '/cobranza' : null)
+  const suyos = (cobro.datos?.deudores ?? []).filter((d) => d.vendedorId === m.id)
+  const fiado = suyos.reduce((s, d) => s + d.saldo, 0)
+  const masViejo = suyos.map((d) => d.desde).filter((f): f is string => !!f).sort()[0]
   const [destino, setDestino] = useState('') // qué hacer con sus clientes al dar de baja: '' = decidir después
   const [trabajando, setTrabajando] = useState(false)
   // Trofeo: los meses cerrados en que llegó a su meta.
@@ -550,6 +555,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           <Linea t="Teléfono" v={m.telefono || '—'} />
           <Linea t="Último acceso" v={m.ultimoAcceso ? hace(new Date(m.ultimoAcceso).getTime()) : 'Todavía no ha entrado'} />
           {m.rol === 'vendedor' && <Linea t="Clientes" v={`${m.clientes}${m.clientes !== m.clientesActivos ? ` (${m.clientesActivos} activos)` : ''}`} />}
+          {fiado > 0 && <Linea t="Fiado por cobrar" v={`${dinero(fiado)} en ${plural(suyos.length, 'cliente', 'clientes')}${masViejo ? ` · desde el ${textoFecha(masViejo).toLowerCase()}` : ''}`} />}
           <Linea t="Avisos" v={textoAvisos(m)} />
           {!!metas?.length && <Linea t="Llegó a su meta" v={metas.slice(0, 6).map(mesCorto).join(', ') + (metas.length > 6 ? ` y ${metas.length - 6} más` : '')} />}
         </dl>

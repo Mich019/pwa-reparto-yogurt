@@ -22,6 +22,7 @@ export interface Cliente {
   qr_uuid: string
   nfc_uid?: string
   precios?: Record<string, number> // precio especial por producto (por unidad); lo pone el servidor, la app no lo edita
+  limiteFiado?: number // lo más que puede deber (migración 036); lo pone el administrador por el servidor, sólo avisa al fiar
   activo: boolean
   creado: number
   actualizado: number
