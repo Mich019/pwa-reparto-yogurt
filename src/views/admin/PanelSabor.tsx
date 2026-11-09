@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Pencil, Trophy, X } from 'lucide-react'
-import { aviso } from '../../components/ui'
+import { aviso, vidrio } from '../../components/ui'
 import { litrosTxt, ultimosMeses, type VentaSabor } from '../../lib/admin-datos'
 import { db, guardar, type Producto } from '../../lib/db'
 import { dinero } from '../../lib/fechas'
@@ -101,7 +101,7 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
         role="dialog"
         aria-modal="true"
         aria-labelledby={titulo}
-        className={`absolute inset-x-2 bottom-2 flex max-h-[90dvh] flex-col overflow-hidden rounded-lg border border-linea bg-papel shadow-[0_24px_80px_rgba(0,32,20,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] supports-[backdrop-filter]:bg-papel/80 supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 sm:inset-x-auto sm:bottom-3 sm:left-3 sm:top-3 sm:max-h-none sm:w-[26rem] ${visible ? 'translate-y-0 sm:translate-x-0' : 'translate-y-[110%] sm:translate-y-0 sm:-translate-x-[110%]'}`}
+        className={`absolute inset-x-2 bottom-2 flex max-h-[90dvh] flex-col overflow-hidden rounded-lg border border-linea bg-papel shadow-[0_24px_80px_rgba(0,32,20,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${vidrio} sm:inset-x-auto sm:bottom-3 sm:left-3 sm:top-3 sm:max-h-none sm:w-[26rem] ${visible ? 'translate-y-0 sm:translate-x-0' : 'translate-y-[110%] sm:translate-y-0 sm:-translate-x-[110%]'}`}
       >
         <button
           ref={cerrar}

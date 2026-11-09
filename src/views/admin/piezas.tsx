@@ -9,7 +9,7 @@ import { dinero } from '../../lib/fechas'
 import { presentacionDe, unidadDe } from '../../lib/unidades'
 import { AveEmpresa, Frasco, useLogoEtiqueta } from './marca'
 import { DibujoEnvase } from '../registro/dibujos'
-import { Hoja } from '../../components/ui'
+import { Hoja, vidrio } from '../../components/ui'
 import type { SeccionAdmin } from './menu'
 
 // Cambio contra el periodo anterior, con signo y flecha (nunca sólo con color). null = no hay con qué comparar.
@@ -197,7 +197,7 @@ export function MenuMas({ opciones }: { opciones: { texto: string; icono: ReactN
         <MoreHorizontal size={18} aria-hidden="true" /> Más <ChevronDown size={16} aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${abierto ? 'rotate-180' : ''}`} />
       </button>
       {abierto && (
-        <div role="menu" className="desplegar absolute right-0 top-full z-20 mt-1 min-w-[13rem] rounded-md bg-papel py-1 shadow-lg ring-1 ring-linea">
+        <div role="menu" className={`desplegar absolute right-0 top-full z-20 mt-1 min-w-[13rem] rounded-md bg-papel py-1 shadow-lg ring-1 ring-linea ${vidrio}`}>
           {opciones.map((o) => (
             <button key={o.texto} type="button" role="menuitem" onClick={() => { setAbierto(false); o.onElegir() }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold hover:bg-niebla focus-visible:bg-niebla focus-visible:outline-none">

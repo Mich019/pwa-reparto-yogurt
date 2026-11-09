@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { vidrio } from './ui'
 
 // Lista desplegable propia, en lugar del <select> del navegador (que en cada sistema se ve distinto y no lleva los
 // colores del tema). Se abre con un leve desliz (sólo opacity/transform: no recalcula el layout), hacia arriba si abajo
@@ -101,7 +102,7 @@ export function Selector<T extends string | number>({ valor, opciones, onCambiar
       {abierto && (
         <ul
           ref={lista} id={`${id}-lista`} role="listbox" aria-label={etiqueta} tabIndex={-1}
-          className={`desplegar absolute z-50 max-h-64 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-lg border border-linea bg-papel p-1 shadow-tarjeta
+          className={`desplegar absolute z-50 max-h-64 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-lg border border-linea bg-papel p-1 shadow-tarjeta ${vidrio}
             ${lado.arriba ? 'desplegar-arriba bottom-full mb-1.5' : 'top-full mt-1.5'} ${lado.derecha ? 'right-0' : 'left-0'}`}
         >
           {opciones.map((o, i) => (

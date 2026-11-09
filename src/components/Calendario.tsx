@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { desdeIso, hoy, iso, sumarDias } from '../lib/fechas'
+import { vidrio } from './ui'
 
 // Calendario propio en lugar del <input type="date"> del navegador (que en cada sistema se ve distinto y no sigue el
 // tema). Dos formas: SelectorFecha (un día) y SelectorRango (desde–hasta, con atajos). El botón que lo abre lo pone
@@ -65,7 +66,7 @@ function Flotante({ ancla, onCerrar, children }: { ancla: HTMLElement | null; on
       ref={caja}
       role="dialog"
       style={pos ?? { top: 0, left: 0, visibility: 'hidden' }}
-      className="calendario-entrar fixed z-[60] rounded-lg border border-linea bg-papel p-3 text-tinta shadow-[0_12px_36px_rgba(0,0,0,0.16)]"
+      className={`calendario-entrar fixed z-[60] rounded-lg border border-linea bg-papel p-3 text-tinta shadow-[0_12px_36px_rgba(0,0,0,0.16)] ${vidrio}`}
     >
       {children}
     </div>,

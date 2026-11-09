@@ -1,6 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
+// Vidrio esmerilado (como el panel de Sabores) para lo que flota sobre la pantalla: hojas, menús y listas desplegables.
+export const vidrio = 'supports-[backdrop-filter]:bg-papel/80 supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150'
+
 // Hoja modal que sube desde abajo, cómoda para usar con una mano.
 export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie, className = '' }: {
   abierta: boolean
@@ -27,13 +30,13 @@ export function Hoja({ abierta, onCerrar, titulo, children, alto = false, pie, c
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div
-        className={`absolute inset-0 bg-black/50 supports-[backdrop-filter]:bg-black/20 transition-opacity duration-250 ${visible ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/50 supports-[backdrop-filter]:bg-transparent transition-opacity duration-250 ${visible ? 'opacity-100' : 'opacity-0'}`}
         onClick={onCerrar}
       />
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative mx-auto flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-[28px] bg-papel text-tinta shadow-hoja supports-[backdrop-filter]:bg-papel/80 supports-[backdrop-filter]:backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 transition-transform duration-250 ease-out ${alto ? 'h-[92dvh]' : ''} ${visible ? 'translate-y-0' : 'translate-y-full'} ${className}`}
+        className={`relative mx-auto flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-[28px] bg-papel text-tinta shadow-hoja supports-[backdrop-filter]:border supports-[backdrop-filter]:border-b-0 supports-[backdrop-filter]:border-linea supports-[backdrop-filter]:shadow-[0_-12px_60px_rgba(0,32,20,0.18)] ${vidrio} transition-transform duration-250 ease-out ${alto ? 'h-[92dvh]' : ''} ${visible ? 'translate-y-0' : 'translate-y-full'} ${className}`}
       >
         <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-linea" />
         <div className="flex items-center gap-3 px-5 pt-7 pb-3">

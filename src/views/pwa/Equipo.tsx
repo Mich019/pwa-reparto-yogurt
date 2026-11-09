@@ -3,7 +3,7 @@ import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightLeft, BellOff, BellRing, Check, Crown, Flame, Target, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
+import { ArrowRightLeft, BellOff, FileSpreadsheet, BellRing, Check, Crown, Flame, Target, Trophy, ChevronRight, Copy, KeyRound, Mail, MessageCircle, Pencil, Search, Share2, ShieldCheck, TriangleAlert, UserCheck, UserPlus, UserX } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { db, type Cliente } from '../../lib/db'
 import {
@@ -11,7 +11,8 @@ import {
   type Miembro, type Rachas, type Trofeos,
 } from '../../lib/equipo'
 import { useServidor } from '../../lib/cobranza'
-import { hace } from '../../lib/fechas'
+import { hace, hoy } from '../../lib/fechas'
+import { descargar, xlsx } from '../../lib/xlsx'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
@@ -113,6 +114,14 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const t = limpiarBusqueda(q)
   const lista = (verBaja ? deBaja : activos).filter((m) => coincide(t, m.nombre, m.correo))
   const vista = usePaginas(panel ? lista : activos, 30, `${t}|${verBaja}`)
+  // Lo que dejó la búsqueda, a Excel (los datos que ya trae la lista del equipo).
+  function exportar() {
+    descargar(xlsx({
+      nombre: verBaja ? 'Dadas de baja' : 'Equipo',
+      columnas: [{ titulo: 'Nombre', ancho: 26 }, { titulo: 'Correo', ancho: 30 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Rol', ancho: 14 }, { titulo: 'Clientes activos', ancho: 10 }, { titulo: 'Meta mensual', dinero: true, ancho: 14 }, { titulo: 'Comisión %', ancho: 10 }, { titulo: 'Último acceso', ancho: 18 }],
+      filas: lista.map((m) => [m.nombre, m.correo, m.telefono, m.rol === 'administrador' ? 'Administrador' : 'Vendedor', m.clientesActivos, m.metaMensual, m.comisionPct, m.ultimoAcceso ? new Date(m.ultimoAcceso).toLocaleString('es-MX') : 'Nunca']),
+    }), `equipo-${hoy()}.xlsx`)
+  }
 
   const fila =(m: Miembro) => (
     <button key={m.id} onClick={() => setFichaId(m.id)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left transition-colors hover:bg-niebla/40 active:bg-niebla">
@@ -168,6 +177,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
             { texto: 'Invitar', icono: <Mail size={18} aria-hidden="true" />, onElegir: () => setInvitando(true) },
             { texto: 'Meta para todos', icono: <Target size={18} aria-hidden="true" />, onElegir: () => setMetaTodos(true) },
             { texto: 'Salón de la fama', icono: <Crown size={18} aria-hidden="true" />, onElegir: () => setFama(true) },
+            { texto: 'Bajar a Excel', icono: <FileSpreadsheet size={18} aria-hidden="true" />, onElegir: exportar },
           ]} />
           <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nueva cuenta</button>
         </Encabezado>

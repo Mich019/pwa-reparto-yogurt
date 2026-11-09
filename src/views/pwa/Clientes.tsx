@@ -8,7 +8,10 @@ import { BookUser, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileT
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Producto, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
-import { DIAS_CORTOS, DIAS_LARGOS, dinero, textoFecha, textoFrecuencia } from '../../lib/fechas'
+import { descargar, xlsx } from '../../lib/xlsx'
+import { llamarAutenticado } from '../../lib/sesion'
+import type { Deudor, EnvasesClientes } from '../../lib/cobranza'
+import { DIAS_CORTOS, DIAS_LARGOS, dinero, hoy, textoFecha, textoFrecuencia } from '../../lib/fechas'
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
 import { exportarLibreta, type Formato } from '../../lib/reportes'
@@ -56,6 +59,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const [imprimir, setImprimir] = useState(false)
   const [libreta, setLibreta] = useState(false)
   const rol = useRol()
+  const equipoNombres = useEquipo()
 
   const prod = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
   const stats = useMemo(() => {
@@ -88,6 +92,26 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const lista = clientes.filter((c) => c.activo !== verInactivos && (coincide(t, textoBusqueda(c)) || telefonoCoincide(digitos, c.telefono)))
   const paginas = usePaginas(lista, 40, `${t}|${verInactivos}`)
   const perfil = clientes.find((c) => c.id === perfilId)
+  // Lo que dejó la búsqueda, a Excel. El vendedor sale si el equipo ya está cargado; con conexión se agregan lo que debe
+  // cada cliente (fiado) y los envases que tiene prestados, y sin ella el Excel sale igual, sin esas dos columnas.
+  async function exportar() {
+    const vendedor = new Map((equipoNombres?.usuarios ?? []).map((u) => [u.id, u.nombre]))
+    const [cobro, envases] = MODO_SERVIDOR
+      ? await Promise.all([
+        llamarAutenticado<{ deudores: Deudor[] }>('/cobranza').catch(() => null),
+        llamarAutenticado<EnvasesClientes>('/envases').catch(() => null),
+      ])
+      : [null, null]
+    const saldo = cobro && new Map(cobro.deudores.map((d) => [d.id, d.saldo]))
+    const prestados = envases && new Map(envases.clientes.map((c) => [c.id, c.total]))
+    descargar(xlsx({
+      nombre: verInactivos ? 'Clientes archivados' : 'Clientes',
+      columnas: [{ titulo: 'Cliente', ancho: 28 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Dirección', ancho: 40 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Visita', ancho: 22 }, { titulo: 'Último pedido entregado', ancho: 14 },
+        ...(saldo ? [{ titulo: 'Debe (fiado)', dinero: true, ancho: 14 }] : []), ...(prestados ? [{ titulo: 'Envases prestados', ancho: 12 }] : []), { titulo: 'Notas', ancho: 36 }],
+      filas: lista.map((c) => [c.nombre, c.telefono, c.direccion, c.vendedorId ? vendedor.get(c.vendedorId) ?? '' : 'Sin vendedor', textoFrecuencia(c.frecuencia), stats.get(c.id)?.ultima ?? '',
+        ...(saldo ? [saldo.get(c.id) ?? 0] : []), ...(prestados ? [prestados.get(c.id) ?? 0] : []), c.notas ?? '']),
+    }), `clientes-${hoy()}.xlsx`)
+  }
 
   const archivados = clientes.filter((c) => !c.activo).length
   const buscador = (
@@ -115,6 +139,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
             <MenuMas opciones={[
               { texto: 'Escanear', icono: <ScanLine size={18} aria-hidden="true" />, onElegir: () => setEscaner(true) },
               { texto: 'Imprimir QR', icono: <Printer size={18} aria-hidden="true" />, onElegir: () => setImprimir(true) },
+              { texto: 'Bajar a Excel', icono: <FileSpreadsheet size={18} aria-hidden="true" />, onElegir: () => void exportar() },
               ...(MODO_SERVIDOR && rol === 'administrador' ? [{ texto: 'Libreta', icono: <BookUser size={18} aria-hidden="true" />, onElegir: () => setLibreta(true) }] : []),
             ]} />
             <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nuevo cliente</button>

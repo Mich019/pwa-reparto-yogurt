@@ -35,3 +35,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck:api
       - run: npm run test:api
+      # Una segunda vuelta sobre la misma base (ya con los datos de la primera) saca a la luz las pruebas que
+      # dependen del orden o de lo que dejaron otras: así se ven en CI y no sólo de vez en cuando en una compu.
+      - name: Segunda vuelta de las pruebas
+        run: npm run test:api
