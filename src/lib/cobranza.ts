@@ -7,7 +7,9 @@ import { mostrarPdf } from '../components/VisorPdf'
 // Cobranza, envases, cortes y cierre de mes (api/_lib/cobranza.ts, envases.ts, cortes.ts). Todo viene del servidor y
 // necesita conexión: no pasa por la cola de sincronización.
 
-export interface Deudor { id: string; nombre: string; telefono: string | null; vendedorId: string | null; vendedor: string | null; fiado: number; abonado: number; saldo: number; desde: string | null; ultimoAbono: string | null }
+export interface Deudor { id: string; nombre: string; telefono: string | null; vendedorId: string | null; vendedor: string | null; fiado: number; abonado: number; saldo: number; desde: string | null; ultimoAbono: string | null; limite?: number | null }
+// Pasó su límite de fiado (el suyo o el de la empresa; migración 036).
+export const pasoSuLimite = (d: Pick<Deudor, 'saldo' | 'limite'>) => d.limite != null && d.saldo > d.limite + 0.004
 export interface CuentaCliente {
   cliente: { id: string; nombre: string }
   fiado: number; abonado: number; saldo: number; desde: string | null

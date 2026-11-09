@@ -48,6 +48,7 @@ CREATE TABLE empresas (
   zona_horaria   varchar(64) NOT NULL DEFAULT 'America/Mexico_City',
   minutos_urgente smallint NOT NULL DEFAULT 30 CHECK (minutos_urgente BETWEEN 5 AND 240), -- urgente sin atender (031)
   ritmo_meta_pct smallint NOT NULL DEFAULT 70 CHECK (ritmo_meta_pct BETWEEN 30 AND 100),   -- aviso de meta atrasada (034)
+  limite_fiado   numeric(12, 2) CONSTRAINT empresas_limite_fiado_valido CHECK (limite_fiado IS NULL OR limite_fiado >= 0),   -- para clientes sin límite propio (036)
   color_marca    char(7),
   logo           text,
   lema           varchar(80),                            -- marca: lema y contacto en los PDF (migración 013)

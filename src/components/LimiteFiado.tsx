@@ -4,6 +4,7 @@ import { guardarLimiteFiado, useServidor, type CuentaCliente } from '../lib/cobr
 import { dinero } from '../lib/fechas'
 import { sincronizar } from '../lib/sync'
 import type { Cliente } from '../lib/db'
+import { useMarca } from '../lib/marca'
 import { Boton, Hoja, aviso, claseInput } from './ui'
 
 // Límite de fiado por cliente (migración 036). El administrador lo pone en la ficha del cliente; viaja al teléfono con
@@ -12,13 +13,14 @@ import { Boton, Hoja, aviso, claseInput } from './ui'
 
 export function LimiteFiado({ cliente }: { cliente: Cliente }) {
   const [abierta, setAbierta] = useState(false)
+  const deEmpresa = useMarca()?.limiteFiado ?? null
   return (
     <>
       <button onClick={() => setAbierta(true)} className="flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-3 text-left active:bg-linea">
         <NotebookPen size={20} className="shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block text-xs text-apagado">Fiado</span>
-          <span className="block font-semibold">{cliente.limiteFiado != null ? `Límite de ${dinero(cliente.limiteFiado)}` : 'Sin límite de fiado'}</span>
+          <span className="block font-semibold">{cliente.limiteFiado != null ? `Límite de ${dinero(cliente.limiteFiado)}` : deEmpresa != null ? `El de la empresa: ${dinero(deEmpresa)}` : 'Sin límite de fiado'}</span>
         </span>
         <ChevronRight size={18} className="shrink-0 text-apagado/60" />
       </button>
@@ -50,7 +52,7 @@ function HojaLimite({ cliente, onCerrar }: { cliente: Cliente; onCerrar: () => v
     <Hoja abierta onCerrar={onCerrar} titulo={<div>Límite de fiado<div className="text-base font-medium text-apagado">{cliente.nombre}</div></div>}
       pie={<Boton onClick={guardar} disabled={enviando || !valido || valor === (cliente.limiteFiado ?? null)} className="w-full text-lg">Guardar</Boton>}>
       <div className="space-y-3 pb-4">
-        <p className="text-sm text-apagado">Lo más que puede deber. Al elegir «Fiado», el teléfono avisa al vendedor si con ese pedido se pasa. Déjalo en blanco para no tener límite.</p>
+        <p className="text-sm text-apagado">Lo más que puede deber. Al elegir «Fiado», el teléfono avisa al vendedor si con ese pedido se pasa. Déjalo en blanco para usar el de la empresa (Configuración → Preferencias) o no tener límite.</p>
         <label className="block">
           <span className="text-sm font-semibold">Límite</span>
           <input inputMode="decimal" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-invalid={!valido} className={`${claseInput} mt-1`} />
@@ -63,7 +65,8 @@ function HojaLimite({ cliente, onCerrar }: { cliente: Cliente; onCerrar: () => v
 
 // En la entrega, con «Fiado» elegido. Lo que debe viene del servidor (con conexión); sin ella sólo recuerda el límite.
 export function AvisoLimiteFiado({ cliente, total }: { cliente: Cliente; total: number }) {
-  const limite = cliente.limiteFiado
+  const deEmpresa = useMarca()?.limiteFiado ?? null
+  const limite = cliente.limiteFiado ?? deEmpresa
   const cuenta = useServidor<CuentaCliente>(limite != null ? `/cobranza/clientes/${cliente.id}` : null)
   if (limite == null) return null
   const debe = cuenta.datos?.saldo

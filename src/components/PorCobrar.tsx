@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from './Mensajes'
 import { esMio } from '../lib/reparto'
 import { ChevronRight, HandCoins } from 'lucide-react'
-import { useServidor, type Deudor } from '../lib/cobranza'
+import { useServidor, type Deudor, pasoSuLimite } from '../lib/cobranza'
 import { dinero, textoFecha } from '../lib/fechas'
 import { CuentaAbierta } from './CuentaDelCliente'
 import { Hoja } from './ui'
@@ -46,8 +46,9 @@ export function PorCobrar() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{x.nombre}</span>
                   {x.desde && <span className="block text-sm text-apagado">Desde el {textoFecha(x.desde).toLowerCase()}</span>}
+                  {pasoSuLimite(x) && <span className="block text-sm font-semibold text-rojo">Pasó su límite de {dinero(x.limite!)}</span>}
                 </span>
-                <span className="font-semibold tabular-nums">{dinero(x.saldo)}</span>
+                <span className={`font-semibold tabular-nums ${pasoSuLimite(x) ? 'text-rojo' : ''}`}>{dinero(x.saldo)}</span>
                 <ChevronRight size={18} className="shrink-0 text-apagado/60" />
               </button>
               {x.telefono && <BotonWhatsApp chico telefono={x.telefono} texto={llenar(cobro, { nombre: x.nombre, saldo: dinero(x.saldo) })} enviado={mandados.has(x.id)} onEnviar={() => setMandados((m) => new Set(m).add(x.id))} />}

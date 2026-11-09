@@ -375,6 +375,43 @@ function RitmoMeta() {
   )
 }
 
+// También de la empresa: el límite de fiado de los clientes que no tienen uno propio (migración 036). Sólo avisa.
+function LimiteFiadoEmpresa() {
+  const marca = useMarca()
+  const [texto, setTexto] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  if (!marca?.zonaHoraria) return null // copia vieja de la marca, sin los ajustes de la empresa
+  const actual = marca.limiteFiado ?? null
+  const valor = texto ?? (actual === null ? '' : String(actual))
+  const t = valor.trim().replace(',', '.')
+  const nuevo = t === '' ? null : Number(t)
+  const valido = nuevo === null || (Number.isFinite(nuevo) && nuevo >= 0)
+  async function guardar() {
+    setGuardando(true)
+    try {
+      await guardarMarca({ limiteFiado: nuevo })
+      setTexto(null)
+      aviso('Guardado')
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <Seccion id="fiado" titulo="Fiado" descripcion="Vale para los clientes que no tienen un límite propio (se pone en la ficha de cada cliente). Sólo avisa: no impide fiar.">
+      <Fila titulo="Límite de fiado" ayuda={actual === null ? 'Sin límite.' : `Al elegir «Fiado», el teléfono avisa si el cliente pasaría de ${'$'}${actual.toLocaleString('es-MX')}. En Por cobrar sale en rojo quien ya lo pasó.`}>
+        <span className="flex items-center gap-2">
+          <input inputMode="decimal" value={valor} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-label="Límite de fiado de la empresa" aria-invalid={!valido} className={`${claseInputRecto} w-32`} />
+          {valor !== (actual === null ? '' : String(actual)) && (
+            <button type="button" onClick={() => void guardar()} disabled={guardando || !valido} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>
+          )}
+        </span>
+      </Fila>
+    </Seccion>
+  )
+}
+
 function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encendido: boolean; deshabilitado: boolean; etiqueta: string; alCambiar: (si: boolean) => void }) {
   return (
     <label className="relative inline-flex cursor-pointer items-center">
@@ -441,6 +478,7 @@ function Preferencias() {
       </Seccion>
       <MinutosUrgente />
       <RitmoMeta />
+      <LimiteFiadoEmpresa />
       <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>
           <Interruptor encendido={!!silencio} deshabilitado={!prefs} etiqueta="Silenciar avisos" alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />

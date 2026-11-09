@@ -6,8 +6,7 @@ import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, useMensaje } from '
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
-  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre,
-} from '../../lib/cobranza'
+  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre, pasoSuLimite } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { textoPorUnidad } from '../../lib/unidades'
 import { usePaginas } from '../../components/Paginas'
@@ -124,8 +123,9 @@ function PorCobrar({ q }: { q: string }) {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold"><Resaltar texto={d.nombre} t={t} /></span>
                       <span className="block truncate text-sm text-apagado">{d.vendedor ? <Resaltar texto={d.vendedor} t={t} /> : 'Sin vendedor'}{d.desde && ` · desde el ${textoFecha(d.desde).toLowerCase()}`}</span>
+                      {pasoSuLimite(d) && <span className="block truncate text-sm font-semibold text-rojo">Pasó su límite de {dinero(d.limite!)}</span>}
                     </span>
-                    <span className="font-semibold tabular-nums">{dinero(d.saldo)}</span>
+                    <span className={`font-semibold tabular-nums ${pasoSuLimite(d) ? 'text-rojo' : ''}`}>{dinero(d.saldo)}</span>
                     <ChevronRight size={18} className="shrink-0 text-apagado/60" />
                   </Fila>
                 </div>

@@ -37,6 +37,7 @@ export interface Deudor {
   abonado: number
   saldo: number
   desde: string | null // fecha del adeudo más viejo que sigue sin cubrirse (los abonos pagan primero lo más antiguo)
+  limite: number | null // su límite de fiado, o el de la empresa si no tiene uno propio (migración 036); null = sin límite
   ultimoAbono: string | null
 }
 
@@ -56,7 +57,8 @@ export async function saldos(q: Consulta, f: { clienteId?: string; vendedorId?: 
               min(c.fecha) FILTER (WHERE c.acum > coalesce(ab.abonado, 0))::text AS desde
          FROM cred c LEFT JOIN ab USING (id_cliente) GROUP BY c.id_cliente, ab.abonado, ab.ultimo
      )
-     SELECT cl.id_cliente, cl.nombre, cl.telefono, cl.id_vendedor, d.fiado::float8, d.abonado::float8, d.desde, d.ultimo
+     SELECT cl.id_cliente, cl.nombre, cl.telefono, cl.id_vendedor, d.fiado::float8, d.abonado::float8, d.desde, d.ultimo,
+            coalesce(cl.limite_fiado, (SELECT e.limite_fiado FROM empresas e WHERE e.id_empresa = cl.id_empresa))::float8 AS limite
        FROM deuda d JOIN clientes cl USING (id_cliente)
       WHERE ($1::uuid IS NULL OR cl.id_cliente = $1) AND ($2::uuid IS NULL OR cl.id_vendedor = $2)
         AND (d.fiado - d.abonado > 0.004 OR $1::uuid IS NOT NULL)
@@ -66,7 +68,7 @@ export async function saldos(q: Consulta, f: { clienteId?: string; vendedorId?: 
   return rows.map((r) => ({
     id: r.id_cliente, nombre: r.nombre, telefono: r.telefono, vendedorId: r.id_vendedor,
     fiado: redondear(r.fiado), abonado: redondear(r.abonado), saldo: redondear(r.fiado - r.abonado),
-    desde: r.desde, ultimoAbono: r.ultimo,
+    desde: r.desde, ultimoAbono: r.ultimo, limite: r.limite,
   }))
 }
 
@@ -77,6 +79,8 @@ export async function saldos(q: Consulta, f: { clienteId?: string; vendedorId?: 
 // cobrar»). Cada cliente vuelve a avisarse a los `dias` días si sigue debiendo (`datos.clienteIds`).
 // Cruza empresas: la conexión del dueño. shortcut: calcula los saldos de todas las empresas en una consulta; si llegan a
 // ser muchas, recorrerlas una por una.
+export const pasoSuLimite = (d: Pick<Deudor, 'saldo' | 'limite'>) => d.limite !== null && d.saldo > d.limite + 0.004
+
 export async function avisarFiadoAtrasado(db: Db, despachador: Despachador, dias = 30): Promise<number> {
   const viejos = (await saldos(db)).filter((d) => d.desde && Date.parse(`${d.desde}T12:00:00Z`) <= Date.now() - dias * 86_400_000)
   if (!viejos.length) return 0
@@ -102,9 +106,13 @@ export async function avisarFiadoAtrasado(db: Db, despachador: Despachador, dias
   const fecha = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
   const texto = (ds: Deudor[]) => {
     const nombres = ds.slice(0, 3).map((d) => d.nombre).join(', ') + (ds.length > 3 ? ` y ${ds.length - 3} más` : '')
-    return ds.length === 1
-      ? { titulo: 'Fiado de más de un mes', cuerpo: `${ds[0].nombre} debe ${pesos(ds[0].saldo)} desde el ${fecha(ds[0].desde!)}` }
-      : { titulo: `${ds.length} clientes deben desde hace más de un mes`, cuerpo: `${nombres}: ${pesos(ds.reduce((s, d) => s + d.saldo, 0))} en total` }
+    const pasados = ds.filter(pasoSuLimite)
+    if (ds.length === 1) {
+      const d = ds[0]
+      return { titulo: 'Fiado de más de un mes', cuerpo: `${d.nombre} debe ${pesos(d.saldo)} desde el ${fecha(d.desde!)}${pasados.length ? ` y ya pasó su límite de ${pesos(d.limite!)}` : ''}` }
+    }
+    const extra = !pasados.length ? '' : pasados.length === 1 ? `. ${pasados[0].nombre} ya pasó su límite` : `. ${pasados.length} ya pasaron su límite`
+    return { titulo: `${ds.length} clientes deben desde hace más de un mes`, cuerpo: `${nombres}: ${pesos(ds.reduce((s, d) => s + d.saldo, 0))} en total${extra}` }
   }
   await despachador.despachar([...porEmpresa].flatMap(([empresa, ds]) => {
     ds.sort((a, b) => b.saldo - a.saldo)

@@ -36,6 +36,24 @@ async function escenario() {
 }
 
 describe('fiado', () => {
+  it('el límite de fiado: el de la empresa vale si el cliente no tiene uno propio, y el aviso dice quién lo pasó', async () => {
+    const x = await escenario()
+    const empresa = (payload: object) => app.inject({ method: 'PATCH', url: '/empresa', headers: { authorization: `Bearer ${x.admin.token}` }, payload })
+    assert.equal((await empresa({ limiteFiado: -5 })).statusCode, 400)
+    assert.equal((await empresa({ limiteFiado: 100 })).json().limiteFiado, 100)
+    assert.equal((await x.entrega('CREDITO', 3, hoyEn(config.zonaHoraria, new Date(Date.now() - 40 * 86_400_000)))).body.resultados[0].estado, 'aplicada') // $180
+    const deudor = async () => (await llamar(x.admin, 'GET', '/cobranza')).body.deudores[0]
+    assert.equal((await deudor()).limite, 100)
+    await app.inject({ method: 'PUT', url: `/clientes/${x.c.id}/limite-fiado`, headers: { authorization: `Bearer ${x.admin.token}` }, payload: { limite: 1000 } })
+    assert.equal((await deudor()).limite, 1000) // el suyo gana
+    await app.inject({ method: 'PUT', url: `/clientes/${x.c.id}/limite-fiado`, headers: { authorization: `Bearer ${x.admin.token}` }, payload: { limite: null } })
+    await avisarFiadoAtrasado(db, crearDespachador(db, null, { error: () => {} }))
+    const { rows: [a] } = await db.query(`SELECT cuerpo FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.admin.id])
+    assert.match(a.cuerpo, /y ya pasó su límite de \$100$/)
+    assert.equal((await empresa({ limiteFiado: null })).json().limiteFiado, null)
+    assert.equal((await deudor()).limite, null)
+  })
+
   it('avisa a los administradores de quien debe desde hace más de un mes, una vez por cliente', async () => {
     const x = await escenario()
     const nuevo = await x.entrega('CREDITO', 1) // de hoy: todavía no
