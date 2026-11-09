@@ -19,6 +19,9 @@ const redondear = (n: number) => Math.round(n * 100) / 100
 const sinRepetidos = (l: { productoId: string }[]) => new Set(l.map((x) => x.productoId)).size === l.length
 
 const queryDia = z.object({ fecha: fechaIso })
+// Lo producido entre dos fechas (Producción lo descuenta del pronóstico): a lo más 31 días.
+const queryRango = z.object({ desde: fechaIso, hasta: fechaIso })
+  .refine((r) => r.desde <= r.hasta && (Date.parse(r.hasta) - Date.parse(r.desde)) / 86_400_000 <= 31)
 const idVendedor = z.object({ id: z.uuid() })
 const bodyProduccion = z.object({
   fecha: fechaIso,
@@ -118,6 +121,18 @@ export async function rutasStock(app: FastifyInstance, { db, config }: Contexto,
     const q = queryDia.safeParse(req.query)
     if (!q.success) return rep.code(400).send({ error: 'Indica la fecha (AAAA-MM-DD)' })
     return leerDia(db, q.data.fecha)
+  })
+
+  // Lo ya producido de cada sabor entre dos días (sumado), para saber cuánto falta del pronóstico.
+  app.get('/stock/producido', { preHandler: requiereAdmin }, async (req, rep) => {
+    const q = queryRango.safeParse(req.query)
+    if (!q.success) return rep.code(400).send({ error: 'Indica desde y hasta (AAAA-MM-DD), a lo más 31 días' })
+    const { rows } = await db.query(
+      `SELECT id_producto, sum(litros)::float8 AS litros FROM produccion_diaria
+        WHERE fecha BETWEEN $1 AND $2 GROUP BY id_producto HAVING sum(litros) > 0 ORDER BY id_producto`,
+      [q.data.desde, q.data.hasta],
+    )
+    return rows.map((r) => ({ productoId: r.id_producto as string, litros: redondear(r.litros) }))
   })
 
   // Litros producidos de cada sabor ese día.

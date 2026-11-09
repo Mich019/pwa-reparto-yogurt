@@ -1,5 +1,6 @@
 import type { Cliente, Pedido, Producto } from './db'
 import { hoy, sumarDias, tocaVisita } from './fechas'
+import { unidadDe } from './unidades'
 
 export interface FilaPronostico {
   producto: Producto
@@ -62,6 +63,39 @@ export function pronosticoSemanal(clientes: Cliente[], pedidos: Pedido[], produc
     .sort((a, b) => b.total - a.total)
 
   return { desde, hasta, filas, clientesEstimados, pedidosConfirmados }
+}
+
+// Qué tan atinado fue el pronóstico en los últimos días: cada día se rehace con lo que se sabía la víspera (el historial
+// de antes y los pedidos de ese día ya creados) y se compara, sabor por sabor, con lo que se entregó. Por unidad (nunca
+// litros con kilos). `desvio`: promedio de lo que se erró (en % de lo entregado); `sesgo` > 0 = suele pasarse.
+export interface AciertoPronostico { unidad: string; dias: number; estimado: number; real: number; desvio: number; sesgo: number }
+export function aciertoPronostico(clientes: Cliente[], pedidos: Pedido[], productos: Producto[], dias = 14, hasta = sumarDias(hoy(), -1)): AciertoPronostico[] {
+  const unidad = new Map(productos.map((p) => [p.id, unidadDe(p)]))
+  const cuentas = new Map<string, { dias: Set<string>; estimado: number; real: number; error: number }>()
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = sumarDias(hasta, -i)
+    const vispera = new Date(`${d}T00:00:00`).getTime()
+    const vistos = pedidos
+      .filter((p) => p.fecha < d || (p.fecha === d && p.creado < vispera))
+      .map((p) => (p.fecha === d ? { ...p, estado: 'PENDIENTE' as const } : p))
+    const est = new Map<string, number>()
+    for (const f of pronosticoSemanal(clientes, vistos, productos, d, 1).filas) est.set(f.producto.id, f.confirmado + f.estimado)
+    const real = new Map<string, number>()
+    for (const p of pedidos) if (p.fecha === d && p.estado === 'ENTREGADO') p.items.forEach((x) => real.set(x.productoId, (real.get(x.productoId) ?? 0) + x.litros))
+    for (const id of new Set([...est.keys(), ...real.keys()])) {
+      const u = unidad.get(id)
+      if (!u) continue
+      const c = cuentas.get(u) ?? { dias: new Set<string>(), estimado: 0, real: 0, error: 0 }
+      const [e, r] = [est.get(id) ?? 0, real.get(id) ?? 0]
+      c.estimado += e; c.real += r; c.error += Math.abs(e - r)
+      if (r > 0) c.dias.add(d)
+      cuentas.set(u, c)
+    }
+  }
+  return [...cuentas].filter(([, c]) => c.real > 0 && c.dias.size >= 3).map(([u, c]) => ({
+    unidad: u, dias: c.dias.size, estimado: Math.round(c.estimado * 10) / 10, real: Math.round(c.real * 10) / 10,
+    desvio: Math.round((c.error / c.real) * 100), sesgo: Math.round(((c.estimado - c.real) / c.real) * 100),
+  }))
 }
 
 export interface ResumenVentas {

@@ -1,12 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRight, Factory } from 'lucide-react'
+import { ArrowRight, Check, Factory, Printer } from 'lucide-react'
 import { db } from '../../lib/db'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
-import { PuntoSabor, Segmentado } from '../../components/ui'
-import { pronosticoSemanal, resumenVentas } from '../../lib/pronostico'
+import { PuntoSabor, Segmentado, aviso } from '../../components/ui'
+import { aciertoPronostico, pronosticoSemanal, resumenVentas, type AciertoPronostico } from '../../lib/pronostico'
+import { useProducido } from '../../lib/stock'
+import { mostrarPdf } from '../../components/VisorPdf'
 import { formato, sumaPorUnidad, unidadDe } from '../../lib/unidades'
-import { Encabezado } from '../admin/piezas'
+import { Encabezado, botonPanelSuave } from '../admin/piezas'
 
 const PERIODOS = { hoy: 'Hoy', semana: '7 días', mes: '30 días' } as const
 // Para cuántos días producir: mañana, los próximos 3 o la semana (desde mañana).
@@ -26,12 +28,36 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
   const totalConf = sumaPorUnidad(pron.filas.filter((f) => f.confirmado > 0).map((f) => ({ unidad: f.producto.unidad, cantidad: f.confirmado })))
   const totalEst = sumaPorUnidad(pron.filas.filter((f) => f.estimado > 0).map((f) => ({ unidad: f.producto.unidad, cantidad: f.estimado })))
   const cuando = horizonte === 1 ? `mañana, ${textoFecha(pron.desde)}` : `de ${textoFecha(pron.desde)} a ${textoFecha(pron.hasta)}`
+  // Lo ya anotado en Stock del día para esos días (sólo con servidor, administrador): se descuenta y se dice cuánto falta.
+  const producido = useProducido(pron.desde, pron.hasta, !!onRegistrar)
+  const hayProducido = !!producido && pron.filas.some((f) => (producido.get(f.producto.id) ?? 0) > 0)
+  const faltaDe = (f: (typeof pron.filas)[number]) => Math.max(0, Math.ceil(f.total - (producido?.get(f.producto.id) ?? 0)))
+  const acierto = useMemo(() => aciertoPronostico(clientes, pedidos, productos), [clientes, pedidos, productos])
+  const [imprimiendo, setImprimiendo] = useState(false)
   const desde = periodo === 'hoy' ? hoy() : sumarDias(hoy(), periodo === 'semana' ? -6 : -29)
   const ventas = useMemo(() => resumenVentas(pedidos, productos, desde, hoy()), [pedidos, productos, desde])
   // Catálogo flexible: cada sabor en su unidad, los totales por unidad («40 L + 10 kg») y cada barra comparada sólo
   // con las de su misma unidad. Para el yogurt todo sigue en litros.
   const l = (n: number, p: Parameters<typeof unidadDe>[0]) => `${formato(Math.round(n * 100) / 100)} ${unidadDe(p)}`
   const totalProd = sumaPorUnidad(pron.filas.map((f) => ({ unidad: f.producto.unidad, cantidad: f.total }))) || l(0, productos[0])
+  const totalFalta = sumaPorUnidad(pron.filas.map((f) => ({ unidad: f.producto.unidad, cantidad: faltaDe(f) }))) || l(0, productos[0])
+  const totalProducido = sumaPorUnidad(pron.filas.map((f) => ({ unidad: f.producto.unidad, cantidad: Math.min(f.total, producido?.get(f.producto.id) ?? 0) })))
+  async function imprimir() {
+    setImprimiendo(true)
+    try {
+      const pdf = await import('../../lib/reportePdf')
+      await pdf.prepararLogoPdf()
+      const o = (n: number, p: (typeof productos)[number]) => (n > 0 ? l(n, p) : '—')
+      mostrarPdf(pdf.hojaProduccionPdf(cuando, pron.filas.map((f) => ({
+        sabor: f.producto.sabor, color: f.producto.color_hex, pedido: o(f.confirmado, f.producto), estimado: o(f.estimado, f.producto),
+        total: l(f.total, f.producto), falta: hayProducido ? o(faltaDe(f), f.producto) : undefined,
+      })), { total: totalProd, falta: hayProducido ? totalFalta : undefined }), `produccion-${pron.desde}.pdf`)
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo generar')
+    } finally {
+      setImprimiendo(false)
+    }
+  }
   const maximo = (filas: { producto: { unidad?: string }; n: number }[]) => {
     const m = new Map<string, number>()
     for (const f of filas) m.set(unidadDe(f.producto), Math.max(m.get(unidadDe(f.producto)) ?? 1, f.n))
@@ -66,12 +92,25 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
           <span className="text-sm text-apagado">Producir para</span>
           <Segmentado valor={String(horizonte) as `${Horizonte}`} onChange={(v) => elegirHorizonte(Number(v) as Horizonte)}
             opciones={(Object.keys(HORIZONTES) as `${Horizonte}`[]).map((k) => ({ valor: k, texto: HORIZONTES[Number(k) as Horizonte] }))} />
+          {pron.filas.length > 0 && (
+            <button type="button" onClick={() => void imprimir()} disabled={imprimiendo} className={`${botonPanelSuave} sm:ml-auto`}>
+              <Printer size={16} aria-hidden="true" /> {imprimiendo ? 'Generando…' : 'Imprimir hoja'}
+            </button>
+          )}
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[auto_1fr] lg:items-end">
           <div>
             <p className="text-sm text-apagado">Total a producir para {cuando}</p>
             <div key={horizonte} className="desplegar mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums">{totalProd}</div>
+            {hayProducido && (
+              <p className="mt-2 text-sm">
+                Ya anotaste <span className="font-semibold tabular-nums">{totalProducido}</span> en Stock del día para esos días:{' '}
+                {pron.filas.every((f) => faltaDe(f) === 0)
+                  ? <span className="font-semibold text-verde">ya está todo cubierto</span>
+                  : <>te faltan <span className="font-semibold tabular-nums">{totalFalta}</span></>}
+              </p>
+            )}
           </div>
           {/* Las dos partes del total, que son también la leyenda de las barras */}
           {pron.filas.length > 0 && (
@@ -114,6 +153,9 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
                     <span className="font-semibold">{f.producto.sabor}</span>
                     <span className="text-right">
                       <span className="text-lg font-semibold tabular-nums">{l(f.total, f.producto)}</span>
+                      {hayProducido && (faltaDe(f) > 0
+                        ? <span className="block text-xs font-semibold tabular-nums">faltan {l(faltaDe(f), f.producto)}</span>
+                        : <span className="flex items-center justify-end gap-1 text-xs font-semibold text-verde"><Check size={13} aria-hidden="true" /> cubierto</span>)}
                     </span>
                   </div>
                   <div className="mt-1.5 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-niebla" role="img"
@@ -135,6 +177,7 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
             ¿Ya lo produjiste? Anótalo en «Stock del día» <ArrowRight size={16} aria-hidden="true" />
           </button>
         )}
+        {acierto.length > 0 && <QueTanAtinado acierto={acierto} />}
       </section>
 
       {conVentas && <>
@@ -174,6 +217,26 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
         </>
       )}
       </>}
+    </div>
+  )
+}
+
+// Cuánto se ha desviado el pronóstico de lo que de verdad se entregó, para saber cuánto fiarse del número.
+function QueTanAtinado({ acierto }: { acierto: AciertoPronostico[] }) {
+  return (
+    <div className="mt-6 rounded-xl bg-niebla p-4">
+      <h2 className="font-semibold">¿Qué tan atinado es?</h2>
+      {acierto.map((a) => {
+        const veredicto = a.desvio <= 15 ? 'Puedes fiarte de él.' : a.desvio <= 30 ? 'Úsalo como guía y ajusta a ojo.' : 'Todavía falla mucho: con más historial mejora.'
+        const tendencia = a.sesgo >= 8 ? ` Suele pasarse (${a.sesgo}% de más): puedes producir un poco menos.` : a.sesgo <= -8 ? ` Suele quedarse corto (${-a.sesgo}% de menos): produce un poco más.` : ''
+        return (
+          <p key={a.unidad} className="mt-1.5 text-sm">
+            En los últimos {a.dias} días con entregas, el pronóstico de cada día se desvió en promedio un{' '}
+            <span className="font-semibold tabular-nums">{a.desvio}%</span> de lo entregado (estimó {formato(a.estimado)} {a.unidad}; se entregaron{' '}
+            {formato(a.real)} {a.unidad}). {veredicto}{tendencia}
+          </p>
+        )
+      })}
     </div>
   )
 }

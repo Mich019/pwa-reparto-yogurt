@@ -232,8 +232,7 @@ describe('resumen diario por correo', () => {
     const admin = await sesion('administrador', 'tel-a', empresa)
     const vend = await sesion('vendedor', 'tel-v', empresa)
     const cifras = (pct: number) => JSON.stringify({ vendedores: [{ id: vend.id, nombre: 'Beto', ventas: pct * 10, meta: 1000, cumplimientoPct: pct }] })
-    await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [empresa])
-    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ('2026-01-01', 'cerrado', $1, now(), '[]'), ('2026-02-01', 'cerrado', $2, now(), '[]')`, [cifras(120), cifras(80)])
+    await db.query(`INSERT INTO cierres_mes (id_empresa, mes, estado, cifras, cerrado_en, historial) VALUES ($3, '2026-01-01', 'cerrado', $1, now(), '[]'), ($3, '2026-02-01', 'cerrado', $2, now(), '[]')`, [cifras(120), cifras(80), empresa])
     const ver = (s: { token: string }) => app.inject({ method: 'GET', url: `/usuarios/${vend.id}/metas`, headers: { authorization: `Bearer ${s.token}` } })
     assert.deepEqual((await ver(admin)).json().meses.map((m: { mes: string }) => m.mes), ['2026-01'])
     assert.equal((await ver(vend)).statusCode, 403)
@@ -244,8 +243,8 @@ describe('resumen diario por correo', () => {
       `SELECT to_char(date_trunc('month', now() AT TIME ZONE zona_horaria) - interval '1 month', 'YYYY-MM-DD') AS m1,
               to_char(date_trunc('month', now() AT TIME ZONE zona_horaria) - interval '2 month', 'YYYY-MM-DD') AS m2,
               to_char(date_trunc('month', now() AT TIME ZONE zona_horaria) - interval '3 month', 'YYYY-MM-DD') AS m3 FROM empresas WHERE id_empresa = $1`, [empresa])
-    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $4, now(), '[]'), ($2, 'cerrado', $4, now(), '[]'), ($3, 'cerrado', $5, now(), '[]')
-                    ON CONFLICT (id_empresa, mes) DO UPDATE SET cifras = EXCLUDED.cifras, estado = 'cerrado'`, [m1, m2, m3, cifras(110), cifras(50)])
+    await db.query(`INSERT INTO cierres_mes (id_empresa, mes, estado, cifras, cerrado_en, historial) VALUES ($6, $1, 'cerrado', $4, now(), '[]'), ($6, $2, 'cerrado', $4, now(), '[]'), ($6, $3, 'cerrado', $5, now(), '[]')
+                    ON CONFLICT (id_empresa, mes) DO UPDATE SET cifras = EXCLUDED.cifras, estado = 'cerrado'`, [m1, m2, m3, cifras(110), cifras(50), empresa])
     assert.equal((await ver(admin)).json().racha, 2)
     // La mejor racha (medallas) cuenta cualquier tramo, aunque ya se haya cortado.
     assert.equal(rachaDesde(['2025-11-01', '2025-12-01', '2026-01-01', '2026-03-01'], '2026-01'), 3)
@@ -269,12 +268,11 @@ describe('resumen diario por correo', () => {
 
     // El resumen del año: aviso a los administradores, una vez por año y empresa.
     const anuales = async () => (await db.query(`SELECT titulo FROM notificaciones WHERE tipo = 'resumen_anual' AND id_usuario = $1`, [admin.id])).rows
-    // La base de pruebas sobrevive entre corridas: sin esto, la marca «ya se mandó este año» de una corrida anterior lo salta.
-    await db.query(`DELETE FROM notificaciones WHERE tipo = 'resumen_anual' AND id_empresa = (SELECT id_empresa FROM usuarios WHERE id_usuario = $1)`, [admin.id])
-    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial)
-                    VALUES (date_trunc('year', now()) - interval '1 year' + interval '2 month', 'cerrado', $1, now(), '[]')
+    // Con la empresa explícita: set_config de arriba vale sólo en una conexión del pool, y este INSERT puede ir por otra.
+    await db.query(`INSERT INTO cierres_mes (id_empresa, mes, estado, cifras, cerrado_en, historial)
+                    VALUES ($2, date_trunc('year', now()) - interval '1 year' + interval '2 month', 'cerrado', $1, now(), '[]')
                     ON CONFLICT (id_empresa, mes) DO NOTHING`,
-      [JSON.stringify({ ventas: { ingreso: 5000 }, vendedores: [{ id: vend.id, nombre: 'Beto', ventas: 5000, meta: 1000, cumplimientoPct: 500 }] })])
+      [JSON.stringify({ ventas: { ingreso: 5000 }, vendedores: [{ id: vend.id, nombre: 'Beto', ventas: 5000, meta: 1000, cumplimientoPct: 500 }] }), empresa])
     await mandarResumenAnual(db, config, despachador, log, true)
     await mandarResumenAnual(db, config, despachador, log, true)
     const a = await anuales()

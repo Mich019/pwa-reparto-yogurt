@@ -442,6 +442,26 @@ export function reportePdf(r: Reporte, ahora = new Date()): PdfListo {
 // Ventas y utilidad del mes, cobranza y comisión por vendedor y las diferencias de los cortes. Si el mes está cerrado
 // son las cifras congeladas al cerrarlo (api/_lib/cortes.ts).
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+// Hoja de producción (Producción → Pronóstico): una hoja para la cocina con cuánto producir de cada sabor, la parte
+// ya pedida y la estimada, lo que falta si ya se anotó algo en Stock del día, y un espacio para palomear.
+export interface FilaHojaProduccion { sabor: string; color: string; pedido: string; estimado: string; total: string; falta?: string }
+export function hojaProduccionPdf(cuando: string, filas: FilaHojaProduccion[], totales: { total: string; falta?: string }, ahora = new Date()): PdfListo {
+  const inf = new Informe('Hoja de producción', cuando)
+  inf.portada(`Cuánto producir para ${cuando}`, [['Para', cuando], ['Sabores', String(filas.length)]], ahora)
+  const conFalta = filas.some((f) => f.falta !== undefined)
+  inf.tituloSeccion('Por sabor', conFalta ? 'Ya descontado lo anotado en Stock del día' : undefined)
+  inf.tabla<FilaHojaProduccion>([
+    { titulo: 'Sabor', ancho: 0.28, valor: (f) => f.sabor, muestra: (f) => hex(f.color) },
+    { titulo: 'Ya pedido', ancho: 0.15, der: true, valor: (f) => f.pedido },
+    { titulo: 'Estimado', ancho: 0.15, der: true, valor: (f) => f.estimado },
+    { titulo: 'Total', ancho: 0.15, der: true, negrita: !conFalta, valor: (f) => f.total },
+    ...(conFalta ? [{ titulo: 'Falta', ancho: 0.15, der: true, negrita: true, valor: (f: FilaHojaProduccion) => f.falta ?? '' }] : []),
+    { titulo: 'Hecho', ancho: 0.12, der: true, valor: () => '______' },
+  ], filas, ['Total', '', '', totales.total, ...(conFalta ? [totales.falta ?? ''] : []), ''])
+  inf.nota('Ya pedido: pedidos agendados, seguro se entregan. Estimado: lo que suelen pedir los clientes a los que les toca visita y aún no piden. Al terminar un sabor, anótalo en Stock del día.')
+  return inf.listo()
+}
+
 // El año en números (Cobranza → Meses): sus meses cerrados, el mes más vendido, el vendedor del año, la mejor racha y
 // la comparación con el año anterior en los mismos meses.
 export interface AnioPdf {

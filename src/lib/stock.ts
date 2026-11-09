@@ -40,6 +40,25 @@ export const guardarCarga = (fecha: string, vendedorId: string, lineas: { produc
 export const copiarCarga = (desde: string, hacia: string) =>
   llamarAutenticado<DiaStock & { copiadas: number }>('/stock/copiar', { cuerpo: { desde, hacia } })
 
+// Lo ya producido de cada sabor entre dos días (Producción lo descuenta del pronóstico). `null` mientras no llega o
+// sin servidor; sólo pide si `activo` (administrador con servidor).
+export const producidoEntre = (desde: string, hasta: string) =>
+  llamarAutenticado<{ productoId: string; litros: number }[]>(`/stock/producido?desde=${desde}&hasta=${hasta}`)
+export function useProducido(desde: string, hasta: string, activo: boolean) {
+  const [producido, setProducido] = useState<Map<string, number> | null>(null)
+  const pedido = useRef(0)
+  const pedir = useCallback(() => {
+    if (!activo) return
+    const mio = ++pedido.current
+    producidoEntre(desde, hasta)
+      .then((l) => { if (mio === pedido.current) setProducido(new Map(l.map((x) => [x.productoId, x.litros]))) })
+      .catch(() => { /* sin red: el pronóstico se ve sin descontar */ })
+  }, [desde, hasta, activo])
+  useEffect(() => { setProducido(null); pedir() }, [pedir])
+  useEnVivo('datos', pedir)
+  return producido
+}
+
 // El día pedido al servidor. Mientras llega otro día se queda el anterior a la vista; los errores no la borran.
 export function useDiaStock(fecha: string) {
   const [dia, setDia] = useState<DiaStock | null>(null)

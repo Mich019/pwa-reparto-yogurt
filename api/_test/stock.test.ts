@@ -78,6 +78,24 @@ describe('producción y carga del día (RF-037)', () => {
     assert.equal(lit(c.body, b.id), 25.5) // lo que no se mandó no se toca
   })
 
+  it('suma lo producido de varios días (Producción lo descuenta del pronóstico)', async () => {
+    const admin = (await sesion('administrador')) as S
+    const vend = (await sesion('vendedor')) as S
+    const [a, b] = await sabores(admin)
+    const f = diaNuevo()
+    const g = new Date(Date.parse(f) + 86_400_000).toISOString().slice(0, 10)
+    usados.add(g)
+    await llamar(admin, 'PUT', '/stock/produccion', { fecha: f, lineas: [{ productoId: a.id, litros: 10 }, { productoId: b.id, litros: 0 }] })
+    await llamar(admin, 'PUT', '/stock/produccion', { fecha: g, lineas: [{ productoId: a.id, litros: 5.5 }] })
+    const r = await llamar(admin, 'GET', `/stock/producido?desde=${f}&hasta=${g}`)
+    assert.equal(r.status, 200)
+    assert.equal(r.body.find((x: any) => x.productoId === a.id)?.litros, 15.5)
+    assert.equal(r.body.find((x: any) => x.productoId === b.id), undefined) // lo que va en cero no sale
+    assert.equal((await llamar(vend, 'GET', `/stock/producido?desde=${f}&hasta=${g}`)).status, 403)
+    assert.equal((await llamar(admin, 'GET', `/stock/producido?desde=${g}&hasta=${f}`)).status, 400)
+    assert.equal((await llamar(admin, 'GET', `/stock/producido?desde=2100-01-01&hasta=2100-03-01`)).status, 400)
+  })
+
   it('rechaza litros negativos o absurdos, sabores repetidos o que no existen', async () => {
     const admin = (await sesion('administrador')) as S
     const [a] = await sabores(admin)

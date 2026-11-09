@@ -183,8 +183,8 @@ describe('cierre de mes', () => {
     await x.entrega('EFECTIVO', 2, `${MES}-10`) // $120: 120% de su meta
     const antes = (n: number) => { const [a, m] = MES.split('-').map(Number); const f = new Date(a, m - 1 - n, 1); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-01` }
     const cifras = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 110, meta: 100, cumplimientoPct: 110 }] })
-    await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [x.empresa])
-    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $3, now(), '[]'), ($2, 'cerrado', $3, now(), '[]')`, [antes(1), antes(2), cifras])
+    // La empresa va explícita: un set_config en el pool cambiaría la de otras pruebas que usen esa conexión.
+    await db.query(`INSERT INTO cierres_mes (id_empresa, mes, estado, cifras, cerrado_en, historial) VALUES ($4, $1, 'cerrado', $3, now(), '[]'), ($4, $2, 'cerrado', $3, now(), '[]')`, [antes(1), antes(2), cifras, x.empresa])
     const r0 = (await llamar(x.admin, 'GET', '/usuarios/rachas')).body[x.ana.id]
     assert.deepEqual([r0.racha, r0.mejorRacha, r0.medallas], [0, 2, []])
     assert.equal((await llamar(x.ana, 'GET', '/usuarios/rachas')).status, 403)
@@ -239,10 +239,9 @@ describe('cierre de mes', () => {
     const antes = (n: number) => { const [a, m] = MES.split('-').map(Number); const f = new Date(a, m - 1 - n, 1); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-01` }
     const bien = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 110, meta: 100, cumplimientoPct: 110 }] })
     const mal = JSON.stringify({ vendedores: [{ id: x.ana.id, nombre: 'Ana', ventas: 10, meta: 100, cumplimientoPct: 10 }] })
-    await db.query(`SELECT set_config('app.id_empresa', $1, false)`, [x.empresa])
     // Antes: una racha de 1 (hace 3 meses), luego un mes sin llegar; ahora 2 seguidos (el anterior y este) = récord de 2.
-    await db.query(`INSERT INTO cierres_mes (mes, estado, cifras, cerrado_en, historial) VALUES ($1, 'cerrado', $3, now(), '[]'), ($2, 'cerrado', $4, now(), '[]'), ($5, 'cerrado', $3, now(), '[]')`,
-      [antes(3), antes(2), bien, mal, antes(1)])
+    await db.query(`INSERT INTO cierres_mes (id_empresa, mes, estado, cifras, cerrado_en, historial) VALUES ($6, $1, 'cerrado', $3, now(), '[]'), ($6, $2, 'cerrado', $4, now(), '[]'), ($6, $5, 'cerrado', $3, now(), '[]')`,
+      [antes(3), antes(2), bien, mal, antes(1), x.empresa])
     assert.equal((await llamar(x.admin, 'POST', `/cierres/${MES}/cerrar`)).status, 200)
     const records = async () => (await db.query(`SELECT titulo, cuerpo, datos FROM notificaciones WHERE tipo = 'record_personal' AND id_usuario = $1`, [x.ana.id])).rows
     const [r] = await records()
