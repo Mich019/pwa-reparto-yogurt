@@ -10,6 +10,7 @@ import { presentacionDe, unidadDe } from '../../lib/unidades'
 import { AveEmpresa, Frasco, useLogoEtiqueta } from './marca'
 import { DibujoEnvase } from '../registro/dibujos'
 import { Hoja } from '../../components/ui'
+import type { SeccionAdmin } from './menu'
 
 // Cambio contra el periodo anterior, con signo y flecha (nunca sólo con color). null = no hay con qué comparar.
 export function Delta({ valor, className = 'text-xs' }: { valor: number | null; className?: string }) {
@@ -113,13 +114,19 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
   )
 }
 
-// «?» muestra los atajos de teclado del panel (montado una vez en AdminLayout). Mismas reglas que «/»: no mientras
-// se escribe en un campo ni con una hoja abierta.
+// «?» muestra los atajos de teclado del panel y «g» seguida de una letra (antes de 1,5 s) salta a una sección, como en
+// GitHub o Gmail (montado una vez en AdminLayout). Mismas reglas que «/»: no mientras se escribe en un campo ni con
+// una hoja abierta.
+const IR_A: [string, SeccionAdmin, string][] = [
+  ['i', 'resumen', 'Resumen'], ['v', 'equipo', 'Vendedores'], ['c', 'clientes', 'Clientes'], ['p', 'produccion', 'Producción'],
+  ['s', 'sabores', 'Sabores'], ['b', 'cobranza', 'Cobranza'], ['r', 'reportes', 'Reportes'], ['o', 'configuracion', 'Configuración'],
+]
 const ATAJOS: [string, string][] = [
   ['/', 'Buscar en la sección (Clientes, Vendedores, Cobranza)'],
   ['Esc', 'Borrar la búsqueda y cerrar el buscador, o cerrar un menú'],
   ['↑ ↓', 'Moverse entre las opciones de un menú'],
   ['?', 'Ver estos atajos'],
+  ...IR_A.map(([k, , texto]): [string, string] => [`g ${k}`, `Ir a ${texto}`]),
 ]
 export function teclaLibre(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return false
@@ -127,10 +134,24 @@ export function teclaLibre(e: KeyboardEvent) {
   if (el?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role=dialog]')) return false
   return !document.querySelector('[role=dialog][aria-modal=true]')
 }
-export function AtajosTeclado() {
+export function AtajosTeclado({ onIr }: { onIr: (s: SeccionAdmin) => void }) {
   const [abierta, setAbierta] = useState(false)
+  const ir = useRef(onIr)
+  ir.current = onIr
   useEffect(() => {
-    const tecla = (e: KeyboardEvent) => { if (e.key === '?' && teclaLibre(e)) { e.preventDefault(); setAbierta(true) } }
+    let g = 0 // cuándo se tocó la «g»; 0 = no está esperando la segunda letra
+    const tecla = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key !== '?') { g = 0; return }
+      if (!teclaLibre(e)) return
+      if (e.key === '?') { e.preventDefault(); g = 0; setAbierta(true); return }
+      if (g && Date.now() - g < 1500) {
+        const destino = IR_A.find(([k]) => k === e.key.toLowerCase())
+        g = 0
+        if (destino) { e.preventDefault(); ir.current(destino[1]) }
+        return
+      }
+      g = e.key === 'g' ? Date.now() : 0
+    }
     document.addEventListener('keydown', tecla)
     return () => document.removeEventListener('keydown', tecla)
   }, [])
@@ -140,7 +161,7 @@ export function AtajosTeclado() {
       <dl className="divide-y divide-linea border-y border-linea mb-4">
         {ATAJOS.map(([k, texto]) => (
           <div key={k} className="flex items-center gap-4 py-3">
-            <dt className="w-14 shrink-0"><kbd className="rounded-md bg-niebla px-2 py-1 font-sans text-sm font-semibold">{k}</kbd></dt>
+            <dt className="w-16 shrink-0"><kbd className="rounded-md bg-niebla px-2 py-1 font-sans text-sm font-semibold">{k}</kbd></dt>
             <dd className="text-sm">{texto}</dd>
           </div>
         ))}

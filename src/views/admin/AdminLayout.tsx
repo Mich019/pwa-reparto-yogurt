@@ -236,7 +236,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>
-      <AtajosTeclado />
+      <AtajosTeclado onIr={setSeccion} />
 
       {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono.
           Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}
