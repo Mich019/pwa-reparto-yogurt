@@ -4,7 +4,7 @@ import type { Usuario } from '../app.js'
 import type { AvisoPendiente } from '../notificaciones.js'
 import { totalPorUnidad } from '../unidades.js'
 import { cifrasDelDia } from '../cortes.js'
-import { redondear } from '../cobranza.js'
+import { pasoSuLimite, redondear, saldos } from '../cobranza.js'
 import {
   clienteWire, pedidoWire, productoWire, recordatorioWire,
   type ClienteWire, type PedidoWire, type ProductoWire, type RecordatorioWire, type Tabla,
@@ -339,7 +339,7 @@ const pedidos: Adaptador<PedidoWire> = {
       const { rows: [d] } = await c.query(`SELECT id_vendedor FROM pedidos WHERE id_pedido = $1`, [w.id])
       cortes = await avisarCortesDescuadrados(c, u, [{ fecha: w.fecha, vendedor: d?.id_vendedor ?? null }, ...(previo ? [{ fecha: previo.fecha, vendedor: ex!.dueno }] : [])])
     }
-    return [...cortes, ...(await avisosDeRuta(c, u, w, ex, hoy))]
+    return [...cortes, ...(await avisosDeRuta(c, u, w, ex, hoy)), ...(await avisarFiadoDeMas(c, u, w, previo))]
   },
   async avisarBorrado(c, u, ex, hoy) {
     const cortes = esEfectivo(ex.wire) ? await avisarCortesDescuadrados(c, u, [{ fecha: ex.wire.fecha, vendedor: ex.dueno }]) : []
@@ -354,6 +354,19 @@ const pedidos: Adaptador<PedidoWire> = {
     await c.query(`SELECT set_config('app.permitir_correccion', 'on', true)`)
     await c.query(`DELETE FROM pedidos WHERE id_pedido = $1`, [id])
   },
+}
+
+// Un vendedor entregó a crédito y con eso el cliente quedó arriba de su límite de fiado (el suyo o el de la empresa):
+// los administradores se enteran (`fiado_sobre_limite`, se puede apagar). El teléfono sólo avisa, no impide fiar.
+const esFiado = (w?: PedidoWire) => !!w && w.estado === 'ENTREGADO' && w.metodo_pago === 'CREDITO'
+async function avisarFiadoDeMas(c: Cx, u: Usuario, w: PedidoWire, previo?: PedidoWire): Promise<AvisoPendiente[]> {
+  if (esAdmin(u) || !esFiado(w) || (esFiado(previo) && firmaItems(w.items) === firmaItems(previo!.items))) return []
+  const [d] = await saldos(c, { clienteId: w.clienteId })
+  if (!d || !pasoSuLimite(d)) return []
+  const { rows: admins } = await c.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo AND id_usuario <> $1`, [u.id])
+  const { rows: [v] } = await c.query(`SELECT nombre FROM usuarios WHERE id_usuario = $1`, [u.id])
+  const cuerpo = `${v?.nombre ?? 'Un vendedor'} le fió a ${d.nombre}: ahora debe $${d.saldo.toFixed(2)} y su límite es $${d.limite!.toFixed(2)}.`
+  return admins.map((a) => ({ para: a.id_usuario as string, tipo: 'fiado_sobre_limite' as const, titulo: 'Se fió de más', cuerpo, datos: { url: '/admin?ir=cobrar' } }))
 }
 
 // RF-054: cuando el administrador agrega, cambia o urgente un pedido del día, el vendedor se entera.

@@ -144,6 +144,7 @@ export interface CifrasResumen {
     sabor: { nombre: string; vendido: number } | null
     vendedores: { nombre: string; semana: number; mes: number; meta: number | null }[]
     porCobrar: number // todo lo fiado que sigue sin cobrarse, al terminar la semana
+    fiadoPorVendedor?: { nombre: string; fiado: number; abonos: number }[] // lo que cada quien fió y cobró de fiado en la semana
   } | null
 }
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -212,11 +213,14 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
   const celda = 'padding:8px 0;border-top:1px solid #eee'
   const aTabla = (filas: [string, string][]) => `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${filas
     .map(([k, v]) => `<tr><td style="${celda};color:#6b6b6b">${escapar(k)}</td><td align="right" style="${celda};font-weight:600">${escapar(v)}</td></tr>`).join('')}</table></td></tr>`
+  // Fiado por vendedor: lo que fió contra lo que cobró en la semana.
+  const fiados: [string, string][] = (c.semana?.fiadoPorVendedor ?? []).map((v) => [v.nombre, `fió ${pesos(v.fiado)} · cobró ${pesos(v.abonos)}`])
   const tabla = aTabla(renglones) + (vendedores.length ? parrafo('<strong>Vendedores</strong> (la semana y, con meta, cómo va el mes)') + aTabla(vendedores) : '')
+    + (fiados.length ? parrafo('<strong>Fiado por vendedor</strong> (lo que fió y lo que cobró en la semana)') + aTabla(fiados) : '')
   const pie = 'Lo recibes porque lo pediste en Configuración → Preferencias. Ahí mismo lo apagas.'
   return {
     asunto: `${empresa}: tu resumen de ${semanal ? 'la semana' : 'ayer'}`,
-    texto: `Hola ${nombre}:\n\nAsí le fue a ${empresa} ${dia}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}${vendedores.length ? `\n\nVendedores:\n${vendedores.map(([k, v]) => `· ${k}: ${v}`).join('\n')}` : ''}${pendientes.length ? `\n\nPendiente: ${pendientes.join('; ')}.` : ''}\n\nEntra a Delisy: ${url}\n\n${pie}`,
+    texto: `Hola ${nombre}:\n\nAsí le fue a ${empresa} ${dia}:\n${renglones.map(([k, v]) => `· ${k}: ${v}`).join('\n')}${vendedores.length ? `\n\nVendedores:\n${vendedores.map(([k, v]) => `· ${k}: ${v}`).join('\n')}` : ''}${fiados.length ? `\n\nFiado por vendedor:\n${fiados.map(([k, v]) => `· ${k}: ${v}`).join('\n')}` : ''}${pendientes.length ? `\n\nPendiente: ${pendientes.join('; ')}.` : ''}\n\nEntra a Delisy: ${url}\n\n${pie}`,
     html: marco(parrafo(`Hola ${primerNombre(nombre)}, así le fue a <strong>${escapar(empresa)}</strong> ${escapar(dia)}:`) + tabla
       + (pendientes.length ? parrafo(`<strong>Pendiente:</strong> ${escapar(pendientes.join('; '))}.`) : '')
       + boton(url, 'Abrir el panel')

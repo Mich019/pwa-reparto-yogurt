@@ -60,6 +60,18 @@ describe('fiado', () => {
     assert.equal((await deudor()).limite, null)
   })
 
+  it('si un vendedor fía de más, los administradores se enteran; dentro del límite, no', async () => {
+    const x = await escenario()
+    await app.inject({ method: 'PUT', url: `/clientes/${x.c.id}/limite-fiado`, headers: { authorization: `Bearer ${x.admin.token}` }, payload: { limite: 150 } })
+    const avisos = async () => (await db.query(`SELECT cuerpo FROM notificaciones WHERE tipo = 'fiado_sobre_limite' AND id_usuario = $1`, [x.admin.id])).rows
+    await x.entrega('CREDITO', 2) // $120: dentro
+    assert.equal((await avisos()).length, 0)
+    await x.entrega('CREDITO', 1) // $180: pasó
+    const a = await avisos()
+    assert.equal(a.length, 1)
+    assert.match(a[0].cuerpo, /le fió a Tienda Fiada: ahora debe \$180\.00 y su límite es \$150\.00/)
+  })
+
   it('avisa a los administradores de quien debe desde hace más de un mes, una vez por cliente', async () => {
     const x = await escenario()
     const nuevo = await x.entrega('CREDITO', 1) // de hoy: todavía no

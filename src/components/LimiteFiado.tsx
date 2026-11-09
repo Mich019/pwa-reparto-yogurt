@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../lib/db'
+import { hoy, sumarDias } from '../lib/fechas'
 import { ChevronRight, NotebookPen, TriangleAlert } from 'lucide-react'
 import { guardarLimiteFiado, useServidor, type CuentaCliente } from '../lib/cobranza'
 import { dinero } from '../lib/fechas'
@@ -35,6 +38,7 @@ function HojaLimite({ cliente, onCerrar }: { cliente: Cliente; onCerrar: () => v
   const t = texto.trim().replace(',', '.')
   const valor = t === '' ? null : Number(t)
   const valido = valor === null || (Number.isFinite(valor) && valor >= 0)
+  const sugerido = useLimiteSugerido(cliente.id)
   async function guardar() {
     setEnviando(true)
     try {
@@ -58,9 +62,32 @@ function HojaLimite({ cliente, onCerrar }: { cliente: Cliente; onCerrar: () => v
           <input inputMode="decimal" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-invalid={!valido} className={`${claseInput} mt-1`} />
         </label>
         {!valido && <p role="alert" className="text-sm font-medium text-rojo">Escribe una cantidad de 0 o más.</p>}
+        {sugerido && (
+          <div className="border-t border-linea pt-3 text-sm">
+            <p><span className="font-semibold">Sugerido: {dinero(sugerido.limite)}</span> <span className="text-apagado">· dos semanas de lo que compra ({dinero(sugerido.semanal)} a la semana{sugerido.lento ? '), a la mitad porque debe desde hace más de un mes' : ')'}.</span></p>
+            {valor !== sugerido.limite && <button type="button" onClick={() => setTexto(String(sugerido.limite))} className="mt-1 py-1 font-semibold underline underline-offset-2">Usar este</button>}
+          </div>
+        )}
       </div>
     </Hoja>
   )
+}
+
+// Límite sugerido: dos semanas de lo que el cliente compra (entregas de los últimos 90 días, de cualquier forma de
+// pago), redondeado hacia arriba a $50; a la mitad si lo que debe viene de hace más de 30 días (paga lento).
+export function limiteSugerido(totales: number[], debeDesde: string | null, hoyIso: string) {
+  const semanal = totales.reduce((s, t) => s + t, 0) / (90 / 7)
+  if (semanal < 1) return null
+  const lento = !!debeDesde && debeDesde < sumarDias(hoyIso, -30)
+  return { semanal: Math.round(semanal * 100) / 100, lento, limite: Math.max(50, Math.ceil((semanal * 2 * (lento ? 0.5 : 1)) / 50) * 50) }
+}
+
+function useLimiteSugerido(clienteId: string) {
+  const cuenta = useServidor<CuentaCliente>(`/cobranza/clientes/${clienteId}`)
+  const desde = sumarDias(hoy(), -90)
+  const totales = useLiveQuery(async () => (await db.pedidos.where('clienteId').equals(clienteId).toArray())
+    .filter((p) => p.estado === 'ENTREGADO' && p.fecha >= desde).map((p) => p.total), [clienteId, desde])
+  return totales ? limiteSugerido(totales, cuenta.datos?.saldo ? cuenta.datos.desde : null, hoy()) : null
 }
 
 // En la entrega, con «Fiado» elegido. Lo que debe viene del servidor (con conexión); sin ella sólo recuerda el límite.

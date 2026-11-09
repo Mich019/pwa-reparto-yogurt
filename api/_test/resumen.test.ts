@@ -87,6 +87,12 @@ describe('resumen diario por correo', () => {
     assert.match(correo.texto, /Vendedores:\n· .+: \$[\d,.]+ · mes: \$[\d,.]+ de \$1,000\.00 \(\d+%\)/)
     assert.match(correo.texto, /Lo que más se vendió: Mango/)
     assert.match(correo.asunto, /tu resumen de la semana/)
+    // Fiado por vendedor: sin ventas a crédito no sale; fiado el de la semana, sale lo que fió el vendedor.
+    assert.deepEqual(conMeta.semana?.fiadoPorVendedor, [])
+    await db.query(`UPDATE pedidos SET metodo_pago = 'credito' WHERE id_pedido = $1`, [dentro.id])
+    const fiado = await cifrasDeLaSemana(db, empresa)
+    assert.deepEqual(fiado.semana?.fiadoPorVendedor?.map((v) => [v.fiado, v.abonos]), [[semana.vendido, 0]])
+    assert.match(correoResumen('Ana', 'Lácteos Semana', fiado, 'https://ejemplo.test/admin').texto, /fió \$[\d,.]+ · cobró \$0\.00/)
     assert.match(correo.texto, /del .+ al .+:/)
     assert.match(correo.texto, /Contra la semana anterior: Igual/)
     assert.match(correoResumen('Ana', 'X', { ...semana, vendidoAntes: semana.vendido / 2 }, 'u').texto, /100% más/)
