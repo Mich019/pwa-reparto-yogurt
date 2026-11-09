@@ -1,5 +1,6 @@
 import { cronAutorizado } from './urgentes.js'
 import { avisarMetasAtrasadas, avisarRachasEnRiesgo, mandarResumenAnual, mandarResumenes } from './resumen.js'
+import { avisarFiadoAtrasado } from './cobranza.js'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { leerAjustes } from './ajustes.js'
@@ -230,8 +231,9 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     const resumenes = await mandarResumenes(db, config, req.log).catch((e) => { req.log.error(e, 'No se pudieron mandar los resúmenes diarios'); return 0 })
     const metas = despachador ? await avisarMetasAtrasadas(db, despachador).catch((e) => { req.log.error(e, 'No se pudieron revisar las metas atrasadas'); return 0 }) : 0
     const rachas = despachador ? await avisarRachasEnRiesgo(db, despachador).catch((e) => { req.log.error(e, 'No se pudieron revisar las rachas'); return 0 }) : 0
+    const fiado = despachador ? await avisarFiadoAtrasado(db, despachador).catch((e) => { req.log.error(e, 'No se pudo revisar el fiado atrasado'); return 0 }) : 0
     const anual = await mandarResumenAnual(db, config, despachador ?? null, req.log).catch((e) => { req.log.error(e, 'No se pudo mandar el resumen del año'); return 0 })
-    return { ok: true, borradas, pruebas, resumenes, metas, rachas, anual }
+    return { ok: true, borradas, pruebas, resumenes, metas, rachas, fiado, anual }
   })
 
   // Apartado «Avisos»: los que la plataforma escribe para las empresas (los vencidos al final) y el aviso automático.

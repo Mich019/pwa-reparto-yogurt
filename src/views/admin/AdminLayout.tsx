@@ -37,6 +37,11 @@ const IR_SUSCRIPCION = irASuscripcion()
 function seccionGuardada(): SeccionAdmin {
   if (irACortes()) return 'cobranza'
   if (irAEquipo()) return 'equipo'
+  // `?ir=cobrar`: el aviso de fiado de más de un mes abre Cobranza → Por cobrar (con el mensaje de cobro de cada cliente).
+  if (new URLSearchParams(location.search).get('ir') === 'cobrar') {
+    history.replaceState(history.state, '', location.pathname + location.hash)
+    return 'cobranza'
+  }
   // `?ir=produccion`: el aviso de la tarde de que falta producir para mañana.
   if (new URLSearchParams(location.search).get('ir') === 'produccion') return 'produccion'
   if (IR_SUSCRIPCION) return 'configuracion'

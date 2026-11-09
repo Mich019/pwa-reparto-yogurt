@@ -23,6 +23,8 @@ const FILTROS: { clave: EstadoPedido | 'todos'; texto: string }[] = [
 
 const TEXTO_ESTADO: Record<EstadoPedido, string> = { PENDIENTE: 'Pendiente', ENTREGADO: 'Entregado', RECORDAR_MAS_TARDE: 'Para después', OMITIDO: 'Sin venta' }
 const TEXTO_PAGO = { EFECTIVO: 'Efectivo', TRANSFERENCIA: 'Transferencia', CREDITO: 'Fiado' } as const
+type Pago = keyof typeof TEXTO_PAGO
+const PAGOS: { clave: Pago | 'todos'; texto: string }[] = [{ clave: 'todos', texto: 'Cualquier pago' }, { clave: 'EFECTIVO', texto: 'Efectivo' }, { clave: 'TRANSFERENCIA', texto: 'Transferencia' }, { clave: 'CREDITO', texto: 'Fiado' }]
 
 // Las formas de nombrar la fecha de un pedido que se pueden buscar.
 function fechaBuscable(f: string) {
@@ -35,6 +37,8 @@ function fechaBuscable(f: string) {
 export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; onCliente: (id: string) => void }) {
   const [q, setQ] = useState('')
   const [estado, setEstado] = useState<EstadoPedido | 'todos'>('todos')
+  // La forma de pago sólo la tienen los pedidos entregados: elegir una deja fuera los demás.
+  const [pago, setPago] = useState<Pago | 'todos'>('todos')
   const [enBuscador, setEnBuscador] = useState(false)
   const recientes = useRecientes('pedidos')
   // Los nombres de los vendedores vienen del equipo (servidor); sin él, el pedido sólo no muestra quién lo lleva.
@@ -54,9 +58,9 @@ export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; o
       }))
   }, [])
   const t = limpiarBusqueda(q)
-  const lista = (datos ?? []).filter((p) => (estado === 'todos' || p.estado === estado)
+  const lista = (datos ?? []).filter((p) => (estado === 'todos' || p.estado === estado) && (pago === 'todos' || p.metodo_pago === pago)
     && coincide(t, p.cliente, p.sabores, p.vendedorId ? vendedor.get(p.vendedorId) : 'sin vendedor', fechaBuscable(p.fecha)))
-  const pagina = usePaginas(lista, 30, `${t}|${estado}`)
+  const pagina = usePaginas(lista, 30, `${t}|${estado}|${pago}`)
   // Lo que suman los pedidos que quedaron; si hay de varios estados, aparte lo ya entregado (lo que de verdad se vendió).
   const suma = lista.reduce((s, p) => s + p.total, 0)
   const entregado = lista.reduce((s, p) => s + (p.estado === 'ENTREGADO' ? p.total : 0), 0)
@@ -87,6 +91,11 @@ export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; o
           <button key={f.clave} type="button" onClick={() => setEstado(f.clave)} aria-pressed={estado === f.clave} className={estado === f.clave ? botonPanel : botonPanelSuave}>{f.texto}</button>
         ))}
       </div>
+      <div className={`${grupoPanel} mt-2`} role="group" aria-label="Forma de pago">
+        {PAGOS.map((f) => (
+          <button key={f.clave} type="button" onClick={() => setPago(f.clave)} aria-pressed={pago === f.clave} className={pago === f.clave ? botonPanel : botonPanelSuave}>{f.texto}</button>
+        ))}
+      </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-apagado" aria-live="polite">
           {datos ? <>{lista.length} {lista.length === 1 ? 'pedido' : 'pedidos'}{lista.length > 0 && <> · <b className="font-semibold text-tinta tabular-nums">{dinero(suma)}</b>{mezclados && <> · entregado <b className="font-semibold text-tinta tabular-nums">{dinero(entregado)}</b></>}</>}</> : 'Cargando…'}
@@ -106,7 +115,7 @@ export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; o
            </button>
           </li>
         ))}
-        {datos && !lista.length && <li className="py-8 text-center text-sm text-apagado">{t ? 'Ningún pedido coincide con la búsqueda.' : 'No hay pedidos con ese estado.'}</li>}
+        {datos && !lista.length && <li className="py-8 text-center text-sm text-apagado">{t ? 'Ningún pedido coincide con la búsqueda.' : pago !== 'todos' ? 'No hay pedidos con ese estado y esa forma de pago.' : 'No hay pedidos con ese estado.'}</li>}
       </ul>
       {pagina.control}
     </Hoja>

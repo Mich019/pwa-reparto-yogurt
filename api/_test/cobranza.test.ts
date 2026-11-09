@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
+import { avisarFiadoAtrasado } from '../_lib/cobranza.js'
+import { crearDespachador } from '../_lib/notificaciones.js'
 import { app, cliente, config, crearEmpresa, db, op, pedido, push, sesion } from './ayuda.js'
 
 // Fiado: lo vendido a crédito suma a lo que debe el cliente, los abonos lo bajan.
@@ -34,6 +36,27 @@ async function escenario() {
 }
 
 describe('fiado', () => {
+  it('avisa a los administradores de quien debe desde hace más de un mes, una vez por cliente', async () => {
+    const x = await escenario()
+    const nuevo = await x.entrega('CREDITO', 1) // de hoy: todavía no
+    assert.equal(nuevo.body.resultados[0].estado, 'aplicada')
+    const despachador = crearDespachador(db, null, { error: () => {} })
+    const avisos = async () => (await db.query(`SELECT titulo, cuerpo, datos FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.admin.id])).rows
+    await avisarFiadoAtrasado(db, despachador)
+    assert.equal((await avisos()).length, 0)
+    assert.equal((await x.entrega('CREDITO', 3, hoyEn(config.zonaHoraria, new Date(Date.now() - 40 * 86_400_000)))).body.resultados[0].estado, 'aplicada')
+    await avisarFiadoAtrasado(db, despachador)
+    const [a] = await avisos()
+    assert.equal(a.titulo, 'Fiado de más de un mes')
+    assert.match(a.cuerpo, /^Tienda Fiada debe \$240 desde el /)
+    assert.deepEqual(a.datos.clienteIds, [x.c.id])
+    assert.equal(a.datos.url, '/admin?ir=cobrar')
+    // Al vendedor no le llega, y otra vuelta del cron no lo repite.
+    assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.ana.id])).rowCount, 0)
+    await avisarFiadoAtrasado(db, despachador)
+    assert.equal((await avisos()).length, 1)
+  })
+
   it('lo vendido a crédito es deuda; lo pagado de contado no', async () => {
     const x = await escenario()
     assert.equal((await x.entrega('CREDITO', 3)).body.resultados[0].estado, 'aplicada') // $180 fiados

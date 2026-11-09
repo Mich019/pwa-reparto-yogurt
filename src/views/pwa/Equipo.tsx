@@ -10,11 +10,11 @@ import {
   avisoDePrueba, cargarEquipo, crearMiembro, metaParaTodos, ventasMesPasado, metasCumplidas, darDeBaja, editarMiembro, invitar, reactivar, reasignarClientes, restablecerPassword, textoReasignado, useEquipo,
   type Miembro, type Rachas, type Trofeos,
 } from '../../lib/equipo'
-import { useServidor } from '../../lib/cobranza'
+import { useServidor, type CifrasMes } from '../../lib/cobranza'
 import { hace, hoy } from '../../lib/fechas'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { copiarDelicado } from '../../lib/portapapeles'
-import { useSesion, type Rol } from '../../lib/sesion'
+import { llamarAutenticado, useSesion, type Rol } from '../../lib/sesion'
 import { Avatar } from '../../components/Avatar'
 import { Medallas } from '../../components/Medallas'
 import { HistorialMetas } from '../../components/HistorialMetas'
@@ -48,7 +48,7 @@ const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHast
 // Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
 const NOMBRE_AVISO: Record<string, string> = {
   stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
-  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas', record_personal: 'récords', produccion_pendiente: 'producción pendiente',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas', record_personal: 'récords', produccion_pendiente: 'producción pendiente', fiado_atrasado: 'fiado atrasado',
 }
 function textoAvisos(m: Miembro) {
   const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'
@@ -114,12 +114,22 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   const t = limpiarBusqueda(q)
   const lista = (verBaja ? deBaja : activos).filter((m) => coincide(t, m.nombre, m.correo))
   const vista = usePaginas(panel ? lista : activos, 30, `${t}|${verBaja}`)
-  // Lo que dejó la búsqueda, a Excel (los datos que ya trae la lista del equipo).
-  function exportar() {
+  // Lo que dejó la búsqueda, a Excel (los datos que ya trae la lista del equipo). Con conexión, también lo vendido en el
+  // mes (como el ranking: GET /cierres/:mes) y lo que le falta para su meta; sin ella, esas columnas no salen.
+  async function exportar() {
+    const mes = hoy().slice(0, 7)
+    const cifras = await llamarAutenticado<{ cifras: CifrasMes }>(`/cierres/${mes}`).then((r) => r.cifras, () => null)
+    const vendido = cifras && new Map(cifras.vendedores.map((v) => [v.id, v.ventas]))
+    const mesColumnas = vendido ? [{ titulo: `Vendido ${mes}`, dinero: true, ancho: 14 }, { titulo: 'Le falta para la meta', dinero: true, ancho: 14 }] : []
+    const delMes = (m: Miembro) => {
+      if (!vendido) return []
+      const v = vendido.get(m.id) ?? 0
+      return [v, m.metaMensual ? Math.max(0, m.metaMensual - v) : null]
+    }
     descargar(xlsx({
       nombre: verBaja ? 'Dadas de baja' : 'Equipo',
-      columnas: [{ titulo: 'Nombre', ancho: 26 }, { titulo: 'Correo', ancho: 30 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Rol', ancho: 14 }, { titulo: 'Clientes activos', ancho: 10 }, { titulo: 'Meta mensual', dinero: true, ancho: 14 }, { titulo: 'Comisión %', ancho: 10 }, { titulo: 'Último acceso', ancho: 18 }],
-      filas: lista.map((m) => [m.nombre, m.correo, m.telefono, m.rol === 'administrador' ? 'Administrador' : 'Vendedor', m.clientesActivos, m.metaMensual, m.comisionPct, m.ultimoAcceso ? new Date(m.ultimoAcceso).toLocaleString('es-MX') : 'Nunca']),
+      columnas: [{ titulo: 'Nombre', ancho: 26 }, { titulo: 'Correo', ancho: 30 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Rol', ancho: 14 }, { titulo: 'Clientes activos', ancho: 10 }, { titulo: 'Meta mensual', dinero: true, ancho: 14 }, ...mesColumnas, { titulo: 'Comisión %', ancho: 10 }, { titulo: 'Último acceso', ancho: 18 }],
+      filas: lista.map((m) => [m.nombre, m.correo, m.telefono, m.rol === 'administrador' ? 'Administrador' : 'Vendedor', m.clientesActivos, m.metaMensual, ...delMes(m), m.comisionPct, m.ultimoAcceso ? new Date(m.ultimoAcceso).toLocaleString('es-MX') : 'Nunca']),
     }), `equipo-${hoy()}.xlsx`)
   }
 
@@ -177,7 +187,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
             { texto: 'Invitar', icono: <Mail size={18} aria-hidden="true" />, onElegir: () => setInvitando(true) },
             { texto: 'Meta para todos', icono: <Target size={18} aria-hidden="true" />, onElegir: () => setMetaTodos(true) },
             { texto: 'Salón de la fama', icono: <Crown size={18} aria-hidden="true" />, onElegir: () => setFama(true) },
-            { texto: 'Bajar a Excel', icono: <FileSpreadsheet size={18} aria-hidden="true" />, onElegir: exportar },
+            { texto: 'Bajar a Excel', icono: <FileSpreadsheet size={18} aria-hidden="true" />, onElegir: () => void exportar() },
           ]} />
           <button onClick={() => setForm('nuevo')} className={`${botonPanel} max-sm:grow`}><UserPlus size={18} /> Nueva cuenta</button>
         </Encabezado>
