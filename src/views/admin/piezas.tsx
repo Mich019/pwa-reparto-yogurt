@@ -121,6 +121,8 @@ const IR_A: [string, SeccionAdmin, string][] = [
   ['i', 'resumen', 'Resumen'], ['v', 'equipo', 'Vendedores'], ['c', 'clientes', 'Clientes'], ['p', 'produccion', 'Producción'],
   ['s', 'sabores', 'Sabores'], ['b', 'cobranza', 'Cobranza'], ['r', 'reportes', 'Reportes'], ['o', 'configuracion', 'Configuración'],
 ]
+// «g c»: el atajo de una sección, para el title del menú.
+export const atajoDe = (s: SeccionAdmin) => { const a = IR_A.find(([, id]) => id === s); return a ? `g ${a[0]}` : undefined }
 const ATAJOS: [string, string][] = [
   ['/', 'Buscar en la sección (Clientes, Vendedores, Cobranza)'],
   ['Esc', 'Borrar la búsqueda y cerrar el buscador, o cerrar un menú'],

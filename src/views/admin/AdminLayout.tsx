@@ -10,7 +10,7 @@ import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
 import { Cobranza, irACortes } from './Cobranza'
 import { LogoEmpresa } from './marca'
-import { AtajosTeclado, Subrayado } from './piezas'
+import { AtajosTeclado, Subrayado, atajoDe } from './piezas'
 import { Equipo, irAEquipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
@@ -165,6 +165,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                 type="button"
                 onClick={() => setSeccion(id)}
                 aria-current={activa ? 'page' : undefined}
+                title={atajoDe(id) && `${texto} (teclas ${atajoDe(id)})`}
                 className={`rounded-md px-2.5 py-2.5 text-[15px] font-semibold transition-colors 2xl:px-3.5 ${id === 'configuracion' ? 'max-2xl:hidden' : ''} ${anillo} ${
                   activa ? 'text-tinta' : 'text-tinta/65 hover:text-tinta'
                 }`}
