@@ -8,7 +8,7 @@ import { Boton, Campo, Hoja, Segmentado, aviso, claseInput } from './ui'
 // En la ficha de un cliente: lo que debe (fiado) y los envases que tiene prestados, con lo necesario para cobrar un
 // abono o recoger envases. Si no debe nada ni tiene envases, no aparece nada. Necesita conexión.
 
-export function CuentaDelCliente({ clienteId }: { clienteId: string }) {
+export function CuentaDelCliente({ clienteId, limite }: { clienteId: string; limite?: number | null }) {
   const cuenta = useServidor<CuentaCliente>(`/cobranza/clientes/${clienteId}`)
   const envases = useServidor<CuentaEnvases>(`/envases/clientes/${clienteId}`)
   const [hoja, setHoja] = useState<'abono' | 'envases' | null>(null)
@@ -29,6 +29,7 @@ export function CuentaDelCliente({ clienteId }: { clienteId: string }) {
           <ChevronRight size={18} className="shrink-0 text-apagado/60" />
         </button>
       )}
+      {saldo > 0 && limite != null && limite > 0 && <BarraLimite saldo={saldo} limite={limite} />}
       {prestados > 0 && (
         <button onClick={() => setHoja('envases')} className="flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-3 text-left active:bg-linea">
           <Boxes size={20} className="shrink-0" />
@@ -42,6 +43,22 @@ export function CuentaDelCliente({ clienteId }: { clienteId: string }) {
       )}
       {hoja === 'abono' && cuenta.datos && <HojaAbono cuenta={cuenta.datos} onCerrar={() => setHoja(null)} onHecho={recargar} />}
       {hoja === 'envases' && envases.datos && <HojaEnvases cuenta={envases.datos} onCerrar={() => setHoja(null)} onHecho={recargar} />}
+    </div>
+  )
+}
+
+// Lo que debe contra su límite de fiado (el suyo o el de la empresa): verde, ámbar desde el 80%, rojo si lo pasó.
+function BarraLimite({ saldo, limite }: { saldo: number; limite: number }) {
+  const pct = saldo / limite
+  const color = pct > 1.00001 ? 'bg-rojo' : pct >= 0.8 ? 'bg-ambar' : 'bg-verde'
+  return (
+    <div className="px-1">
+      <div className="h-2 overflow-hidden rounded-full bg-linea" role="meter" aria-valuemin={0} aria-valuemax={limite} aria-valuenow={saldo} aria-label="Lo que debe contra su límite de fiado">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, pct * 100)}%` }} />
+      </div>
+      <p className={`mt-1 text-xs ${pct > 1.00001 ? 'font-semibold text-rojo' : 'text-apagado'}`}>
+        {pct > 1.00001 ? `Pasó su límite de ${dinero(limite)} por ${dinero(saldo - limite)}` : `${Math.round(pct * 100)}% de su límite de ${dinero(limite)}`}
+      </p>
     </div>
   )
 }

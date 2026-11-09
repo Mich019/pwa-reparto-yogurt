@@ -23,6 +23,7 @@ import { usePaginas } from '../../components/Paginas'
 import { CuentaDelCliente } from '../../components/CuentaDelCliente'
 import { PreciosDelCliente } from '../../components/PreciosDelCliente'
 import { LimiteFiado } from '../../components/LimiteFiado'
+import { useMarca } from '../../lib/marca'
 import { PorCobrar } from '../../components/PorCobrar'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
@@ -61,6 +62,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const [libreta, setLibreta] = useState(false)
   const rol = useRol()
   const equipoNombres = useEquipo()
+  const limiteDeEmpresa = useMarca()?.limiteFiado ?? null
 
   const prod = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos])
   const stats = useMemo(() => {
@@ -108,9 +110,9 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
     descargar(xlsx({
       nombre: verInactivos ? 'Clientes archivados' : 'Clientes',
       columnas: [{ titulo: 'Cliente', ancho: 28 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Dirección', ancho: 40 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Visita', ancho: 22 }, { titulo: 'Último pedido entregado', ancho: 14 },
-        ...(saldo ? [{ titulo: 'Debe (fiado)', dinero: true, ancho: 14 }] : []), ...(prestados ? [{ titulo: 'Envases prestados', ancho: 12 }] : []), { titulo: 'Notas', ancho: 36 }],
+        ...(saldo ? [{ titulo: 'Debe (fiado)', dinero: true, ancho: 14 }] : []), { titulo: 'Límite de fiado', dinero: true, ancho: 14 }, ...(prestados ? [{ titulo: 'Envases prestados', ancho: 12 }] : []), { titulo: 'Notas', ancho: 36 }],
       filas: lista.map((c) => [c.nombre, c.telefono, c.direccion, c.vendedorId ? vendedor.get(c.vendedorId) ?? '' : 'Sin vendedor', textoFrecuencia(c.frecuencia), stats.get(c.id)?.ultima ?? '',
-        ...(saldo ? [saldo.get(c.id) ?? 0] : []), ...(prestados ? [prestados.get(c.id) ?? 0] : []), c.notas ?? '']),
+        ...(saldo ? [saldo.get(c.id) ?? 0] : []), c.limiteFiado ?? limiteDeEmpresa, ...(prestados ? [prestados.get(c.id) ?? 0] : []), c.notas ?? '']),
     }), `clientes-${hoy()}.xlsx`)
   }
 
@@ -248,6 +250,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
   // RF-041: el administrador ve de quién es el cliente y puede pasarlo a otro vendedor (sólo si ya está en el servidor).
   const rol = useRol()
   const gestiona = MODO_SERVIDOR && rol === 'administrador' && cliente.version != null
+  const limiteEmpresa = useMarca()?.limiteFiado ?? null
   const equipo = useEquipo()
   useEffect(() => {
     if (gestiona && !equipo) void cargarEquipo().catch(() => {})
@@ -295,7 +298,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
         {gestiona && <PreciosDelCliente clienteId={cliente.id} nombre={cliente.nombre} />}
         {gestiona && <LimiteFiado cliente={cliente} />}
         <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
-        {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} />}
+        {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} limite={cliente.limiteFiado ?? limiteEmpresa} />}
 
         {pendientes.length > 0 && (
           <Seccion titulo="Pedidos agendados">
