@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Check, CreditCard, Eye, Nfc, RotateCcw, Search, Unlink } from 'lucide-react'
@@ -127,7 +128,7 @@ export function FichaCodigos({ cliente, onCerrar }: { cliente: Cliente; onCerrar
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            <Boton onClick={() => void verPdf()} disabled={ocupado}><Eye size={20} /> {ocupado ? 'Generando…' : 'Ver PDF'}</Boton>
+            <Boton onClick={() => void verPdf()} disabled={ocupado}>{ocupado ? <Ocupado texto="Generando…" /> : <><Eye size={20} /> Ver PDF</>}</Boton>
             <Boton variante="secundario" onClick={() => setModo({ t: 'reponer' })}><RotateCcw size={20} /> Reponer QR</Boton>
           </div>
         )}
@@ -231,7 +232,7 @@ export function ImpresionMasiva({ clientes, onCerrar }: { clientes: Cliente[]; o
       titulo={<div>Imprimir QR<div className="text-base font-medium text-apagado">{ETIQUETAS_POR_HOJA} etiquetas por hoja Carta</div></div>}
       pie={
         <Boton className="w-full text-lg" disabled={!total || generando} onClick={() => void generar()}>
-          <Eye size={20} /> {generando ? 'Generando…' : total ? `Ver PDF · ${total} ${total === 1 ? 'etiqueta' : 'etiquetas'} (${hojas} ${hojas === 1 ? 'hoja' : 'hojas'})` : 'Elige clientes'}
+          {generando ? <Ocupado texto="Generando…" /> : <Eye size={20} />}{generando ? null : total ? `Ver PDF · ${total} ${total === 1 ? 'etiqueta' : 'etiquetas'} (${hojas} ${hojas === 1 ? 'hoja' : 'hojas'})` : 'Elige clientes'}
         </Boton>
       }
     >

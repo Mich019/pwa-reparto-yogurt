@@ -15,7 +15,7 @@ import { Columnas } from '../../components/graficas'
 import { BarraSegmentada, BarrasPeriodo } from '../admin/graficas'
 import { SelectorRango, textoRangoCorto } from '../../components/Calendario'
 import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from '../admin/piezas'
-import { Cargando } from '../../components/Cargando'
+import { BarrasHueso, CifrasHueso, Esqueleto, FilasHueso, Hueso, Ocupado } from '../../components/Esqueleto'
 
 // Reportes del administrador (RF-043 a RF-048): corte del día, comparativos por semana y mes, utilidad por sabor,
 // ranking de sabores, rendimiento de cada vendedor y exportación a Excel o CSV. Los arma el servidor.
@@ -118,7 +118,11 @@ export function Reportes({ panel = false }: { panel?: boolean } = {}) {
         {error && !vigente ? (
           <Fallo error={error} reintentar={recargar} />
         ) : !reporte ? (
-          <Cargando texto="Cargando reporte…" className="mt-10" />
+          <Esqueleto className="mt-6 space-y-7" etiqueta="Cargando el reporte">
+            <CifrasHueso className="border-y border-linea py-5" />
+            <BarrasHueso />
+            <FilasHueso filas={4} inicio="punto" />
+          </Esqueleto>
         ) : (
           <div className={`transition-opacity ${cargando ? 'opacity-50' : ''}`}>
             {error && <Fallo error={error} reintentar={recargar} chico />}
@@ -383,7 +387,7 @@ function Tendencia({ vista, rango, unidades, onElegir, vendedor, chico }: { vist
   const m = medidas.some((x) => x.valor === medida) ? medida : 'ingreso'
   const formato = m === 'pedidos' ? (n: number) => `${num(n, 0)} ${n === 1 ? 'pedido' : 'pedidos'}` : m === 'litros' ? (n: number) => litros(n, u ?? 'L') : dinero
   if (!reporte || reporte.desde !== contexto.desde || reporte.hasta !== contexto.hasta) {
-    return <div className="mt-7 h-56 animate-pulse rounded-lg bg-niebla" aria-label="Cargando la tendencia" />
+    return <Esqueleto className="mt-7" etiqueta="Cargando la tendencia"><BarrasHueso /></Esqueleto>
   }
   const variosAnios = reporte.desde.slice(0, 4) !== reporte.hasta.slice(0, 4)
   const datos = reporte.periodos.map((p) => ({
@@ -473,7 +477,7 @@ function HojaVendedor({ vendedor: v, onCerrar, vista, rango, unidades, onElegir 
             {!meta ? (
               <p className="mt-1 text-sm text-apagado">No tiene meta mensual. Se le pone en Vendedores, en su ficha.</p>
             ) : vendido === null ? (
-              <div className="mt-3 h-3 animate-pulse rounded-full bg-niebla" />
+              <Hueso className="mt-3 h-3 rounded-full" />
             ) : (
               <>
                 <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-niebla" role="img" aria-label={`${dinero(vendido)} de ${dinero(meta)}`}>
@@ -693,7 +697,7 @@ function HojaExportar({ abierta, onCerrar, reporte }: { abierta: boolean; onCerr
       abierta={abierta}
       onCerrar={onCerrar}
       titulo="Exportar reporte"
-      pie={<Boton onClick={descargar} disabled={bajando} className="w-full">{formato === 'pdf' ? <Eye size={18} /> : <Download size={18} />} {bajando ? 'Preparando…' : formato === 'pdf' ? 'Ver vista previa' : 'Descargar'}</Boton>}
+      pie={<Boton onClick={descargar} disabled={bajando} className="w-full">{bajando ? <Ocupado texto="Preparando…" /> : formato === 'pdf' ? <Eye size={18} /> : <Download size={18} />}{bajando ? null : formato === 'pdf' ? 'Ver vista previa' : 'Descargar'}</Boton>}
     >
       <p className="text-sm text-apagado">Del {reporte.desde.split('-').reverse().join('/')} al {reporte.hasta.split('-').reverse().join('/')}.</p>
       <Segmentado

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { EsqueletoLista, Ocupado } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
@@ -215,7 +216,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
     <>
       <Seccion id="perfil" titulo="Perfil" acciones={
         <button type="submit" form="form-perfil" disabled={!cambios || nombre.trim().length < 2 || guardando} className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-          {guardando ? 'Guardando…' : 'Guardar cambios'}
+          {guardando ? <Ocupado texto="Guardando…" /> : 'Guardar cambios'}
         </button>
       } descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
         <FotoPerfil />
@@ -584,7 +585,7 @@ function Preferencias() {
             {(['diario', 'semanal'] as const).map((t) => (
               <button key={t} type="button" onClick={() => void mandarAhora(t)} disabled={!!mandando}
                 className={`rounded-md border border-linea px-3 py-2 text-sm font-semibold transition-colors hover:bg-niebla disabled:opacity-50 ${anillo}`}>
-                {mandando === t ? 'Mandando…' : t === 'diario' ? 'El de ayer' : 'El de la semana'}
+                {mandando === t ? <Ocupado texto="Mandando…" /> : t === 'diario' ? 'El de ayer' : 'El de la semana'}
               </button>
             ))}
           </span>
@@ -670,7 +671,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
         <div className="-mt-3"><DosPasos /></div>
       </Seccion>
       <Seccion id="sesiones" titulo="Sesiones abiertas" descripcion="Dónde está abierta tu cuenta ahora. Si no reconoces una, ciérrala y cambia tu contraseña.">
-        {!sesiones ? <p className="text-sm text-apagado">Cargando…</p> : (
+        {!sesiones ? <EsqueletoLista filas={2} /> : (
           <>
             <ul className="divide-y divide-linea">
               {sesiones.map((s) => (
@@ -684,7 +685,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
                   </div>
                   {!s.actual && (
                     <button type="button" onClick={() => void cerrar(s.id)} disabled={!!cerrando} className={`rounded-md px-3 py-1.5 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
-                      {cerrando === s.id ? 'Cerrando…' : 'Cerrar'}
+                      {cerrando === s.id ? <Ocupado texto="Cerrando…" /> : 'Cerrar'}
                     </button>
                   )}
                 </li>
@@ -692,7 +693,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
             </ul>
             {otras > 1 && (
               <button type="button" onClick={() => void cerrar()} disabled={!!cerrando} className={`mt-4 rounded-md bg-niebla px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-linea disabled:opacity-40 ${anillo}`}>
-                {cerrando === 'todas' ? 'Cerrando…' : `Cerrar las otras ${otras}`}
+                {cerrando === 'todas' ? <Ocupado texto="Cerrando…" /> : `Cerrar las otras ${otras}`}
               </button>
             )}
           </>

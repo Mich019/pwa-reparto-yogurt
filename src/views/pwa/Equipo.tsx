@@ -21,7 +21,7 @@ import { HistorialMetas } from '../../components/HistorialMetas'
 import { usePaginas } from '../../components/Paginas'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, MenuMas, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
-import { Cargando } from '../../components/Cargando'
+import { Esqueleto, EsqueletoLista, Hueso, Ocupado, TextoCargando } from '../../components/Esqueleto'
 
 // M07 · Alta y baja de vendedores y reasignación de clientes (RF-038 a RF-041). Sólo para el administrador.
 
@@ -177,7 +177,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   return (
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'flex h-full flex-col'}>
       {panel ? (
-        <Encabezado titulo="Equipo" ayuda="equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : 'Cargando…'}>
+        <Encabezado titulo="Equipo" ayuda="equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : <TextoCargando ancho="11rem" />}>
           <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" clave="equipo" />
           <div className={grupoPanel} role="group" aria-label="Mostrar">
             <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activas</button>
@@ -205,10 +205,10 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
         {error && (
           <div className="mt-3 rounded-lg bg-rojo/10 p-4">
             <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
-            <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => void cargar()} disabled={cargando}>{cargando ? 'Cargando…' : 'Reintentar'}</Boton>
+            <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => void cargar()} disabled={cargando}>{cargando ? <Ocupado texto="Cargando…" /> : 'Reintentar'}</Boton>
           </div>
         )}
-        {!equipo && !error && <Cargando texto="Cargando equipo…" />}
+        {!equipo && !error && <EsqueletoLista filas={6} inicio="avatar" columnas={columnas} derecha={false} etiqueta="Cargando el equipo" />}
 
         {equipo && equipo.clientesSinAsignar > 0 && (
           <button onClick={() => setCartera({ desde: SIN_VENDEDOR })} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-ambar/20 p-4 text-left">
@@ -287,7 +287,7 @@ function Invitar({ onCerrar }: { onCerrar: () => void }) {
   }
   return (
     <Hoja abierta onCerrar={onCerrar} titulo="Invitar a un vendedor"
-      pie={<Boton className="w-full" onClick={() => void enviar()} disabled={enviando || !correo.trim()}>{enviando ? 'Enviando…' : 'Enviar invitación'}</Boton>}>
+      pie={<Boton className="w-full" onClick={() => void enviar()} disabled={enviando || !correo.trim()}>{enviando ? <Ocupado texto="Enviando…" /> : 'Enviar invitación'}</Boton>}>
       <p className="mb-3 text-sm text-apagado">Le llega un enlace por correo para crear su propia contraseña. Su cuenta aparece aquí cuando lo acepte; el enlace vence en 7 días.</p>
       <Campo etiqueta="Correo">
         <input className={claseInput} type="email" autoComplete="off" value={correo} onChange={(e) => setCorreo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && correo.trim() && void enviar()} placeholder="correo@ejemplo.com" />
@@ -311,7 +311,7 @@ function SalonDeLaFama({ onCerrar, onAbrir }: { onCerrar: () => void; onAbrir: (
     <Hoja abierta onCerrar={onCerrar} titulo="Salón de la fama">
       <p className="mb-3 text-sm text-apagado">Las mejores rachas de meses seguidos llegando a la meta, de todos los meses cerrados.</p>
       {r.error && !r.datos ? <p className="text-sm text-rojo">{r.error}</p>
-        : !r.datos ? <p className="text-sm text-apagado">Cargando…</p>
+        : !r.datos ? <EsqueletoLista filas={5} inicio="avatar" />
         : !lista.length ? <p className="border-t border-linea pt-4 text-sm text-apagado">Todavía nadie llega a su meta en un mes cerrado. Al cerrar el primero aparecen aquí.</p>
         : (
           <ol className="space-y-1.5">
@@ -399,7 +399,7 @@ function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerr
   }
   return (
     <Hoja abierta onCerrar={onCerrar} titulo="Meta para todos"
-      pie={<Boton className="w-full" onClick={enviar} disabled={guardando || !valido || !vendedores.length}>{guardando ? 'Guardando…' : `Poner a ${plural(vendedores.length, 'vendedor', 'vendedores')}`}</Boton>}>
+      pie={<Boton className="w-full" onClick={enviar} disabled={guardando || !valido || !vendedores.length}>{guardando ? <Ocupado texto="Guardando…" /> : `Poner a ${plural(vendedores.length, 'vendedor', 'vendedores')}`}</Boton>}>
       <Segmentado className="mb-3" valor={modo} onChange={setModo}
         opciones={[{ valor: 'monto', texto: 'La misma para todos' }, { valor: 'pct', texto: 'Según su mes pasado' }]} />
       <p className="mb-3 text-sm text-apagado">
@@ -419,7 +419,7 @@ function MetaParaTodos({ vendedores, onCerrar }: { vendedores: Miembro[]; onCerr
       {modo === 'pct' && (
         <div className="mt-4">
           <p className="mb-2 text-xs font-semibold text-apagado">Así quedaría</p>
-          {!ventas ? <p className="text-sm text-apagado">Cargando…</p> : (
+          {!ventas ? <Esqueleto className="space-y-3 rounded-lg bg-niebla p-3">{[0, 1, 2].map((i) => <Hueso key={i} className="h-4 w-full" />)}</Esqueleto> : (
             <ul className="divide-y divide-linea rounded-lg bg-niebla px-3 text-sm">
               {vendedores.map((v) => {
                 const antes = ventas[v.id] ?? 0
@@ -705,7 +705,7 @@ function FormMiembro({ miembro, esYo, onCerrar, onClave }: { miembro?: Miembro; 
   return (
     <Hoja
       abierta onCerrar={onCerrar} alto titulo={miembro ? 'Editar cuenta' : 'Nueva cuenta'}
-      pie={<Boton className="w-full" onClick={() => void guardar()} disabled={guardando}>{guardando ? 'Guardando…' : miembro ? 'Guardar cambios' : 'Crear cuenta'}</Boton>}
+      pie={<Boton className="w-full" onClick={() => void guardar()} disabled={guardando}>{guardando ? <Ocupado texto="Guardando…" /> : miembro ? 'Guardar cambios' : 'Crear cuenta'}</Boton>}
     >
       <form className="space-y-4 pb-4" onSubmit={(e) => { e.preventDefault(); void guardar() }}>
         <Campo etiqueta="Nombre"><input className={claseInput} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Rosa Hernández" autoComplete="off" /></Campo>
@@ -827,7 +827,7 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
       abierta onCerrar={onCerrar} alto titulo="Pasar cartera"
       pie={
         <Boton className="w-full" onClick={() => void pasar()} disabled={trabajando || !hacia || !cuantos}>
-          {trabajando ? 'Pasando…' : hacia && cuantos ? `Pasar ${plural(cuantos, 'cliente', 'clientes')} ${nombreDestino}` : 'Elige a dónde pasan'}
+          {trabajando ? <Ocupado texto="Pasando…" /> : hacia && cuantos ? `Pasar ${plural(cuantos, 'cliente', 'clientes')} ${nombreDestino}` : 'Elige a dónde pasan'}
         </Boton>
       }
     >
@@ -922,7 +922,7 @@ export function CambiarVendedor({ cliente, onCerrar }: { cliente: Cliente; onCer
     <Hoja abierta onCerrar={onCerrar} titulo="Cambiar de vendedor">
       <div className="pb-4">
         <p className="mb-2 text-sm text-apagado">{cliente.nombre} pasa con sus pedidos agendados. Elige a quién:</p>
-        {!equipo && !error && <Cargando className="py-8" />}
+        {!equipo && !error && <EsqueletoLista filas={4} inicio="avatar" derecha={false} />}
         {equipo && opciones.map((o) => (
           <button key={o.id} disabled={trabajando || o.id === actual} onClick={() => void pasar(o.id, o.nombre)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left active:bg-niebla disabled:opacity-60">
             <span className="min-w-0 flex-1">

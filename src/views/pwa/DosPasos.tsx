@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Esqueleto, Hueso, Ocupado } from '../../components/Esqueleto'
 import { Copy, Download, KeyRound, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { ErrorRed } from '../../lib/api'
 import { descargarArchivo } from '../../lib/pdf'
@@ -56,7 +57,7 @@ export function DosPasos() {
       {sinRed && !estado ? (
         <p className="mt-1 text-sm text-apagado">Conéctate a internet para ver o cambiar esta opción.</p>
       ) : !estado ? (
-        <p className="mt-1 text-sm text-apagado">Cargando…</p>
+        <Esqueleto className="mt-2 space-y-2"><Hueso className="h-3.5 w-3/4" /><Hueso className="mt-3 h-12 w-full" /></Esqueleto>
       ) : estado.activa ? (
         <>
           <p className="mt-1 text-sm text-apagado">
@@ -75,7 +76,7 @@ export function DosPasos() {
               ? 'Recomendada para administradores: aunque alguien sepa tu contraseña, sin tu teléfono no puede entrar.'
               : 'Además de la contraseña, al entrar se pide un código de una app en tu teléfono.'}
           </p>
-          <Boton className="mt-3 w-full" onClick={empezar} disabled={ocupado}><ShieldCheck size={18} /> {ocupado ? 'Preparando…' : 'Activar'}</Boton>
+          <Boton className="mt-3 w-full" onClick={empezar} disabled={ocupado}>{ocupado ? <Ocupado texto="Preparando…" /> : <><ShieldCheck size={18} /> Activar</>}</Boton>
         </>
       )}
 
@@ -124,7 +125,7 @@ function Configurar({ secreto, uri, onActivada, onCerrar }: { secreto: string; u
 
   return (
     <Hoja abierta onCerrar={onCerrar} alto titulo="Activar verificación en dos pasos"
-      pie={<Boton className="w-full" onClick={activar} disabled={enviando || codigo.length < 6}>{enviando ? 'Verificando…' : 'Verificar y activar'}</Boton>}>
+      pie={<Boton className="w-full" onClick={activar} disabled={enviando || codigo.length < 6}>{enviando ? <Ocupado texto="Verificando…" /> : 'Verificar y activar'}</Boton>}>
       <ol className="space-y-5 pb-4 text-sm">
         <li>
           <div className="font-semibold">1. Instala una app de autenticación</div>
@@ -196,7 +197,7 @@ function Desactivar({ onCerrar }: { onCerrar: () => void }) {
 
   return (
     <Hoja abierta onCerrar={onCerrar} titulo="Desactivar verificación en dos pasos"
-      pie={<Boton variante="peligro" className="w-full" onClick={desactivar} disabled={enviando || !password || codigo.length < 6}>{enviando ? 'Desactivando…' : 'Desactivar'}</Boton>}>
+      pie={<Boton variante="peligro" className="w-full" onClick={desactivar} disabled={enviando || !password || codigo.length < 6}>{enviando ? <Ocupado texto="Desactivando…" /> : 'Desactivar'}</Boton>}>
       <div className="space-y-4 pb-4">
         <p className="text-sm text-apagado">Tu cuenta quedará protegida sólo con la contraseña. Para confirmar, escribe tu contraseña y un código de tu app (o uno de respaldo).</p>
         <Campo etiqueta="Contraseña">
@@ -231,7 +232,7 @@ function Renovar({ onNuevos, onCerrar }: { onNuevos: (codigos: string[]) => void
 
   return (
     <Hoja abierta onCerrar={onCerrar} titulo="Nuevos códigos de respaldo"
-      pie={<Boton className="w-full" onClick={renovar} disabled={enviando || codigo.length < 6}>{enviando ? 'Generando…' : 'Generar códigos nuevos'}</Boton>}>
+      pie={<Boton className="w-full" onClick={renovar} disabled={enviando || codigo.length < 6}>{enviando ? <Ocupado texto="Generando…" /> : 'Generar códigos nuevos'}</Boton>}>
       <div className="space-y-4 pb-4">
         <p className="text-sm text-apagado">Los códigos de respaldo que tienes ahora dejarán de servir. Escribe el código que muestra tu app para confirmar.</p>
         <CampoCodigo valor={codigo} onChange={setCodigo} />

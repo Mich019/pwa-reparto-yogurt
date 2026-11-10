@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { BarrasHueso, Esqueleto, EsqueletoLista, Hueso, TextoCargando } from '../../components/Esqueleto'
 import { abrirCliente, verSinComprar } from '../pwa/Clientes'
 import { BuscarPedidos } from './BuscarPedidos'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -76,12 +77,15 @@ function Tarjeta({ id, titulo, subtitulo, accion, className = '', children }: { 
   )
 }
 
-function Cifra({ etiqueta, valor, pie }: { etiqueta: string; valor: string; pie?: ReactNode }) {
+// `valor` null: todavía no llega; un hueso del tamaño de la cifra.
+function Cifra({ etiqueta, valor, pie }: { etiqueta: string; valor: string | null; pie?: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[13px] text-apagado">{etiqueta}</dt>
       <dd className="mt-1.5">
-        <span className="cifra block whitespace-nowrap text-[2rem] sm:text-[2.25rem]">{valor}</span>
+        {valor === null
+          ? <span className="esqueleto block py-1" role="status" aria-label="Cargando"><Hueso className="h-8 w-28 sm:h-9" /></span>
+          : <span className="cifra block whitespace-nowrap text-[2rem] sm:text-[2.25rem]">{valor}</span>}
         <span className="mt-2 flex min-h-5 items-center gap-1.5 whitespace-nowrap text-xs text-apagado">{pie}</span>
       </dd>
     </div>
@@ -163,7 +167,7 @@ function QueHacerHoy({ sinVendedor, onNavegar }: { sinVendedor: number; onNavega
   )
 }
 
-const esperando = <div className="mt-4 h-28 animate-pulse rounded-2xl bg-linea/60" aria-hidden="true" />
+const esperando = <Esqueleto className="mt-4"><BarrasHueso className="h-28" /></Esqueleto>
 
 export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
   const sesion = useSesion()
@@ -221,7 +225,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
   const avance = porAtender ? Math.round((atendidos / porAtender) * 100) : 0
   const nombre = sesion?.usuario.nombre.split(' ')[0] ?? ''
   const fechaTexto = stats ? desdeIso(stats.fecha).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }) : ''
-  const valor = (texto: string) => (stats ? texto : '—')
+  const valor = (texto: string) => (stats ? texto : null)
 
   const reporte = ventas.reporte
   const crecimiento = reporte ? cambio(reporte.resumen.ingreso, reporte.anterior?.resumen.ingreso) : null
@@ -264,7 +268,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             <Subrayado>{nombre || 'equipo'}</Subrayado>
           </h1>
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-apagado">
-            <span className="first-letter:uppercase">{fechaTexto || 'Cargando…'}</span>
+            <span className="first-letter:uppercase">{fechaTexto || <TextoCargando ancho="10rem" />}</span>
             <BotonAyuda seccion="resumen" className="-my-2 h-8 w-8" />
             {!enVivo && <button
               type="button"
@@ -282,7 +286,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           <Cifra etiqueta="Cobrado hoy" valor={valor(dinero(p?.totalCobrado ?? 0))} pie={stats && p!.totalEsperado > p!.totalCobrado ? `de ${dinero(p!.totalEsperado)} esperados` : undefined} />
           <Cifra
             etiqueta="Ventas, 30 días"
-            valor={reporte ? dinero(reporte.resumen.ingreso) : '—'}
+            valor={reporte ? dinero(reporte.resumen.ingreso) : null}
             pie={reporte && crecimiento !== null ? <><Delta valor={crecimiento} /> <span>vs. 30 días antes</span></> : undefined}
           />
           <Cifra etiqueta="Pedidos de hoy" valor={valor(String(porAtender))} />
@@ -323,8 +327,8 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             subtitulo="Pedidos atendidos"
             accion={<button type="button" aria-label="Abrir los reportes" title="Reportes" onClick={() => onNavegar('reportes')} className={botonRedondo}><ArrowUpRight size={18} /></button>}
           >
-            <p className="cifra mt-5 text-[3.5rem] leading-none">{stats ? `${avance}%` : '—'}</p>
-            <p className="mt-3 text-[13px] text-apagado">{stats ? (porAtender ? `${atendidos} de ${porAtender} pedidos` : 'No hay pedidos agendados para hoy') : 'Cargando…'}</p>
+            {stats ? <p className="cifra mt-5 text-[3.5rem] leading-none">{avance}%</p> : <span className="esqueleto mt-5 block" aria-hidden="true"><Hueso className="h-14 w-32" /></span>}
+            <p className="mt-3 text-[13px] text-apagado">{stats ? (porAtender ? `${atendidos} de ${porAtender} pedidos` : 'No hay pedidos agendados para hoy') : <TextoCargando ancho="8rem" />}</p>
             <div className="mt-6">
               <BarraSegmentada segmentos={segmentos} descripcion={segmentos.map((s) => `${s.nombre}: ${s.n}`).join(', ')} />
             </div>
@@ -333,7 +337,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
                 <li key={s.nombre} className="flex items-center gap-2.5 py-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden="true" />
                   <span className="text-apagado">{s.nombre}</span>
-                  <span className="ml-auto font-semibold tabular-nums">{stats ? s.n : '—'}</span>
+                  <span className="ml-auto font-semibold tabular-nums">{stats ? s.n : <TextoCargando ancho="1.5rem" />}</span>
                 </li>
               ))}
             </ul>
@@ -651,7 +655,7 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
       {r.error && !r.datos ? (
         <p className="mt-3 rounded-2xl bg-rojo/10 p-3 text-sm font-medium text-rojo">No se pudo traer el mes. <button className="font-semibold underline underline-offset-2" onClick={r.recargar}>Reintentar</button></p>
       ) : !r.datos || r.datos.cifras.mes !== mes ? (
-        <p className="mt-3 text-sm text-apagado">Cargando…</p>
+        <EsqueletoLista filas={4} inicio="avatar" className="mt-3" />
       ) : !filas.length ? (
         <Vacio>{atras ? 'Ese mes no hubo ventas de vendedores.' : 'Cuando tus vendedores entreguen pedidos este mes aparecen aquí.'}</Vacio>
       ) : (

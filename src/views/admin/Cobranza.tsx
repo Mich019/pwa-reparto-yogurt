@@ -12,13 +12,16 @@ import { textoPorUnidad } from '../../lib/unidades'
 import { usePaginas } from '../../components/Paginas'
 import { CuentaAbierta } from '../../components/CuentaDelCliente'
 import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
-import { BuscadorDesplegable, Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
+import { BuscadorDesplegable, Delta, Encabezado, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from './piezas'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../lib/db'
+import { cambio } from '../../lib/reportes'
 import { Selector } from '../../components/Selector'
 import { mostrarPdf } from '../../components/VisorPdf'
 import { AnioEnNumeros, type ResumenAnio } from './AdminDashboard'
 import { abrirFicha } from '../pwa/Equipo'
 import type { SeccionAdmin } from './menu'
-import { Cargando } from '../../components/Cargando'
+import { BarrasHueso, CifrasHueso, Esqueleto, EsqueletoLista, FilasHueso, Hueso, Ocupado } from '../../components/Esqueleto'
 
 // Finanzas del panel (antes «Cobranza»; el id de la sección sigue siendo `cobranza`): quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
 // informe. Todo viene del servidor y necesita conexión.
@@ -39,17 +42,23 @@ const PARTES: { id: Parte; texto: string; corto?: string; detalle: string }[] = 
   { id: 'meses', texto: 'Cierre de mes', corto: 'Cierre', detalle: 'Ventas, utilidad, comisiones y cortes de cada mes; ciérralo para que ya no cambie y baja su informe.' },
 ]
 
-export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void } = {}) {
+// Los cortes de hoy (para la franja) y cuántos piden atención: los de hoy por confirmar más los confirmados que ya no
+// cuadran. Lo usan el numerito de «Cortes del día» y el del menú del panel (AdminLayout).
+// `activo` en falso (sin sesión de administrador) no pregunta nada.
+export function useCortesPorAtender(activo = true) {
+  const cortesHoy = useServidor<{ fecha: string; filas: FilaCorte[] }>(activo ? `/cortes?fecha=${hoy()}` : null).datos
+  const descuadres = useServidor<{ cortes: Descuadre[] }>(activo ? '/cortes/descuadres' : null).datos
+  return { cortesHoy, porAtender: (cortesHoy?.filas ?? []).filter((f) => f.estado === 'pendiente').length + (descuadres?.cortes.length ?? 0) }
+}
+
+export function Cobranza({ onNavegar, cortes }: { onNavegar?: (s: SeccionAdmin) => void; cortes: ReturnType<typeof useCortesPorAtender> }) {
   const [parte, setParte] = useState<Parte>(() => {
     if (!irACortes()) return 'cobrar'
     history.replaceState(history.state, '', location.pathname + location.hash) // que al recargar no vuelva a saltar
     return 'cortes'
   })
   const [q, setQ] = useState('')
-  // Los cortes de hoy (para la franja y el numerito de «Cortes del día») y los confirmados que ya no cuadran.
-  const cortesHoy = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${hoy()}`).datos
-  const descuadres = useServidor<{ cortes: Descuadre[] }>('/cortes/descuadres').datos
-  const porAtender = (cortesHoy?.filas ?? []).filter((f) => f.estado === 'pendiente').length + (descuadres?.cortes.length ?? 0)
+  const { cortesHoy, porAtender } = cortes
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
       <Encabezado titulo="Finanzas" ayuda="cobranza" detalle={PARTES.find((p) => p.id === parte)?.detalle}>
@@ -87,26 +96,43 @@ function FranjaFinanzas({ cortesHoy, onElegir }: { cortesHoy?: FilaCorte[]; onEl
   // Entregado y por confirmar: lo que dijo el vendedor; sin entregar todavía: lo que debe traer.
   const falta = sinConfirmar.reduce((s, f) => s + (f.entregado ?? f.esperado), 0)
   const cobradoMes = cifras ? cifras.cobro.efectivo + cifras.cobro.transferencia + cifras.abonos.total : 0
-  const items: { parte: Parte; etiqueta: string; valor: string; pie: string }[] = [
-    { parte: 'cobrar', etiqueta: 'Te deben', valor: deben ? dinero(deben.total) : '—',
+  // Del 1 a hoy contra del 1 al mismo día del mes pasado (o su último día, si es más corto).
+  const dia = hoy()
+  const mesAntes = sumarDias(`${mes}-01`, -1).slice(0, 7)
+  const hastaAntes = `${mesAntes}-${String(Math.min(Number(dia.slice(8)), Number(sumarDias(`${mes}-01`, -1).slice(8)))).padStart(2, '0')}`
+  const tramo = useLiveQuery(async () => {
+    let ahora = 0, antes = 0
+    await db.pedidos.where('fecha').between(`${mesAntes}-01`, dia, true, true).each((p) => {
+      if (p.estado !== 'ENTREGADO') return
+      if (p.fecha >= `${mes}-01`) ahora += p.total
+      else if (p.fecha <= hastaAntes) antes += p.total
+    })
+    return { ahora, antes }
+  }, [mes, mesAntes, dia, hastaAntes])
+  const crecimiento = tramo && tramo.antes > 0 ? cambio(tramo.ahora, tramo.antes) : null
+  const nombreAntes = textoMes(mesAntes).split(' ')[0].toLowerCase()
+  const items: { parte: Parte; etiqueta: string; valor: string | null; pie: ReactNode }[] = [
+    { parte: 'cobrar', etiqueta: 'Te deben', valor: deben ? dinero(deben.total) : null,
       pie: !deben ? '' : deben.deudores.length ? `${deben.deudores.length} ${deben.deudores.length === 1 ? 'cliente' : 'clientes'}` : 'Nadie te debe' },
-    { parte: 'cortes', etiqueta: 'Efectivo de hoy por confirmar', valor: cortesHoy ? dinero(falta) : '—',
+    { parte: 'cortes', etiqueta: 'Efectivo de hoy por confirmar', valor: cortesHoy ? dinero(falta) : null,
       pie: !cortesHoy ? '' : !cortesHoy.length ? 'Nadie ha vendido hoy' : falta > 0 ? `de ${dinero(efectivoHoy)} del día` : sinConfirmar.length ? 'Sin efectivo por entregar' : 'Todo confirmado' },
-    { parte: 'envases', etiqueta: 'Envases prestados', valor: envases ? envases.total.toLocaleString('es-MX') : '—',
+    { parte: 'envases', etiqueta: 'Envases prestados', valor: envases ? envases.total.toLocaleString('es-MX') : null,
       pie: !envases ? '' : envases.clientes.length ? `en ${envases.clientes.length} ${envases.clientes.length === 1 ? 'cliente' : 'clientes'}` : 'Todos devueltos' },
-    { parte: 'meses', etiqueta: `Vendido en ${textoMes(mes).split(' ')[0].toLowerCase()}`, valor: cifras ? dinero(cifras.ventas.ingreso) : '—',
-      pie: cifras ? `cobrado ${dinero(cobradoMes)}` : '' },
+    { parte: 'meses', etiqueta: `Vendido en ${textoMes(mes).split(' ')[0].toLowerCase()}`, valor: cifras ? dinero(cifras.ventas.ingreso) : null,
+      pie: crecimiento !== null ? <><Delta valor={crecimiento} /> <span>vs. {nombreAntes} a esta fecha</span></> : cifras ? `cobrado ${dinero(cobradoMes)}` : '' },
   ]
   return (
-    <section aria-label="Finanzas de un vistazo" className="mb-6 border-y border-linea py-5">
+    <section aria-label="Finanzas de un vistazo" aria-busy={items.some((c) => c.valor === null)} className="mb-6 border-y border-linea py-5">
       <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
         {items.map((c) => (
           <button key={c.parte} type="button" onClick={() => onElegir(c.parte)}
             className="min-w-0 rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-marca">
             <span className="block truncate text-[13px] text-apagado">{c.etiqueta}</span>
             <span className="mt-1 block">
-              <span className="cifra block truncate text-2xl sm:text-[1.75rem]">{c.valor}</span>
-              <span className="mt-1 block min-h-5 truncate text-xs text-apagado">{c.pie}</span>
+              {c.valor === null
+                ? <span className="esqueleto block py-1" aria-hidden="true"><Hueso className="h-7 w-28 max-w-full sm:h-8" /></span>
+                : <span className="cifra block truncate text-2xl sm:text-[1.75rem]">{c.valor}</span>}
+              <span className="mt-1 flex min-h-5 items-center gap-1 truncate whitespace-nowrap text-xs text-apagado">{c.pie}</span>
             </span>
           </button>
         ))}
@@ -115,9 +141,22 @@ function FranjaFinanzas({ cortesHoy, onElegir }: { cortesHoy?: FilaCorte[]; onEl
   )
 }
 
-function Estado({ cargando, error, vacio, children }: { cargando: boolean; error: string; vacio?: string; children: ReactNode }) {
+// `esqueleto`: la forma de la pestaña mientras carga (por omisión, una lista con su total arriba).
+// El cierre de mes mientras llega: (los meses en botones,) el título, sus cifras y la tabla de vendedores.
+function EsqueletoMes({ chips = false }: { chips?: boolean }) {
+  return (
+    <Esqueleto className="space-y-6">
+      {chips && <div className="flex gap-2 overflow-hidden">{[0, 1, 2, 3].map((i) => <Hueso key={i} className="h-10 w-32 shrink-0" />)}</div>}
+      <span className="block space-y-2"><Hueso className="h-7 w-48" /><Hueso className="h-3.5 w-28" /></span>
+      <CifrasHueso className="border-y border-linea py-5" />
+      <FilasHueso filas={4} inicio="avatar" />
+    </Esqueleto>
+  )
+}
+
+function Estado({ cargando, error, vacio, children, esqueleto }: { cargando: boolean; error: string; vacio?: string; children: ReactNode; esqueleto?: ReactNode }) {
   if (error) return <p role="alert" className="py-12 text-center text-sm font-medium text-rojo">{error}</p>
-  if (cargando) return <Cargando />
+  if (cargando) return <>{esqueleto ?? <EsqueletoLista resumen />}</>
   if (vacio) return <p className="py-12 text-center text-apagado">{vacio}</p>
   return <>{children}</>
 }
@@ -251,6 +290,21 @@ function Cortes() {
   const recargar = () => { lista.recargar(); descuadres.recargar() }
   const filas = lista.datos?.filas ?? []
   const [confirmando, setConfirmando] = useState<string | null>(null)
+  // Entregados por confirmar que cuadran al centavo (y sin cambios después): se confirman uno por uno, de un toque.
+  const cuadran = filas.filter((f) => f.estado === 'pendiente' && f.diferencia === 0 && f.cambioDespues === null)
+  async function confirmarTodos() {
+    setConfirmando('todos')
+    let hechos = 0
+    try {
+      for (const f of cuadran) { await confirmarCorte(f.id); hechos++ }
+      aviso(`${hechos} cortes confirmados`)
+    } catch (e) {
+      aviso(`${hechos ? `${hechos} confirmados; ` : ''}${e instanceof Error ? e.message : 'no se pudo confirmar'}`)
+    } finally {
+      setConfirmando(null)
+      recargar()
+    }
+  }
   async function confirmar(f: FilaCorte) {
     setConfirmando(f.id)
     try {
@@ -285,7 +339,15 @@ function Cortes() {
         <span className="min-w-36 text-center font-semibold">{fecha === hoy() ? 'Hoy' : textoFecha(fecha)}</span>
         <button onClick={() => setFecha(sumarDias(fecha, 1))} disabled={fecha >= hoy()} aria-label="Día siguiente" className={botonPanelIcono}><ChevronRight size={18} /></button>
       </div>
-      <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !filas.length ? 'Nadie vendió este día.' : undefined}>
+      {cuadran.length >= 2 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-linea px-1 pb-3">
+          <p className="text-sm text-apagado">{cuadran.length} cortes entregaron justo lo que debían.</p>
+          <button type="button" onClick={() => void confirmarTodos()} disabled={!!confirmando} className={botonPanel}>
+            {confirmando === 'todos' ? <Ocupado texto="Confirmando…" /> : `Confirmar los ${cuadran.length} que cuadran`}
+          </button>
+        </div>
+      )}
+      <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !filas.length ? 'Nadie vendió este día.' : undefined} esqueleto={<EsqueletoLista filas={4} />}>
         {filas.map((f) => (
           <div key={f.vendedorId} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-linea px-1 py-3.5">
             <span className="min-w-0 flex-1 basis-40">
@@ -394,7 +456,7 @@ function Meses({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void }) {
   const meses = lista.datos?.meses ?? []
   const elegido = mes ?? meses.find((m) => !m.actual)?.mes ?? meses[0]?.mes ?? null
   return (
-    <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !meses.length ? 'Todavía no hay ventas.' : undefined}>
+    <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !meses.length ? 'Todavía no hay ventas.' : undefined} esqueleto={<EsqueletoMes chips />}>
       <div className="flex gap-2 overflow-x-auto pb-4" role="group" aria-label="Mes">
         {meses.map((m) => (
           <button key={m.mes} onClick={() => setMes(m.mes)} aria-pressed={elegido === m.mes} className={`${elegido === m.mes ? botonPanel : botonPanelSuave} shrink-0`}>
@@ -439,7 +501,7 @@ function ElAnio({ anios, onNavegar }: { anios: number[]; onNavegar?: (s: Seccion
           )}
           {!!r.datos?.meses.length && (
             <button type="button" onClick={() => void pdfDelAnio(r.datos!)} disabled={generando} className={botonPanelSuave}>
-              <FileText size={16} aria-hidden="true" /> {generando ? 'Generando…' : 'Descargar PDF'}
+              {generando ? <Ocupado texto="Generando…" /> : <><FileText size={16} aria-hidden="true" /> Descargar PDF</>}
             </button>
           )}
         </div>
@@ -447,7 +509,7 @@ function ElAnio({ anios, onNavegar }: { anios: number[]; onNavegar?: (s: Seccion
       <p className="mt-1 text-sm text-apagado">Sólo cuentan los meses cerrados.</p>
       <div className="mt-3 border-t border-linea pt-4">
         {r.error && !r.datos ? <p className="text-sm text-rojo">{r.error}</p>
-          : !r.datos ? <p className="text-sm text-apagado">Cargando…</p>
+          : !r.datos ? <Esqueleto><BarrasHueso barras={12} className="h-40" /></Esqueleto>
           : !r.datos.meses.length ? <p className="text-sm text-apagado">Ese año todavía no tiene meses cerrados.</p>
           : <AnioEnNumeros r={r.datos} onFicha={(id) => { abrirFicha(id); onNavegar?.('equipo') }} />}
       </div>
@@ -476,7 +538,7 @@ function DetalleMes({ mes, actual, onCambio }: { mes: string; actual: boolean; o
     try { await exportarInforme(i, formato) } catch (e) { aviso(e instanceof Error ? e.message : 'No se pudo generar') } finally { setExportando(null) }
   }
   return (
-    <Estado cargando={informe.cargando && !i} error={informe.error}>
+    <Estado cargando={informe.cargando && !i} error={informe.error} esqueleto={<EsqueletoMes />}>
       {i && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">

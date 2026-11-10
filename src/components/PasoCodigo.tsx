@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Ocupado } from './Esqueleto'
 import { AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { ErrorApi } from '../lib/api'
 import { cancelarCodigo, confirmarCodigo, mensajeErrorLogin } from '../lib/sesion'
@@ -68,7 +69,7 @@ export function PasoCodigo({ onListo, onVolver }: { onListo?: () => void; onVolv
       )}
 
       <button type="submit" disabled={enviando} className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40">
-        {enviando ? 'Verificando…' : 'Verificar y entrar'}
+        {enviando ? <Ocupado texto="Verificando…" /> : 'Verificar y entrar'}
       </button>
 
       <div className="flex items-center justify-between text-sm font-semibold">

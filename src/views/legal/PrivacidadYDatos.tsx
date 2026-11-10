@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Download, FileText, Mail, Trash2, TriangleAlert } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
@@ -92,11 +93,11 @@ export function PrivacidadYDatos({ plataforma = false }: { plataforma?: boolean 
         <p>Un archivo con todo lo que Delisy guarda de tu cuenta: perfil, sesiones y aceptaciones (derecho de acceso).</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" onClick={() => void hacer('mios', descargarMisDatos)} disabled={!!trabajando} className={`${boton} bg-tinta text-white hover:bg-marca-oscuro`}>
-            {trabajando === 'mios' ? 'Preparando…' : 'Descargar mis datos'}
+            {trabajando === 'mios' ? <Ocupado texto="Preparando…" /> : 'Descargar mis datos'}
           </button>
           {admin && (
             <button type="button" onClick={() => void hacer('empresa', () => descargarDatosEmpresa((t) => setTrabajando(`empresa:${t}`)))} disabled={!!trabajando} className={`${boton} bg-niebla text-tinta hover:bg-linea`}>
-              {trabajando?.startsWith('empresa') ? `Juntando ${trabajando.slice(8).replace('_', ' ') || 'datos'}…` : 'Descargar todo lo de la empresa'}
+              {trabajando?.startsWith('empresa') ? <Ocupado texto={`Juntando ${trabajando.slice(8).replace('_', ' ') || 'datos'}…`} /> : 'Descargar todo lo de la empresa'}
             </button>
           )}
         </div>
@@ -118,7 +119,7 @@ export function PrivacidadYDatos({ plataforma = false }: { plataforma?: boolean 
               <Confirmacion password={password} setPassword={setPassword} codigo={codigo} setCodigo={setCodigo} />
               {error && <p role="alert" className="mt-3 font-medium text-rojo">{error}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
-                <button type="submit" disabled={!password || !!trabajando} className={`${boton} bg-rojo text-white`}>{trabajando === 'cuenta' ? 'Eliminando…' : 'Eliminar mi cuenta para siempre'}</button>
+                <button type="submit" disabled={!password || !!trabajando} className={`${boton} bg-rojo text-white`}>{trabajando === 'cuenta' ? <Ocupado texto="Eliminando…" /> : 'Eliminar mi cuenta para siempre'}</button>
                 <button type="button" onClick={() => abrir(null)} className={`${boton} bg-niebla text-tinta hover:bg-linea`}>Cancelar</button>
               </div>
             </form>

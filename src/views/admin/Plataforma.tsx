@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Esqueleto, EsqueletoLista, Hueso, Ocupado } from '../../components/Esqueleto'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Selector } from '../../components/Selector'
@@ -642,7 +643,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
         <input type="checkbox" checked={exenta} onChange={(x) => setExenta(x.target.checked)} className="h-5 w-5 accent-[var(--plat)]" />
       </label>
       {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
-      <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={`${botonPrimario} w-full`}>{guardando ? 'Guardando…' : 'Guardar ajustes'}</button>
+      <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={`${botonPrimario} w-full`}>{guardando ? <Ocupado texto="Guardando…" /> : 'Guardar ajustes'}</button>
     </div>
   )
 }
@@ -735,7 +736,7 @@ function NuevaEmpresa({ ir, alCrear }: { ir: (v: Vista) => void; alCrear: () => 
             <Campo t="Correo"><input type="email" value={f.adminCorreo} onChange={(x) => poner({ adminCorreo: x.target.value })} className={claseInputRecto} placeholder="correo@ejemplo.com" maxLength={150} /></Campo>
           </div>
           {error && <p role="alert" className="mt-4 text-sm font-medium text-rojo">{error}</p>}
-          <button type="submit" disabled={!listo || enviando} className={`${botonPrimario} mt-6 w-full lg:mt-auto`}>{enviando ? 'Creando…' : 'Crear empresa e invitar'}</button>
+          <button type="submit" disabled={!listo || enviando} className={`${botonPrimario} mt-6 w-full lg:mt-auto`}>{enviando ? <Ocupado texto="Creando…" /> : 'Crear empresa e invitar'}</button>
         </section>
       </form>
     </>
@@ -819,7 +820,7 @@ function Cuentas({ cuentas, alCrear }: { cuentas: Cuenta[]; alCrear: () => Promi
               <Campo t="Nombre"><input value={nombre} onChange={(x) => setNombre(x.target.value)} className={claseInputRecto} autoComplete="off" /></Campo>
               <Campo t="Correo"><input type="email" value={correo} onChange={(x) => setCorreo(x.target.value)} className={claseInputRecto} autoComplete="off" placeholder="correo@ejemplo.com" /></Campo>
               {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
-              <button type="submit" disabled={enviando || nombre.trim().length < 2 || !correo.trim()} className={`${botonPrimario} w-full`}>{enviando ? 'Creando…' : 'Crear cuenta'}</button>
+              <button type="submit" disabled={enviando || nombre.trim().length < 2 || !correo.trim()} className={`${botonPrimario} w-full`}>{enviando ? <Ocupado texto="Creando…" /> : 'Crear cuenta'}</button>
             </form>
           )}
         </section>
@@ -887,7 +888,7 @@ function Avisos() {
     <>
       <Encabezado titulo="Avisos" detalle="Salen arriba del panel y de la app de reparto, sólo a quien tiene la sesión abierta. Cada quien puede cerrarlos; vuelven a salir si los cambias." />
       {error && <p role="alert" className="mb-6 text-sm font-medium text-rojo">{error}</p>}
-      {!lista ? !error && <p className="text-sm text-apagado">Cargando…</p> : (
+      {!lista ? !error && <EsqueletoLista filas={4} /> : (
         <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
           <div className="min-w-0 space-y-10">
             <EditorAviso key={editando?.id ?? 'nuevo'} aviso={editando} correoActivo={lista.correoActivo} alTerminar={async () => { setEditando(null); await cargar() }} />
@@ -939,7 +940,7 @@ function FilaAviso({ a, editando, alEditar, alQuitar }: { a: AvisoPlataforma; ed
       </div>
       <div className="mt-2.5"><MuestraAviso texto={a.texto} tipo={a.tipo} /></div>
       <div className="mt-2 flex gap-4 text-sm font-semibold">
-        <button type="button" onClick={alEditar} disabled={editando} className={`text-[var(--plat-texto)] hover:underline disabled:opacity-40 ${anillo}`}>{editando ? 'Editando…' : 'Editar'}</button>
+        <button type="button" onClick={alEditar} disabled={editando} className={`text-[var(--plat-texto)] hover:underline disabled:opacity-40 ${anillo}`}>{editando ? <Ocupado texto="Editando…" /> : 'Editar'}</button>
         <button type="button" onClick={() => void quitar()} disabled={quitando} className={`text-rojo hover:underline disabled:opacity-40 ${anillo}`}>Quitar</button>
       </div>
     </li>
@@ -1024,7 +1025,7 @@ function EditorAviso({ aviso: original, correoActivo, alTerminar }: { aviso: Avi
         {(alReves || vencido) && <p role="alert" className="text-sm font-medium text-ambar">{alReves ? 'El final va después del inicio.' : 'Esa fecha de fin ya pasó: no lo verá nadie.'}</p>}
         {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
         <div className="flex flex-wrap gap-3">
-          <button type="submit" disabled={guardando || !texto.trim() || alReves} className={botonPrimario}>{guardando ? 'Guardando…' : original ? 'Guardar cambios' : desde && new Date(desde).getTime() > Date.now() ? 'Programar' : 'Publicar'}</button>
+          <button type="submit" disabled={guardando || !texto.trim() || alReves} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : original ? 'Guardar cambios' : desde && new Date(desde).getTime() > Date.now() ? 'Programar' : 'Publicar'}</button>
           {original && <button type="button" onClick={() => void alTerminar()} className={botonSuave}>Cancelar</button>}
         </div>
       </form>
@@ -1078,7 +1079,7 @@ function AvisoAutomatico({ inicial, alGuardar }: { inicial: { dias: number; vend
         )}
         {hay && (
           <div className="flex gap-3">
-            <button type="button" onClick={() => void guardar()} disabled={guardando || n > 60} className={botonPrimario}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+            <button type="button" onClick={() => void guardar()} disabled={guardando || n > 60} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : 'Guardar'}</button>
             <button type="button" onClick={() => { setDias(String(inicial.dias)); setVendedores(inicial.vendedores) }} className={botonSuave}>Deshacer</button>
           </div>
         )}
@@ -1149,7 +1150,7 @@ function AjustesServicio() {
   })
   useEffect(() => { if (s) setB(desde(s.ajustes)) }, [s])
   if (error) return <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
-  if (!s || !b) return <p className="text-sm text-apagado">Cargando…</p>
+  if (!s || !b) return <Esqueleto className="space-y-5">{[0, 1, 2, 3].map((i) => <span key={i} className="block space-y-2"><Hueso className="h-3.5 w-32" /><Hueso className="h-10 w-full" /></span>)}</Esqueleto>
 
   const o = desde(s.ajustes)
   const cambios = {
@@ -1195,7 +1196,7 @@ function AjustesServicio() {
       </Seccion>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-6">
-        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? 'Guardando…' : 'Guardar ajustes'}</button>
+        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : 'Guardar ajustes'}</button>
         {hay && <button type="button" onClick={() => { setErrorGuardar(''); setB(o) }} className={botonSuave}>Deshacer</button>}
         {errorGuardar && <p role="alert" className="text-sm font-medium text-rojo">{errorGuardar}</p>}
         {!hay && s.ajustes.actualizado && <span className="text-xs text-apagado">Último cambio: {new Date(s.ajustes.actualizado).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>}
@@ -1211,7 +1212,7 @@ const megas = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).to
 function Servicio() {
   const { s, error } = useServicio()
   if (error) return <p role="alert" className="text-sm font-medium text-rojo">{error}</p>
-  if (!s) return <p className="text-sm text-apagado">Cargando…</p>
+  if (!s) return <EsqueletoLista filas={6} derecha />
   const listo = (ok: boolean, si: string, no: string) => (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold ${ok ? 'text-verde' : 'text-ambar'}`}>
       {ok ? <Check size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}{ok ? si : no}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { TextoCargando } from '../../components/Esqueleto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { FileSpreadsheet, Search } from 'lucide-react'
 import { descargar, xlsx } from '../../lib/xlsx'
@@ -98,7 +99,7 @@ export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; o
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-apagado" aria-live="polite">
-          {datos ? <>{lista.length} {lista.length === 1 ? 'pedido' : 'pedidos'}{lista.length > 0 && <> · <b className="font-semibold text-tinta tabular-nums">{dinero(suma)}</b>{mezclados && <> · entregado <b className="font-semibold text-tinta tabular-nums">{dinero(entregado)}</b></>}</>}</> : 'Cargando…'}
+          {datos ? <>{lista.length} {lista.length === 1 ? 'pedido' : 'pedidos'}{lista.length > 0 && <> · <b className="font-semibold text-tinta tabular-nums">{dinero(suma)}</b>{mezclados && <> · entregado <b className="font-semibold text-tinta tabular-nums">{dinero(entregado)}</b></>}</>}</> : <TextoCargando ancho="9rem" />}
         </p>
         {lista.length > 0 && <button type="button" onClick={exportar} className={botonPanelSuave}><FileSpreadsheet size={18} aria-hidden="true" /> Excel</button>}
       </div>

@@ -24,7 +24,7 @@ import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Hoja, PuntoSabor, Segmentado, aviso, telLimpio } from '../../components/ui'
-import { Cargando } from '../../components/Cargando'
+import { Esqueleto, Hueso } from '../../components/Esqueleto'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -328,7 +328,13 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
         <div className="mx-auto max-w-xl overflow-hidden rounded-t-[28px] bg-papel shadow-hoja">
           <button onClick={() => setExpandida(!expandida)} className="mx-auto mt-2.5 block h-1 w-10 rounded-full bg-linea" aria-label="Expandir" />
           {cargando ? (
-            <Cargando className="py-8" />
+            <Esqueleto className="px-5 pt-3 pb-5" etiqueta="Cargando la ruta">
+              <div className="flex items-start gap-3">
+                <span className="min-w-0 flex-1 space-y-2"><Hueso className="h-7 w-3/5" /><Hueso className="h-3.5 w-2/5" /></span>
+                <span className="space-y-2"><Hueso className="ml-auto h-7 w-20" /><Hueso className="h-3.5 w-24" /></span>
+              </div>
+              <Hueso className="mt-5 h-14 w-full" />
+            </Esqueleto>
           ) : activo && clienteActivo ? (
             <>
               <div className={`px-5 pt-3 ${expandida ? 'max-h-[44dvh] overflow-y-auto' : ''}`}>

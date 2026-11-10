@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Ocupado } from './Esqueleto'
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../lib/api'
 import { mensajeErrorLogin, restablecerPassword, solicitarRecuperacion } from '../lib/sesion'
@@ -137,7 +138,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
           disabled={cargando}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
         >
-          {cargando ? 'Actualizando contraseña…' : 'Restablecer contraseña'}
+          {cargando ? <Ocupado texto="Actualizando contraseña…" /> : 'Restablecer contraseña'}
         </button>
         <div className="flex items-center justify-between text-sm font-semibold">
           <button type="button" onClick={() => { setError(''); setPaso('correo') }} className="py-1 text-apagado hover:text-tinta">
@@ -177,7 +178,7 @@ export function RecuperarPassword({ correoInicial, onVolver }: { correoInicial: 
         disabled={cargando}
         className="flex w-full items-center justify-center gap-2 rounded-md bg-tinta py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
       >
-        {cargando ? 'Enviando código…' : 'Enviar código'}
+        {cargando ? <Ocupado texto="Enviando código…" /> : 'Enviar código'}
       </button>
       <button type="button" onClick={volver} className="flex w-full items-center justify-center gap-1.5 py-2 text-sm font-semibold text-apagado hover:text-tinta">
         <ArrowLeft size={16} /> Volver a iniciar sesión

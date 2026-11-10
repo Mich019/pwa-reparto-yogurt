@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { ShieldCheck } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { aceptarLegal } from '../../lib/legal'
@@ -55,7 +56,7 @@ export function AceptarLegal() {
         </label>
         {error && <p role="alert" className="mt-3 text-sm font-medium text-rojo">{error}</p>}
         <button type="button" onClick={() => void aceptar()} disabled={!marcado || enviando} className="mt-5 w-full rounded-md bg-tinta py-3 font-semibold text-white disabled:opacity-40">
-          {enviando ? 'Guardando…' : 'Continuar'}
+          {enviando ? <Ocupado texto="Guardando…" /> : 'Continuar'}
         </button>
         <button type="button" onClick={() => void cerrarSesion()} className="mt-2 w-full rounded-md py-2.5 text-sm font-semibold text-apagado hover:text-tinta">Ahora no, cerrar sesión</button>
       </div>

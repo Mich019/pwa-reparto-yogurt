@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { reparte } from '../../lib/reparto'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -130,7 +131,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
         disabled={cargando}
         className="flex w-full items-center justify-center rounded-md bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
       >
-        {cargando ? 'Guardando…' : 'Guardar contraseña'}
+        {cargando ? <Ocupado texto="Guardando…" /> : 'Guardar contraseña'}
       </button>
     </form>
   )
@@ -472,7 +473,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
 
       <div className="mt-3 space-y-2">
         <Boton variante="secundario" className="w-full" onClick={() => setCambiando(true)}>Cambiar contraseña</Boton>
-        <Boton variante="peligro" className="w-full" onClick={() => void salir()} disabled={saliendo}><LogOut size={18} />{saliendo ? 'Cerrando…' : 'Cerrar sesión'}</Boton>
+        <Boton variante="peligro" className="w-full" onClick={() => void salir()} disabled={saliendo}>{saliendo ? <Ocupado texto="Cerrando…" /> : <><LogOut size={18} />Cerrar sesión</>}</Boton>
         {pendientes > 0 && <p className="px-1 text-xs text-apagado">Los cambios por enviar se guardan en este teléfono y salen cuando vuelvas a entrar con esta cuenta.</p>}
       </div>
 

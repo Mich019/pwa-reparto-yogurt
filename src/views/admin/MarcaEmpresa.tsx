@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react'
+import { Esqueleto, Hueso, Ocupado } from '../../components/Esqueleto'
 import { AlertCircle, AlertTriangle, Check, CheckCircle2, ChevronDown, ImagePlus, Sparkles } from 'lucide-react'
 import { colorLegible, guardarMarca, useMarca, type Marca } from '../../lib/marca'
 import { prepararLogo, revisarLogo, type RevisionLogo } from '../../lib/logo'
@@ -51,7 +52,12 @@ export function MarcaEmpresa() {
     revisarLogo(logoActual).then((r) => { if (vigente) setRevision(r) }).catch(() => {})
     return () => { vigente = false }
   }, [logoActual])
-  if (!m || !borrador) return <p className="text-sm text-apagado">Cargando…</p>
+  if (!m || !borrador) return (
+    <Esqueleto className="space-y-5" etiqueta="Cargando la marca">
+      <div className="flex items-center gap-4"><Hueso className="h-28 w-28 shrink-0 rounded-lg" /><span className="flex-1 space-y-2"><Hueso className="h-4 w-1/3" /><Hueso className="h-10 w-full" /></span></div>
+      {[0, 1, 2].map((i) => <span key={i} className="block space-y-2"><Hueso className="h-3.5 w-24" /><Hueso className="h-10 w-full" /></span>)}
+    </Esqueleto>
+  )
 
   const cambio = borrador.nombre.trim() !== m.nombre || borrador.color !== m.color || borrador.logo !== m.logo
     || borrador.lema.trim() !== (m.lema ?? '') || borrador.contacto.trim() !== (m.contacto ?? '')
@@ -125,7 +131,7 @@ export function MarcaEmpresa() {
       )}
       <button type="button" onClick={() => void guardar()} disabled={!cambio || guardando || procesando}
         className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-        {guardando ? 'Guardando…' : 'Guardar marca'}
+        {guardando ? <Ocupado texto="Guardando…" /> : 'Guardar marca'}
       </button>
     </>
   )
@@ -187,7 +193,7 @@ export function MarcaEmpresa() {
                     Tu logo trae un fondo <Muestra color={revision.fondo} />: en la app se verá como un recuadro.{' '}
                     <button type="button" onClick={() => void quitarFondo()} disabled={procesando}
                       className={`inline-flex items-center gap-1 font-semibold text-azul hover:underline disabled:opacity-40 ${anillo}`}>
-                      <Sparkles size={14} aria-hidden="true" /> {procesando ? 'Quitando…' : 'Quitar el fondo'}
+                      {procesando ? <Ocupado texto="Quitando…" /> : <><Sparkles size={14} aria-hidden="true" /> Quitar el fondo</>}
                     </button>
                   </Consejo>
                 )

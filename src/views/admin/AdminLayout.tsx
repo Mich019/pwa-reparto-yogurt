@@ -8,7 +8,7 @@ import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'
 import { useConexionEnVivo } from '../../lib/enVivo'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminSabores } from './AdminSabores'
-import { Cobranza, irACortes, marcarCobrarViejos } from './Cobranza'
+import { Cobranza, irACortes, marcarCobrarViejos, useCortesPorAtender } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { AtajosTeclado, Subrayado, atajoDe } from './piezas'
 import { GuiaInicio } from '../../components/GuiaInicio'
@@ -101,6 +101,8 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
 
   // Guía de la primera vez (lib/guiaInicio.ts): cada paso abre su sección; la bienvenida, el Resumen. No sale con la
   // suscripción vencida ni llegando por un enlace a una guía.
+  // Los cortes que piden atención: una sola consulta para el numerito del menú y para Finanzas.
+  const cortes = useCortesPorAtender(esAdmin)
   const pasoGuia = useGuiaInicio('panel', sesion?.usuario.id, esAdmin && suscripcion?.estado !== 'vencida' && !location.search.includes('guia='))
   useEffect(() => {
     if (pasoGuia !== null) { const p = PASOS_PANEL[pasoGuia]; setSeccion((p?.abrir ?? p?.seccion ?? 'resumen') as SeccionAdmin) }
@@ -187,6 +189,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                 }`}
               >
                 {activa ? <Subrayado dibujar>{texto}</Subrayado> : texto}
+                {id === 'cobranza' && <NumeritoCortes n={cortes.porAtender} />}
               </button>
             )
           })}
@@ -251,7 +254,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {seccion === 'equipo' && <Equipo panel />}
           {seccion === 'clientes' && <Clientes panel />}
           {seccion === 'produccion' && <Produccion panel />}
-          {seccion === 'cobranza' && <Cobranza onNavegar={setSeccion} />}
+          {seccion === 'cobranza' && <Cobranza onNavegar={setSeccion} cortes={cortes} />}
           {seccion === 'reportes' && <Reportes panel />}
         </div>
       </main>
@@ -277,7 +280,10 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                     activa ? 'bg-tinta text-white max-[429px]:w-11 min-[430px]:w-full min-[430px]:px-3' : 'w-11 text-apagado hover:bg-niebla max-[380px]:w-10'
                   }`}
                 >
-                  <Icono size={20} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
+                  <span className="relative">
+                    <Icono size={20} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
+                    {id === 'cobranza' && <NumeritoCortes n={cortes.porAtender} flotante />}
+                  </span>
                   {/* Con siete secciones, en el teléfono angosto sólo cabe el ícono (el título de la sección ya dice cuál es). */}
                   {activa && <span className="truncate text-[13px] font-semibold max-[429px]:hidden">{texto}</span>}
                 </button>
@@ -287,5 +293,17 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
         </ul>
       </nav>
     </div>
+  )
+}
+
+// Cuántos cortes piden atención (de hoy por confirmar o confirmados que ya no cuadran), junto a «Finanzas» en el menú.
+// `flotante`: en la esquina del ícono de la barra de abajo.
+function NumeritoCortes({ n: porAtender, flotante = false }: { n: number; flotante?: boolean }) {
+  if (!porAtender) return null
+  return (
+    <span aria-label={porAtender === 1 ? 'un corte por atender' : `${porAtender} cortes por atender`}
+      className={`inline-flex min-w-[18px] items-center justify-center rounded-full bg-ambar px-1 text-[11px] font-bold leading-[18px] tabular-nums text-tinta ${flotante ? 'absolute -right-2.5 -top-2' : 'ml-1.5 align-middle'}`}>
+      {porAtender}
+    </span>
   )
 }

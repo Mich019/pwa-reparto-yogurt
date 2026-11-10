@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { Recientes, Resaltar, useRecientes } from '../../components/Busqueda'
 import { coincide, digitosBuscados, limpiarBusqueda, normalizar, propsBuscador, telefonoCoincide } from '../../lib/busqueda'
 import { esMio } from '../../lib/reparto'
@@ -591,7 +592,7 @@ function HojaLibreta({ abierta, onCerrar }: { abierta: boolean; onCerrar: () => 
       abierta={abierta}
       onCerrar={onCerrar}
       titulo="Libreta de clientes"
-      pie={<Boton onClick={descargar} disabled={bajando} className="w-full">{formato === 'pdf' ? <Eye size={18} /> : <Download size={18} />} {bajando ? 'Preparando…' : formato === 'pdf' ? 'Ver vista previa' : 'Descargar'}</Boton>}
+      pie={<Boton onClick={descargar} disabled={bajando} className="w-full">{bajando ? <Ocupado texto="Preparando…" /> : formato === 'pdf' ? <Eye size={18} /> : <Download size={18} />}{bajando ? null : formato === 'pdf' ? 'Ver vista previa' : 'Descargar'}</Boton>}
     >
       <p className="text-sm text-apagado">Todos los clientes activos de todos los vendedores, con sus datos al día de hoy.</p>
       <Segmentado

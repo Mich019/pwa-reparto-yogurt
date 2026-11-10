@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowRight, Check, Factory, FileSpreadsheet, Printer } from 'lucide-react'
 import { descargar, xlsx } from '../../lib/xlsx'
@@ -200,7 +201,7 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
               <div className="mt-6 flex flex-col gap-2">
                 {onRegistrar && <button type="button" onClick={onRegistrar} className={`${botonPanel} justify-center`}>Anotar lo producido <ArrowRight size={16} aria-hidden="true" /></button>}
                 <button type="button" onClick={() => void imprimir()} disabled={imprimiendo} className={`${botonPanelSuave} justify-center`}>
-                  <Printer size={16} aria-hidden="true" /> {imprimiendo ? 'Generando…' : 'Imprimir hoja para la cocina'}
+                  {imprimiendo ? <Ocupado texto="Generando…" /> : <><Printer size={16} aria-hidden="true" /> Imprimir hoja para la cocina</>}
                 </button>
                 <button type="button" onClick={bajarExcel} className={`${botonPanelSuave} justify-center`}>
                   <FileSpreadsheet size={16} aria-hidden="true" /> Bajar a Excel

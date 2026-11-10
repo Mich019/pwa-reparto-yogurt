@@ -1,4 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react'
+import { Ocupado } from './Esqueleto'
 import { Camera, ZoomIn, ZoomOut } from 'lucide-react'
 import { ErrorApi } from '../lib/api'
 import { leerImagen, recortarFoto } from '../lib/imagen'
@@ -61,7 +62,7 @@ export function FotoPerfil({ tamano = 'h-20 w-20 text-3xl', compacto = false }: 
       </button>
       {!compacto && <div className="flex flex-col items-start gap-1 text-sm">
         <button type="button" onClick={() => entrada.current?.click()} disabled={guardando} className="font-semibold text-azul hover:underline disabled:opacity-40">
-          {guardando ? 'Guardando…' : u.foto ? 'Cambiar foto' : 'Poner foto'}
+          {guardando ? <Ocupado texto="Guardando…" /> : u.foto ? 'Cambiar foto' : 'Poner foto'}
         </button>
         {u.foto && !guardando && <button type="button" onClick={() => void guardar(null)} className="font-semibold text-apagado hover:text-rojo">Quitar foto</button>}
         <span className="text-xs text-apagado">JPG, PNG o WEBP. Tú eliges el encuadre.</span>

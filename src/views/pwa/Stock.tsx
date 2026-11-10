@@ -8,7 +8,7 @@ import { useStockDeHoy } from '../../lib/stock'
 import type { Nivel } from '../../lib/stock-calculo'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Boton, PuntoSabor } from '../../components/ui'
-import { Cargando } from '../../components/Cargando'
+import { Esqueleto, FilasHueso, Hueso } from '../../components/Esqueleto'
 
 // RF-037 · La carga del vendedor: lo que el administrador le asignó hoy y lo que le va quedando. Las cuentas salen de
 // los pedidos entregados en este mismo teléfono, así funcionan sin internet.
@@ -39,7 +39,10 @@ export function Stock() {
       <div className="text-sm text-apagado">{textoFecha(hoy())}</div>
 
       {filas === undefined ? (
-        <Cargando className="mt-10" />
+        <Esqueleto className="mt-4" etiqueta="Cargando tu carga">
+          <span className="block space-y-2 border-y border-linea py-5"><Hueso className="h-4 w-20" /><Hueso className="h-12 w-24" /><Hueso className="h-3 w-32" /><Hueso className="mt-3 h-2 w-full rounded-full" /></span>
+          <FilasHueso filas={5} inicio="punto" />
+        </Esqueleto>
       ) : filas.length === 0 ? (
         <div className="mt-6 border-t border-linea py-10 text-center">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-niebla"><Package size={26} /></span>

@@ -120,3 +120,17 @@ body {
 @keyframes ayuda-pulso { from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-marca) 55%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }
 .ayuda-pulso { animation: ayuda-pulso 1.6s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ayuda-entrar, .ayuda-pulso { animation: none; } }
+
+/* Carga con forma (components/Esqueleto.tsx): ocupa su lugar sin verse los primeros 300 ms, para que lo que llega
+   rápido no parpadee; luego aparece y sus huesos laten suave. El circulito de los botones gira. */
+.esqueleto { opacity: 0; animation: esqueleto-aparece .2s ease-out .3s forwards; }
+@keyframes esqueleto-aparece { to { opacity: 1; } }
+.hueso { animation: hueso-late 1.6s ease-in-out infinite; }
+@keyframes hueso-late { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.girando { animation: girando .7s linear infinite; }
+@keyframes girando { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto { animation-duration: 0s; }
+  .hueso { animation: none; }
+  .girando { animation-duration: 1.6s; }
+}

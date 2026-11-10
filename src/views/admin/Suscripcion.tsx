@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Ocupado } from '../../components/Esqueleto'
 import { AlertCircle, CreditCard, LogOut } from 'lucide-react'
 import { dinero } from '../../lib/fechas'
 import { cerrarSesion } from '../../lib/sesion'
@@ -116,7 +117,7 @@ export function SeccionSuscripcion({ s }: { s: Suscripcion }) {
       {s.estado !== 'activa' && <BotonSuscribirse s={s} />}
       {(s.suscripcion === 'authorized' || s.suscripcion === 'pending') && (
         <button type="button" onClick={() => void cancelar()} disabled={cancelando} className={`rounded-md border border-rojo/40 px-5 py-3 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
-          {cancelando ? 'Cancelando…' : 'Cancelar suscripción'}
+          {cancelando ? <Ocupado texto="Cancelando…" /> : 'Cancelar suscripción'}
         </button>
       )}
       {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}

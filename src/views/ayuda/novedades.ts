@@ -12,7 +12,8 @@ export const NOVEDADES: Novedad[] = [
   {
     fecha: '2026-11-10', titulo: 'Clientes que dejaron de comprar y más WhatsApp',
     puntos: [
-      { texto: '«Cobranza» ahora se llama «Finanzas», con pestañas más claras: Por cobrar, Envases, Cortes del día y Cierre de mes; debajo del título dice para qué sirve cada una. Arriba, cuatro cifras de un vistazo (lo que te deben, el efectivo de hoy por confirmar, los envases prestados y lo vendido en el mes) y «Cortes del día» trae un numerito con los que faltan por confirmar. Su atajo es «g f».', para: 'administrador', donde: 'panel', guia: 'cobranza' },
+      { texto: '«Cobranza» ahora se llama «Finanzas», con pestañas más claras: Por cobrar, Envases, Cortes del día y Cierre de mes; debajo del título dice para qué sirve cada una. Arriba, cuatro cifras de un vistazo (lo que te deben, el efectivo de hoy por confirmar, los envases prestados y lo vendido en el mes) y «Cortes del día» trae un numerito con los que faltan por confirmar (también junto a «Finanzas» en el menú). Lo vendido en el mes se compara con el mes pasado a la misma fecha, y con «Confirmar los que cuadran» confirmas de un toque los cortes que entregaron justo lo que debían. Su atajo es «g f».', para: 'administrador', donde: 'panel', guia: 'cobranza' },
+      { texto: 'Mientras algo carga ves en gris la forma de lo que va a aparecer, y los botones muestran un circulito mientras guardan, generan o envían.' },
       { texto: 'La primera vez que entras, un recorrido corto te muestra para qué sirve cada parte, señalando cada botón. Lo repites cuando quieras con «Ver la guía otra vez», aquí en Ayuda.' },
       { texto: 'En Clientes ves quiénes dejaron de comprar (más de un mes sin pedido) y les escribes desde ahí.', guia: 'sin-comprar' },
       { texto: '«Qué hacer hoy» en el Resumen te dice cuántos dejaron de comprar, y la ficha de cada vendedor cuántos de su cartera.', para: 'administrador', donde: 'panel' },

@@ -7,7 +7,7 @@ import { copiarCarga, guardarCarga, guardarProduccion, useDiaStock, type DiaStoc
 import { formato, sumaPorUnidad } from '../../lib/unidades'
 import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
 import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
-import { Cargando } from '../../components/Cargando'
+import { CifrasHueso, Esqueleto, FilasHueso, Hueso, Ocupado } from '../../components/Esqueleto'
 
 // RF-037 · El administrador registra, para un día, los litros producidos de cada sabor y los que le entrega a cada vendedor
 // al empezar la jornada (y, al cerrar, lo que devuelven). Se hace por internet: el servidor es quien lleva las cuentas.
@@ -114,7 +114,13 @@ export function StockAdmin({ selector, panel = false }: { selector?: ReactNode; 
         </div>
       )}
 
-      {!dia && !error && <Cargando className="mt-10" />}
+      {!dia && !error && (
+        <Esqueleto className="mt-4" etiqueta="Cargando el stock del día">
+          <CifrasHueso n={3} />
+          <Hueso className="mt-6 h-7 w-32" />
+          <FilasHueso filas={5} inicio="punto" />
+        </Esqueleto>
+      )}
 
       {dia && cuentas && (
         <div className={`transition-opacity ${actual ? '' : 'pointer-events-none opacity-40'}`} aria-busy={!actual}>
@@ -157,7 +163,7 @@ export function StockAdmin({ selector, panel = false }: { selector?: ReactNode; 
             <h2 className="text-2xl font-bold tracking-tight">Vendedores</h2>
             {sinCarga && (
               <Boton variante="secundario" className="!px-4 !py-2.5 text-sm" onClick={repetir} disabled={copiando}>
-                <Copy size={16} /> {copiando ? 'Copiando…' : 'Repetir el día anterior'}
+                {copiando ? <Ocupado texto="Copiando…" /> : <><Copy size={16} /> Repetir el día anterior</>}
               </Boton>
             )}
           </div>
@@ -260,7 +266,7 @@ function HojaProduccion({ abierta, onCerrar, dia, sabores, onGuardado }: {
 
   return (
     <Hoja abierta={abierta} onCerrar={onCerrar} alto titulo={<div>Producción<div className="text-base font-medium text-apagado capitalize">{textoFecha(dia.fecha)}</div></div>}
-      pie={<Boton className="w-full text-lg" onClick={guardar} disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar producción'}</Boton>}>
+      pie={<Boton className="w-full text-lg" onClick={guardar} disabled={guardando}>{guardando ? <Ocupado texto="Guardando…" /> : 'Guardar producción'}</Boton>}>
       <p className="mb-1 text-sm text-apagado">Lo que se produjo de cada sabor este día. Lo que no asignes a un vendedor queda en el almacén.</p>
       <div className="divide-y divide-linea">
         {sabores.map((p) => (
@@ -322,7 +328,7 @@ function HojaCarga({ abierta, onCerrar, dia, sabores, vendedor, onGuardado }: {
   return (
     <Hoja abierta={abierta} onCerrar={onCerrar} alto
       titulo={<div>{vendedor ? `Carga de ${vendedor.nombre}` : 'Carga'}<div className="text-base font-medium text-apagado capitalize">{textoFecha(dia.fecha)}</div></div>}
-      pie={<Boton className="w-full text-lg" onClick={guardar} disabled={guardando || !vendedor}>{guardando ? 'Guardando…' : `Guardar carga · ${totalAsignado}`}</Boton>}>
+      pie={<Boton className="w-full text-lg" onClick={guardar} disabled={guardando || !vendedor}>{guardando ? <Ocupado texto="Guardando…" /> : `Guardar carga · ${totalAsignado}`}</Boton>}>
       <p className="mb-1 text-sm text-apagado">
         Lo que se lleva de cada sabor al empezar el día.{puedeDevolver && ' Al cerrar, anota lo que regresa.'} Le llegará un aviso al guardar.
       </p>

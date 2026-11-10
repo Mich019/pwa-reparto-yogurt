@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { TextoCargando } from '../../components/Esqueleto'
 import { FileSpreadsheet, IceCreamBowl } from 'lucide-react'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { hoy } from '../../lib/fechas'
@@ -32,7 +33,7 @@ export function AdminSabores() {
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
-      <Encabezado titulo="Sabores" ayuda="sabores" detalle={productos ? `${aLaVenta} a la venta${sinStock ? ` · ${sinStock} sin stock` : ''} · ventas de los últimos 30 días` : 'Cargando…'}>
+      <Encabezado titulo="Sabores" ayuda="sabores" detalle={productos ? `${aLaVenta} a la venta${sinStock ? ` · ${sinStock} sin stock` : ''} · ventas de los últimos 30 días` : <TextoCargando ancho="16rem" />}>
         <button type="button" onClick={exportar} disabled={!ordenados.length} className={botonPanelSuave}>
           <FileSpreadsheet size={18} aria-hidden="true" /> Bajar a Excel
         </button>
