@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, Check, ChevronRight, MessageCircle, Search, Sparkles, X } from 'lucide-react'
+import { verGuia } from '../../lib/guiaInicio'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Compass, MessageCircle, Search, Sparkles, X } from 'lucide-react'
 import { db } from '../../lib/db'
 import { useSesion } from '../../lib/sesion'
 import { useMarca } from '../../lib/marca'
@@ -104,6 +105,14 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
 
   return (
     <div className="space-y-7">
+      <button type="button" onClick={() => verGuia(donde)} className={`flex w-full items-center gap-3 rounded-lg bg-niebla p-4 text-left transition-colors hover:bg-linea/70 ${anillo}`}>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-marca text-white"><Compass size={22} aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Ver la guía otra vez</span>
+          <span className="block text-xs text-apagado">El recorrido de bienvenida: para qué sirve cada parte, en un minuto.</span>
+        </span>
+        <ArrowRight size={18} className="shrink-0 text-apagado" aria-hidden="true" />
+      </button>
       <label className="flex h-11 items-center gap-2 rounded-md bg-niebla px-3 focus-within:outline-2 focus-within:outline-marca">
         <Search size={18} className="shrink-0 text-apagado" aria-hidden="true" />
         <input {...propsBuscador} value={q} onChange={(e) => setQ(e.target.value)} placeholder="¿Qué quieres hacer? Ej. cliente, reporte, sin señal" aria-label="Buscar en la ayuda"

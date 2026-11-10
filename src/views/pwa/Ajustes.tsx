@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, IceCreamBowl, Trash2, Upload } from 'lucide-react'
+import { Compass, Download, IceCreamBowl, Trash2, Upload } from 'lucide-react'
+import { verGuia } from '../../lib/guiaInicio'
 import { borrar, db, guardar, guardarVarios, uid, type Producto } from '../../lib/db'
 import { dinero, hoy } from '../../lib/fechas'
 import { borrarTodo } from '../../lib/demo'
@@ -40,6 +41,14 @@ export function Ajustes() {
 
       <h2 className="mt-8 text-2xl font-semibold tracking-tight">Tus datos</h2>
       <DatosYRespaldo />
+
+      <button type="button" onClick={() => verGuia('app')} className="mt-8 flex min-h-12 w-full items-center gap-3 rounded-lg bg-niebla p-4 text-left active:bg-linea">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-marca text-white"><Compass size={22} aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Ver la guía otra vez</span>
+          <span className="block text-xs text-apagado">El recorrido de bienvenida: para qué sirve cada parte, en un minuto.</span>
+        </span>
+      </button>
 
       {editando && (
         <FormSabor
