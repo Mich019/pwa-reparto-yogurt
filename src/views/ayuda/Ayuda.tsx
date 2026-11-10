@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, Check, ChevronRight, Search, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, MessageCircle, Search, Sparkles, X } from 'lucide-react'
 import { db } from '../../lib/db'
 import { useSesion } from '../../lib/sesion'
 import { useMarca } from '../../lib/marca'
@@ -9,6 +9,8 @@ import { useLogoEtiqueta } from '../admin/marca'
 import { useSuscripcion } from '../../lib/suscripcion'
 import { GUIAS, TEMAS, guiaInstalar, type Donde, type Guia, type Tema } from './guias'
 import { Escena, type Valores } from './Escena'
+import { NOVEDADES, type Novedad } from './novedades'
+import { usePlataformaPublica } from '../../lib/plataforma'
 
 // Ayuda: un manual corto que se adapta a quien lo abre. Muestra sólo lo que esa cuenta puede hacer (administrador o
 // vendedor, panel o app de reparto), una lista «Para empezar» que se va palomeando con lo que el negocio ya tiene
@@ -24,15 +26,36 @@ function sistema(): 'ios' | 'android' | 'otro' {
 }
 const instalada = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
 
-const DESTINOS: Record<string, string> = { resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', cobranza: 'Cobranza', reportes: 'Reportes', marca: 'Marca' }
+const DESTINOS: Record<string, string> = { preferencias: 'Preferencias', resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', cobranza: 'Cobranza', reportes: 'Reportes', marca: 'Marca' }
 
-export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => void }) {
+// Lo que las capturas dicen con los datos de este negocio (nombre, logo, cambios por enviar).
+export function useValores(): Valores {
+  const marca = useMarca()
+  const logo = useLogoEtiqueta()
+  const cola = useLiveQuery(() => db.cola.count(), [])
+  return {
+    empresa: marca?.nombre || 'Tu negocio',
+    logo,
+    pendientes: cola === undefined ? '' : cola ? `${cola} ${cola === 1 ? 'cambio' : 'cambios'} por enviar` : 'Nada pendiente por enviar',
+  }
+}
+
+// Las guías que le tocan a esta cuenta aquí: por su papel, panel o app, y Suscripción sólo si la empresa paga.
+export function useGuiasVisibles(donde: Donde) {
   const usuario = useSesion()?.usuario
   const rol = usuario?.rol ?? 'administrador' // sin servidor, quien usa la app es el dueño
   const suscripcion = useSuscripcion(donde === 'panel' ? usuario?.id : undefined) // null: la empresa no paga
+  return useMemo(() => {
+    const puede = (g: Guia) => g.para === 'todos' || g.para === rol
+    const todas = [...GUIAS, guiaInstalar(sistema())]
+    return todas.filter((g) => puede(g) && (donde === 'panel' || g.donde === 'app') && (g.id !== 'suscripcion' || !!suscripcion))
+  }, [rol, donde, suscripcion])
+}
+
+export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => void }) {
+  const rol = useSesion()?.usuario.rol ?? 'administrador'
   const [tema, setTema] = useState<Tema | null>(null)
   const marca = useMarca()
-  const logo = useLogoEtiqueta()
   const [q, setQ] = useState('')
   const [abierta, setAbierta] = useState<string | null>(null)
 
@@ -41,20 +64,10 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
     clientes: await db.clientes.count(),
     pedidos: await db.pedidos.count(),
     entregados: await db.pedidos.where('estado').equals('ENTREGADO').count(),
-    cola: await db.cola.count(),
   }), [])
 
-  const valores: Valores = {
-    empresa: marca?.nombre || 'Tu negocio',
-    logo,
-    pendientes: !cuentas ? '' : cuentas.cola ? `${cuentas.cola} ${cuentas.cola === 1 ? 'cambio' : 'cambios'} por enviar` : 'Nada pendiente por enviar',
-  }
-
-  const guias = useMemo(() => {
-    const puede = (g: Guia) => g.para === 'todos' || g.para === rol
-    const todas = [...GUIAS, guiaInstalar(sistema())]
-    return todas.filter((g) => puede(g) && (donde === 'panel' || g.donde === 'app') && (g.id !== 'suscripcion' || !!suscripcion))
-  }, [rol, donde, suscripcion])
+  const valores = useValores()
+  const guias = useGuiasVisibles(donde)
 
   // Lo que ya está hecho en este negocio; cada renglón abre su guía.
   const ya = instalada()
@@ -108,6 +121,8 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
         ))}
       </div>
 
+      {!q && !tema && <QueHayDeNuevo donde={donde} rol={rol} guias={guias} onAbrir={setAbierta} />}
+
       {!q && !tema && pendientes.length > 0 && hechos < pendientes.length && (
         <section aria-labelledby="para-empezar">
           <div className="flex items-baseline justify-between gap-3">
@@ -160,11 +175,114 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
   )
 }
 
-function Visor({ guia, valores, donde, ir, onVolver, resumenExtra }: { guia: Guia; valores: Valores; donde: Donde; ir?: (d: string) => void; onVolver: () => void; resumenExtra?: string }) {
+// «¿Qué hay de nuevo?»: la última versión a la vista y las anteriores al pedirlas. Lo que esta persona no había visto en
+// este dispositivo sale con «Nuevo»; al verlo, queda visto para la próxima.
+const CLAVE_VISTO = 'delisy:novedades-vistas'
+const leerVisto = () => { try { return localStorage.getItem(CLAVE_VISTO) ?? '' } catch { return '' } }
+const novedadesPara = (rol: string, donde: Donde): Novedad[] => NOVEDADES
+  .map((n) => ({ ...n, puntos: n.puntos.filter((p) => (!p.para || p.para === rol) && (!p.donde || p.donde === donde || donde === 'panel')) }))
+  .filter((n) => n.puntos.length)
+
+// Para el puntito junto a «Ayuda»: hay algo nuevo para esta persona que este dispositivo no ha visto.
+export function useHayNovedades(donde: Donde) {
+  const rol = useSesion()?.usuario.rol ?? 'administrador'
+  const [visto, setVisto] = useState(leerVisto)
+  useEffect(() => {
+    const f = () => setVisto(leerVisto())
+    addEventListener('delisy:novedades', f)
+    addEventListener('storage', f)
+    return () => { removeEventListener('delisy:novedades', f); removeEventListener('storage', f) }
+  }, [])
+  const ultima = novedadesPara(rol, donde)[0]
+  return !!ultima && ultima.fecha > visto
+}
+
+function QueHayDeNuevo({ donde, rol, guias, onAbrir }: { donde: Donde; rol: string; guias: Guia[]; onAbrir: (id: string) => void }) {
+  const [visto] = useState(leerVisto)
+  const [todas, setTodas] = useState(false)
+  const lista = novedadesPara(rol, donde)
+  useEffect(() => {
+    if (lista[0]) try { localStorage.setItem(CLAVE_VISTO, lista[0].fecha); dispatchEvent(new Event('delisy:novedades')) } catch { /* sin almacenamiento: vuelve a decir «Nuevo» */ }
+  }, [lista[0]?.fecha]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!lista.length) return null
+  const fecha = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
+  return (
+    <section aria-labelledby="novedades">
+      <h3 id="novedades" className="flex items-center gap-2 text-base font-semibold"><Sparkles size={18} className="text-marca" aria-hidden="true" /> ¿Qué hay de nuevo?</h3>
+      <div className="mt-2 divide-y divide-linea border-y border-linea">
+        {(todas ? lista : lista.slice(0, 1)).map((n, i) => (
+          <div key={n.fecha + n.titulo} className="py-3">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+              <span className="font-semibold">{n.titulo}</span>
+              <span className="text-xs text-apagado">{fecha(n.fecha)}</span>
+              {n.fecha > visto && (visto || i === 0) && <span className="rounded-full bg-marca px-2 py-0.5 text-[11px] font-semibold text-white">Nuevo</span>}
+            </p>
+            <ul className="mt-1.5 space-y-1.5">
+              {n.puntos.map((p) => {
+                const g = p.guia ? guias.find((x) => x.id === p.guia) : undefined
+                return (
+                  <li key={p.texto} className="flex gap-2 text-sm text-apagado">
+                    <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-apagado" />
+                    <span>{p.texto}{g && <> <button type="button" onClick={() => onAbrir(g.id)} className={`font-semibold text-tinta underline underline-offset-2 ${anillo}`}>Ver cómo</button></>}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {lista.length > 1 && (
+        <button type="button" onClick={() => setTodas(!todas)} aria-expanded={todas} className={`mt-2 py-1 text-sm font-semibold underline-offset-2 hover:underline ${anillo}`}>
+          {todas ? 'Ver sólo lo último' : 'Ver lo de antes'}
+        </button>
+      )}
+    </section>
+  )
+}
+
+// El administrador le manda una guía de la app a su equipo: un enlace que la abre al entrar (?guia=, AyudaRapida.tsx).
+function MandarGuia({ guia }: { guia: Guia }) {
+  const rol = useSesion()?.usuario.rol
+  if (rol !== 'administrador' || guia.para === 'administrador' || guia.donde !== 'app') return null
+  const texto = `Mira esta guía de la app: «${guia.titulo}». ${location.origin}/?guia=${guia.id}`
+  return (
+    <a href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer"
+      className={`mt-3 inline-flex items-center gap-1.5 text-sm font-semibold underline-offset-2 hover:underline ${anillo}`}>
+      <MessageCircle size={16} aria-hidden="true" /> Mandar esta guía por WhatsApp
+    </a>
+  )
+}
+
+// Al final de cada guía: ¿te sirvió? Si no, ofrece escribirle a soporte (el correo que pone la plataforma) con la guía
+// ya nombrada. La respuesta se queda en este dispositivo para no volver a preguntar por la misma guía.
+function TeSirvio({ guia }: { guia: Guia }) {
+  const clave = `delisy:guia-sirvio:${guia.id}`
+  const [voto, setVoto] = useState(() => { try { return localStorage.getItem(clave) } catch { return null } })
+  const soporte = usePlataformaPublica()?.correoSoporte
+  const votar = (v: 'si' | 'no') => { setVoto(v); try { localStorage.setItem(clave, v) } catch { /* sólo por esta vez */ } }
+  if (voto === 'si') return <p className="mt-4 border-t border-linea pt-3 text-sm text-apagado">¡Qué bueno! Gracias por decirnos.</p>
+  if (voto === 'no') return (
+    <p className="mt-4 border-t border-linea pt-3 text-sm text-apagado">
+      Gracias, la vamos a explicar mejor.
+      {soporte && <> Si quieres, <a className={`font-semibold text-tinta underline underline-offset-2 ${anillo}`} href={`mailto:${soporte}?subject=${encodeURIComponent(`Ayuda: ${guia.titulo}`)}`}>cuéntanos qué faltó</a>.</>}
+    </p>
+  )
+  return (
+    <div className="mt-4 flex items-center gap-2 border-t border-linea pt-3 text-sm">
+      <span className="flex-1 text-apagado">¿Te sirvió esta guía?</span>
+      <button type="button" onClick={() => votar('si')} className={`rounded-full bg-niebla px-3 py-1.5 font-semibold hover:bg-linea ${anillo}`}>Sí</button>
+      <button type="button" onClick={() => votar('no')} className={`rounded-full bg-niebla px-3 py-1.5 font-semibold hover:bg-linea ${anillo}`}>No mucho</button>
+    </div>
+  )
+}
+
+// `compacto`: en la hoja del «?», una sola columna aunque la pantalla sea grande. `volver` cambia el texto de regreso.
+export function Visor({ guia, valores, donde, ir, onVolver, resumenExtra, compacto = false, volver = 'Todas las guías' }: { guia: Guia; valores: Valores; donde: Donde; ir?: (d: string) => void; onVolver: () => void; resumenExtra?: string; compacto?: boolean; volver?: string }) {
   const [paso, setPaso] = useState(0)
   const total = guia.pasos.length
   const actual = guia.pasos[paso]
   const destino = donde === 'panel' && ir && guia.ir ? guia.ir : null
+  const ancho = donde === 'panel' && !compacto
 
   // Con las flechas del teclado también se avanza (fuera de los campos de texto).
   useEffect(() => {
@@ -181,14 +299,14 @@ function Visor({ guia, valores, donde, ir, onVolver, resumenExtra }: { guia: Gui
   return (
     <div>
       <button type="button" onClick={onVolver} className={`-ml-1 mb-4 flex items-center gap-1.5 rounded-md px-1 py-1 text-sm font-semibold text-apagado hover:text-tinta ${anillo}`}>
-        <ArrowLeft size={16} aria-hidden="true" /> Todas las guías
+        <ArrowLeft size={16} aria-hidden="true" /> {volver}
       </button>
       <h3 className="text-2xl font-semibold leading-tight">{guia.titulo}</h3>
       <p className="mt-1 text-sm text-apagado">{resumenExtra ?? guia.resumen}</p>
 
-      <div className={`mt-6 grid gap-6 ${donde === 'panel' ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:items-start' : ''}`}>
+      <div className={`mt-6 grid gap-6 ${ancho ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:items-start' : ''}`}>
         {/* La lista de pasos sólo en la computadora; en pantalla chica va el paso actual sobre su captura. */}
-        <ol className={`min-w-0 space-y-1 ${donde === 'panel' ? 'hidden lg:order-1 lg:block' : 'hidden'}`}>
+        <ol className={`min-w-0 space-y-1 ${ancho ? 'hidden lg:order-1 lg:block' : 'hidden'}`}>
           {guia.pasos.map((p, i) => (
             <li key={i}>
               <button type="button" onClick={() => setPaso(i)} aria-current={i === paso ? 'step' : undefined}
@@ -202,8 +320,8 @@ function Visor({ guia, valores, donde, ir, onVolver, resumenExtra }: { guia: Gui
           ))}
         </ol>
 
-        <div className={`min-w-0 ${donde === 'panel' ? 'order-1 lg:order-2 lg:sticky lg:top-2' : 'order-1'}`}>
-          <p className={`mb-4 min-h-[2.75rem] text-[15px] font-semibold leading-snug ${donde === 'panel' ? 'lg:hidden' : ''}`}>
+        <div className={`min-w-0 ${ancho ? 'order-1 lg:order-2 lg:sticky lg:top-2' : 'order-1'}`}>
+          <p className={`mb-4 min-h-[2.75rem] text-[15px] font-semibold leading-snug ${ancho ? 'lg:hidden' : ''}`}>
             <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-full bg-tinta align-[1px] text-xs text-white tabular-nums">{paso + 1}</span>
             {actual.texto}
           </p>
@@ -224,6 +342,8 @@ function Visor({ guia, valores, donde, ir, onVolver, resumenExtra }: { guia: Gui
               <button type="button" onClick={onVolver} className={`${boton} bg-tinta text-white hover:bg-marca-oscuro`}><Check size={18} aria-hidden="true" /> Entendido</button>
             )}
           </div>
+          {paso === total - 1 && <TeSirvio guia={guia} />}
+          <MandarGuia guia={guia} />
         </div>
       </div>
     </div>

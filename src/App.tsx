@@ -10,6 +10,7 @@ import { PaginaLegal, documentoDeRuta } from './views/legal/PaginaLegal'
 import { AceptarLegal } from './views/legal/AceptarLegal'
 import { Avisos } from './components/ui'
 import { VisorPdf } from './components/VisorPdf'
+import { HojaAyuda } from './views/ayuda/AyudaRapida'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
 import { useTemaOscuro } from './lib/tema'
@@ -164,6 +165,7 @@ export default function App() {
       <div className={`tema-admin ${oscuro ? 'oscuro' : ''}`} style={colorMarca}>
         <Avisos />
         <VisorPdf />
+        <HojaAyuda donde="panel" />
         {!sesion ? <LoginAdmin onIrAPwa={irAPwa} onIrARegistro={irARegistro} />
           : sesion.usuario.debeCambiarPassword ? <CambioObligatorio />
           : <><AdminLayout onIrAPwa={irAPwa} /><AceptarLegal /></>}
@@ -184,6 +186,7 @@ export default function App() {
         : (
           <>
             <VisorPdf />
+            <HojaAyuda donde="app" />
             <PwaLayout onIrAAdmin={irAAdmin} />
             {MODO_SERVIDOR && <AceptarLegal />}
           </>

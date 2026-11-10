@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRight, Check, Factory, Printer } from 'lucide-react'
+import { ArrowRight, Check, Factory, FileSpreadsheet, Printer } from 'lucide-react'
+import { descargar, xlsx } from '../../lib/xlsx'
 import { db, type Producto } from '../../lib/db'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { PuntoSabor, Segmentado, aviso } from '../../components/ui'
@@ -76,6 +77,20 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
       setImprimiendo(false)
     }
   }
+  // Lo mismo que la hoja de cocina, en Excel: un renglón por sabor y, con 3 días o la semana, una columna por día.
+  function bajarExcel() {
+    const cant = horizonte > 1 ? cantidadesPorDia(pron.dias, filas) : null
+    const n = (x: number) => Math.round(x * 100) / 100
+    descargar(xlsx({
+      nombre: 'Producción',
+      columnas: [{ titulo: 'Sabor', ancho: 24 }, { titulo: 'Unidad', ancho: 8 }, { titulo: 'Ya pedido', ancho: 11 }, { titulo: 'Estimado', ancho: 11 }, { titulo: 'Total', ancho: 10 },
+        ...(hayProducido ? [{ titulo: 'Falta', ancho: 10 }] : []),
+        ...(cant ? pron.dias.map((d) => ({ titulo: textoFecha(d.fecha), ancho: 12 })) : [])],
+      filas: filas.map((f) => [f.producto.sabor, unidadDe(f.producto), n(f.confirmado), n(f.estimado), n(f.total),
+        ...(hayProducido ? [faltaDe(f)] : []),
+        ...(cant ? pron.dias.map((d) => n(cant.get(`${d.fecha}|${f.producto.id}`) ?? 0)) : [])]),
+    }), `produccion-${pron.desde}.xlsx`)
+  }
   const maximo = (filas: { producto: { unidad?: string }; n: number }[]) => {
     const m = new Map<string, number>()
     for (const f of filas) m.set(unidadDe(f.producto), Math.max(m.get(unidadDe(f.producto)) ?? 1, f.n))
@@ -95,7 +110,7 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
   return (
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
       {panel ? (
-        <Encabezado titulo={conVentas ? 'Producción y ventas' : 'Producción'} detalle="Cuánto producir de cada sabor para cubrir lo que viene">
+        <Encabezado titulo={conVentas ? 'Producción y ventas' : 'Producción'} ayuda="produccion" detalle="Cuánto producir de cada sabor para cubrir lo que viene">
           {selector}
         </Encabezado>
       ) : (
@@ -186,6 +201,9 @@ export function Pronostico({ selector, conVentas = true, panel = false, onRegist
                 {onRegistrar && <button type="button" onClick={onRegistrar} className={`${botonPanel} justify-center`}>Anotar lo producido <ArrowRight size={16} aria-hidden="true" /></button>}
                 <button type="button" onClick={() => void imprimir()} disabled={imprimiendo} className={`${botonPanelSuave} justify-center`}>
                   <Printer size={16} aria-hidden="true" /> {imprimiendo ? 'Generando…' : 'Imprimir hoja para la cocina'}
+                </button>
+                <button type="button" onClick={bajarExcel} className={`${botonPanelSuave} justify-center`}>
+                  <FileSpreadsheet size={16} aria-hidden="true" /> Bajar a Excel
                 </button>
               </div>
             )}

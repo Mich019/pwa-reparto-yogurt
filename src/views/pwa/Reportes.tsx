@@ -1,4 +1,6 @@
 import { useId, useState, type ReactNode } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../lib/db'
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Download, Eye, FileDown, FileSpreadsheet, FileText, Star, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
 import { dinero, hoy, sumarDias } from '../../lib/fechas'
 import { useEquipo } from '../../lib/equipo'
@@ -65,7 +67,7 @@ export function Reportes({ panel = false }: { panel?: boolean } = {}) {
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
       <div className={panel ? '' : 'mx-auto max-w-5xl'}>
         {panel ? (
-          <Encabezado titulo="Reportes" detalle={`${textoRango(vista, rango)}${vista === 'dia' ? '' : ` · ${enCurso ? 'en curso' : `${diasDelRango(rango)} días`}`}`}>
+          <Encabezado titulo="Reportes" ayuda="reportes" detalle={`${textoRango(vista, rango)}${vista === 'dia' ? '' : ` · ${enCurso ? 'en curso' : `${diasDelRango(rango)} días`}`}`}>
             <div className={`${grupoPanel} max-sm:basis-full`} role="group" aria-label="Periodo">
               {VISTAS.map((v) => (
                 <button key={v.valor} onClick={() => cambiarVista(v.valor)} aria-pressed={vista === v.valor} className={vista === v.valor ? botonPanel : botonPanelSuave}>{v.texto}</button>
@@ -214,6 +216,7 @@ function Contenido({ reporte, vista, enCurso, posibles, agrupar, onAgrupar, expo
         </div>
       )}
       <FiadoDelPeriodo fiado={r.credito ?? 0} cobrado={reporte.abonos ?? 0} porVendedor={reporte.fiadoPorVendedor ?? []} />
+      {!sinVentas && <ClientesDelPeriodo desde={reporte.desde} hasta={reporte.hasta} />}
 
       {sinVentas ? (
         <div className="mt-6 border-t border-linea py-10 text-center">
@@ -498,6 +501,45 @@ function HojaVendedor({ vendedor: v, onCerrar, vista, rango, unidades, onElegir 
 }
 
 // Lo que se fió en el periodo contra lo que se cobró de fiado (abonos): si el fiado pendiente crece o baja.
+// Con los pedidos del dispositivo: a cuántos clientes se les entregó, cuántos compraron por primera vez y quiénes
+// compraron más en el periodo.
+function ClientesDelPeriodo({ desde, hasta }: { desde: string; hasta: string }) {
+  const datos = useLiveQuery(async () => {
+    const [pedidos, clientes] = await Promise.all([db.pedidos.where('fecha').belowOrEqual(hasta).filter((p) => p.estado === 'ENTREGADO').toArray(), db.clientes.toArray()])
+    const primera = new Map<string, string>()
+    const suma = new Map<string, number>()
+    for (const p of pedidos) {
+      if (p.fecha < (primera.get(p.clienteId) ?? '9')) primera.set(p.clienteId, p.fecha)
+      if (p.fecha >= desde) suma.set(p.clienteId, (suma.get(p.clienteId) ?? 0) + p.total)
+    }
+    const nombre = new Map(clientes.map((c) => [c.id, c.nombre]))
+    return {
+      compraron: suma.size,
+      nuevos: [...suma.keys()].filter((id) => (primera.get(id) ?? '') >= desde).length,
+      mejores: [...suma.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, total]) => ({ id, nombre: nombre.get(id) ?? 'Cliente', total })),
+    }
+  }, [desde, hasta])
+  if (!datos?.compraron) return null
+  return (
+    <section aria-labelledby="clientes-periodo" className="mt-8 border-t border-linea pt-6">
+      <h2 id="clientes-periodo" className="text-lg font-semibold">Clientes</h2>
+      <p className="mt-1 text-sm text-apagado">
+        Compraron <span className="font-semibold text-tinta tabular-nums">{datos.compraron}</span>
+        {datos.nuevos > 0 && <> · <span className="font-semibold text-tinta tabular-nums">{datos.nuevos}</span> por primera vez</>}
+      </p>
+      <ol className="mt-3 divide-y divide-linea border-y border-linea">
+        {datos.mejores.map((c, i) => (
+          <li key={c.id} className="flex items-center gap-3 py-2.5 text-sm">
+            <span className="w-5 shrink-0 font-semibold text-apagado tabular-nums">{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate font-semibold">{c.nombre}</span>
+            <span className="font-semibold tabular-nums">{dinero(c.total)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
 function FiadoDelPeriodo({ fiado, cobrado, porVendedor }: { fiado: number; cobrado: number; porVendedor: NonNullable<Reporte['fiadoPorVendedor']> }) {
   if (fiado <= 0 && cobrado <= 0) return null
   const neto = fiado - cobrado

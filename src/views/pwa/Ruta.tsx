@@ -1,11 +1,12 @@
 import { AvisoLimiteFiado } from '../../components/LimiteFiado'
+import { abrirAyuda } from '../ayuda/AyudaRapida'
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { EditorMensaje, enlaceWhatsApp, llenar, useMensaje } from '../../components/Mensajes'
 import { esMio, reparte } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, TriangleAlert, WifiOff, X, ArrowRight,
+  CircleHelp, Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, TriangleAlert, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
 import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
@@ -17,7 +18,7 @@ import { enlaceComprobante } from '../../lib/comprobante'
 import { marcaActual } from '../../lib/marca'
 import { AlertasRuta } from './AlertasRuta'
 import { pasoSuLimite, useServidor, type Deudor, type MiMeta } from '../../lib/cobranza'
-import { sesionActual } from '../../lib/sesion'
+import { sesionActual, useSesion } from '../../lib/sesion'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
@@ -176,6 +177,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
   const pasados = new Set((cobro.datos?.deudores ?? []).filter(pasoSuLimite).map((d) => d.id))
 
   const entregados = (pedidosHoy ?? []).filter((p) => p.estado === 'ENTREGADO')
+  const msjCamino = useMensaje('camino')
   const totalDia = entregados.reduce((s, p) => s + p.total, 0)
   // Lo que se quedó fiado todavía no se cobró: «cobrado hoy» no lo cuenta.
   const cobradoDia = entregados.reduce((s, p) => s + (p.metodo_pago === 'CREDITO' ? 0 : p.total), 0)
@@ -314,6 +316,9 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
           <BotonRedondo onClick={() => recalcular(true)} etiqueta="Recalcular ruta">
             <RefreshCw size={20} className={calculando ? 'animate-spin' : ''} />
           </BotonRedondo>
+          <BotonRedondo onClick={() => abrirAyuda('ruta')} etiqueta="Ayuda de la ruta">
+            <CircleHelp size={20} />
+          </BotonRedondo>
         </div>
       </div>
 
@@ -361,7 +366,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                     <div className="grid grid-cols-4 gap-2">
                       <Accion href={enlaceNavegar(puntoActivo!)} icono={<Navigation size={22} />} texto="Navegar" />
                       <Accion href={`tel:${clienteActivo.telefono}`} icono={<Phone size={22} />} texto="Llamar" />
-                      <Accion href={`https://wa.me/${telLimpio(clienteActivo.telefono)}`} icono={<MessageCircle size={22} />} texto="WhatsApp" />
+                      <Accion href={enlaceWhatsApp(clienteActivo.telefono, llenar(msjCamino, { nombre: clienteActivo.nombre })) ?? `https://wa.me/${telLimpio(clienteActivo.telefono)}`} icono={<MessageCircle size={22} />} texto="Voy en camino" />
                       <Accion onClick={() => setEditor({ cliente: clienteActivo, pedido: activo })} icono={<Pencil size={22} />} texto="Editar" />
                     </div>
                     <div className="mt-5 text-sm font-semibold text-apagado">Forma de pago</div>
@@ -429,6 +434,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
               <div className="mt-1 text-apagado">
                 {entregados.length} entregas · {litrosEntregados} · {dinero(totalDia)}
               </div>
+              <ComoTePagaron entregados={entregados} />
             </div>
           ) : (
             <div className="px-5 pt-3 pb-5">
@@ -610,6 +616,28 @@ function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: React
       </div>
       <ChevronRight size={20} className="shrink-0 opacity-40" />
     </button>
+  )
+}
+
+// Al terminar la ruta: cuánto entró en efectivo (lo que va en el corte), por transferencia y a fiado.
+function ComoTePagaron({ entregados }: { entregados: Pedido[] }) {
+  const nombre = useSesion()?.usuario.nombre
+  const suma = (m: string) => entregados.reduce((s, p) => s + (p.metodo_pago === m ? p.total : 0), 0)
+  const partes = ([['EFECTIVO', 'Efectivo'], ['TRANSFERENCIA', 'Transferencia'], ['CREDITO', 'Fiado']] as const)
+    .map(([m, texto]) => ({ texto, monto: suma(m) })).filter((x) => x.monto > 0)
+  if (!partes.length) return null
+  const efectivo = suma('EFECTIVO')
+  return (
+    <div className="mt-3 border-t border-linea pt-3 text-sm">
+      <dl className="flex flex-wrap gap-x-5 gap-y-1">
+        {partes.map((x) => <div key={x.texto}><dt className="inline text-apagado">{x.texto} </dt><dd className="inline font-semibold tabular-nums">{dinero(x.monto)}</dd></div>)}
+      </dl>
+      {efectivo > 0 && <p className="mt-1 text-apagado">Cuenta el efectivo antes de entregar tu corte: deberías traer {dinero(efectivo)} (más los abonos en efectivo).</p>}
+      <a href={`https://wa.me/?text=${encodeURIComponent([`Ruta terminada${nombre ? ` (${nombre})` : ''}: ${entregados.length} ${entregados.length === 1 ? 'entrega' : 'entregas'}, ${dinero(entregados.reduce((s, p) => s + p.total, 0))}.`, ...partes.map((x) => `${x.texto}: ${dinero(x.monto)}`)].join('\n'))}`}
+        target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 font-semibold underline-offset-2 hover:underline">
+        <MessageCircle size={16} aria-hidden="true" /> Mandar este resumen por WhatsApp
+      </a>
+    </div>
   )
 }
 

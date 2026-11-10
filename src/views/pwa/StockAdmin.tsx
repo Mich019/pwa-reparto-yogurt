@@ -72,7 +72,7 @@ export function StockAdmin({ selector, panel = false }: { selector?: ReactNode; 
   return (
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'h-full overflow-y-auto px-4 pt-safe pb-24'}>
       {panel ? (
-        <Encabezado titulo="Producción" detalle={<span className="first-letter:uppercase">{textoFecha(fecha)}{fecha === hoy() ? '' : fecha < hoy() ? ' · día pasado' : ' · día por venir'}</span>}>
+        <Encabezado titulo="Producción" ayuda="produccion" detalle={<span className="first-letter:uppercase">{textoFecha(fecha)}{fecha === hoy() ? '' : fecha < hoy() ? ' · día pasado' : ' · día por venir'}</span>}>
           {selector}
           <Separador />
           <div className="flex grow gap-1 sm:grow-0">

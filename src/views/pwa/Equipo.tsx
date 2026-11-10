@@ -11,7 +11,7 @@ import {
   type Miembro, type Rachas, type Trofeos,
 } from '../../lib/equipo'
 import { useServidor, type CifrasMes, type Deudor } from '../../lib/cobranza'
-import { dinero, hace, hoy, textoFecha } from '../../lib/fechas'
+import { dinero, hace, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { copiarDelicado } from '../../lib/portapapeles'
 import { llamarAutenticado, useSesion, type Rol } from '../../lib/sesion'
@@ -176,7 +176,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
   return (
     <div className={panel ? 'mx-auto max-w-[1280px] px-4 pt-2 sm:px-8' : 'flex h-full flex-col'}>
       {panel ? (
-        <Encabezado titulo="Equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : 'Cargando…'}>
+        <Encabezado titulo="Equipo" ayuda="equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : 'Cargando…'}>
           <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" clave="equipo" />
           <div className={grupoPanel} role="group" aria-label="Mostrar">
             <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activas</button>
@@ -470,6 +470,21 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   const masViejo = suyos.map((d) => d.desde).filter((f): f is string => !!f).sort()[0]
   const deMas = useServidor<{ vendedores: { id: string; veces: number }[] }>(m.rol === 'vendedor' ? '/cobranza/fiado-de-mas' : null, 'cobranza')
   const vecesDeMas = deMas.datos?.vendedores.find((v) => v.id === m.id)?.veces ?? 0
+  // Sus clientes activos que ya compraban, sin pedido pendiente y con la última entrega hace más de 30 días.
+  const sinComprar = useLiveQuery(async () => {
+    if (m.rol !== 'vendedor') return 0
+    const suyos = await db.clientes.filter((c) => c.activo && c.vendedorId === m.id).toArray()
+    if (!suyos.length) return 0
+    const hace30 = sumarDias(hoy(), -30)
+    const pedidos = await db.pedidos.where('clienteId').anyOf(suyos.map((c) => c.id)).toArray()
+    const ultima = new Map<string, string>()
+    const pendiente = new Set<string>()
+    for (const p of pedidos) {
+      if (p.estado === 'PENDIENTE') pendiente.add(p.clienteId)
+      else if (p.estado === 'ENTREGADO' && p.fecha > (ultima.get(p.clienteId) ?? '')) ultima.set(p.clienteId, p.fecha)
+    }
+    return suyos.filter((c) => !pendiente.has(c.id) && (ultima.get(c.id) ?? '9') < hace30).length
+  }, [m.id, m.rol]) ?? 0
   const [destino, setDestino] = useState('') // qué hacer con sus clientes al dar de baja: '' = decidir después
   const [trabajando, setTrabajando] = useState(false)
   // Trofeo: los meses cerrados en que llegó a su meta.
@@ -558,6 +573,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           <Linea t="Último acceso" v={m.ultimoAcceso ? hace(new Date(m.ultimoAcceso).getTime()) : 'Todavía no ha entrado'} />
           {m.rol === 'vendedor' && <Linea t="Clientes" v={`${m.clientes}${m.clientes !== m.clientesActivos ? ` (${m.clientesActivos} activos)` : ''}`} />}
           {fiado > 0 && <Linea t="Fiado por cobrar" v={`${dinero(fiado)} en ${plural(suyos.length, 'cliente', 'clientes')}${masViejo ? ` · desde el ${textoFecha(masViejo).toLowerCase()}` : ''}`} />}
+          {sinComprar > 0 && <Linea t="Dejaron de comprar" v={`${plural(sinComprar, 'cliente', 'clientes')} de su cartera, más de un mes sin pedido`} />}
           {vecesDeMas > 0 && <Linea t="Fió de más" v={`${plural(vecesDeMas, 'vez', 'veces')} este mes: el cliente quedó arriba de su límite`} />}
           <Linea t="Avisos" v={textoAvisos(m)} />
           {!!metas?.length && <Linea t="Llegó a su meta" v={metas.slice(0, 6).map(mesCorto).join(', ') + (metas.length > 6 ? ` y ${metas.length - 6} más` : '')} />}

@@ -20,6 +20,8 @@ export const nombreUnidad = (u: string, n: number) => (NOMBRES[u] ? NOMBRES[u][n
 // Plural de la primera palabra: «Garrafón» → «garrafones», «Bolsa de nylon» → «bolsas de nylon».
 export function plural(nombre: string, n: number) {
   const [primera, ...resto] = nombre.toLowerCase().split(' ')
+  // «Por pieza» se cuenta en piezas: «1 pieza», «3 piezas» (no «3 pores pieza»).
+  if (primera === 'por' && resto.length) return plural(resto.join(' '), n)
   if (n === 1) return [primera, ...resto].join(' ')
   const p = /[aeiouáéíóú]$/.test(primera) ? `${primera}s` : `${primera.replace(/ón$/, 'on').replace(/án$/, 'an')}es`
   return [p, ...resto].join(' ')

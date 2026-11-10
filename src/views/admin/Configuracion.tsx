@@ -11,7 +11,7 @@ import { useSuscripcion } from '../../lib/suscripcion'
 import { SeccionSuscripcion } from './Suscripcion'
 import { MarcaEmpresa } from './MarcaEmpresa'
 import { ZonaEmpresa } from './ZonaEmpresa'
-import { Ayuda } from '../ayuda/Ayuda'
+import { Ayuda, useHayNovedades } from '../ayuda/Ayuda'
 import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
 import { activarPush, desactivarPush, enviarPrueba, useEstadoPush } from '../../lib/push'
 import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
@@ -102,6 +102,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     ...(plataforma ? [] : [{ id: 'ayuda', texto: 'Ayuda', ayuda: 'Guías paso a paso', icono: LifeBuoy }]),
   ]
   const visible = menu.some((m) => m.id === apartado) ? apartado : 'cuenta'
+  const novedades = useHayNovedades('panel')
   const elegir = (id: string) => {
     setApartado(id)
     document.getElementById('apartado-config')?.scrollTo({ top: 0 })
@@ -128,7 +129,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
               >
                 <Icono size={18} aria-hidden="true" className="shrink-0" />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{texto}</span>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold">{texto}{id === 'ayuda' && novedades && visible !== 'ayuda' && <span className="h-2 w-2 rounded-full bg-marca" aria-label="Hay novedades" />}</span>
                   <span className={`hidden text-xs lg:block ${elegido ? 'text-white/70' : 'text-apagado'}`}>{ayuda}</span>
                 </span>
               </button>

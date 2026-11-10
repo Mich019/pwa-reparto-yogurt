@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { abrirCliente } from '../pwa/Clientes'
+import { abrirCliente, verSinComprar } from '../pwa/Clientes'
 import { BuscarPedidos } from './BuscarPedidos'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarHeart, ChevronRight, Crown, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
 import { Medallas } from '../../components/Medallas'
 import type { Rachas } from '../../lib/equipo'
 import { abrirFicha } from '../pwa/Equipo'
+import { BotonAyuda } from '../ayuda/AyudaRapida'
 import { litrosTxt, ordenarPorVentas, saludo, usePedidosRecientes, useVentasPorSabor } from '../../lib/admin-datos'
 import { db } from '../../lib/db'
 import { DIAS_CORTOS, desdeIso, dinero, hoy, sumarDias } from '../../lib/fechas'
@@ -104,6 +105,17 @@ function QueHacerHoy({ sinVendedor, onNavegar }: { sinVendedor: number; onNavega
   const cortes = useServidor<{ filas: FilaCorte[] }>(`/cortes?fecha=${dia}`).datos
   const descuadres = useServidor<{ cortes: unknown[] }>('/cortes/descuadres').datos
   const deudores = useServidor<{ deudores: Deudor[] }>('/cobranza').datos
+  // Activos que ya compraban, sin pedido pendiente y con la última entrega hace más de 30 días (lo mismo que Clientes).
+  const sinComprar = useLiveQuery(async () => {
+    const hace = sumarDias(dia, -30)
+    const ultima = new Map<string, string>()
+    const pendiente = new Set<string>()
+    await db.pedidos.each((p) => {
+      if (p.estado === 'PENDIENTE') pendiente.add(p.clienteId)
+      else if (p.estado === 'ENTREGADO' && p.fecha > (ultima.get(p.clienteId) ?? '')) ultima.set(p.clienteId, p.fecha)
+    })
+    return (await db.clientes.toArray()).filter((c) => c.activo && !pendiente.has(c.id) && (ultima.get(c.id) ?? '9') < hace).length
+  }, [dia]) ?? 0
 
   // Lo que falta producir para mañana: pedidos confirmados menos lo ya anotado en Stock del día (sin red, sin descontar).
   const faltan = [...(porProducir ?? [])]
@@ -130,6 +142,7 @@ function QueHacerHoy({ sinVendedor, onNavegar }: { sinVendedor: number; onNavega
     const debe = vencidos.reduce((s, d) => s + d.saldo, 0)
     renglones.push({ clave: 'fiado', texto: `${vencidos.length === 1 ? 'Un cliente debe' : `${vencidos.length} clientes deben`} ${dinero(debe)} de fiado sin abonar en más de 30 días`, enlace: 'Ver por cobrar', ir: aCobrar })
   }
+  if (sinComprar) renglones.push({ clave: 'sincomprar', texto: sinComprar === 1 ? 'Un cliente dejó de comprar (más de un mes sin pedido)' : `${sinComprar} clientes dejaron de comprar (más de un mes sin pedido)`, enlace: 'Ver quiénes', ir: () => { verSinComprar(); onNavegar('clientes') } })
   if (sinVendedor) renglones.push({ clave: 'sinvendedor', texto: sinVendedor === 1 ? 'Un cliente sin vendedor (no sale en ninguna ruta)' : `${sinVendedor} clientes sin vendedor (no salen en ninguna ruta)`, enlace: 'Asignar', ir: () => onNavegar('clientes') })
   if (!renglones.length) return null
 
@@ -252,6 +265,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           </h1>
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-apagado">
             <span className="first-letter:uppercase">{fechaTexto || 'Cargando…'}</span>
+            <BotonAyuda seccion="resumen" className="-my-2 h-8 w-8" />
             {!enVivo && <button
               type="button"
               onClick={() => void aMano()}
@@ -381,6 +395,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
           <div className="space-y-12">
             <RankingMes onNavegar={onNavegar} />
             <MedallasDelMes onNavegar={onNavegar} />
+            <MejoresClientes onNavegar={onNavegar} />
           </div>
         </div>
 
@@ -389,6 +404,55 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
 
       {ficha.panel}
     </div>
+  )
+}
+
+// Los 5 clientes que más compraron en el mes (lo entregado, con los datos del dispositivo) y cómo van contra el mismo
+// tramo del mes pasado. Tocar uno abre su ficha en Clientes.
+function MejoresClientes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
+  const dia = hoy()
+  const inicio = `${dia.slice(0, 8)}01`
+  const antes = desdeIso(inicio)
+  antes.setMonth(antes.getMonth() - 1)
+  const inicioAntes = `${antes.getFullYear()}-${String(antes.getMonth() + 1).padStart(2, '0')}-01`
+  const hastaAntes = sumarDias(inicioAntes, Number(dia.slice(8)) - 1)
+  const datos = useLiveQuery(async () => {
+    const [pedidos, clientes] = await Promise.all([
+      db.pedidos.where('fecha').between(inicioAntes, dia, true, true).filter((p) => p.estado === 'ENTREGADO').toArray(),
+      db.clientes.toArray(),
+    ])
+    const suma = new Map<string, { ahora: number; antes: number; pedidos: number }>()
+    for (const p of pedidos) {
+      const s = suma.get(p.clienteId) ?? { ahora: 0, antes: 0, pedidos: 0 }
+      if (p.fecha >= inicio) { s.ahora += p.total; s.pedidos++ } else if (p.fecha <= hastaAntes) s.antes += p.total
+      suma.set(p.clienteId, s)
+    }
+    const nombre = new Map(clientes.map((c) => [c.id, c.nombre]))
+    return [...suma.entries()].filter(([, s]) => s.ahora > 0).sort((a, b) => b[1].ahora - a[1].ahora).slice(0, 5)
+      .map(([id, s]) => ({ id, nombre: nombre.get(id) ?? 'Cliente', ...s }))
+  }, [dia, inicio, inicioAntes, hastaAntes])
+  if (!datos?.length) return null
+  return (
+    <Tarjeta id="t-mejores" titulo="Mejores clientes del mes" subtitulo="Lo entregado este mes, contra lo mismo del mes pasado">
+      <ol className="mt-4 divide-y divide-linea border-y border-linea">
+        {datos.map((c, i) => (
+          <li key={c.id}>
+            <button type="button" onClick={() => { abrirCliente(c.id); onNavegar('clientes') }}
+              className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-niebla/60 focus-visible:outline-2 focus-visible:outline-marca">
+              <span className="w-5 shrink-0 text-sm font-semibold text-apagado tabular-nums">{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{c.nombre}</span>
+                <span className="block text-xs text-apagado">{c.pedidos} {c.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
+              </span>
+              <span className="text-right">
+                <span className="block text-sm font-semibold tabular-nums">{dinero(c.ahora)}</span>
+                {c.antes > 0 && <span className="block text-xs"><Delta valor={cambio(c.ahora, c.antes)} /></span>}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </Tarjeta>
   )
 }
 

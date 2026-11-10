@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { BotonAyuda, abrirAyuda } from '../ayuda/AyudaRapida'
+import type { AYUDA_DE } from '../ayuda/guias'
 import { propsBuscador } from '../../lib/busqueda'
 import { Recientes, useRecientes } from '../../components/Busqueda'
 import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus, MoreHorizontal, Search } from 'lucide-react'
@@ -29,12 +31,13 @@ export function Delta({ valor, className = 'text-xs' }: { valor: number | null; 
 // Encabezado de una sección del panel: título grande, una línea de detalle y, a la derecha, sus acciones. Las acciones
 // siempre llevan texto (Nuevo cliente, Invitar…), nunca un «+» suelto. En el teléfono, si no caben junto al título,
 // bajan a su propia fila y la llenan (los grupos con `grupoPanel` se reparten el ancho).
-export function Encabezado({ titulo, detalle, children }: { titulo: string; detalle?: ReactNode; children?: ReactNode }) {
+// `ayuda`: la sección cuyas guías abre el «?» junto al título (AYUDA_DE en views/ayuda/guias.ts).
+export function Encabezado({ titulo, detalle, children, ayuda }: { titulo: string; detalle?: ReactNode; children?: ReactNode; ayuda?: keyof typeof AYUDA_DE }) {
   return (
     // Las acciones se centran con el título (no con el título y el detalle juntos); el detalle va debajo.
     <header className="pb-6 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-[2.25rem] font-semibold leading-none sm:text-[2.5rem] lg:text-[3.25rem]">{titulo}</h1>
+        <h1 className="flex items-center gap-1 text-[2.25rem] font-semibold leading-none sm:text-[2.5rem] lg:text-[3.25rem]">{titulo}{ayuda && <BotonAyuda seccion={ayuda} className="self-center" />}</h1>
         {children && <div className="flex flex-wrap items-center gap-2 max-sm:grow max-sm:justify-end">{children}</div>}
       </div>
       {detalle && <p className="mt-3 text-sm text-apagado">{detalle}</p>}
@@ -128,6 +131,7 @@ const ATAJOS: [string, string][] = [
   ['Esc', 'Borrar la búsqueda y cerrar el buscador, o cerrar un menú'],
   ['↑ ↓', 'Moverse entre las opciones de un menú'],
   ['?', 'Ver estos atajos'],
+  ['h', 'Ayuda de la sección en la que estás'],
   ...IR_A.map(([k, , texto]): [string, string] => [`g ${k}`, `Ir a ${texto}`]),
 ]
 export function teclaLibre(e: KeyboardEvent) {
@@ -136,10 +140,12 @@ export function teclaLibre(e: KeyboardEvent) {
   if (el?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role=dialog]')) return false
   return !document.querySelector('[role=dialog][aria-modal=true]')
 }
-export function AtajosTeclado({ onIr }: { onIr: (s: SeccionAdmin) => void }) {
+export function AtajosTeclado({ onIr, seccion }: { onIr: (s: SeccionAdmin) => void; seccion?: SeccionAdmin }) {
   const [abierta, setAbierta] = useState(false)
   const ir = useRef(onIr)
   ir.current = onIr
+  const actual = useRef(seccion)
+  actual.current = seccion
   useEffect(() => {
     let g = 0 // cuándo se tocó la «g»; 0 = no está esperando la segunda letra
     const tecla = (e: KeyboardEvent) => {
@@ -151,6 +157,10 @@ export function AtajosTeclado({ onIr }: { onIr: (s: SeccionAdmin) => void }) {
         g = 0
         if (destino) { e.preventDefault(); ir.current(destino[1]) }
         return
+      }
+      if (e.key === 'h') {
+        const s = actual.current
+        if (s && s !== 'configuracion') { e.preventDefault(); abrirAyuda(s) }
       }
       g = e.key === 'g' ? Date.now() : 0
     }

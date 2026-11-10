@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { BotonAyuda } from '../ayuda/AyudaRapida'
 import { Package, RefreshCw, TriangleAlert } from 'lucide-react'
 import { db, type Producto } from '../../lib/db'
 import { textoFecha, hoy } from '../../lib/fechas'
@@ -33,7 +34,7 @@ export function Stock() {
 
   return (
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">Mi carga de hoy</h1>
+      <h1 className="mt-3 flex items-center gap-1 text-3xl font-bold tracking-tight">Mi carga de hoy<BotonAyuda seccion="stock" /></h1>
       <div className="text-sm text-apagado">{textoFecha(hoy())}</div>
 
       {filas === undefined ? (

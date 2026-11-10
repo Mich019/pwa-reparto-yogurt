@@ -10,10 +10,11 @@ import { aviso, claseInput, telLimpio } from './ui'
 // así lo siguen del teléfono a la computadora, y el dispositivo tiene una copia (db.meta) para usarlos sin señal.
 // Se mandan con un enlace wa.me: abre WhatsApp con el texto ya escrito, sin API ni cuentas. Las palabras entre llaves se
 // cambian por los datos de cada cliente.
-export type TipoMensaje = 'visita' | 'cobro' | 'limite'
+export type TipoMensaje = 'visita' | 'cobro' | 'limite' | 'camino'
 export const MENSAJES: Record<TipoMensaje, { porDefecto: string; variables: string[]; titulo: string }> = {
   visita: { porDefecto: 'Hola {nombre}, ¿te llevo yogurt hoy? 🍓', variables: ['{nombre}'], titulo: 'Tu mensaje' },
   cobro: { porDefecto: 'Hola {nombre}, te recuerdo tu saldo pendiente de {saldo}. ¡Gracias!', variables: ['{nombre}', '{saldo}'], titulo: 'Mensaje para cobrar' },
+  camino: { porDefecto: 'Hola {nombre}, voy en camino con tu pedido. ¡Nos vemos en un rato!', variables: ['{nombre}'], titulo: 'Mensaje de «voy en camino»' },
   limite: { porDefecto: 'Hola {nombre}, tu saldo pendiente es de {saldo} y ya pasó tu límite de {limite}. ¿Me ayudas con un abono? ¡Gracias!', variables: ['{nombre}', '{saldo}', '{limite}'], titulo: 'Mensaje para quien pasó su límite' },
 }
 const clave = (t: TipoMensaje) => `mensaje:${t}`

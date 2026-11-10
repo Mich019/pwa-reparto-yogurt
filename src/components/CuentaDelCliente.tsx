@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Boxes, ChevronRight, HandCoins } from 'lucide-react'
+import { Boxes, ChevronRight, HandCoins, MessageCircle } from 'lucide-react'
+import { enlaceWhatsApp } from './Mensajes'
+import { textoEstadoCuenta } from '../lib/comprobante'
+import { marcaActual } from '../lib/marca'
 import { anularAbono, registrarAbono, registrarRecogida, useServidor, type CuentaCliente, type CuentaEnvases } from '../lib/cobranza'
 import { dinero, textoFecha } from '../lib/fechas'
 import { useRol } from '../lib/sesion'
@@ -8,7 +11,7 @@ import { Boton, Campo, Hoja, Segmentado, aviso, claseInput } from './ui'
 // En la ficha de un cliente: lo que debe (fiado) y los envases que tiene prestados, con lo necesario para cobrar un
 // abono o recoger envases. Si no debe nada ni tiene envases, no aparece nada. Necesita conexión.
 
-export function CuentaDelCliente({ clienteId, limite }: { clienteId: string; limite?: number | null }) {
+export function CuentaDelCliente({ clienteId, limite, telefono }: { clienteId: string; limite?: number | null; telefono?: string }) {
   const cuenta = useServidor<CuentaCliente>(`/cobranza/clientes/${clienteId}`)
   const envases = useServidor<CuentaEnvases>(`/envases/clientes/${clienteId}`)
   const [hoja, setHoja] = useState<'abono' | 'envases' | null>(null)
@@ -30,6 +33,14 @@ export function CuentaDelCliente({ clienteId, limite }: { clienteId: string; lim
         </button>
       )}
       {saldo > 0 && limite != null && limite > 0 && <BarraLimite saldo={saldo} limite={limite} />}
+      {saldo > 0 && cuenta.datos && (() => {
+        const href = enlaceWhatsApp(telefono, textoEstadoCuenta(cuenta.datos.cliente.nombre, cuenta.datos.movimientos, saldo, marcaActual()?.nombre))
+        return href && (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-1 py-1 text-sm font-semibold underline-offset-2 hover:underline">
+            <MessageCircle size={16} aria-hidden="true" /> Mandarle su estado de cuenta
+          </a>
+        )
+      })()}
       {prestados > 0 && (
         <button onClick={() => setHoja('envases')} className="flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-3 text-left active:bg-linea">
           <Boxes size={20} className="shrink-0" />

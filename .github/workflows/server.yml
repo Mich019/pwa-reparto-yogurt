@@ -2,9 +2,9 @@ name: Probar el servidor
 
 on:
   push:
-    paths: ['api/**', 'db/**', 'package.json', 'package-lock.json', '.github/workflows/server.yml']
+    paths: ['api/**', 'db/**', 'src/**', 'public/sw.js', 'package.json', 'package-lock.json', '.github/workflows/server.yml']
   pull_request:
-    paths: ['api/**', 'db/**', 'package.json', 'package-lock.json', '.github/workflows/server.yml']
+    paths: ['api/**', 'db/**', 'src/**', 'public/sw.js', 'package.json', 'package-lock.json', '.github/workflows/server.yml']
 
 jobs:
   pruebas:

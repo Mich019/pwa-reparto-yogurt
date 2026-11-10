@@ -46,7 +46,7 @@ export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void 
   const [q, setQ] = useState('')
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
-      <Encabezado titulo="Cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">
+      <Encabezado titulo="Cobranza" ayuda="cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">
         {parte === 'cobrar' && <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="cobranza" />}
         <div className={grupoPanel} role="group" aria-label="Apartado">
           {PARTES.map((p) => (
@@ -85,10 +85,13 @@ function PorCobrar({ q }: { q: string }) {
   const [pasados, setPasados] = useState(false)
   useEffect(() => { cobrarViejos = false }, []) // sólo la primera vez que se abre (no al volver a la sección)
   const limite = sumarDias(hoy(), -30)
+  const [orden, setOrden] = useState<'saldo' | 'antiguo' | 'nombre'>('saldo')
   const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor) && (!viejos || (!!d.desde && d.desde < limite)) && (!pasados || pasoSuLimite(d)))
-  const vista = usePaginas(filtrados, 30, `${t}|${viejos}|${pasados}`)
+  if (orden === 'antiguo') filtrados.sort((a, b) => (a.desde ?? '9').localeCompare(b.desde ?? '9'))
+  else if (orden === 'nombre') filtrados.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  const vista = usePaginas(filtrados, 30, `${t}|${viejos}|${pasados}|${orden}`)
   const hayPasados = deudores.some(pasoSuLimite)
-  // Los que se ven (con la búsqueda), del que más debe al que menos, como en la lista; en el navegador (lib/xlsx.ts).
+  // Los que se ven (con la búsqueda), en el orden de la lista; en el navegador (lib/xlsx.ts).
   function exportar() {
     descargar(xlsx({
       nombre: 'Por cobrar',
@@ -116,6 +119,8 @@ function PorCobrar({ q }: { q: string }) {
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${filtrados.length})` : ''}</button>
             {(hayPasados || pasados) && <button type="button" onClick={() => setPasados(!pasados)} aria-pressed={pasados} className={pasados ? botonPanel : botonPanelSuave}>Pasaron su límite{pasados ? ` (${filtrados.length})` : ''}</button>}
+            <Selector valor={orden} onCambiar={setOrden} etiqueta="Ordenar" className={`${claseInput} w-48`}
+              opciones={[{ valor: 'saldo', texto: 'Más deuda primero' }, { valor: 'antiguo', texto: 'Debe desde hace más' }, { valor: 'nombre', texto: 'Por nombre' }]} />
             <MandarATodos lista={filtrados.map((d) => ({ id: d.id, nombre: d.nombre, telefono: d.telefono, texto: textoCobro(d, cobro, msjLimite, pasoSuLimite(d), dinero) }))}
               mandados={mandados} onEnviar={(id) => setMandados((m) => new Set(m).add(id))} />
           </div>

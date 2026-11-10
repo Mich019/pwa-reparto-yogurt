@@ -5,11 +5,11 @@ import { BotonWhatsApp, EditorMensaje, llenar, useMensaje } from '../../componen
 
 // A los clientes que hoy les toca visita y no tienen pedido, un WhatsApp de un toque con el mensaje del repartidor
 // (components/Mensajes.tsx: se edita aquí y se guarda en su teléfono).
-export function VisitasSinPedido({ clientes, abierta, onCerrar, onVerClientes }: { clientes: Cliente[]; abierta: boolean; onCerrar: () => void; onVerClientes?: () => void }) {
+export function VisitasSinPedido({ clientes, abierta, onCerrar, onVerClientes, titulo = 'Les toca visita hoy' }: { clientes: Cliente[]; abierta: boolean; onCerrar: () => void; onVerClientes?: () => void; titulo?: string }) {
   const plantilla = useMensaje('visita')
   const [mandados, setMandados] = useState<Set<string>>(new Set())
   return (
-    <Hoja abierta={abierta} onCerrar={onCerrar} alto titulo="Les toca visita hoy">
+    <Hoja abierta={abierta} onCerrar={onCerrar} alto titulo={titulo}>
       <div className="pb-4">
         <EditorMensaje tipo="visita" abierto={abierta} />
         <ul className="mt-4 divide-y divide-linea border-y border-linea">

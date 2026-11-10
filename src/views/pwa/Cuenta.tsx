@@ -17,7 +17,8 @@ import { Boton, Campo, Hoja, aviso, claseInput } from '../../components/ui'
 import { DosPasos } from './DosPasos'
 import { MiDia } from './MiDia'
 import { FotoPerfil } from '../../components/Avatar'
-import { Ayuda } from '../ayuda/Ayuda'
+import { Ayuda, useHayNovedades } from '../ayuda/Ayuda'
+import { EditorMensaje } from '../../components/Mensajes'
 import { PrivacidadYDatos } from '../legal/PrivacidadYDatos'
 
 const ROL = { administrador: 'Administrador', vendedor: 'Vendedor' }
@@ -257,6 +258,11 @@ function Notificaciones() {
         />
       </label>
       {MODO_SERVIDOR && <PreferenciasAvisos vendedor={sesionActual()?.usuario.rol === 'vendedor'} />}
+      <details className="mt-4 border-t border-linea pt-3">
+        <summary className="cursor-pointer py-1 text-sm font-semibold">Mensaje de «voy en camino»</summary>
+        <p className="mt-1 text-sm text-apagado">Es el que se abre al tocar «Voy en camino» en la parada de la ruta.</p>
+        <div className="mt-2"><EditorMensaje tipo="camino" /></div>
+      </details>
       {MODO_SERVIDOR && sesionActual()?.usuario.rol === 'administrador' && reparte() && <MiMetaPropia />}
     </div>
   )
@@ -388,6 +394,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
   const problemas = useLiveQuery(() => db.problemas.filter((p) => !p.visto).toArray(), []) ?? []
   const [cambiando, setCambiando] = useState(false)
   const [ayuda, setAyuda] = useState(false)
+  const novedades = useHayNovedades('app')
   const [privacidad, setPrivacidad] = useState(false)
   const [saliendo, setSaliendo] = useState(false)
   const [aMano, setAMano] = useState(false) // sólo lo que pidió la persona gira; lo automático pasa en silencio
@@ -451,7 +458,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
 
       <button onClick={() => setAyuda(true)} className="mt-6 flex w-full items-center gap-3 border-y border-linea py-4 text-left active:bg-niebla">
         <LifeBuoy size={20} className="shrink-0" />
-        <span className="min-w-0 flex-1"><span className="block font-semibold">Ayuda</span><span className="block text-sm text-apagado">Guías paso a paso: pedidos, entregas, clientes…</span></span>
+        <span className="min-w-0 flex-1"><span className="flex items-center gap-2 font-semibold">Ayuda{novedades && <span className="rounded-full bg-marca px-2 py-0.5 text-[11px] font-semibold text-white">Nuevo</span>}</span><span className="block text-sm text-apagado">{novedades ? 'Hay cosas nuevas en la app: míralas aquí.' : 'Guías paso a paso: pedidos, entregas, clientes…'}</span></span>
         <ChevronRight size={18} className="shrink-0 text-apagado" />
       </button>
 

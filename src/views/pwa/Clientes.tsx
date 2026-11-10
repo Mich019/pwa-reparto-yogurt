@@ -4,22 +4,25 @@ import { coincide, digitosBuscados, limpiarBusqueda, normalizar, propsBuscador, 
 import { esMio } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Map as MapaML, Marker } from 'maplibre-gl'
-import { BookUser, ChevronRight, NotebookPen, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Printer, QrCode, ScanLine, Search, ShoppingBag, Star, Sun, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react'
+import { BookUser, ChevronRight, NotebookPen, Download, Eye, FileDown, FileSpreadsheet, FileText, Crosshair, Flame, MessageCircle, Moon, Pencil, Phone, Printer, QrCode, RotateCcw, ScanLine, Search, ShoppingBag, Star, Sun, TriangleAlert, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { db, guardar, uid, type Cliente, type Frecuencia, type Pedido, type Producto, type Ventana } from '../../lib/db'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { llamarAutenticado } from '../../lib/sesion'
 import type { Deudor, EnvasesClientes } from '../../lib/cobranza'
-import { DIAS_CORTOS, DIAS_LARGOS, dinero, hoy, textoFecha, textoFrecuencia } from '../../lib/fechas'
+import { DIAS_CORTOS, DIAS_LARGOS, dinero, hoy, sumarDias, textoFecha, textoFrecuencia } from '../../lib/fechas'
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
 import { exportarLibreta, type Formato } from '../../lib/reportes'
 import { ESTILO_MAPA } from './Mapa'
 import { EditorPedido } from './EditorPedido'
+import { aCantidades, type Cantidades } from './SelectorSabores'
 import { CambiarVendedor } from './Equipo'
 import { FichaCodigos, ImpresionMasiva } from './CodigosCliente'
 import { usePaginas } from '../../components/Paginas'
+import { BotonAyuda } from '../ayuda/AyudaRapida'
+import { VisitasSinPedido } from './VisitasSinPedido'
 import { CuentaDelCliente } from '../../components/CuentaDelCliente'
 import { PreciosDelCliente } from '../../components/PreciosDelCliente'
 import { HojaLimitesSugeridos, LimiteFiado } from '../../components/LimiteFiado'
@@ -44,6 +47,11 @@ let clientePedido: string | null = null
 export function abrirCliente(id: string) {
   clientePedido = id
 }
+// Abre Clientes con «dejaron de comprar» puesto (desde «Qué hacer hoy» del Resumen).
+let abrirSinComprar = false
+export function verSinComprar() {
+  abrirSinComprar = true
+}
 
 // `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
 export function Clientes({ panel = false }: { panel?: boolean } = {}) {
@@ -55,6 +63,8 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const [enBuscador, setEnBuscador] = useState(false)
   const recientes = useRecientes('clientes')
   const [verInactivos, setVerInactivos] = useState(false)
+  const [soloSinComprar, setSoloSinComprar] = useState(() => { const v = abrirSinComprar; abrirSinComprar = false; return v })
+  const [escribirles, setEscribirles] = useState(false)
   const [form, setForm] = useState<Cliente | 'nuevo' | null>(null)
   const [perfilId, setPerfilId] = useState<string | null>(() => { const c = clientePedido; clientePedido = null; return c })
   const [escaner, setEscaner] = useState(false)
@@ -93,8 +103,13 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   const t = limpiarBusqueda(q)
   // Un número (con espacios, guiones o paréntesis) se compara sólo con los dígitos del teléfono.
   const digitos = digitosBuscados(t)
-  const lista = clientes.filter((c) => c.activo !== verInactivos && (coincide(t, textoBusqueda(c)) || telefonoCoincide(digitos, c.telefono)))
-  const paginas = usePaginas(lista, 40, `${t}|${verInactivos}`)
+  // Dejaron de comprar: activos que ya compraron, sin pedido pendiente y con la última entrega hace más de 30 días.
+  const hace30 = sumarDias(hoy(), -30)
+  const dejo = (c: Cliente) => { const s = stats.get(c.id); return c.activo && !!s?.ultima && !s.proximo && s.ultima < hace30 }
+  const sinComprar = clientes.filter(dejo).length
+  const filtrarSinComprar = soloSinComprar && !verInactivos && sinComprar > 0
+  const lista = clientes.filter((c) => c.activo !== verInactivos && (!filtrarSinComprar || dejo(c)) && (coincide(t, textoBusqueda(c)) || telefonoCoincide(digitos, c.telefono)))
+  const paginas = usePaginas(lista, 40, `${t}|${verInactivos}|${filtrarSinComprar}`)
   const perfil = clientes.find((c) => c.id === perfilId)
   // Lo que dejó la búsqueda, a Excel. El vendedor sale si el equipo ya está cargado; con conexión se agregan lo que debe
   // cada cliente (fiado) y los envases que tiene prestados, y sin ella el Excel sale igual, sin esas dos columnas.
@@ -110,9 +125,9 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
     const prestados = envases && new Map(envases.clientes.map((c) => [c.id, c.total]))
     descargar(xlsx({
       nombre: verInactivos ? 'Clientes archivados' : 'Clientes',
-      columnas: [{ titulo: 'Cliente', ancho: 28 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Dirección', ancho: 40 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Visita', ancho: 22 }, { titulo: 'Último pedido entregado', ancho: 14 },
+      columnas: [{ titulo: 'Cliente', ancho: 28 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Dirección', ancho: 40 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Visita', ancho: 22 }, { titulo: 'Último pedido entregado', ancho: 14 }, { titulo: 'Compra cada (días)', ancho: 12 },
         ...(saldo ? [{ titulo: 'Debe (fiado)', dinero: true, ancho: 14 }] : []), { titulo: 'Límite de fiado', dinero: true, ancho: 14 }, ...(prestados ? [{ titulo: 'Envases prestados', ancho: 12 }] : []), { titulo: 'Notas', ancho: 36 }],
-      filas: lista.map((c) => [c.nombre, c.telefono, c.direccion, c.vendedorId ? vendedor.get(c.vendedorId) ?? '' : 'Sin vendedor', textoFrecuencia(c.frecuencia), stats.get(c.id)?.ultima ?? '',
+      filas: lista.map((c) => [c.nombre, c.telefono, c.direccion, c.vendedorId ? vendedor.get(c.vendedorId) ?? '' : 'Sin vendedor', textoFrecuencia(c.frecuencia), stats.get(c.id)?.ultima ?? '', cadaCuanto(pedidos.filter((p) => p.clienteId === c.id)),
         ...(saldo ? [saldo.get(c.id) ?? 0] : []), c.limiteFiado ?? limiteDeEmpresa, ...(prestados ? [prestados.get(c.id) ?? 0] : []), c.notas ?? '']),
     }), `clientes-${hoy()}.xlsx`)
   }
@@ -133,7 +148,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
       {panel ? (
         <>
           {/* Una sola fila a la altura del detalle: buscar y filtrar, y luego las acciones; todo de 40 px de alto. */}
-          <Encabezado titulo="Clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} archivados` : ''}`}>
+          <Encabezado titulo="Clientes" ayuda="clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} archivados` : ''}`}>
             <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="clientes" />
             <div className={grupoPanel} role="group" aria-label="Mostrar">
               <button onClick={() => setVerInactivos(false)} aria-pressed={!verInactivos} className={verInactivos ? botonPanelSuave : botonPanel}>Activos</button>
@@ -153,7 +168,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
       ) : (
       <div className="px-4 pt-safe">
         <div className="mt-3 flex items-center justify-between gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
+          <h1 className="flex items-center gap-1 text-3xl font-bold tracking-tight">Clientes<BotonAyuda seccion="clientes" /></h1>
           <div className="flex items-center gap-2">
             <button onClick={() => setEscaner(true)} aria-label="Escanear QR o tarjeta" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
               <ScanLine size={20} />
@@ -175,6 +190,21 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
         {buscador}
       </div>
       )}
+      {!verInactivos && sinComprar > 0 && (
+        <div className={panel ? '-mt-2 mb-2 text-sm' : 'px-4 pt-2 text-sm'}>
+          <button type="button" onClick={() => setSoloSinComprar(!filtrarSinComprar)} aria-pressed={filtrarSinComprar}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-semibold transition-colors ${filtrarSinComprar ? 'bg-tinta text-white' : 'bg-niebla text-tinta hover:bg-linea'}`}>
+            {filtrarSinComprar ? 'Ver todos' : `${sinComprar} ${sinComprar === 1 ? 'dejó' : 'dejaron'} de comprar`}
+          </button>
+          {filtrarSinComprar && <>
+            <button type="button" onClick={() => setEscribirles(true)} className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-niebla px-3 py-1.5 font-semibold hover:bg-linea">
+              <MessageCircle size={15} aria-hidden="true" /> Escribirles
+            </button>
+            <span className="ml-2 text-apagado max-sm:mt-2 max-sm:block max-sm:ml-0">Sin pedido y su última entrega fue hace más de un mes.</span>
+          </>}
+        </div>
+      )}
+      <VisitasSinPedido titulo="Dejaron de comprar" clientes={escribirles ? clientes.filter(dejo) : []} abierta={escribirles} onCerrar={() => setEscribirles(false)} />
       <div className={panel ? 'mt-2 grid gap-x-10 lg:grid-cols-2' : 'flex-1 overflow-y-auto px-4 pt-2 pb-28'}>
         {!panel && MODO_SERVIDOR && <div className="col-span-full"><PorCobrar /></div>}
         <div ref={paginas.ancla} className="col-span-full scroll-mt-4" />
@@ -199,6 +229,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
                   {/* En línea con el texto: si no cabe, se recorta el nombre del sabor y no desaparece entero. */}
                   {fav && <> · <PuntoSabor color={fav.color_hex} className="h-2.5 w-2.5 align-middle" /> {fav.sabor}</>}
                 </div>
+                {dejo(c) && s?.ultima && <div className="mt-0.5 flex items-center gap-1 text-xs font-semibold"><TriangleAlert size={12} className="text-ambar" aria-hidden="true" /> Sin comprar desde el {textoFecha(s.ultima).toLowerCase()}</div>}
               </div>
               {s?.proximo && <div className="rounded-md bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
               <ChevronRight size={18} className="shrink-0 text-apagado/60" />
@@ -238,6 +269,32 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   )
 }
 
+// Días promedio entre sus últimas entregas (hasta 10), o null con menos de tres.
+function cadaCuanto(pedidos: Pedido[]): number | null {
+  const fechas = [...new Set(pedidos.filter((p) => p.estado === 'ENTREGADO').map((p) => p.fecha))].sort().slice(-10)
+  if (fechas.length < 3) return null
+  const dia = (s: string) => Date.parse(`${s}T12:00:00`) / 864e5
+  return Math.round((dia(fechas[fechas.length - 1]) - dia(fechas[0])) / (fechas.length - 1))
+}
+
+// Cada cuánto compra de verdad (promedio entre sus últimas entregas) y hace cuánto fue la última; con eso se ve si ya
+// se tardó más de lo normal.
+function RitmoDeCompra({ pedidos }: { pedidos: Pedido[] }) {
+  const ultima = pedidos.filter((p) => p.estado === 'ENTREGADO').reduce((m, p) => (p.fecha > m ? p.fecha : m), '')
+  if (!ultima) return null
+  const hace = Math.round((Date.parse(`${hoy()}T12:00:00`) - Date.parse(`${ultima}T12:00:00`)) / 864e5)
+  const cada = cadaCuanto(pedidos)
+  const tarde = cada != null && cada > 0 && hace > cada * 1.5
+  const texto = hace <= 0 ? 'su última entrega fue hoy' : hace === 1 ? 'su última entrega fue ayer' : `su última entrega fue hace ${hace} días`
+  return (
+    <p className={`text-sm ${tarde ? 'font-semibold text-tinta' : 'text-apagado'}`}>
+      {tarde && <TriangleAlert size={14} className="mr-1 inline align-[-2px] text-ambar" aria-hidden="true" />}
+      {cada != null ? `Compra cada ${cada <= 1 ? 'día' : `${cada} días`} en promedio; ${texto}` : `${texto.charAt(0).toUpperCase()}${texto.slice(1)}`}
+      {tarde && ': ya se tardó más de lo normal.'}
+    </p>
+  )
+}
+
 function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEditar }: {
   cliente: Cliente
   pedidos: Pedido[]
@@ -247,7 +304,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
   onCerrar: () => void
   onEditar: () => void
 }) {
-  const [editor, setEditor] = useState<{ pedido?: Pedido } | null>(null)
+  const [editor, setEditor] = useState<{ pedido?: Pedido; repetir?: Cantidades } | null>(null)
   const [codigos, setCodigos] = useState(false)
   const [cambiandoVendedor, setCambiandoVendedor] = useState(false)
   // RF-041: el administrador ve de quién es el cliente y puede pasarlo a otro vendedor (sólo si ya está en el servidor).
@@ -269,6 +326,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
     <Hoja abierta onCerrar={onCerrar} alto titulo={cliente.nombre}>
       <div className="space-y-5 pb-4">
         <div className="text-sm text-apagado">{cliente.direccion} · {textoFrecuencia(cliente.frecuencia)} · {cliente.ventana === 'MAÑANA' ? 'mañana' : 'tarde'}</div>
+        <RitmoDeCompra pedidos={pedidos} />
         <div className="grid grid-cols-3 gap-2 text-center">
           <Dato valor={consumido} etiqueta="Consumidos" />
           <Dato valor={favorito?.sabor ?? '—'} etiqueta="Favorito" icono={favorito ? <PuntoSabor color={favorito.color_hex} className="h-2.5 w-2.5 align-[-1px]" /> : <Star size={12} className="inline" />} />
@@ -300,8 +358,11 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
         )}
         {gestiona && <PreciosDelCliente clienteId={cliente.id} nombre={cliente.nombre} />}
         {gestiona && <LimiteFiado cliente={cliente} />}
-        <Boton className="w-full" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
-        {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} limite={cliente.limiteFiado ?? limiteEmpresa} />}
+        <div className="flex gap-2">
+          <Boton className="flex-1" onClick={() => setEditor({})}><ShoppingBag size={20} /> Nuevo pedido</Boton>
+          {ultima && <Boton variante="secundario" className="flex-1" onClick={() => setEditor({ repetir: aCantidades(ultima.items) })}><RotateCcw size={20} /> Repetir el último</Boton>}
+        </div>
+        {MODO_SERVIDOR && cliente.version != null && <CuentaDelCliente clienteId={cliente.id} limite={cliente.limiteFiado ?? limiteEmpresa} telefono={cliente.telefono} />}
 
         {pendientes.length > 0 && (
           <Seccion titulo="Pedidos agendados">
@@ -315,7 +376,7 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
           {historial.map((p) => <FilaPedido key={p.id} p={p} sabor={sabor} />)}
         </Seccion>
       </div>
-      {editor && <EditorPedido abierto cliente={cliente} pedido={editor.pedido} base={base} onCerrar={() => setEditor(null)} />}
+      {editor && <EditorPedido abierto cliente={cliente} pedido={editor.pedido} base={editor.repetir ?? base} onCerrar={() => setEditor(null)} />}
       {codigos && <FichaCodigos cliente={cliente} onCerrar={() => setCodigos(false)} />}
       {cambiandoVendedor && <CambiarVendedor cliente={cliente} onCerrar={() => setCambiandoVendedor(false)} />}
     </Hoja>

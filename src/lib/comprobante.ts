@@ -27,6 +27,19 @@ export function textoComprobante(cliente: Pick<Cliente, 'nombre'>, pedido: Pedid
   ].filter((l, n, todas) => l !== '' || (n > 0 && todas[n - 1] !== '')).join('\n').trim()
 }
 
+// Estado de cuenta del fiado: los últimos movimientos (sin los anulados) y lo que queda pendiente.
+export function textoEstadoCuenta(nombre: string, movimientos: { tipo: 'venta' | 'abono'; fecha: string; monto: number; anulado: boolean }[], saldo: number, empresa?: string): string {
+  const ultimos = movimientos.filter((m) => !m.anulado).sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 8).reverse()
+  return [
+    empresa ? `*${empresa}*` : '',
+    `Hola ${nombre.split(' ')[0] || nombre}, este es tu estado de cuenta:`,
+    '',
+    ...ultimos.map((m) => `• ${textoFecha(m.fecha.slice(0, 10))}: ${m.tipo === 'venta' ? 'compra a fiado' : 'abono'} ${dinero(m.monto)}`),
+    '',
+    `*Saldo pendiente: ${dinero(saldo)}*`,
+  ].filter((l, n, todas) => l !== '' || (n > 0 && todas[n - 1] !== '')).join('\n').trim()
+}
+
 export const enlaceComprobante = (cliente: Pick<Cliente, 'nombre' | 'telefono'>, pedido: Pedido, productos: Producto[], empresa?: string) =>
   `https://wa.me/${telLimpio(cliente.telefono)}?text=${encodeURIComponent(textoComprobante(cliente, pedido, productos, empresa))}`
 

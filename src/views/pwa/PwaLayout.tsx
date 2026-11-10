@@ -14,6 +14,7 @@ import { db } from '../../lib/db'
 import { useAlertasLocales } from '../../lib/alertas'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { alCerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
+import { abrirGuia } from '../ayuda/AyudaRapida'
 import { iniciarSincronizacionAutomatica } from '../../lib/sync'
 import { useConexionEnVivo } from '../../lib/enVivo'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
@@ -40,6 +41,16 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   const [pestana, setPestana] = useState<PestanaPwa>(pestanaInicial)
   const sesion = useSesion()
   const esAdmin = sesion?.usuario.rol === 'administrador'
+  // La primera vez que un vendedor entra en este teléfono, le abre la guía de entregar (una sola vez por cuenta).
+  const idUsuario = sesion?.usuario.id
+  useEffect(() => {
+    if (!idUsuario || esAdmin) return
+    const clave = `delisy:bienvenida:${idUsuario}`
+    try { if (localStorage.getItem(clave)) return } catch { return }
+    // Se marca al abrirla, no antes: al entrar la pantalla se monta dos veces y la primera cancela su espera.
+    const t = setTimeout(() => { try { localStorage.setItem(clave, '1') } catch { /* sin almacenamiento */ } abrirGuia('entregar') }, 1200)
+    return () => clearTimeout(t)
+  }, [idUsuario, esAdmin])
   const visibles = PESTANAS_PWA.filter((p) =>
     p.solo === 'vendedor' ? MODO_SERVIDOR : p.solo === 'servidor' ? MODO_SERVIDOR : p.solo === 'sinServidor' ? !MODO_SERVIDOR : true)
   const actual = visibles.some((p) => p.id === pestana) ? pestana : 'ruta'
