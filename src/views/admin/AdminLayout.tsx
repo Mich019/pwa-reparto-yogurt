@@ -11,6 +11,8 @@ import { AdminSabores } from './AdminSabores'
 import { Cobranza, irACortes, marcarCobrarViejos } from './Cobranza'
 import { LogoEmpresa } from './marca'
 import { AtajosTeclado, Subrayado, atajoDe } from './piezas'
+import { GuiaInicio } from '../../components/GuiaInicio'
+import { PASOS_PANEL, irAPasoGuia, terminarGuia, useGuiaInicio } from '../../lib/guiaInicio'
 import { Equipo, irAEquipo } from '../pwa/Equipo'
 import { Clientes } from '../pwa/Clientes'
 import { Produccion } from '../pwa/Produccion'
@@ -97,6 +99,13 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   }, [esAdmin, sesion?.usuario.id])
   useEffect(() => { if (sesion) void refrescarPerfil() }, [sesion?.usuario.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Guía de la primera vez (lib/guiaInicio.ts): cada paso abre su sección; la bienvenida, el Resumen. No sale con la
+  // suscripción vencida ni llegando por un enlace a una guía.
+  const pasoGuia = useGuiaInicio('panel', sesion?.usuario.id, esAdmin && suscripcion?.estado !== 'vencida' && !location.search.includes('guia='))
+  useEffect(() => {
+    if (pasoGuia !== null) setSeccion((PASOS_PANEL[pasoGuia]?.seccion ?? 'resumen') as SeccionAdmin)
+  }, [pasoGuia]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function setSeccion(s: SeccionAdmin) {
     setSeccionEstado(s)
     try { sessionStorage.setItem(CLAVE_SECCION, s) } catch { /* sin almacenamiento: sólo no se recuerda */ }
@@ -170,6 +179,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                 key={id}
                 type="button"
                 onClick={() => setSeccion(id)}
+                data-seccion={id}
                 aria-current={activa ? 'page' : undefined}
                 title={atajoDe(id) && `${texto} (teclas ${atajoDe(id)})`}
                 className={`rounded-md px-2.5 py-2.5 text-[15px] font-semibold transition-colors 2xl:px-3.5 ${id === 'configuracion' ? 'max-2xl:hidden' : ''} ${anillo} ${
@@ -199,6 +209,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           <button
             type="button"
             onClick={() => setSeccion('configuracion')}
+            data-seccion="configuracion"
             aria-label="Configuración"
             title="Configuración"
             className={`group hidden h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:text-marca xl:grid 2xl:hidden ${anillo}`}
@@ -209,6 +220,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           <button
             type="button"
             onClick={() => abrirConfiguracion('cuenta')}
+            data-seccion="configuracion"
             aria-label="Configuración de tu cuenta"
             title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : 'Mi cuenta'}
             className={`h-10 w-10 shrink-0 rounded-full transition-opacity hover:opacity-85 ${anillo}`}
@@ -244,6 +256,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
         </div>
       </main>
       <AtajosTeclado onIr={setSeccion} seccion={seccion} />
+      {pasoGuia !== null && <GuiaInicio pasos={PASOS_PANEL} paso={pasoGuia} onPaso={(n) => irAPasoGuia('panel', n)} onTerminar={() => { terminarGuia('panel'); setSeccion('resumen') }} />}
 
       {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono.
           Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}
@@ -256,6 +269,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                 <button
                   type="button"
                   onClick={() => setSeccion(id)}
+                  data-seccion={id}
                   aria-label={texto}
                   aria-current={activa ? 'page' : undefined}
                   title={texto}

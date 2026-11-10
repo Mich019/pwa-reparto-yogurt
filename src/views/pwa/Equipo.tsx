@@ -21,6 +21,7 @@ import { HistorialMetas } from '../../components/HistorialMetas'
 import { usePaginas } from '../../components/Paginas'
 import { Accion, Boton, Campo, Hoja, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
 import { BuscadorDesplegable, Encabezado, MenuMas, Separador, botonPanel, botonPanelSuave, grupoPanel } from '../admin/piezas'
+import { Cargando } from '../../components/Cargando'
 
 // M07 · Alta y baja de vendedores y reasignación de clientes (RF-038 a RF-041). Sólo para el administrador.
 
@@ -207,7 +208,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
             <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => void cargar()} disabled={cargando}>{cargando ? 'Cargando…' : 'Reintentar'}</Boton>
           </div>
         )}
-        {!equipo && !error && <div className="py-12 text-center text-apagado">Cargando equipo…</div>}
+        {!equipo && !error && <Cargando texto="Cargando equipo…" />}
 
         {equipo && equipo.clientesSinAsignar > 0 && (
           <button onClick={() => setCartera({ desde: SIN_VENDEDOR })} className="mt-3 flex w-full items-center gap-3 rounded-lg bg-ambar/20 p-4 text-left">
@@ -921,7 +922,7 @@ export function CambiarVendedor({ cliente, onCerrar }: { cliente: Cliente; onCer
     <Hoja abierta onCerrar={onCerrar} titulo="Cambiar de vendedor">
       <div className="pb-4">
         <p className="mb-2 text-sm text-apagado">{cliente.nombre} pasa con sus pedidos agendados. Elige a quién:</p>
-        {!equipo && !error && <div className="py-8 text-center text-apagado">Cargando…</div>}
+        {!equipo && !error && <Cargando className="py-8" />}
         {equipo && opciones.map((o) => (
           <button key={o.id} disabled={trabajando || o.id === actual} onClick={() => void pasar(o.id, o.nombre)} className="flex w-full items-center gap-3 border-b border-linea py-3.5 text-left active:bg-niebla disabled:opacity-60">
             <span className="min-w-0 flex-1">

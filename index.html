@@ -10,8 +10,35 @@
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
     <title>Delisy</title>
+    <!-- Pantalla de carga: el logo en medio, con un aro que gira y un punto en órbita. Va aquí, y no en el CSS de la
+         app, para que se vea desde el primer instante (al abrir o recargar), antes de que llegue el código.
+         public/arranque.js le pone el logo y el color de la empresa recordada; src/main.tsx la quita al estar lista.
+         components/Cargando.tsx usa estas mismas clases mientras una sección trae sus datos. -->
+    <style>
+      #arranque { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #f8f6ec; transition: opacity .3s ease; }
+      #arranque.oscuro { background: #0e1611; }
+      #arranque.fuera { opacity: 0; pointer-events: none; }
+      .cargador { --carga-color: #113250; position: relative; display: grid; place-items: center; width: var(--carga-lado, 96px); aspect-ratio: 1; }
+      .cargador-aro { position: absolute; inset: 0; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--carga-color) 16%, transparent); border-top-color: var(--carga-color); animation: cargador-gira 1.1s cubic-bezier(.55,.15,.45,.85) infinite; }
+      .cargador-orbita { position: absolute; inset: -9%; animation: cargador-gira 2.6s linear infinite reverse; }
+      .cargador-orbita::before { content: ''; position: absolute; top: 0; left: 50%; width: 11%; aspect-ratio: 1; margin-left: -5.5%; border-radius: 50%; background: #f9dc07; box-shadow: 0 0 0 2px color-mix(in srgb, var(--carga-color) 25%, transparent); }
+      .cargador-logo { display: grid; place-items: center; width: 66%; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: #fdfdf8; color: #fff; font: 700 calc(var(--carga-lado, 96px) * .3)/1 system-ui, sans-serif; box-shadow: 0 6px 18px -8px rgba(0,32,20,.45); animation: cargador-late 1.6s ease-in-out infinite; }
+      .cargador-logo.inicial { background: var(--carga-color); }
+      .cargador-logo img { width: 76%; height: 76%; object-fit: contain; }
+      @keyframes cargador-gira { to { transform: rotate(360deg); } }
+      @keyframes cargador-late { 0%, 100% { transform: none; } 30% { transform: scale(1.09) rotate(-5deg); } 62% { transform: scale(.95) rotate(4deg); } }
+      @media (prefers-reduced-motion: reduce) { .cargador-aro, .cargador-orbita, .cargador-logo { animation: none; } #arranque { transition: none; } }
+    </style>
   </head>
   <body>
+    <div id="arranque" role="status" aria-label="Cargando">
+      <div class="cargador" style="--carga-lado: 128px">
+        <span class="cargador-aro"></span>
+        <span class="cargador-orbita"></span>
+        <span class="cargador-logo"><img src="./icon.svg" alt="" /></span>
+      </div>
+    </div>
+    <script src="./arranque.js"></script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

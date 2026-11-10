@@ -7,6 +7,7 @@ import { copiarCarga, guardarCarga, guardarProduccion, useDiaStock, type DiaStoc
 import { formato, sumaPorUnidad } from '../../lib/unidades'
 import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
 import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
+import { Cargando } from '../../components/Cargando'
 
 // RF-037 · El administrador registra, para un día, los litros producidos de cada sabor y los que le entrega a cada vendedor
 // al empezar la jornada (y, al cerrar, lo que devuelven). Se hace por internet: el servidor es quien lleva las cuentas.
@@ -113,7 +114,7 @@ export function StockAdmin({ selector, panel = false }: { selector?: ReactNode; 
         </div>
       )}
 
-      {!dia && !error && <div className="mt-10 text-center text-apagado">Cargando…</div>}
+      {!dia && !error && <Cargando className="mt-10" />}
 
       {dia && cuentas && (
         <div className={`transition-opacity ${actual ? '' : 'pointer-events-none opacity-40'}`} aria-busy={!actual}>

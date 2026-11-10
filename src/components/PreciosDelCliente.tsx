@@ -5,6 +5,7 @@ import { dinero } from '../lib/fechas'
 import { sincronizar } from '../lib/sync'
 import { nombreUnidad } from '../lib/unidades'
 import { Boton, Hoja, aviso, claseInput } from './ui'
+import { Cargando } from './Cargando'
 
 // Precio especial por cliente (mayoreo), sólo para el administrador. Un precio en blanco = el de lista. El teléfono
 // recibe el cambio en la siguiente sincronización y lo usa al armar los pedidos de ese cliente.
@@ -55,7 +56,7 @@ function HojaPrecios({ nombre, clienteId, precios, error, onCerrar }: { nombre: 
       <div className="pb-4">
         <p className="pb-3 text-sm text-apagado">Déjalo en blanco para cobrar el precio de lista.</p>
         {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
-        {!precios && !error && <p className="py-8 text-center text-apagado">Cargando…</p>}
+        {!precios && !error && <Cargando className="py-8" />}
         <div className="divide-y divide-linea">
           {(precios ?? []).map((p) => (
             <label key={p.productoId} className="flex items-center gap-3 py-2.5">

@@ -12,6 +12,7 @@ export const NOVEDADES: Novedad[] = [
   {
     fecha: '2026-11-10', titulo: 'Clientes que dejaron de comprar y más WhatsApp',
     puntos: [
+      { texto: 'La primera vez que entras, un recorrido corto te muestra para qué sirve cada parte, señalando cada botón. Lo repites cuando quieras con «Ver la guía otra vez», aquí en Ayuda.' },
       { texto: 'En Clientes ves quiénes dejaron de comprar (más de un mes sin pedido) y les escribes desde ahí.', guia: 'sin-comprar' },
       { texto: '«Qué hacer hoy» en el Resumen te dice cuántos dejaron de comprar, y la ficha de cada vendedor cuántos de su cartera.', para: 'administrador', donde: 'panel' },
       { texto: 'La ficha del cliente dice cada cuánto compra y avisa si ya se tardó; «Repetir el último» arma su pedido de siempre.' },

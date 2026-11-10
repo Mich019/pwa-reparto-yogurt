@@ -15,6 +15,8 @@ import { useAlertasLocales } from '../../lib/alertas'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { alCerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { abrirGuia } from '../ayuda/AyudaRapida'
+import { GuiaInicio } from '../../components/GuiaInicio'
+import { PASOS_APP, irAPasoGuia, terminarGuia, useGuiaInicio, useGuiaVista } from '../../lib/guiaInicio'
 import { iniciarSincronizacionAutomatica } from '../../lib/sync'
 import { useConexionEnVivo } from '../../lib/enVivo'
 import { AnuncioPlataforma } from '../../components/AnuncioPlataforma'
@@ -41,20 +43,28 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   const [pestana, setPestana] = useState<PestanaPwa>(pestanaInicial)
   const sesion = useSesion()
   const esAdmin = sesion?.usuario.rol === 'administrador'
+  // Guía de la primera vez (lib/guiaInicio.ts): un paso por pestaña de las que tiene esta cuenta.
+  const pasoGuia = useGuiaInicio('app', sesion?.usuario.id, (!MODO_SERVIDOR || !!sesion) && !location.search.includes('guia='))
+  const guiaYaVista = useGuiaVista('app')
   // La primera vez que un vendedor entra en este teléfono, le abre la guía de entregar (una sola vez por cuenta).
   const idUsuario = sesion?.usuario.id
   useEffect(() => {
     if (!idUsuario || esAdmin) return
+    if (pasoGuia !== null || !guiaYaVista) return // primero el recorrido; la guía de entregar, al terminarlo
     const clave = `delisy:bienvenida:${idUsuario}`
     try { if (localStorage.getItem(clave)) return } catch { return }
     // Se marca al abrirla, no antes: al entrar la pantalla se monta dos veces y la primera cancela su espera.
     const t = setTimeout(() => { try { localStorage.setItem(clave, '1') } catch { /* sin almacenamiento */ } abrirGuia('entregar') }, 1200)
     return () => clearTimeout(t)
-  }, [idUsuario, esAdmin])
+  }, [idUsuario, esAdmin, pasoGuia, guiaYaVista])
   const visibles = PESTANAS_PWA.filter((p) =>
     p.solo === 'vendedor' ? MODO_SERVIDOR : p.solo === 'servidor' ? MODO_SERVIDOR : p.solo === 'sinServidor' ? !MODO_SERVIDOR : true)
   const actual = visibles.some((p) => p.id === pestana) ? pestana : 'ruta'
   const irA = (p: PestanaPwa) => { if (visibles.some((v) => v.id === p)) setPestana(p) }
+  const pasosGuia = PASOS_APP.filter((x) => !x.seccion || visibles.some((v) => v.id === x.seccion))
+  useEffect(() => {
+    if (pasoGuia !== null) setPestana((pasosGuia[pasoGuia]?.seccion ?? 'ruta') as PestanaPwa)
+  }, [pasoGuia]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aquí se reparte: el administrador también, como un vendedor con su cartera (lib/reparto.ts). Se fija antes de que
   // las pestañas lean la base; al salir al panel se quita.
@@ -137,6 +147,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
               <li key={id} className={activa ? 'min-w-0 flex-1' : 'shrink-0'}>
                 <button
                   onClick={() => setPestana(id)}
+                  data-seccion={id}
                   aria-label={texto}
                   aria-current={activa ? 'page' : undefined}
                   className={`relative flex h-12 items-center justify-center gap-2 rounded-md transition-colors ${
@@ -152,6 +163,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
           })}
         </ul>
       </nav>
+      {pasoGuia !== null && <GuiaInicio pasos={pasosGuia} paso={pasoGuia} onPaso={(n) => irAPasoGuia('app', n)} onTerminar={() => { terminarGuia('app'); setPestana('ruta') }} />}
     </div>
   )
 }

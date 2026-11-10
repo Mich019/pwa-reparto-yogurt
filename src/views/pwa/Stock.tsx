@@ -8,6 +8,7 @@ import { useStockDeHoy } from '../../lib/stock'
 import type { Nivel } from '../../lib/stock-calculo'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Boton, PuntoSabor } from '../../components/ui'
+import { Cargando } from '../../components/Cargando'
 
 // RF-037 · La carga del vendedor: lo que el administrador le asignó hoy y lo que le va quedando. Las cuentas salen de
 // los pedidos entregados en este mismo teléfono, así funcionan sin internet.
@@ -38,7 +39,7 @@ export function Stock() {
       <div className="text-sm text-apagado">{textoFecha(hoy())}</div>
 
       {filas === undefined ? (
-        <div className="mt-10 text-center text-apagado">Cargando…</div>
+        <Cargando className="mt-10" />
       ) : filas.length === 0 ? (
         <div className="mt-6 border-t border-linea py-10 text-center">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-niebla"><Package size={26} /></span>
