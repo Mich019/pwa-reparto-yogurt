@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Brilla } from '../../components/Brillo'
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronsRight, Copy, Factory, RefreshCw, TriangleAlert, WifiOff } from 'lucide-react'
 import { ErrorApi, ErrorRed } from '../../lib/api'
 import { desdeIso, hoy, sumarDias, textoFecha } from '../../lib/fechas'
@@ -208,7 +209,7 @@ function Tarjeta({ valor, etiqueta }: { valor: string; etiqueta: string }) {
   return (
     // Con varias unidades («20 L + 5 kg»), una por renglón: partidas a media cifra no se leen en una tarjeta angosta.
     <div className="border-l-2 border-linea py-0.5 pl-3">
-      {valor.split(' + ').map((v) => <div key={v} className="text-lg leading-6 font-semibold whitespace-nowrap tabular-nums">{v}</div>)}
+      {valor.split(' + ').map((v, i) => <div key={i} className="text-lg leading-6 font-semibold whitespace-nowrap tabular-nums"><Brilla valor={v}>{v}</Brilla></div>)}
       <div className="text-xs text-apagado">{etiqueta}</div>
     </div>
   )

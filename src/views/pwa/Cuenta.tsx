@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Listo, Ocupado, useListo } from '../../components/Esqueleto'
+import { cambiarPreferencias, usePreferenciasPanel } from '../../lib/tema'
+import { type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { reparte } from '../../lib/reparto'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -55,6 +56,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
       marcarListo()
       onListo?.()
     } catch (e) {
+      marcarListo(false)
       setError(e instanceof ErrorApi || e instanceof ErrorRed ? e.message : 'No se pudo cambiar la contraseña')
     } finally {
       setCargando(false)
@@ -133,7 +135,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
         disabled={cargando}
         className="flex w-full items-center justify-center rounded-md bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
       >
-        {cargando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar contraseña'}
+        {cargando ? <Ocupado texto="Guardando…" /> : listo ? <Listo estado={listo} /> : 'Guardar contraseña'}
       </button>
     </form>
   )
@@ -328,11 +330,12 @@ function Interruptor({ encendido, deshabilitado, alCambiar }: { encendido: boole
   )
 }
 
-function Opcion({ titulo, ayuda, children }: { titulo: string; ayuda: string; children: React.ReactNode }) {
+// `listo`: la marca de «Guardado» de lo último que se cambió ahí, junto al título.
+function Opcion({ titulo, ayuda, children, listo }: { titulo: string; ayuda: string; children: React.ReactNode; listo?: EstadoListo }) {
   return (
     <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
       <span className="min-w-0">
-        <span className="block text-sm font-medium">{titulo}</span>
+        <span className="flex flex-wrap items-center gap-x-2 text-sm font-medium">{titulo}{listo !== undefined && <span aria-live="polite"><MarcaGuardado estado={listo} /></span>}</span>
         <span className="block text-xs text-apagado">{ayuda}</span>
       </span>
       {children}
@@ -341,16 +344,17 @@ function Opcion({ titulo, ayuda, children }: { titulo: string; ayuda: string; ch
 }
 
 function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarSemanal, cambiarDiaSemanal } = usePreferenciasAvisos((e) => aviso(mensajeError(e)))
+  const { prefs, sinSenal, listo, encendido, alternar, cambiarSilencio, cambiarSemanal, cambiarDiaSemanal } = usePreferenciasAvisos((e) => aviso(mensajeError(e)))
   const diaSemanal = prefs?.resumenSemanalDia ?? 1
   const silencio = prefs?.silencio ?? null
   const claseHora = 'rounded-md bg-niebla px-3 py-2 text-sm font-semibold'
+  const { fondo } = usePreferenciasPanel()
   return (
     <>
       {sinSenal && <p className="mt-4 border-t border-linea pt-3 text-xs text-apagado">Sin conexión: lo de abajo se puede cambiar cuando haya señal.</p>}
       {vendedor && (
         <div className="mt-4 border-t border-linea pt-3">
-          <div className="text-sm font-semibold">Qué avisos recibes</div>
+          <div className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">Qué avisos recibes <span aria-live="polite"><MarcaGuardado estado={listo.avisos} /></span></div>
           <p className="text-xs text-apagado">Los pedidos urgentes siempre te llegan.</p>
           {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
             <Opcion key={tipo} titulo={titulo} ayuda={ayuda}>
@@ -361,7 +365,7 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
       )}
       {vendedor && (
         <div className="mt-4 border-t border-linea pt-3">
-          <Opcion titulo="Tu semana por correo" ayuda={prefs?.resumenSemanal ? `Cada ${DIAS_SEMANA[diaSemanal - 1].toLowerCase()}: lo que vendiste, contra la semana anterior y cómo vas con tu meta.` : 'Apagado.'}>
+          <Opcion listo={listo.resumen} titulo="Tu semana por correo" ayuda={prefs?.resumenSemanal ? `Cada ${DIAS_SEMANA[diaSemanal - 1].toLowerCase()}: lo que vendiste, contra la semana anterior y cómo vas con tu meta.` : 'Apagado.'}>
             <Interruptor encendido={!!prefs?.resumenSemanal} deshabilitado={!prefs} alCambiar={(si) => void cambiarSemanal(si)} />
           </Opcion>
           {prefs?.resumenSemanal && (
@@ -373,7 +377,7 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
         </div>
       )}
       <div className="mt-4 border-t border-linea pt-3">
-        <Opcion titulo="Horario de silencio" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)} no suenan; los ves al abrir la app. Los urgentes sí suenan.` : 'Los avisos suenan a cualquier hora.'}>
+        <Opcion listo={listo.silencio} titulo="Horario de silencio" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)} no suenan; los ves al abrir la app. Los urgentes sí suenan.` : 'Los avisos suenan a cualquier hora.'}>
           <Interruptor encendido={!!silencio} deshabilitado={!prefs} alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />
         </Opcion>
         {silencio && (
@@ -385,6 +389,24 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
               opciones={HORAS.map((h) => ({ valor: h, texto: hora(h), deshabilitada: h === silencio.desde }))} />
           </div>
         )}
+      </div>
+      <div className="mt-4 border-t border-linea pt-3">
+        {/* No va en <Opcion> (un label): tocar su texto elegiría el primer botón. */}
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">Color del fondo</span>
+            <span className="block text-xs text-apagado">Sólo en este teléfono, aparte de los colores de tu empresa.</span>
+          </span>
+          <span role="radiogroup" aria-label="Color del fondo" className="flex shrink-0 gap-1.5">
+            {(['crema', 'blanco'] as const).map((f) => (
+              <button key={f} type="button" role="radio" aria-checked={fondo === f} onClick={() => cambiarPreferencias({ fondo: f })}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold ${fondo === f ? 'bg-tinta text-white' : 'bg-niebla'}`}>
+                <span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-linea" style={{ background: f === 'crema' ? '#f8f6ec' : '#ffffff' }} />
+                {f === 'crema' ? 'Crema' : 'Blanco'}
+              </button>
+            ))}
+          </span>
+        </div>
       </div>
     </>
   )

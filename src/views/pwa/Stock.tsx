@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Brilla } from '../../components/Brillo'
 import { BotonAyuda } from '../ayuda/AyudaRapida'
 import { Package, RefreshCw, TriangleAlert } from 'lucide-react'
 import { db, type Producto } from '../../lib/db'
@@ -57,7 +58,7 @@ export function Stock() {
         <>
           <section className="mt-4 border-y border-linea py-5" aria-label="Resumen de la carga">
             <div className="text-sm font-medium text-apagado">Te quedan</div>
-            <div className="mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums">{total((f) => f.restante)}</div>
+            <div className="mt-1 text-5xl leading-none font-bold tracking-tight tabular-nums"><Brilla valor={total((f) => f.restante)}>{total((f) => f.restante)}</Brilla></div>
             <div className="mt-1 text-sm text-apagado">de {total((f) => f.asignada)} que llevabas</div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-niebla" role="img" aria-label={`Entregaste ${total((f) => Math.min(f.entregado, f.asignada))} de ${total((f) => f.asignada)}`}>
               <div className="h-full rounded-md bg-tinta transition-[width]" style={{ width: `${asignada ? Math.min(100, (entregado / asignada) * 100) : 0}%` }} />

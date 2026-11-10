@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 
 // Carga con forma: cuando ya se sabe cómo se verá lo que llega (una lista, unas cifras, una gráfica), se dibuja su
 // silueta en gris en lugar de un círculo que gira, para que nada salte al llegar los datos. Aparece hasta los 300 ms
@@ -114,20 +114,36 @@ export function Girando({ className = '' }: { className?: string }) {
   return <span aria-hidden="true" className={`girando inline-block h-[1.05em] w-[1.05em] shrink-0 rounded-full border-2 border-current border-r-transparent ${className}`} />
 }
 
-// Después de guardar, el botón dice «Guardado ✓» un momento (además del aviso de abajo) y luego vuelve a su texto.
-// Sólo para botones que se quedan en pantalla al guardar; las hojas que se cierran no lo necesitan.
-export function useListo(ms = 1600): [boolean, () => void] {
-  const [listo, setListo] = useState(false)
+// Después de guardar, el botón dice «Guardado ✓» un momento (además del aviso de abajo) y luego vuelve a su texto; si
+// falló, «No se pudo» con una cruz roja, un poco más de tiempo. También junto al título de los apartados que guardan
+// solos (Preferencias). Sólo donde lo guardado se queda en pantalla; las hojas que se cierran no lo necesitan.
+export type EstadoListo = 'ok' | 'error' | null
+export function useListo(ms = 1600): [EstadoListo, (ok?: boolean) => void] {
+  const [listo, setListo] = useState<EstadoListo>(null)
   const t = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(t.current), [])
-  const marcar = useCallback(() => {
+  const marcar = useCallback((ok = true) => {
     clearTimeout(t.current)
-    setListo(true)
-    t.current = setTimeout(() => setListo(false), ms)
+    setListo(ok ? 'ok' : 'error')
+    t.current = setTimeout(() => setListo(null), ok ? ms : ms * 1.6)
   }, [ms])
   return [listo, marcar]
 }
 
-export function Listo({ texto = 'Guardado' }: { texto?: string }) {
-  return <span className="listo inline-flex items-center gap-1.5" role="status"><Check size={16} strokeWidth={2.6} aria-hidden="true" />{texto}</span>
+export function Listo({ estado = 'ok', texto }: { estado?: EstadoListo; texto?: string }) {
+  if (estado === 'error') {
+    return (
+      <span className="listo inline-flex items-center gap-1.5" role="status">
+        <span className="grid h-[1.15em] w-[1.15em] place-items-center rounded-full bg-rojo text-white"><X size={12} strokeWidth={3} aria-hidden="true" /></span>
+        {texto ?? 'No se pudo'}
+      </span>
+    )
+  }
+  return <span className="listo inline-flex items-center gap-1.5" role="status"><Check size={16} strokeWidth={2.6} aria-hidden="true" />{texto ?? 'Guardado'}</span>
+}
+
+// Junto al título de un apartado que guarda solo: «Guardado ✓» en verde o «No se pudo guardar» en rojo, en letra chica.
+export function MarcaGuardado({ estado }: { estado: EstadoListo }) {
+  if (!estado) return null
+  return <span className={`text-sm font-semibold ${estado === 'ok' ? 'text-verde' : 'text-rojo'}`}><Listo estado={estado} texto={estado === 'ok' ? 'Guardado' : 'No se pudo guardar'} /></span>
 }

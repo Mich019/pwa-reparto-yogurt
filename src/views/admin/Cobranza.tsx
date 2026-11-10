@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Brilla } from '../../components/Brillo'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda } from '../../lib/busqueda'
@@ -137,7 +138,7 @@ function FranjaFinanzas({ cortesHoy, onElegir }: { cortesHoy?: FilaCorte[]; onEl
             <span className="mt-1 block">
               {c.valor === null
                 ? <span className="esqueleto block py-1" aria-hidden="true"><Hueso className="h-7 w-28 max-w-full sm:h-8" /></span>
-                : <span className="cifra block truncate text-2xl sm:text-[1.75rem]">{c.valor}</span>}
+                : <span className="cifra block truncate text-2xl sm:text-[1.75rem]"><Brilla valor={c.valor}>{c.valor}</Brilla></span>}
               <span className="mt-1 flex min-h-5 items-center gap-1 truncate whitespace-nowrap text-xs text-apagado">{c.pie}</span>
             </span>
           </button>

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { EsqueletoLista, Listo, Ocupado, useListo } from '../../components/Esqueleto'
+import { EsqueletoLista, type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
-import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
+import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
 import { aviso, claseInputRecto } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
@@ -40,9 +40,13 @@ export type ApartadoConfig = 'cuenta' | 'seguridad' | 'preferencias' | 'marca' |
 export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
-  { valor: 'claro', texto: 'Claro', ayuda: 'Crema, el de siempre', icono: Sun },
+  { valor: 'claro', texto: 'Claro', ayuda: 'Con el fondo que elijas abajo', icono: Sun },
   { valor: 'oscuro', texto: 'Oscuro', ayuda: 'Descansa la vista de noche', icono: Moon },
   { valor: 'sistema', texto: 'Automático', ayuda: 'Igual que tu computadora o teléfono', icono: Monitor },
+]
+const FONDOS: { valor: Fondo; texto: string; ayuda: string; color: string }[] = [
+  { valor: 'crema', texto: 'Crema', ayuda: 'El de siempre, más cálido', color: '#f8f6ec' },
+  { valor: 'blanco', texto: 'Blanco', ayuda: 'Más limpio y luminoso', color: '#ffffff' },
 ]
 const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
   { valor: 'normal', texto: 'Normal', muestra: 'text-base' },
@@ -51,11 +55,13 @@ const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
 ]
 
 // `acciones` (Guardar, Deshacer…) van a la derecha del título, que se queda fijo arriba al desplazarse: siempre a mano.
-export function Seccion({ id, titulo, descripcion, acciones, children }: { id: string; titulo: string; descripcion?: string; acciones?: ReactNode; children: ReactNode }) {
+// `listo`: lo que dejó el último guardado de un apartado que guarda solo («Guardado ✓» / «No se pudo guardar»).
+export function Seccion({ id, titulo, descripcion, acciones, children, listo }: { id: string; titulo: string; descripcion?: string; acciones?: ReactNode; children: ReactNode; listo?: EstadoListo }) {
   return (
     <section aria-labelledby={id} className="border-t border-linea pt-7 first:border-t-0 first:pt-0">
       <div className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ${acciones ? 'sticky top-0 z-10 -mx-2 bg-[var(--color-lienzo)] px-2 py-2' : ''}`}>
         <h2 id={id} className="text-xl font-semibold">{titulo}</h2>
+        {listo !== undefined && <span aria-live="polite" className="mr-auto"><MarcaGuardado estado={listo} /></span>}
         {acciones && <div className="flex flex-wrap items-center gap-2">{acciones}</div>}
       </div>
       {descripcion && <p className="mt-1 text-sm text-apagado">{descripcion}</p>}
@@ -207,6 +213,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
       aviso('Perfil guardado')
       marcarListo()
     } catch (e) {
+      marcarListo(false)
       setError(mensaje(e))
     } finally {
       setGuardando(false)
@@ -218,7 +225,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
     <>
       <Seccion id="perfil" titulo="Perfil" acciones={
         <button type="submit" form="form-perfil" disabled={!cambios || nombre.trim().length < 2 || guardando} className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-          {guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar cambios'}
+          {guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo estado={listo} /> : 'Guardar cambios'}
         </button>
       } descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
         <FotoPerfil />
@@ -329,6 +336,7 @@ const MINUTOS_URGENTE = [10, 15, 20, 30, 45, 60, 90, 120]
 function MinutosUrgente() {
   const marca = useMarca()
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   if (!marca?.minutosUrgente) return null
   const actual = marca.minutosUrgente
   const opciones = MINUTOS_URGENTE.includes(actual) ? MINUTOS_URGENTE : [...MINUTOS_URGENTE, actual].sort((a, b) => a - b)
@@ -337,7 +345,9 @@ function MinutosUrgente() {
     try {
       await guardarMarca({ minutosUrgente })
       aviso('Tiempo de urgentes guardado')
+      marcarListo()
     } catch (e) {
+      marcarListo(false)
       aviso(mensaje(e))
     } finally {
       setGuardando(false)
@@ -345,7 +355,7 @@ function MinutosUrgente() {
   }
   const texto = (n: number) => (n < 60 ? `${n} minutos` : n === 60 ? '1 hora' : `${n / 60} horas`)
   return (
-    <Seccion id="urgentes" titulo="Pedidos urgentes" descripcion="Vale para toda tu empresa: lo ven igual los demás administradores.">
+    <Seccion listo={listo} id="urgentes" titulo="Pedidos urgentes" descripcion="Vale para toda tu empresa: lo ven igual los demás administradores.">
       <Fila titulo="Recordar si siguen pendientes" ayuda={`Después de ${texto(actual)} se le recuerda al vendedor y te avisa a ti.`}>
         <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputRecto} etiqueta="Tiempo antes de recordar un urgente"
           opciones={opciones.map((n) => ({ valor: n, texto: texto(n) }))} />
@@ -359,6 +369,7 @@ const RITMOS = [50, 60, 70, 80, 90]
 function RitmoMeta() {
   const marca = useMarca()
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   if (!marca?.ritmoMetaPct) return null
   const actual = marca.ritmoMetaPct
   const opciones = RITMOS.includes(actual) ? RITMOS : [...RITMOS, actual].sort((a, b) => a - b)
@@ -367,14 +378,16 @@ function RitmoMeta() {
     try {
       await guardarMarca({ ritmoMetaPct })
       aviso('Guardado')
+      marcarListo()
     } catch (e) {
+      marcarListo(false)
       aviso(mensaje(e))
     } finally {
       setGuardando(false)
     }
   }
   return (
-    <Seccion id="metas" titulo="Metas de los vendedores" descripcion="Vale para toda tu empresa. El aviso sale del 15 al 20 de cada mes, una vez por vendedor.">
+    <Seccion listo={listo} id="metas" titulo="Metas de los vendedores" descripcion="Vale para toda tu empresa. El aviso sale del 15 al 20 de cada mes, una vez por vendedor.">
       <Fila titulo="Avisar si alguien va atrasado" ayuda={`Si lleva menos del ${actual}% de lo que debería a esas alturas. Por ejemplo, a mitad de mes, menos del ${Math.round(actual / 2)}% de su meta.`}>
         <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputRecto} etiqueta="Qué tan atrasado avisar"
           opciones={opciones.map((n) => ({ valor: n, texto: `Menos del ${n}%` }))} />
@@ -388,6 +401,7 @@ function LimiteFiadoEmpresa() {
   const marca = useMarca()
   const [texto, setTexto] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   if (!marca?.zonaHoraria) return null // copia vieja de la marca, sin los ajustes de la empresa
   const actual = marca.limiteFiado ?? null
   const valor = texto ?? (actual === null ? '' : String(actual))
@@ -401,7 +415,9 @@ function LimiteFiadoEmpresa() {
       await guardarMarca({ codigoFiado: c })
       setCodigo('')
       aviso(c ? 'Código guardado: anótalo, no se vuelve a mostrar' : 'Ya no se pide código')
+      marcarListo()
     } catch (e) {
+      marcarListo(false)
       aviso(mensaje(e))
     } finally {
       setGuardando(false)
@@ -413,14 +429,16 @@ function LimiteFiadoEmpresa() {
       await guardarMarca({ limiteFiado: nuevo })
       setTexto(null)
       aviso('Guardado')
+      marcarListo()
     } catch (e) {
+      marcarListo(false)
       aviso(mensaje(e))
     } finally {
       setGuardando(false)
     }
   }
   return (
-    <Seccion id="fiado" titulo="Fiado" descripcion="El límite vale para los clientes que no tienen uno propio (se pone en la ficha de cada cliente). Sin código sólo avisa; con código, fiar de más lo necesita.">
+    <Seccion listo={listo} id="fiado" titulo="Fiado" descripcion="El límite vale para los clientes que no tienen uno propio (se pone en la ficha de cada cliente). Sin código sólo avisa; con código, fiar de más lo necesita.">
       <Fila titulo="Límite de fiado" ayuda={actual === null ? 'Sin límite.' : `Al elegir «Fiado», el teléfono avisa si el cliente pasaría de ${'$'}${actual.toLocaleString('es-MX')}. En Por cobrar sale en rojo quien ya lo pasó.`}>
         <span className="flex items-center gap-2">
           <input inputMode="decimal" value={valor} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-label="Límite de fiado de la empresa" aria-invalid={!valido} className={`${claseInputRecto} w-32`} />
@@ -452,6 +470,7 @@ function FirmaCierre() {
   const [otra, setOtra] = useState<string | null>(null)
   const [cargo, setCargo] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   const [dibujando, setDibujando] = useState(false)
   const archivo = useRef<HTMLInputElement>(null)
   if (!marca?.zonaHoraria) return null // copia vieja de la marca, sin los ajustes de la empresa
@@ -461,7 +480,9 @@ function FirmaCierre() {
       await guardarMarca({ firmaImagen })
       setDibujando(false)
       aviso(firmaImagen ? 'Firma guardada' : 'Firma quitada')
+      marcarListo()
     } catch (e) {
+      marcarListo(false)
       aviso(mensaje(e))
     } finally {
       setGuardando(false)
@@ -488,14 +509,16 @@ function FirmaCierre() {
       await guardarMarca({ firmaNombre: nombre || null, firmaCargo: cargoTexto.trim() || null })
       setEleccion(null); setOtra(null); setCargo(null)
       aviso('Guardado')
+      marcarListo()
     } catch (e) {
+      marcarListo(false)
       aviso(mensaje(e))
     } finally {
       setGuardando(false)
     }
   }
   return (
-    <Seccion id="firma" titulo="Firma de los informes" descripcion="El informe del cierre de mes, el del año y la hoja de producción terminan con una firma y un espacio para la fecha. Vale para toda tu empresa, también en el informe que llega por correo.">
+    <Seccion listo={listo} id="firma" titulo="Firma de los informes" descripcion="El informe del cierre de mes, el del año y la hoja de producción terminan con una firma y un espacio para la fecha. Vale para toda tu empresa, también en el informe que llega por correo.">
       <Fila titulo="Quién firma" ayuda={nombre ? `Sale impreso «${nombre}» debajo de la línea.` : 'Sale el nombre del administrador que genera el informe.'}>
         <span className="flex flex-col gap-2">
           <Selector valor={valor} deshabilitado={guardando} onCambiar={setEleccion} className={`${claseInputRecto} w-56`} etiqueta="Quién firma el informe del mes"
@@ -540,7 +563,7 @@ function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encend
 }
 
 function Preferencias() {
-  const { prefs, sinSenal, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal, cambiarDiaSemanal, cambiarMensual } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
+  const { prefs, sinSenal, listo, encendido, alternar, cambiarSilencio, cambiarResumen, cambiarSemanal, cambiarDiaSemanal, cambiarMensual } = usePreferenciasAvisos((e) => aviso(mensaje(e)))
   const [mandando, setMandando] = useState<'diario' | 'semanal' | null>(null)
   async function mandarAhora(tipo: 'diario' | 'semanal') {
     setMandando(tipo)
@@ -559,14 +582,14 @@ function Preferencias() {
   return (
     <>
       <AvisosPush />
-      <Seccion id="que-avisos" titulo="Qué avisos recibes" descripcion={sinSenal ? 'Sin conexión con el servidor: se pueden cambiar cuando vuelva.' : 'Se guarda en tu cuenta: vale en todos tus dispositivos.'}>
+      <Seccion listo={listo.avisos} id="que-avisos" titulo="Qué avisos recibes" descripcion={sinSenal ? 'Sin conexión con el servidor: se pueden cambiar cuando vuelva.' : 'Se guarda en tu cuenta: vale en todos tus dispositivos.'}>
         {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
           <Fila key={tipo} titulo={titulo} ayuda={ayuda}>
             <Interruptor encendido={encendido(tipo)} deshabilitado={!prefs} etiqueta={titulo} alCambiar={(si) => void alternar(tipo, si)} />
           </Fila>
         ))}
       </Seccion>
-      <Seccion id="resumen" titulo="Resumen por correo" descripcion="Ventas, cobro, fiado, cortes por confirmar y urgentes que tardaron, en un solo correo. Si lo prendes, puedes apagar arriba «Corte por confirmar» para no recibir un aviso por cada uno.">
+      <Seccion listo={listo.resumen} id="resumen" titulo="Resumen por correo" descripcion="Ventas, cobro, fiado, cortes por confirmar y urgentes que tardaron, en un solo correo. Si lo prendes, puedes apagar arriba «Corte por confirmar» para no recibir un aviso por cada uno.">
         <Fila titulo="Cada mañana" ayuda={prefs?.resumenCorreo ? 'Lo de ayer, en tu correo.' : 'Apagado.'}>
           <Interruptor encendido={!!prefs?.resumenCorreo} deshabilitado={!prefs} etiqueta="Resumen de cada mañana" alCambiar={(si) => void cambiarResumen(si)} />
         </Fila>
@@ -597,7 +620,7 @@ function Preferencias() {
       <RitmoMeta />
       <LimiteFiadoEmpresa />
       <FirmaCierre />
-      <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
+      <Seccion listo={listo.silencio} id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>
           <Interruptor encendido={!!silencio} deshabilitado={!prefs} etiqueta="Silenciar avisos" alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />
         </Fila>
@@ -732,6 +755,24 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
                     <span className="block text-sm font-semibold">{texto}</span>
                     <span className="block text-xs text-apagado">{ayuda}</span>
                   </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </Seccion>
+
+      <Seccion id="fondo" titulo="Color del fondo" descripcion="Sólo en el tema claro y en este navegador. Es aparte de los colores de tu empresa: el logo y el color de la marca no cambian.">
+        <div role="radiogroup" aria-label="Color del fondo" className="flex flex-wrap gap-3">
+          {FONDOS.map(({ valor, texto, ayuda, color }) => {
+            const elegido = p.fondo === valor
+            return (
+              <button key={valor} type="button" role="radio" aria-checked={elegido} onClick={() => cambiarPreferencias({ fondo: valor })}
+                className={`flex min-w-[13rem] flex-1 items-center gap-3 rounded-lg p-3 text-left transition-colors sm:flex-none ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}>
+                <span aria-hidden="true" className="h-10 w-14 shrink-0 rounded-md border border-linea" style={{ background: color }} />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{texto}</span>
+                  <span className="block text-xs text-apagado">{ayuda}</span>
                 </span>
               </button>
             )

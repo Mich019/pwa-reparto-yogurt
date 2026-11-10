@@ -13,7 +13,7 @@ import { VisorPdf } from './components/VisorPdf'
 import { HojaAyuda } from './views/ayuda/AyudaRapida'
 import { MODO_SERVIDOR } from './lib/api'
 import { useSesion } from './lib/sesion'
-import { useTemaOscuro } from './lib/tema'
+import { useAplicarFondo, useTemaOscuro } from './lib/tema'
 import { estiloMarca, useCargarMarca, useMarca } from './lib/marca'
 
 function esRuta(ruta: string) {
@@ -31,6 +31,7 @@ const DELISY = { nombre: 'Delisy', color: '#113250', logo: null }
 export default function App() {
   const sesion = useSesion()
   const oscuro = useTemaOscuro()
+  useAplicarFondo() // crema o blanco, de este navegador (Configuración → Tema)
   // Marca de la empresa (src/lib/marca.ts): su color en los botones del panel y de la app de reparto.
   useCargarMarca(sesion?.usuario.id)
   // Lo que es de Delisy (la entrada, el registro, la invitación y la plataforma) va con su azul, también en los enlaces;

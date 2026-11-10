@@ -114,6 +114,7 @@ export function MarcaEmpresa() {
       aviso('Marca guardada')
       marcarListo()
     } catch (e) {
+      marcarListo(false)
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
       setGuardando(false)
@@ -133,7 +134,7 @@ export function MarcaEmpresa() {
       )}
       <button type="button" onClick={() => void guardar()} disabled={!cambio || guardando || procesando}
         className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-        {guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar marca'}
+        {guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo estado={listo} /> : 'Guardar marca'}
       </button>
     </>
   )

@@ -86,11 +86,23 @@
   scrollbar-color: #3a4a3f transparent;
 }
 
+/* Fondo blanco (Configuración → Tema → «Color del fondo», por navegador; src/lib/tema.ts): el lienzo blanco y lo que
+   flota apenas cálido, para que siga separándose del fondo. Sólo en claro; el beige de botones y chips se queda. */
+html.fondo-blanco .tema-admin:not(.oscuro) {
+  --color-lienzo: #ffffff;
+  --color-papel: #fbfaf5;
+}
+
 /* Detrás del panel, el mismo fondo al rebotar la pantalla o dejar espacio sin contenido. */
 html:has(.tema-admin),
 html:has(.tema-admin) body,
 html:has(.tema-admin) #root {
   background-color: #f8f6ec;
+}
+html.fondo-blanco:has(.tema-admin:not(.oscuro)),
+html.fondo-blanco:has(.tema-admin:not(.oscuro)) body,
+html.fondo-blanco:has(.tema-admin:not(.oscuro)) #root {
+  background-color: #ffffff;
 }
 html:has(.tema-admin.oscuro),
 html:has(.tema-admin.oscuro) body,

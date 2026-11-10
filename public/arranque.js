@@ -8,7 +8,9 @@
     var tema = localStorage.getItem('tema-panel')
     var ruta = location.pathname + location.hash
     var enPanel = /\/(admin|plataforma)/.test(ruta)
-    if (enPanel && (tema === 'oscuro' || (!tema && matchMedia('(prefers-color-scheme: dark)').matches))) pantalla.classList.add('oscuro')
+    var oscuro = enPanel && (tema === 'oscuro' || (!tema && matchMedia('(prefers-color-scheme: dark)').matches))
+    if (oscuro) pantalla.classList.add('oscuro')
+    else if ((JSON.parse(localStorage.getItem('preferencias-panel') || '{}') || {}).fondo === 'blanco') pantalla.style.background = '#ffffff'
     if (/\/plataforma/.test(ruta)) return // el panel de la plataforma es de Delisy
     var marca = JSON.parse(localStorage.getItem('marca-empresa') || 'null')
     if (!marca || !marca.nombre) return

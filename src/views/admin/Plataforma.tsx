@@ -609,6 +609,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
       marcarListo()
       await alGuardar()
     } catch (x) {
+      marcarListo(false)
       setError(mensaje(x))
     } finally {
       setGuardando(false)
@@ -645,7 +646,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
         <input type="checkbox" checked={exenta} onChange={(x) => setExenta(x.target.checked)} className="h-5 w-5 accent-[var(--plat)]" />
       </label>
       {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
-      <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={`${botonPrimario} w-full`}>{guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar ajustes'}</button>
+      <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={`${botonPrimario} w-full`}>{guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo estado={listo} /> : 'Guardar ajustes'}</button>
     </div>
   )
 }
@@ -1173,6 +1174,7 @@ function AjustesServicio() {
       marcarListo()
       await cargar()
     } catch (e) {
+      marcarListo(false)
       setErrorGuardar(mensaje(e))
     } finally {
       setGuardando(false)
@@ -1200,7 +1202,7 @@ function AjustesServicio() {
       </Seccion>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-6">
-        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar ajustes'}</button>
+        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo estado={listo} /> : 'Guardar ajustes'}</button>
         {hay && <button type="button" onClick={() => { setErrorGuardar(''); setB(o) }} className={botonSuave}>Deshacer</button>}
         {errorGuardar && <p role="alert" className="text-sm font-medium text-rojo">{errorGuardar}</p>}
         {!hay && s.ajustes.actualizado && <span className="text-xs text-apagado">Último cambio: {new Date(s.ajustes.actualizado).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>}

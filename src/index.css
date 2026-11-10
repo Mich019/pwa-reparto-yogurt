@@ -129,10 +129,14 @@ body {
 @keyframes hueso-late { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 .girando { animation: girando .7s linear infinite; }
 .listo { animation: paso-entrar .25s ease-out; }
+/* Una cifra que cambió sola (components/Brillo.tsx): un subrayado de marcatextos que se desvanece. */
+.brillo { border-radius: 6px; animation: brillo 1.8s ease-out; }
+@keyframes brillo { 0%, 25% { background-color: color-mix(in srgb, var(--color-limon) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-limon) 45%, transparent); } 100% { background-color: transparent; box-shadow: 0 0 0 3px transparent; } }
 @keyframes girando { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .esqueleto { animation-duration: 0s; }
   .hueso { animation: none; }
   .girando { animation-duration: 1.6s; }
   .listo { animation: none; }
+  .brillo { animation: none; }
 }

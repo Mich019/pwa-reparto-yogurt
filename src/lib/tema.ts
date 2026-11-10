@@ -39,9 +39,12 @@ export const useTemaOscuro = () =>
 // Más preferencias del panel, también de cada navegador: el tamaño del texto (todo va en rem, así que basta con el
 // tamaño de la raíz), menos movimiento (tema.css) y el orden del menú del panel (views/admin/menu.ts).
 export type TamanoTexto = 'normal' | 'grande' | 'mas-grande'
-export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean; ordenMenu: string[] }
+// El color del fondo en el tema claro: crema (el de siempre) o blanco. Es de cada navegador y aparte de los colores de la
+// empresa (Marca): no cambia el logo ni el color de la marca, sólo el lienzo de atrás.
+export type Fondo = 'crema' | 'blanco'
+export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean; ordenMenu: string[]; fondo: Fondo }
 const CLAVE_PREF = 'preferencias-panel'
-const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false, ordenMenu: [] }
+const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false, ordenMenu: [], fondo: 'crema' }
 export const TAMANOS: Record<TamanoTexto, string> = { normal: '100%', grande: '112.5%', 'mas-grande': '125%' }
 
 let preferencias: PreferenciasPanel = (() => {
@@ -60,6 +63,17 @@ export function cambiarPreferencias(cambio: Partial<PreferenciasPanel>) {
 }
 export const usePreferenciasPanel = () => useSyncExternalStore(suscribir, () => preferencias)
 export const preferenciasPanel = () => preferencias
+
+// El fondo vale en el panel y en la app de reparto (los dos usan `.tema-admin`), por eso lo pone App.tsx siempre:
+// `html.fondo-blanco` (views/admin/tema.css), y el color de la barra del navegador a juego.
+export function useAplicarFondo() {
+  const { fondo } = usePreferenciasPanel()
+  const oscuro = useTemaOscuro()
+  useEffect(() => {
+    document.documentElement.classList.toggle('fondo-blanco', fondo === 'blanco')
+    if (!oscuro) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', fondo === 'blanco' ? '#ffffff' : '#f8f6ec')
+  }, [fondo, oscuro])
+}
 
 // Pone el tamaño del texto y «menos movimiento» en la página mientras el panel está abierto; al salir los quita, para
 // que la app de reparto siga como estaba.

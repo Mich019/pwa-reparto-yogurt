@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Brilla } from '../../components/Brillo'
 import { BarrasHueso, Esqueleto, EsqueletoLista, Hueso, TextoCargando } from '../../components/Esqueleto'
 import { abrirCliente, verSinComprar } from '../pwa/Clientes'
 import { BuscarPedidos } from './BuscarPedidos'
@@ -85,7 +86,7 @@ function Cifra({ etiqueta, valor, pie }: { etiqueta: string; valor: string | nul
       <dd className="mt-1.5">
         {valor === null
           ? <span className="esqueleto block py-1" role="status" aria-label="Cargando"><Hueso className="h-8 w-28 sm:h-9" /></span>
-          : <span className="cifra block whitespace-nowrap text-[2rem] sm:text-[2.25rem]">{valor}</span>}
+          : <span className="cifra block whitespace-nowrap text-[2rem] sm:text-[2.25rem]"><Brilla valor={valor}>{valor}</Brilla></span>}
         <span className="mt-2 flex min-h-5 items-center gap-1.5 whitespace-nowrap text-xs text-apagado">{pie}</span>
       </dd>
     </div>
@@ -327,7 +328,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
             subtitulo="Pedidos atendidos"
             accion={<button type="button" aria-label="Abrir los reportes" title="Reportes" onClick={() => onNavegar('reportes')} className={botonRedondo}><ArrowUpRight size={18} /></button>}
           >
-            {stats ? <p className="cifra mt-5 text-[3.5rem] leading-none">{avance}%</p> : <span className="esqueleto mt-5 block" aria-hidden="true"><Hueso className="h-14 w-32" /></span>}
+            {stats ? <p className="cifra mt-5 text-[3.5rem] leading-none"><Brilla valor={avance}>{avance}%</Brilla></p> : <span className="esqueleto mt-5 block" aria-hidden="true"><Hueso className="h-14 w-32" /></span>}
             <p className="mt-3 text-[13px] text-apagado">{stats ? (porAtender ? `${atendidos} de ${porAtender} pedidos` : 'No hay pedidos agendados para hoy') : <TextoCargando ancho="8rem" />}</p>
             <div className="mt-6">
               <BarraSegmentada segmentos={segmentos} descripcion={segmentos.map((s) => `${s.nombre}: ${s.n}`).join(', ')} />
