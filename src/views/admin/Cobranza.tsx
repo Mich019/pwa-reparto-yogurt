@@ -18,6 +18,7 @@ import { mostrarPdf } from '../../components/VisorPdf'
 import { AnioEnNumeros, type ResumenAnio } from './AdminDashboard'
 import { abrirFicha } from '../pwa/Equipo'
 import type { SeccionAdmin } from './menu'
+import { Cargando } from '../../components/Cargando'
 
 // Cobranza del panel: quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
 // informe. Todo viene del servidor y necesita conexión.
@@ -64,7 +65,7 @@ export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void 
 
 function Estado({ cargando, error, vacio, children }: { cargando: boolean; error: string; vacio?: string; children: ReactNode }) {
   if (error) return <p role="alert" className="py-12 text-center text-sm font-medium text-rojo">{error}</p>
-  if (cargando) return <p className="py-12 text-center text-apagado">Cargando…</p>
+  if (cargando) return <Cargando />
   if (vacio) return <p className="py-12 text-center text-apagado">{vacio}</p>
   return <>{children}</>
 }

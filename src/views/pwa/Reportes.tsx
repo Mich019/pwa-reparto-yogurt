@@ -15,6 +15,7 @@ import { Columnas } from '../../components/graficas'
 import { BarraSegmentada, BarrasPeriodo } from '../admin/graficas'
 import { SelectorRango, textoRangoCorto } from '../../components/Calendario'
 import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave, grupoPanel } from '../admin/piezas'
+import { Cargando } from '../../components/Cargando'
 
 // Reportes del administrador (RF-043 a RF-048): corte del día, comparativos por semana y mes, utilidad por sabor,
 // ranking de sabores, rendimiento de cada vendedor y exportación a Excel o CSV. Los arma el servidor.
@@ -117,7 +118,7 @@ export function Reportes({ panel = false }: { panel?: boolean } = {}) {
         {error && !vigente ? (
           <Fallo error={error} reintentar={recargar} />
         ) : !reporte ? (
-          <div className="mt-10 text-center text-sm text-apagado">Cargando reporte…</div>
+          <Cargando texto="Cargando reporte…" className="mt-10" />
         ) : (
           <div className={`transition-opacity ${cargando ? 'opacity-50' : ''}`}>
             {error && <Fallo error={error} reintentar={recargar} chico />}

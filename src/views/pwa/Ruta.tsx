@@ -24,6 +24,7 @@ import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Hoja, PuntoSabor, Segmentado, aviso, telLimpio } from '../../components/ui'
+import { Cargando } from '../../components/Cargando'
 
 const Escaner = lazy(() => import('./Escaner'))
 
@@ -327,7 +328,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
         <div className="mx-auto max-w-xl overflow-hidden rounded-t-[28px] bg-papel shadow-hoja">
           <button onClick={() => setExpandida(!expandida)} className="mx-auto mt-2.5 block h-1 w-10 rounded-full bg-linea" aria-label="Expandir" />
           {cargando ? (
-            <div className="py-8 text-center text-apagado">Cargando…</div>
+            <Cargando className="py-8" />
           ) : activo && clienteActivo ? (
             <>
               <div className={`px-5 pt-3 ${expandida ? 'max-h-[44dvh] overflow-y-auto' : ''}`}>
