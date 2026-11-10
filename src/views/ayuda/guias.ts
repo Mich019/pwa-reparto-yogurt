@@ -218,9 +218,9 @@ export const GUIAS: Guia[] = [
     resumen: 'Todos los saldos por cobrar, del adeudo más viejo al más nuevo, con su abono a un toque.',
     palabras: 'cobranza fiado deuda debe saldo abono cobrar cuentas por cobrar envases prestados limite pasaron whatsapp excel',
     pasos: [
-      { texto: 'En Cobranza, «Por cobrar» lista a quien debe y desde cuándo (en rojo, quien pasó su límite). Arriba buscas por cliente o vendedor. «Envases» muestra quién tiene prestados garrafones o botellas.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Por cobrar', primario: true, foco: true }, { texto: 'Envases' }, { texto: 'Cortes' }, { texto: 'Meses' }] }, { t: 'filas', n: 4 }]) },
-      { texto: 'Filtra «Más de un mes» o «Pasaron su límite». Con «Mensaje para cobrar» escribes el texto de WhatsApp ({nombre}, {saldo}); el botón verde de cada quien lo abre ya escrito y «Mandar a todos» va uno por uno. «Bajar a Excel» se lleva lo que dejó el filtro.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Más de un mes' }, { texto: 'Pasaron su límite' }, { icono: MessageCircle, texto: 'Mandar a todos', primario: true, foco: true }] }, { t: 'filas', n: 3 }]) },
-      { texto: 'Toca a un cliente para registrar su abono: te dice cuánto quedaría debiendo. Si te equivocas, anúlalo con un motivo: no se borra, queda a la vista. Cada día te avisamos de quien debe desde hace más de un mes.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
+      { texto: 'En Finanzas, «Por cobrar» lista a quien debe y desde cuándo (en rojo, quien pasó su límite). Arriba buscas por cliente o vendedor. «Envases» muestra quién tiene prestados garrafones o botellas.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'Por cobrar', primario: true, foco: true }, { texto: 'Envases' }, { texto: 'Cortes del día' }, { texto: 'Cierre de mes' }] }, { t: 'filas', n: 4 }]) },
+      { texto: 'Filtra «Más de un mes» o «Pasaron su límite». Con «Mensaje para cobrar» escribes el texto de WhatsApp ({nombre}, {saldo}); el botón verde de cada quien lo abre ya escrito y «Mandar a todos» va uno por uno. «Bajar a Excel» se lleva lo que dejó el filtro.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'Más de un mes' }, { texto: 'Pasaron su límite' }, { icono: MessageCircle, texto: 'Mandar a todos', primario: true, foco: true }] }, { t: 'filas', n: 3 }]) },
+      { texto: 'Toca a un cliente para registrar su abono: te dice cuánto quedaría debiendo. Si te equivocas, anúlalo con un motivo: no se borra, queda a la vista. Cada día te avisamos de quien debe desde hace más de un mes.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }], { titulo: 'Abonar', piezas: [{ t: 'campos', items: [{ etiqueta: 'Monto', valor: '420', foco: true }] }, { t: 'chips', items: ['Efectivo', 'Transferencia'], elegido: 0 }, { t: 'boton', texto: 'Registrar abono' }] }) },
     ],
   },
   {
@@ -230,7 +230,7 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Configuración → Preferencias → «Fiado» pon el límite de la empresa (vale para quien no tiene uno propio). Si además pones un código, el teléfono no deja fiar de más sin él: dáselo al vendedor cuando lo autorices.', escena: panel('Configuración', [{ t: 'titulo', texto: 'Fiado' }, { t: 'campos', items: [{ etiqueta: 'Límite de fiado', valor: '500' }, { etiqueta: 'Código para fiar de más', valor: '••••', foco: true }] }]) },
       { texto: 'Para un cliente en particular, ábrelo en Clientes y toca «Fiado»: la app te sugiere un límite según lo que compra y lo bien que paga. Con «Más» → «Límite sugerido para todos» se lo pones de una vez a los que no tienen uno.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, encClientes('mas'), masClientes(4)]) },
-      { texto: 'Si un vendedor fía de más te llega «Se fió de más», y su ficha en Vendedores dice cuántas veces pasó en el mes. En Cobranza, «Pasaron su límite» los separa, con su propio mensaje de WhatsApp; en Reportes, «Quién cobra mejor» compara lo que cada vendedor fió con lo que cobró.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Más de un mes' }, { texto: 'Pasaron su límite', primario: true, foco: true }] }, { t: 'filas', n: 3 }]) },
+      { texto: 'Si un vendedor fía de más te llega «Se fió de más», y su ficha en Vendedores dice cuántas veces pasó en el mes. En Finanzas, «Pasaron su límite» los separa, con su propio mensaje de WhatsApp; en Reportes, «Quién cobra mejor» compara lo que cada vendedor fió con lo que cobró.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'Más de un mes' }, { texto: 'Pasaron su límite', primario: true, foco: true }] }, { t: 'filas', n: 3 }]) },
     ],
   },
   {
@@ -249,8 +249,8 @@ export const GUIAS: Guia[] = [
     resumen: 'Cada día, el efectivo que el vendedor dice que entregó contra el que debía entregar.',
     palabras: 'corte caja efectivo vendedor confirmar reabrir diferencia faltante sobrante cuadrar dia',
     pasos: [
-      { texto: 'En Cobranza, abre «Cortes» y elige el día. Cada vendedor muestra el efectivo que debía entregar y el que entregó; aparte, lo que fió y lo que le pagaron por transferencia.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'Por cobrar' }, { texto: 'Envases' }, { texto: 'Cortes', primario: true, foco: true }, { texto: 'Meses' }] }, { t: 'filas', n: 3 }]) },
-      { texto: 'Si cuadra, toca «Confirmar». Si el vendedor no lo capturó, usa «Capturar» por él. Si después llega un cobro de ese día, «Reabrir» con un motivo lo regresa a por confirmar. Los que cambiaron después de confirmarlos salen marcados arriba.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'filas', n: 3 }, { t: 'botones', items: [{ texto: 'Confirmar', primario: true, foco: true }] }]) },
+      { texto: 'En Finanzas, abre «Cortes del día» y elige el día. Cada vendedor muestra el efectivo que debía entregar y el que entregó; aparte, lo que fió y lo que le pagaron por transferencia.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'Por cobrar' }, { texto: 'Envases' }, { texto: 'Cortes del día', primario: true, foco: true }, { texto: 'Meses' }] }, { t: 'filas', n: 3 }]) },
+      { texto: 'Si cuadra, toca «Confirmar». Si el vendedor no lo capturó, usa «Capturar» por él. Si después llega un cobro de ese día, «Reabrir» con un motivo lo regresa a por confirmar. Los que cambiaron después de confirmarlos salen marcados arriba.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'filas', n: 3 }, { t: 'botones', items: [{ texto: 'Confirmar', primario: true, foco: true }] }]) },
     ],
   },
   {
@@ -258,10 +258,10 @@ export const GUIAS: Guia[] = [
     resumen: 'Congela las cifras del mes, bloquea correcciones y te da el informe en PDF o Excel.',
     palabras: 'cierre mes cerrar reabrir informe mensual pdf excel utilidad cobranza comisiones metas año numeros anual',
     pasos: [
-      { texto: 'En Cobranza, abre «Meses» y elige el mes. Ves ventas, utilidad, por cobrar, envases, comisiones y cortes.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'chips', items: ['Octubre', 'Septiembre', 'Agosto'], elegido: 0, foco: 0 }, { t: 'filas', n: 4 }]) },
-      { texto: 'Toca «Cerrar mes». Ya no se podrán cambiar ventas, abonos ni cortes de esos días. Con «Reabrir» y un motivo se corrige y se vuelve a cerrar. Al cerrarlo cuentan las metas, rachas y medallas de tu equipo.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'PDF' }, { texto: 'Excel' }, { icono: Lock, texto: 'Cerrar mes', primario: true, foco: true }] }]) },
-      { texto: 'Descarga el informe con «PDF» o «Excel». Si lo pediste en Preferencias, también te llega por correo.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'Cobranza' }, { t: 'botones', items: [{ texto: 'PDF', foco: true }, { texto: 'Excel', foco: true }, { texto: 'Reabrir' }] }]) },
-      { texto: 'Hasta abajo, «El año en números» junta los meses cerrados de cualquier año contra el anterior; «Descargar PDF» lo saca en una hoja.', escena: panel('Cobranza', [{ t: 'titulo', texto: 'El año en números' }, { t: 'tarjetas', n: 1, alto: 'alto', cols: 1 }, { t: 'boton', texto: 'Descargar PDF', secundario: true, foco: true }]) },
+      { texto: 'En Finanzas, abre «Cierre de mes» y elige el mes. Ves ventas, utilidad, por cobrar, envases, comisiones y cortes.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'chips', items: ['Octubre', 'Septiembre', 'Agosto'], elegido: 0, foco: 0 }, { t: 'filas', n: 4 }]) },
+      { texto: 'Toca «Cerrar mes». Ya no se podrán cambiar ventas, abonos ni cortes de esos días. Con «Reabrir» y un motivo se corrige y se vuelve a cerrar. Al cerrarlo cuentan las metas, rachas y medallas de tu equipo.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'PDF' }, { texto: 'Excel' }, { icono: Lock, texto: 'Cerrar mes', primario: true, foco: true }] }]) },
+      { texto: 'Descarga el informe con «PDF» o «Excel». Si lo pediste en Preferencias, también te llega por correo.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'PDF', foco: true }, { texto: 'Excel', foco: true }, { texto: 'Reabrir' }] }]) },
+      { texto: 'Hasta abajo, «El año en números» junta los meses cerrados de cualquier año contra el anterior; «Descargar PDF» lo saca en una hoja.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'El año en números' }, { t: 'tarjetas', n: 1, alto: 'alto', cols: 1 }, { t: 'boton', texto: 'Descargar PDF', secundario: true, foco: true }]) },
     ],
   },
   {
@@ -338,7 +338,7 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Clientes, abre «Más» y toca «Libreta».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, encClientes('mas'), masClientes(3)]) },
       { texto: 'Elige el formato: PDF para imprimir, Excel o CSV para trabajar los datos.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Libreta de clientes', piezas: [{ t: 'chips', items: ['PDF', 'Excel', 'CSV'], elegido: 0, foco: 0 }, { t: 'texto', lineas: 2 }, { t: 'boton', texto: 'Ver vista previa' }] }) },
-      { texto: '«Bajar a Excel» (en el mismo «Más») se lleva lo que deja tu búsqueda, con lo que debe cada uno, su límite y sus envases. En Vendedores y en Cobranza hay uno igual.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, encClientes('mas'), masClientes(2)]) },
+      { texto: '«Bajar a Excel» (en el mismo «Más») se lleva lo que deja tu búsqueda, con lo que debe cada uno, su límite y sus envases. En Vendedores y en Finanzas hay uno igual.', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, encClientes('mas'), masClientes(2)]) },
     ],
   },
   {
@@ -386,7 +386,7 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En el Resumen, en «Pedidos recientes», toca «Buscar pedidos». Escribe cliente, sabor, vendedor o fecha («ayer», «lunes», «12 oct») y filtra por estado o forma de pago.', escena: panel('Resumen', [{ t: 'caja', titulo: 'Pedidos recientes' }], { titulo: 'Buscar pedidos', piezas: [{ t: 'campos', items: [{ etiqueta: 'Cliente, sabor, vendedor o fecha', valor: 'fresa ayer', foco: true }] }, { t: 'chips', items: ['Todos', 'Pendientes', 'Entregados', 'Sin venta'], elegido: 0 }, { t: 'filas', n: 3 }] }) },
       { texto: 'Abajo suma lo encontrado y lo baja a Excel. Tocar un pedido abre la ficha de su cliente.', escena: panel('Resumen', [{ t: 'caja', titulo: 'Pedidos recientes' }], { titulo: 'Buscar pedidos', piezas: [{ t: 'filas', n: 3, foco: 0 }, { t: 'boton', texto: 'Excel', secundario: true }] }) },
-      { texto: 'Con el teclado: «/» abre el buscador de la sección, «?» muestra todos los atajos y «g» y una letra te lleva a una sección (g c, Clientes; g b, Cobranza…). Las búsquedas recientes quedan a la mano.', escena: panel('Resumen', [{ t: 'titulo', texto: 'Atajos' }, { t: 'filas', n: 4, textos: ['/  Buscar en la sección', '?  Ver estos atajos', 'g c  Ir a Clientes', 'g b  Ir a Cobranza'] }]) },
+      { texto: 'Con el teclado: «/» abre el buscador de la sección, «?» muestra todos los atajos y «g» y una letra te lleva a una sección (g c, Clientes; g f, Finanzas…). Las búsquedas recientes quedan a la mano.', escena: panel('Resumen', [{ t: 'titulo', texto: 'Atajos' }, { t: 'filas', n: 4, textos: ['/  Buscar en la sección', '?  Ver estos atajos', 'g c  Ir a Clientes', 'g f  Ir a Finanzas'] }]) },
     ],
   },
   {

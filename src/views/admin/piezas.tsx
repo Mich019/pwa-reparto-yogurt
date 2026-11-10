@@ -122,12 +122,12 @@ export function BuscadorDesplegable({ valor, onChange, placeholder, clave }: { v
 // una hoja abierta.
 const IR_A: [string, SeccionAdmin, string][] = [
   ['i', 'resumen', 'Resumen'], ['v', 'equipo', 'Vendedores'], ['c', 'clientes', 'Clientes'], ['p', 'produccion', 'Producción'],
-  ['s', 'sabores', 'Sabores'], ['b', 'cobranza', 'Cobranza'], ['r', 'reportes', 'Reportes'], ['o', 'configuracion', 'Configuración'],
+  ['s', 'sabores', 'Sabores'], ['f', 'cobranza', 'Finanzas'], ['r', 'reportes', 'Reportes'], ['o', 'configuracion', 'Configuración'],
 ]
 // «g c»: el atajo de una sección, para el title del menú.
 export const atajoDe = (s: SeccionAdmin) => { const a = IR_A.find(([, id]) => id === s); return a ? `g ${a[0]}` : undefined }
 const ATAJOS: [string, string][] = [
-  ['/', 'Buscar en la sección (Clientes, Vendedores, Cobranza)'],
+  ['/', 'Buscar en la sección (Clientes, Vendedores, Finanzas)'],
   ['Esc', 'Borrar la búsqueda y cerrar el buscador, o cerrar un menú'],
   ['↑ ↓', 'Moverse entre las opciones de un menú'],
   ['?', 'Ver estos atajos'],

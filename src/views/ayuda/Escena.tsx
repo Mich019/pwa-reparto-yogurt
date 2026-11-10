@@ -335,7 +335,7 @@ function Hoja({ titulo, piezas, compacto, panel }: { titulo: string; piezas: Pie
   )
 }
 
-const MENU_PANEL = ['Resumen', 'Vendedores', 'Clientes', 'Producción', 'Sabores', 'Cobranza', 'Reportes', 'Configuración']
+const MENU_PANEL = ['Resumen', 'Vendedores', 'Clientes', 'Producción', 'Sabores', 'Finanzas', 'Reportes', 'Configuración']
 const PESTANAS_APP = [{ id: 'Ruta', icono: MapPin }, { id: 'Clientes', icono: Users }, { id: 'Stock', icono: Package }, { id: 'Cuenta', icono: User }]
 
 export function Escena({ escena, valores, className = '' }: { escena: TEscena; valores: Valores; className?: string }) {

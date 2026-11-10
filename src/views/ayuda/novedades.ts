@@ -12,6 +12,7 @@ export const NOVEDADES: Novedad[] = [
   {
     fecha: '2026-11-10', titulo: 'Clientes que dejaron de comprar y más WhatsApp',
     puntos: [
+      { texto: '«Cobranza» ahora se llama «Finanzas», con pestañas más claras: Por cobrar, Envases, Cortes del día y Cierre de mes; debajo del título dice para qué sirve cada una. Arriba, cuatro cifras de un vistazo (lo que te deben, el efectivo de hoy por confirmar, los envases prestados y lo vendido en el mes) y «Cortes del día» trae un numerito con los que faltan por confirmar. Su atajo es «g f».', para: 'administrador', donde: 'panel', guia: 'cobranza' },
       { texto: 'La primera vez que entras, un recorrido corto te muestra para qué sirve cada parte, señalando cada botón. Lo repites cuando quieras con «Ver la guía otra vez», aquí en Ayuda.' },
       { texto: 'En Clientes ves quiénes dejaron de comprar (más de un mes sin pedido) y les escribes desde ahí.', guia: 'sin-comprar' },
       { texto: '«Qué hacer hoy» en el Resumen te dice cuántos dejaron de comprar, y la ficha de cada vendedor cuántos de su cartera.', para: 'administrador', donde: 'panel' },
@@ -54,7 +55,7 @@ export const NOVEDADES: Novedad[] = [
       { texto: '«Qué hacer hoy» en el Resumen: urgentes, producción de mañana, cortes, fiado viejo y clientes sin vendedor.', para: 'administrador', donde: 'panel', guia: 'resumen' },
       { texto: 'Si tú también repartes, la app de reparto te muestra tus clientes como a un vendedor y pones tu propia meta.', para: 'administrador', guia: 'admin-reparte' },
       { texto: 'Reportes con tendencia, comparación con hace un año y la ficha de cada vendedor.', para: 'administrador', guia: 'reportes' },
-      { texto: 'Tu año en números: en el Resumen en diciembre y enero, y en Cobranza → Meses para cualquier año, con su PDF.', para: 'administrador', guia: 'cierre-mes' },
+      { texto: 'Tu año en números: en el Resumen en diciembre y enero, y en Finanzas → Cierre de mes para cualquier año, con su PDF.', para: 'administrador', guia: 'cierre-mes' },
     ],
   },
   {

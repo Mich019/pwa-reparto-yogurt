@@ -1,21 +1,23 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { BarChart3, HandCoins, IceCreamBowl, LayoutDashboard, Map, MapPin, Package, Settings, Sparkles, User, Users, type LucideIcon } from 'lucide-react'
+import { BarChart3, IceCreamBowl, LayoutDashboard, Map, MapPin, Package, Settings, Sparkles, User, Users, Wallet, type LucideIcon } from 'lucide-react'
 
 // Guía de la primera vez: un recorrido corto que se muestra una sola vez al entrar al panel o a la app de reparto.
 // Cada paso abre la sección real y resalta su botón real de la navegación (el que lleva data-seccion). Aquí van los
 // pasos como datos y el estado (qué paso va, si ya se vio); el dibujo está en components/GuiaInicio.tsx y quien abre
 // las secciones es cada pantalla principal (AdminLayout, PwaLayout). El panel de la plataforma no la lleva.
-// Una frase por paso, con lo que se puede hacer ahí. Máximo 6 pasos: uno de bienvenida y uno por sección principal.
+// Una frase por paso, con lo que se puede hacer ahí. Pocos pasos: uno de bienvenida, uno por sección principal y, en
+// Finanzas, uno más para sus pestañas (`abrir`: la sección que se abre cuando lo resaltado no es un botón del menú).
 
 export type DondeGuia = 'panel' | 'app'
-export interface PasoGuia { seccion: string | null; icono: LucideIcon; titulo: string; texto: string }
+export interface PasoGuia { seccion: string | null; abrir?: string; icono: LucideIcon; titulo: string; texto: string }
 
 export const PASOS_PANEL: PasoGuia[] = [
   { seccion: null, icono: Sparkles, titulo: 'Te damos la bienvenida', texto: 'En un minuto te mostramos para qué sirve cada parte del panel.' },
   { seccion: 'resumen', icono: LayoutDashboard, titulo: 'Resumen', texto: 'Aquí ves de un vistazo lo cobrado hoy, las ventas y los pedidos del día.' },
   { seccion: 'equipo', icono: Users, titulo: 'Vendedores', texto: 'Aquí invitas a tu equipo y le repartes sus clientes.' },
   { seccion: 'clientes', icono: MapPin, titulo: 'Clientes', texto: 'Aquí das de alta a tus clientes y ves lo que compra cada uno.' },
-  { seccion: 'cobranza', icono: HandCoins, titulo: 'Cobranza', texto: 'Aquí ves quién te debe, confirmas los cortes del día y cierras el mes.' },
+  { seccion: 'cobranza', icono: Wallet, titulo: 'Finanzas', texto: 'Aquí ves quién te debe, confirmas los cortes del día y cierras el mes.' },
+  { seccion: 'finanzas-pestanas', abrir: 'cobranza', icono: Wallet, titulo: 'Sus cuatro pestañas', texto: 'Por cobrar, Envases, Cortes del día y Cierre de mes. Debajo, cuatro cifras de un vistazo: tócalas para ir directo.' },
   { seccion: 'configuracion', icono: Settings, titulo: 'Configuración', texto: 'Aquí pones tu logo y cambias tus preferencias. Esta guía también está aquí, en Ayuda.' },
 ]
 

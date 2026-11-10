@@ -261,7 +261,7 @@ function AvisosPush() {
   }
   const activar = () => accion(async () => ((await activarPush()) === 'push'
     ? 'Avisos activados en este dispositivo'
-    : 'El servidor aún no tiene avisos push configurados: por ahora los cortes que no cuadran se ven en Cobranza → Cortes.'))
+    : 'El servidor aún no tiene avisos push configurados: por ahora los cortes que no cuadran se ven en Finanzas → Cortes del día.'))
   const probar = () => accion(async () => {
     const r = await enviarPrueba()
     return r.dispositivos ? `Prueba enviada a ${r.enviados} de ${r.dispositivos} ${r.dispositivos === 1 ? 'dispositivo' : 'dispositivos'}` : 'Este dispositivo aún no está suscrito'
@@ -576,7 +576,7 @@ function Preferencias() {
               opciones={DIAS_SEMANA.map((d, i) => ({ valor: i + 1, texto: d }))} />
           </Fila>
         )}
-        <Fila titulo="Al cerrar el mes" ayuda={prefs?.resumenMensual ? 'Te llega el informe del mes en PDF cuando alguien lo cierra en Cobranza → Meses.' : 'Apagado.'}>
+        <Fila titulo="Al cerrar el mes" ayuda={prefs?.resumenMensual ? 'Te llega el informe del mes en PDF cuando alguien lo cierra en Finanzas → Cierre de mes.' : 'Apagado.'}>
           <Interruptor encendido={!!prefs?.resumenMensual} deshabilitado={!prefs} etiqueta="Informe al cerrar el mes" alCambiar={(si) => void cambiarMensual(si)} />
         </Fila>
         <Fila titulo="Ver cómo llega" ayuda="Te manda uno ahora a tu correo; el de cada día sale igual.">

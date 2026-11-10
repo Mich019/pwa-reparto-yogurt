@@ -103,7 +103,7 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
   // suscripción vencida ni llegando por un enlace a una guía.
   const pasoGuia = useGuiaInicio('panel', sesion?.usuario.id, esAdmin && suscripcion?.estado !== 'vencida' && !location.search.includes('guia='))
   useEffect(() => {
-    if (pasoGuia !== null) setSeccion((PASOS_PANEL[pasoGuia]?.seccion ?? 'resumen') as SeccionAdmin)
+    if (pasoGuia !== null) { const p = PASOS_PANEL[pasoGuia]; setSeccion((p?.abrir ?? p?.seccion ?? 'resumen') as SeccionAdmin) }
   }, [pasoGuia]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setSeccion(s: SeccionAdmin) {

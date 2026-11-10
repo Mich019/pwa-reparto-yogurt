@@ -27,7 +27,7 @@ function sistema(): 'ios' | 'android' | 'otro' {
 }
 const instalada = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
 
-const DESTINOS: Record<string, string> = { preferencias: 'Preferencias', resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', cobranza: 'Cobranza', reportes: 'Reportes', marca: 'Marca' }
+const DESTINOS: Record<string, string> = { preferencias: 'Preferencias', resumen: 'Resumen', cuenta: 'Cuenta', seguridad: 'Seguridad', suscripcion: 'Suscripción', apariencia: 'Apariencia', clientes: 'Clientes', equipo: 'Vendedores', sabores: 'Sabores', produccion: 'Producción', cobranza: 'Finanzas', reportes: 'Reportes', marca: 'Marca' }
 
 // Lo que las capturas dicen con los datos de este negocio (nombre, logo, cambios por enviar).
 export function useValores(): Valores {

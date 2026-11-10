@@ -1,4 +1,4 @@
-import { BarChart3, ChartLine, HandCoins, IceCreamBowl, LayoutDashboard, MapPin, Settings, Users } from 'lucide-react'
+import { BarChart3, ChartLine, IceCreamBowl, LayoutDashboard, MapPin, Settings, Users, Wallet } from 'lucide-react'
 import { guardarPerfil } from '../../lib/sesion'
 import { cambiarPreferencias, usePreferenciasPanel } from '../../lib/tema'
 
@@ -13,7 +13,8 @@ export const PESTANAS: { id: SeccionAdmin; texto: string; icono: typeof Users }[
   { id: 'clientes', texto: 'Clientes', icono: MapPin },
   { id: 'produccion', texto: 'Producción', icono: BarChart3 },
   { id: 'sabores', texto: 'Sabores', icono: IceCreamBowl },
-  { id: 'cobranza', texto: 'Cobranza', icono: HandCoins },
+  // Se llama «Finanzas» en pantalla; el id sigue siendo «cobranza» (orden del menú guardado, ?ir=, ayuda).
+  { id: 'cobranza', texto: 'Finanzas', icono: Wallet },
   { id: 'reportes', texto: 'Reportes', icono: ChartLine },
   { id: 'configuracion', texto: 'Configuración', icono: Settings },
 ]

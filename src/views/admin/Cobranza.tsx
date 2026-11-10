@@ -20,22 +20,23 @@ import { abrirFicha } from '../pwa/Equipo'
 import type { SeccionAdmin } from './menu'
 import { Cargando } from '../../components/Cargando'
 
-// Cobranza del panel: quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
+// Finanzas del panel (antes «Cobranza»; el id de la sección sigue siendo `cobranza`): quién debe, quién tiene envases prestados, el corte de cada día y el cierre de cada mes con su
 // informe. Todo viene del servidor y necesita conexión.
 
 type Parte = 'cobrar' | 'envases' | 'cortes' | 'meses'
 
-// `?ir=cortes` (lo pone el aviso de un corte que ya no cuadra) abre Cobranza → Cortes.
+// `?ir=cortes` (lo pone el aviso de un corte que ya no cuadra) abre Finanzas → Cortes del día.
 // `?ir=cobrar` (el aviso de fiado de más de un mes) abre Por cobrar sólo con quienes deben desde hace más de 30 días;
 // AdminLayout quita el parámetro de la dirección y deja la marca aquí.
 let cobrarViejos = false
 export const marcarCobrarViejos = () => { cobrarViejos = true }
 export const irACortes = () => new URLSearchParams(location.search).get('ir') === 'cortes'
-const PARTES: { id: Parte; texto: string }[] = [
-  { id: 'cobrar', texto: 'Por cobrar' },
-  { id: 'envases', texto: 'Envases' },
-  { id: 'cortes', texto: 'Cortes' },
-  { id: 'meses', texto: 'Meses' },
+// `corto`: en el teléfono, para que las cuatro quepan en una fila. `detalle`: qué es cada una, bajo el título.
+const PARTES: { id: Parte; texto: string; corto?: string; detalle: string }[] = [
+  { id: 'cobrar', texto: 'Por cobrar', detalle: 'Quién te debe, cuánto y desde cuándo. Toca a un cliente para registrar lo que te pague.' },
+  { id: 'envases', texto: 'Envases', detalle: 'Garrafones, botellas y demás envases retornables que tus clientes no han devuelto.' },
+  { id: 'cortes', texto: 'Cortes del día', corto: 'Cortes', detalle: 'El efectivo que cada vendedor debe entregar al terminar el día contra el que entregó.' },
+  { id: 'meses', texto: 'Cierre de mes', corto: 'Cierre', detalle: 'Ventas, utilidad, comisiones y cortes de cada mes; ciérralo para que ya no cambie y baja su informe.' },
 ]
 
 export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void } = {}) {
@@ -45,21 +46,72 @@ export function Cobranza({ onNavegar }: { onNavegar?: (s: SeccionAdmin) => void 
     return 'cortes'
   })
   const [q, setQ] = useState('')
+  // Los cortes de hoy (para la franja y el numerito de «Cortes del día») y los confirmados que ya no cuadran.
+  const cortesHoy = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${hoy()}`).datos
+  const descuadres = useServidor<{ cortes: Descuadre[] }>('/cortes/descuadres').datos
+  const porAtender = (cortesHoy?.filas ?? []).filter((f) => f.estado === 'pendiente').length + (descuadres?.cortes.length ?? 0)
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
-      <Encabezado titulo="Cobranza" ayuda="cobranza" detalle="Lo que te deben, los envases prestados, el efectivo de cada día y el cierre de mes.">
+      <Encabezado titulo="Finanzas" ayuda="cobranza" detalle={PARTES.find((p) => p.id === parte)?.detalle}>
         {parte === 'cobrar' && <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="cobranza" />}
-        <div className={grupoPanel} role="group" aria-label="Apartado">
+        <div className={grupoPanel} role="group" aria-label="Apartado" data-seccion="finanzas-pestanas">
           {PARTES.map((p) => (
-            <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={`${parte === p.id ? botonPanel : botonPanelSuave} max-sm:px-3`}>{p.texto}</button>
+            <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={`${parte === p.id ? botonPanel : botonPanelSuave} max-sm:px-3`}>
+              {p.corto ? <><span className="sm:hidden">{p.corto}</span><span className="max-sm:hidden">{p.texto}</span></> : p.texto}
+              {p.id === 'cortes' && porAtender > 0 && (
+                <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-ambar px-1.5 text-xs font-bold tabular-nums text-tinta"
+                  aria-label={porAtender === 1 ? 'uno por atender' : `${porAtender} por atender`}>{porAtender}</span>
+              )}
+            </button>
           ))}
         </div>
       </Encabezado>
+      <FranjaFinanzas cortesHoy={cortesHoy?.filas} onElegir={setParte} />
       {parte === 'cobrar' && <PorCobrar q={q} />}
       {parte === 'envases' && <Envases />}
       {parte === 'cortes' && <Cortes />}
       {parte === 'meses' && <Meses onNavegar={onNavegar} />}
     </div>
+  )
+}
+
+// Cuatro cifras de un vistazo, entre dos líneas (sin tarjetas): lo que te deben, el efectivo de hoy que falta
+// confirmar, los envases prestados y lo vendido en el mes. Cada una lleva a su pestaña.
+function FranjaFinanzas({ cortesHoy, onElegir }: { cortesHoy?: FilaCorte[]; onElegir: (p: Parte) => void }) {
+  const deben = useServidor<{ total: number; deudores: Deudor[] }>('/cobranza').datos
+  const envases = useServidor<EnvasesClientes>('/envases').datos
+  const mes = hoy().slice(0, 7)
+  const cifras = useServidor<InformeMes>(`/cierres/${mes}`, ['datos', 'cobranza']).datos?.cifras
+  const sinConfirmar = (cortesHoy ?? []).filter((f) => f.estado !== 'confirmado')
+  const efectivoHoy = (cortesHoy ?? []).reduce((s, f) => s + (f.entregado ?? f.esperado), 0)
+  // Entregado y por confirmar: lo que dijo el vendedor; sin entregar todavía: lo que debe traer.
+  const falta = sinConfirmar.reduce((s, f) => s + (f.entregado ?? f.esperado), 0)
+  const cobradoMes = cifras ? cifras.cobro.efectivo + cifras.cobro.transferencia + cifras.abonos.total : 0
+  const items: { parte: Parte; etiqueta: string; valor: string; pie: string }[] = [
+    { parte: 'cobrar', etiqueta: 'Te deben', valor: deben ? dinero(deben.total) : '—',
+      pie: !deben ? '' : deben.deudores.length ? `${deben.deudores.length} ${deben.deudores.length === 1 ? 'cliente' : 'clientes'}` : 'Nadie te debe' },
+    { parte: 'cortes', etiqueta: 'Efectivo de hoy por confirmar', valor: cortesHoy ? dinero(falta) : '—',
+      pie: !cortesHoy ? '' : !cortesHoy.length ? 'Nadie ha vendido hoy' : falta > 0 ? `de ${dinero(efectivoHoy)} del día` : sinConfirmar.length ? 'Sin efectivo por entregar' : 'Todo confirmado' },
+    { parte: 'envases', etiqueta: 'Envases prestados', valor: envases ? envases.total.toLocaleString('es-MX') : '—',
+      pie: !envases ? '' : envases.clientes.length ? `en ${envases.clientes.length} ${envases.clientes.length === 1 ? 'cliente' : 'clientes'}` : 'Todos devueltos' },
+    { parte: 'meses', etiqueta: `Vendido en ${textoMes(mes).split(' ')[0].toLowerCase()}`, valor: cifras ? dinero(cifras.ventas.ingreso) : '—',
+      pie: cifras ? `cobrado ${dinero(cobradoMes)}` : '' },
+  ]
+  return (
+    <section aria-label="Finanzas de un vistazo" className="mb-6 border-y border-linea py-5">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
+        {items.map((c) => (
+          <button key={c.parte} type="button" onClick={() => onElegir(c.parte)}
+            className="min-w-0 rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-marca">
+            <span className="block truncate text-[13px] text-apagado">{c.etiqueta}</span>
+            <span className="mt-1 block">
+              <span className="cifra block truncate text-2xl sm:text-[1.75rem]">{c.valor}</span>
+              <span className="mt-1 block min-h-5 truncate text-xs text-apagado">{c.pie}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }
 
