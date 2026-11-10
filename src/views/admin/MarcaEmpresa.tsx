@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react'
-import { Esqueleto, Hueso, Ocupado } from '../../components/Esqueleto'
+import { Esqueleto, Hueso, Listo, Ocupado, useListo } from '../../components/Esqueleto'
 import { AlertCircle, AlertTriangle, Check, CheckCircle2, ChevronDown, ImagePlus, Sparkles } from 'lucide-react'
 import { colorLegible, guardarMarca, useMarca, type Marca } from '../../lib/marca'
 import { prepararLogo, revisarLogo, type RevisionLogo } from '../../lib/logo'
@@ -25,6 +25,7 @@ export function MarcaEmpresa() {
   const m = useMarca()
   const [borrador, setBorrador] = useState<Borrador | null>(m && aBorrador(m))
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState<RevisionLogo | null>(null)
@@ -111,6 +112,7 @@ export function MarcaEmpresa() {
       })
       setOriginal(null)
       aviso('Marca guardada')
+      marcarListo()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
@@ -131,7 +133,7 @@ export function MarcaEmpresa() {
       )}
       <button type="button" onClick={() => void guardar()} disabled={!cambio || guardando || procesando}
         className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-        {guardando ? <Ocupado texto="Guardando…" /> : 'Guardar marca'}
+        {guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar marca'}
       </button>
     </>
   )

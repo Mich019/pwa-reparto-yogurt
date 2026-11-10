@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Esqueleto, EsqueletoLista, Hueso, Ocupado } from '../../components/Esqueleto'
+import { Esqueleto, EsqueletoLista, Hueso, Listo, Ocupado, useListo } from '../../components/Esqueleto'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { Selector } from '../../components/Selector'
@@ -586,6 +586,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
   const [prueba, setPrueba] = useState(hoy(e.pruebaHasta))
   const [exenta, setExenta] = useState(e.exenta)
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   const [error, setError] = useState('')
   const cambios = {
     ...(nombre.trim() !== e.nombre ? { nombre: nombre.trim() } : {}),
@@ -605,6 +606,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
     try {
       await llamarAutenticado(`/plataforma/empresas/${e.id}`, { metodo: 'PATCH', cuerpo: cambios })
       aviso('Ajustes guardados')
+      marcarListo()
       await alGuardar()
     } catch (x) {
       setError(mensaje(x))
@@ -643,7 +645,7 @@ function Ajustes({ e, alGuardar }: { e: Detalle; alGuardar: () => Promise<void> 
         <input type="checkbox" checked={exenta} onChange={(x) => setExenta(x.target.checked)} className="h-5 w-5 accent-[var(--plat)]" />
       </label>
       {error && <p role="alert" className="text-sm font-medium text-rojo">{error}</p>}
-      <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={`${botonPrimario} w-full`}>{guardando ? <Ocupado texto="Guardando…" /> : 'Guardar ajustes'}</button>
+      <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={`${botonPrimario} w-full`}>{guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar ajustes'}</button>
     </div>
   )
 }
@@ -1142,6 +1144,7 @@ function AjustesServicio() {
   const { s, error, cargar } = useServicio()
   const [b, setB] = useState<{ registroAbierto: boolean; pruebaDias: string; correoSoporte: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   const [errorGuardar, setErrorGuardar] = useState('')
   const desde = (a: AjustesPlataforma) => ({
     registroAbierto: a.registroAbierto,
@@ -1167,6 +1170,7 @@ function AjustesServicio() {
     try {
       await llamarAutenticado('/plataforma/ajustes', { metodo: 'PATCH', cuerpo: cambios })
       aviso('Ajustes guardados')
+      marcarListo()
       await cargar()
     } catch (e) {
       setErrorGuardar(mensaje(e))
@@ -1196,7 +1200,7 @@ function AjustesServicio() {
       </Seccion>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-linea pt-6">
-        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : 'Guardar ajustes'}</button>
+        <button type="button" onClick={() => void guardar()} disabled={!hay || guardando} className={botonPrimario}>{guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar ajustes'}</button>
         {hay && <button type="button" onClick={() => { setErrorGuardar(''); setB(o) }} className={botonSuave}>Deshacer</button>}
         {errorGuardar && <p role="alert" className="text-sm font-medium text-rojo">{errorGuardar}</p>}
         {!hay && s.ajustes.actualizado && <span className="text-xs text-apagado">Último cambio: {new Date(s.ajustes.actualizado).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { EsqueletoLista, Ocupado } from '../../components/Esqueleto'
+import { EsqueletoLista, Listo, Ocupado, useListo } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
@@ -185,6 +185,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
   const [nombre, setNombre] = useState(u?.nombre ?? '')
   const [telefono, setTelefono] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
   const [error, setError] = useState('')
 
   // El teléfono y las fechas no viajan en la sesión: se piden al abrir.
@@ -204,6 +205,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
       setNombre(r.nombre)
       setTelefono(r.telefono)
       aviso('Perfil guardado')
+      marcarListo()
     } catch (e) {
       setError(mensaje(e))
     } finally {
@@ -216,7 +218,7 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
     <>
       <Seccion id="perfil" titulo="Perfil" acciones={
         <button type="submit" form="form-perfil" disabled={!cambios || nombre.trim().length < 2 || guardando} className={`rounded-md bg-tinta px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${anillo}`}>
-          {guardando ? <Ocupado texto="Guardando…" /> : 'Guardar cambios'}
+          {guardando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar cambios'}
         </button>
       } descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
         <FotoPerfil />

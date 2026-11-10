@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Ocupado } from '../../components/Esqueleto'
+import { Listo, Ocupado, useListo } from '../../components/Esqueleto'
 import { reparte } from '../../lib/reparto'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -33,6 +33,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
   const [verRepetir, setVerRepetir] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [listo, marcarListo] = useListo()
 
   async function guardar() {
     const act = actual.trim()
@@ -51,6 +52,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
       await cambiarPassword(act, nue)
       void renovarSuscripcion().catch(() => {}) // el servidor quitó los avisos de todos los teléfonos: éste se vuelve a suscribir
       aviso('Contraseña actualizada')
+      marcarListo()
       onListo?.()
     } catch (e) {
       setError(e instanceof ErrorApi || e instanceof ErrorRed ? e.message : 'No se pudo cambiar la contraseña')
@@ -131,7 +133,7 @@ export function FormPassword({ onListo }: { onListo?: () => void }) {
         disabled={cargando}
         className="flex w-full items-center justify-center rounded-md bg-tinta px-4 py-4 text-base font-semibold text-white active:bg-neutral-800 disabled:opacity-40"
       >
-        {cargando ? <Ocupado texto="Guardando…" /> : 'Guardar contraseña'}
+        {cargando ? <Ocupado texto="Guardando…" /> : listo ? <Listo /> : 'Guardar contraseña'}
       </button>
     </form>
   )

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Ocupado } from '../../components/Esqueleto'
+import { EsqueletoLista, Ocupado } from '../../components/Esqueleto'
 import { Recientes, Resaltar, useRecientes } from '../../components/Busqueda'
 import { coincide, digitosBuscados, limpiarBusqueda, normalizar, propsBuscador, telefonoCoincide } from '../../lib/busqueda'
 import { esMio } from '../../lib/reparto'
@@ -57,7 +57,8 @@ export function verSinComprar() {
 // `panel`: dentro del panel web, con el encabezado y el ancho de las demás secciones y la lista en dos columnas.
 export function Clientes({ panel = false }: { panel?: boolean } = {}) {
   // En la app de reparto, el administrador ve su cartera y la que no tiene vendedor (lib/reparto.ts); en el panel, todo.
-  const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').filter((c) => panel || esMio(c.vendedorId)).toArray(), [panel]) ?? []
+  const clientesQ = useLiveQuery(() => db.clientes.orderBy('nombre').filter((c) => panel || esMio(c.vendedorId)).toArray(), [panel])
+  const clientes = clientesQ ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
   const [q, setQ] = useState('')
@@ -209,7 +210,10 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
       <div className={panel ? 'mt-2 grid gap-x-10 lg:grid-cols-2' : 'flex-1 overflow-y-auto px-4 pt-2 pb-28'}>
         {!panel && MODO_SERVIDOR && <div className="col-span-full"><PorCobrar /></div>}
         <div ref={paginas.ancla} className="col-span-full scroll-mt-4" />
-        {lista.length === 0 && (
+        {clientesQ === undefined && (
+          <div className="col-span-full"><EsqueletoLista filas={8} inicio="circulo" columnas={panel ? 'grid gap-x-10 lg:grid-cols-2' : ''} etiqueta="Cargando los clientes" /></div>
+        )}
+        {clientesQ !== undefined && lista.length === 0 && (
           <div className="py-12 text-center text-apagado lg:col-span-2">
             {clientes.length ? 'Sin resultados' : 'Aún no hay clientes. Agrega el primero con «Nuevo cliente».'}
           </div>

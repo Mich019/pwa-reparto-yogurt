@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { TextoCargando } from '../../components/Esqueleto'
+import { TarjetasSaborHueso, TextoCargando } from '../../components/Esqueleto'
 import { FileSpreadsheet, IceCreamBowl } from 'lucide-react'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { hoy } from '../../lib/fechas'
@@ -43,7 +43,7 @@ export function AdminSabores() {
       </Encabezado>
 
       <section aria-label="Sabores" className="border-t border-linea pt-5">
-        {productos && !ordenados.length ? (
+        {!productos ? <TarjetasSaborHueso /> : !ordenados.length ? (
           <Vacio>Todavía no hay sabores. Agrega el primero con «Nuevo sabor».</Vacio>
         ) : (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">

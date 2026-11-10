@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Check } from 'lucide-react'
 
 // Carga con forma: cuando ya se sabe cómo se verá lo que llega (una lista, unas cifras, una gráfica), se dibuja su
 // silueta en gris en lugar de un círculo que gira, para que nada salte al llegar los datos. Aparece hasta los 300 ms
@@ -27,16 +28,18 @@ export function TextoCargando({ ancho = '12rem' }: { ancho?: string }) {
 }
 
 // Renglones separados por líneas, como las listas de la app: a la izquierda dos líneas (nombre y detalle), a la
-// derecha una cifra. `inicio`: un círculo (avatar, como el de Avatar.tsx) o un punto (sabor) antes. `columnas`: las clases de la rejilla de
+// derecha una cifra. `inicio`: lo que va antes: `avatar` (cuadrito, como Avatar.tsx), `circulo` (la inicial del
+// cliente), `punto` (sabor chico) o `sabor` (sabor grande, como en Sabores y datos). `columnas`: las clases de la rejilla de
 // la lista de verdad, si va en columnas.
-export function FilasHueso({ filas = 6, inicio, columnas = '', derecha = true }: { filas?: number; inicio?: 'avatar' | 'punto'; columnas?: string; derecha?: boolean }) {
+const INICIO = { avatar: 'h-10 w-10 rounded-md', circulo: 'h-12 w-12 rounded-full', punto: 'h-5 w-5 rounded-full', sabor: 'h-11 w-11 rounded-full' }
+
+export function FilasHueso({ filas = 6, inicio, columnas = '', derecha = true }: { filas?: number; inicio?: keyof typeof INICIO; columnas?: string; derecha?: boolean }) {
   const anchos = ['w-2/5', 'w-1/2', 'w-1/3', 'w-3/5', 'w-2/5', 'w-1/2', 'w-1/3', 'w-2/5'] // como nombres de verdad
   return (
     <div className={columnas}>
       {Array.from({ length: filas }, (_, i) => (
         <div key={i} className="flex items-center gap-3 border-b border-linea px-1 py-3.5">
-          {inicio === 'avatar' && <Hueso className="h-10 w-10 shrink-0 rounded-md" />}
-          {inicio === 'punto' && <Hueso className="h-5 w-5 shrink-0 rounded-full" />}
+          {inicio && <Hueso className={`shrink-0 ${INICIO[inicio]}`} />}
           <span className="min-w-0 flex-1 space-y-2">
             <Hueso className={`h-4 ${anchos[i % anchos.length]}`} />
             <Hueso className="h-3 w-1/4" />
@@ -73,6 +76,22 @@ export function CifrasHueso({ n = 4, className = '' }: { n?: number; className?:
   )
 }
 
+// Las tarjetas de sabor (Sabores del panel): el frasco y dos líneas abajo.
+export function TarjetasSaborHueso({ n = 12, frasco = 'h-32 sm:h-36' }: { n?: number; frasco?: string }) {
+  return (
+    <Esqueleto etiqueta="Cargando los sabores">
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+        {Array.from({ length: n }, (_, i) => (
+          <li key={i} className="flex flex-col items-center rounded-[22px] bg-papel px-3 pb-3.5 pt-4">
+            <Hueso className={`w-20 rounded-[18px] ${frasco}`} />
+            <span className="mt-3 w-full space-y-1.5"><Hueso className="h-3.5 w-2/3" /><Hueso className="h-3 w-1/2" /></span>
+          </li>
+        ))}
+      </ul>
+    </Esqueleto>
+  )
+}
+
 // Una gráfica de barras: barras de alturas distintas sobre su línea base.
 export function BarrasHueso({ barras = 14, className = 'h-56' }: { barras?: number; className?: string }) {
   const altos = [45, 60, 35, 70, 55, 80, 50, 65, 40, 75, 58, 68, 48, 72]
@@ -93,4 +112,22 @@ export function Ocupado({ texto }: { texto: ReactNode }) {
 
 export function Girando({ className = '' }: { className?: string }) {
   return <span aria-hidden="true" className={`girando inline-block h-[1.05em] w-[1.05em] shrink-0 rounded-full border-2 border-current border-r-transparent ${className}`} />
+}
+
+// Después de guardar, el botón dice «Guardado ✓» un momento (además del aviso de abajo) y luego vuelve a su texto.
+// Sólo para botones que se quedan en pantalla al guardar; las hojas que se cierran no lo necesitan.
+export function useListo(ms = 1600): [boolean, () => void] {
+  const [listo, setListo] = useState(false)
+  const t = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(t.current), [])
+  const marcar = useCallback(() => {
+    clearTimeout(t.current)
+    setListo(true)
+    t.current = setTimeout(() => setListo(false), ms)
+  }, [ms])
+  return [listo, marcar]
+}
+
+export function Listo({ texto = 'Guardado' }: { texto?: string }) {
+  return <span className="listo inline-flex items-center gap-1.5" role="status"><Check size={16} strokeWidth={2.6} aria-hidden="true" />{texto}</span>
 }

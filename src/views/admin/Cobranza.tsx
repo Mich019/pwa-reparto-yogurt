@@ -46,9 +46,15 @@ const PARTES: { id: Parte; texto: string; corto?: string; detalle: string }[] = 
 // cuadran. Lo usan el numerito de «Cortes del día» y el del menú del panel (AdminLayout).
 // `activo` en falso (sin sesión de administrador) no pregunta nada.
 export function useCortesPorAtender(activo = true) {
-  const cortesHoy = useServidor<{ fecha: string; filas: FilaCorte[] }>(activo ? `/cortes?fecha=${hoy()}` : null).datos
-  const descuadres = useServidor<{ cortes: Descuadre[] }>(activo ? '/cortes/descuadres' : null).datos
-  return { cortesHoy, porAtender: (cortesHoy?.filas ?? []).filter((f) => f.estado === 'pendiente').length + (descuadres?.cortes.length ?? 0) }
+  const hoyR = useServidor<{ fecha: string; filas: FilaCorte[] }>(activo ? `/cortes?fecha=${hoy()}` : null)
+  const descR = useServidor<{ cortes: Descuadre[] }>(activo ? '/cortes/descuadres' : null)
+  const cortesHoy = hoyR.datos, descuadres = descR.datos
+  return {
+    cortesHoy,
+    porAtender: (cortesHoy?.filas ?? []).filter((f) => f.estado === 'pendiente').length + (descuadres?.cortes.length ?? 0),
+    // Lo llama «Cortes del día» al confirmar o capturar: el numerito baja al momento, sin esperar el aviso en vivo.
+    recargar: () => { hoyR.recargar(); descR.recargar() },
+  }
 }
 
 export function Cobranza({ onNavegar, cortes }: { onNavegar?: (s: SeccionAdmin) => void; cortes: ReturnType<typeof useCortesPorAtender> }) {
@@ -78,7 +84,7 @@ export function Cobranza({ onNavegar, cortes }: { onNavegar?: (s: SeccionAdmin) 
       <FranjaFinanzas cortesHoy={cortesHoy?.filas} onElegir={setParte} />
       {parte === 'cobrar' && <PorCobrar q={q} />}
       {parte === 'envases' && <Envases />}
-      {parte === 'cortes' && <Cortes />}
+      {parte === 'cortes' && <Cortes onCambio={cortes.recargar} />}
       {parte === 'meses' && <Meses onNavegar={onNavegar} />}
     </div>
   )
@@ -280,14 +286,14 @@ function Envases() {
 // ---- Cortes
 const ETIQUETA_CORTE = { sin_corte: 'Sin entregar', pendiente: 'Por confirmar', confirmado: 'Confirmado' } as const
 
-function Cortes() {
+function Cortes({ onCambio }: { onCambio: () => void }) {
   const [fecha, setFecha] = useState(hoy)
   const lista = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${fecha}`)
   const [captura, setCaptura] = useState<FilaCorte | null>(null)
   const [reabriendo, setReabriendo] = useState<FilaCorte | null>(null)
   const descuadres = useServidor<{ cortes: Descuadre[] }>('/cortes/descuadres')
   const otros = (descuadres.datos?.cortes ?? []).filter((d) => d.fecha !== fecha)
-  const recargar = () => { lista.recargar(); descuadres.recargar() }
+  const recargar = () => { lista.recargar(); descuadres.recargar(); onCambio() }
   const filas = lista.datos?.filas ?? []
   const [confirmando, setConfirmando] = useState<string | null>(null)
   // Entregados por confirmar que cuadran al centavo (y sin cambios después): se confirman uno por uno, de un toque.

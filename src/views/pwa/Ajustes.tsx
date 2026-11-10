@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EsqueletoLista } from '../../components/Esqueleto'
 import { Selector } from '../../components/Selector'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Compass, Download, IceCreamBowl, Trash2, Upload } from 'lucide-react'
@@ -14,7 +15,8 @@ import { formato, nombreUnidad, presentacionDe, unidadDe } from '../../lib/unida
 const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce', '#ef4444', '#22c55e', '#38bdf8', '#a3e635']
 
 export function Ajustes() {
-  const productos = useLiveQuery(() => db.productos.toArray(), []) ?? []
+  const productosQ = useLiveQuery(() => db.productos.toArray(), [])
+  const productos = productosQ ?? []
   const pedidos = useLiveQuery(() => db.pedidos.toArray(), []) ?? []
   const [editando, setEditando] = useState<Producto | 'nuevo' | null>(null)
 
@@ -23,6 +25,7 @@ export function Ajustes() {
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Sabores y datos</h1>
 
       <div className="mt-4 divide-y divide-linea border-y border-linea">
+        {!productosQ && <EsqueletoLista filas={6} inicio="sabor" etiqueta="Cargando los sabores" />}
         {productos.map((p) => (
           <button key={p.id} onClick={() => setEditando(p)} className={`flex w-full items-center gap-3 py-3 text-left active:bg-niebla ${p.disponible ? '' : 'opacity-50'}`}>
             <PuntoSabor color={p.color_hex} className="h-11 w-11" />
