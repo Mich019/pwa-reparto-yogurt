@@ -21,12 +21,12 @@ describe('marca de la empresa', () => {
 
     const r = await cambiar(admin, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO })
     assert.equal(r.status, 200)
-    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null })
+    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null })
     assert.deepEqual((await get(vend, '/empresa')).body, r.body)
-    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null })
+    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null })
 
     // Cambiar sólo una cosa deja las demás; null quita el logo.
-    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null })
+    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null })
   })
 
   it('lema y contacto: se guardan sin espacios de sobra y vacíos se quitan', async () => {
@@ -50,6 +50,10 @@ describe('marca de la empresa', () => {
     assert.equal(vacio.firmaNombre, null)
     assert.equal(vacio.firmaCargo, null)
     assert.equal((await cambiar(admin, { firmaCargo: 'x'.repeat(81) })).status, 400)
+    // La firma como imagen: PNG/JPG/WEBP sí, SVG (o cualquier otra cosa) no; null la quita.
+    assert.equal((await cambiar(admin, { firmaImagen: LOGO })).body.firmaImagen, LOGO)
+    assert.equal((await cambiar(admin, { firmaImagen: 'data:image/svg+xml;base64,PHN2Zz4=' })).status, 400)
+    assert.equal((await cambiar(admin, { firmaImagen: null })).body.firmaImagen, null)
   })
 
   it('sólo el administrador la cambia y con datos válidos', async () => {

@@ -18,6 +18,7 @@ export interface Marca {
   codigoFiado?: string | null // `sal:sha256`: con él, fiar de más pide el código del administrador (037); al guardar se manda el código
   firmaNombre?: string | null // quién firma el informe del cierre de mes (038); null = quien lo genera
   firmaCargo?: string | null // debajo de la firma; null = «Administrador»
+  firmaImagen?: string | null // la firma dibujada o fotografiada, sobre la línea (039)
   de?: string // id de la cuenta con la que se guardó la copia
 }
 

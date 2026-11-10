@@ -1,5 +1,6 @@
 import { ajustarTexto, anchoTexto, Documento, imagenParaPdf, type Color, type Fuente, type ImagenPdf, type PdfListo } from './pdf'
 import { colorLegible, marcaActual, type Marca } from './marca'
+import { sesionActual } from './sesion'
 import { textoPorUnidad, tituloUnidad } from './unidades'
 import type { InformeMes } from './cobranza'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
@@ -27,12 +28,24 @@ const marca = () => marcaDeMuestra ?? marcaActual()
 // El logo va como JPEG (pdf.ts imagenParaPdf), que se prepara antes de armar el PDF: prepararLogoPdf.
 let logoListo: { fuente: string; img: ImagenPdf } | null = null
 const logo = () => (marcaDeMuestra ? logoDeMuestra : logoListo && logoListo.fuente === marcaActual()?.logo ? logoListo.img : null)
+// La firma de los informes (Preferencias → Firma de los informes) también va como JPEG y se prepara junto con el logo.
+let firmaLista: { fuente: string; img: ImagenPdf } | null = null
 export async function prepararLogoPdf() {
-  const fuente = marcaActual()?.logo
-  if (!fuente || logoListo?.fuente === fuente) return
-  try {
-    logoListo = { fuente, img: await imagenParaPdf(fuente) }
-  } catch { /* una imagen que el navegador no sabe dibujar: el PDF sale sin logo */ }
+  const preparar = async (fuente: string | null | undefined, lista: { fuente: string } | null) => {
+    if (!fuente || lista?.fuente === fuente) return undefined
+    try {
+      return { fuente, img: await imagenParaPdf(fuente) }
+    } catch { return undefined /* una imagen que el navegador no sabe dibujar: el PDF sale sin ella */ }
+  }
+  const [l, f] = await Promise.all([preparar(marcaActual()?.logo, logoListo), preparar(marcaActual()?.firmaImagen, firmaLista)])
+  if (l) logoListo = l
+  if (f) firmaLista = f
+}
+// Quién firma los informes: la persona elegida en Preferencias o, sin elegir, el administrador que lo genera.
+const firmaEmpresa = () => {
+  const m = marca()
+  const imagen = firmaLista && firmaLista.fuente === m?.firmaImagen ? firmaLista.img : undefined
+  return { nombre: m?.firmaNombre || sesionActual()?.usuario.nombre, cargo: m?.firmaCargo || 'Administrador', imagen }
 }
 const acento = (): Color => {
   const c = marca()?.color
@@ -145,6 +158,13 @@ class Informe {
     pdf.texto(`${this.titulo} · ${this.referencia}`, this.ancho - M, 11, { tam: 7.5, color: TENUE, alinear: 'der' })
     pdf.linea(M, 13.5, this.ancho - M, 13.5, { color: REGLA, grosor: 0.2 })
     this.y = 21
+  }
+
+  // Al final de un informe: la firma de la empresa, con su título pegado a ella (nunca solo al pie de la hoja).
+  firmaFinal(nota: string) {
+    this.asegurar(48)
+    this.tituloSeccion('Firma', nota)
+    this.firmas([firmaEmpresa()])
   }
 
   // Si lo que sigue no cabe en esta página, pasa a la siguiente.
@@ -267,16 +287,24 @@ class Informe {
     tabla('Por vendedor', 3, false)
   }
 
-  // Líneas para firmar, dos por renglón: la línea, el nombre (si va impreso) y su cargo. Un renglón nunca se parte.
-  firmas(quienes: { nombre?: string; cargo: string }[]) {
+  // Líneas para firmar, dos por renglón: la firma (si hay imagen), la línea, el nombre (si va impreso), su cargo y un
+  // espacio para la fecha. Un renglón nunca se parte.
+  firmas(quienes: { nombre?: string; cargo: string; imagen?: ImagenPdf }[]) {
     const { pdf } = this
     const ancho = (this.util - 16) / 2
     for (let k = 0; k < quienes.length; k += 2) {
       this.asegurar(30)
       quienes.slice(k, k + 2).forEach((q, j) => {
         const x = M + j * (ancho + 16)
+        if (q.imagen) {
+          // Hasta 15 mm de alto y 60% del ancho, apoyada sobre la línea como una firma a mano.
+          const escala = Math.min(15 / q.imagen.alto, (ancho * 0.6) / q.imagen.ancho)
+          const w = q.imagen.ancho * escala, h = q.imagen.alto * escala
+          pdf.imagen(q.imagen, x + 2, this.y + 18.6 - h, w, h)
+        }
         pdf.linea(x, this.y + 18, x + ancho, this.y + 18, { color: TINTA, grosor: 0.35 })
-        pdf.texto(ajustarTexto(q.nombre ?? 'Nombre y firma', q.nombre ? 'negrita' : 'normal', 8.5, ancho, 1)[0] ?? '', x, this.y + 22.5, { fuente: q.nombre ? 'negrita' : 'normal', tam: 8.5, color: q.nombre ? TINTA : TENUE })
+        pdf.texto('Fecha ____ / ____ / ________', x + ancho, this.y + 22.5, { tam: 7.5, color: TENUE, alinear: 'der' })
+        pdf.texto(ajustarTexto(q.nombre ?? 'Nombre y firma', q.nombre ? 'negrita' : 'normal', 8.5, ancho - 42, 1)[0] ?? '', x, this.y + 22.5, { fuente: q.nombre ? 'negrita' : 'normal', tam: 8.5, color: q.nombre ? TINTA : TENUE })
         pdf.texto(ajustarTexto(q.cargo, 'normal', 7.5, ancho, 1)[0] ?? '', x, this.y + 26.3, { tam: 7.5, color: TENUE })
       })
       this.y += 32
@@ -487,6 +515,7 @@ export function hojaProduccionPdf(cuando: string, filas: FilaHojaProduccion[], t
       ...porDia.dias.map((d, i) => ({ titulo: d, ancho, der: true, valor: (f: DiasHojaProduccion['filas'][number]) => f.valores[i] })),
     ], porDia.filas)
   }
+  inf.firmaFinal('Autorizó la producción')
   return inf.listo()
 }
 
@@ -521,6 +550,7 @@ export function informeAnualPdf(r: AnioPdf, ahora = new Date()): PdfListo {
     { titulo: 'Vendido', ancho: 0.3, der: true, valor: (m) => din(m.ventas) },
     { titulo: 'Del mejor mes', ancho: 0.4, der: true, valor: (m) => pct((m.ventas / tope) * 100) },
   ], r.meses, ['Total', din(r.total), ''])
+  inf.firmaFinal(`Conformidad con las cifras de ${r.anio}`)
   return inf.listo()
 }
 
@@ -528,7 +558,7 @@ export function informeAnualPdf(r: AnioPdf, ahora = new Date()): PdfListo {
 // ganadas con ese mes y las mejores rachas de todos los tiempos (a la fecha en que se genera).
 export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fama: { nombre: string; mejorRacha: number; cumplidos: number; racha: number }[] }
 
-export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: LogrosMes, firma?: { nombre?: string | null; cargo?: string | null }): PdfListo {
+export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: LogrosMes): PdfListo {
   const c = i.cifras
   const [anio, mesNum] = i.mes.split('-').map(Number)
   const nombreMes = `${MESES[mesNum - 1]} de ${anio}`
@@ -609,9 +639,7 @@ export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: Lo
   inf.nota('Notas: se consideran los pedidos entregados por su fecha de entrega. La comisión es el porcentaje de cada vendedor sobre lo vendido en el mes. '
     + '"Por cobrar" es lo vendido a crédito menos los abonos, al último día del mes. Una diferencia negativa es efectivo que faltó.')
 
-  inf.asegurar(48) // que el título no quede solo al pie y la firma en la hoja siguiente
-  inf.tituloSeccion('Firma', `Conformidad con las cifras de ${nombreMes}`)
-  inf.firmas([{ nombre: firma?.nombre || undefined, cargo: firma?.cargo || 'Administrador' }])
+  inf.firmaFinal(`Conformidad con las cifras de ${nombreMes}`)
   return inf.listo()
 }
 type CifrasMes_Vendedor = InformeMes['cifras']['vendedores'][number]

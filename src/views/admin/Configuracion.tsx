@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
@@ -19,6 +19,8 @@ import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
 import { guardarMarca, useMarca } from '../../lib/marca'
 import { Selector } from '../../components/Selector'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
+import { prepararLogo } from '../../lib/logo'
+import { PadFirma } from '../../components/PadFirma'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -436,7 +438,8 @@ function LimiteFiadoEmpresa() {
   )
 }
 
-// También de la empresa: de quién sale el nombre en la firma del informe del cierre de mes (migración 038).
+// También de la empresa: quién firma los informes en PDF (cierre de mes, año, hoja de producción; migraciones 038 y
+// 039): su nombre, su cargo y, si quiere, su firma dibujada aquí o en foto, impresa sobre la línea.
 const OTRA = '__otra'
 function FirmaCierre() {
   const marca = useMarca()
@@ -446,7 +449,30 @@ function FirmaCierre() {
   const [otra, setOtra] = useState<string | null>(null)
   const [cargo, setCargo] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [dibujando, setDibujando] = useState(false)
+  const archivo = useRef<HTMLInputElement>(null)
   if (!marca?.zonaHoraria) return null // copia vieja de la marca, sin los ajustes de la empresa
+  async function guardarImagen(firmaImagen: string | null) {
+    setGuardando(true)
+    try {
+      await guardarMarca({ firmaImagen })
+      setDibujando(false)
+      aviso(firmaImagen ? 'Firma guardada' : 'Firma quitada')
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  // Una foto de la firma en papel: sin el fondo, recortada y chica (como el logo, lib/logo.ts).
+  async function subirFoto(f: File | undefined) {
+    if (!f) return
+    try {
+      await guardarImagen(await prepararLogo(f, { quitarFondo: true }))
+    } catch {
+      aviso('No se pudo leer esa imagen')
+    }
+  }
   const admins = (equipo?.usuarios ?? []).filter((u) => u.rol === 'administrador' && u.activo).map((u) => u.nombre)
   const guardado = marca.firmaNombre ?? ''
   const valor = eleccion ?? (guardado === '' || admins.includes(guardado) ? guardado : OTRA)
@@ -466,7 +492,7 @@ function FirmaCierre() {
     }
   }
   return (
-    <Seccion id="firma" titulo="Cierre de mes" descripcion="El informe del mes en PDF termina con una firma. Vale para toda tu empresa, también en el que llega por correo.">
+    <Seccion id="firma" titulo="Firma de los informes" descripcion="El informe del cierre de mes, el del año y la hoja de producción terminan con una firma y un espacio para la fecha. Vale para toda tu empresa, también en el informe que llega por correo.">
       <Fila titulo="Quién firma" ayuda={nombre ? `Sale impreso «${nombre}» debajo de la línea.` : 'Sale el nombre del administrador que genera el informe.'}>
         <span className="flex flex-col gap-2">
           <Selector valor={valor} deshabilitado={guardando} onCambiar={setEleccion} className={`${claseInputRecto} w-56`} etiqueta="Quién firma el informe del mes"
@@ -483,6 +509,19 @@ function FirmaCierre() {
           {cambio && <button type="button" onClick={() => void guardar()} disabled={guardando || (valor === OTRA && !nombre)} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>}
         </span>
       </Fila>
+      <Fila titulo="Firma" ayuda={marca.firmaImagen ? 'Se imprime sobre la línea.' : 'Sin firma: la línea queda en blanco para firmar a mano.'}>
+        <span className="flex flex-col items-end gap-2">
+          {/* Fondo blanco a propósito: es la hoja del PDF, y la tinta oscura no se vería en el modo oscuro. */}
+          {marca.firmaImagen && <img src={marca.firmaImagen} alt="Firma guardada" className="h-14 max-w-56 rounded-md border border-linea bg-[#fff] object-contain p-1" />}
+          <span className="flex flex-wrap justify-end gap-3 text-sm font-semibold">
+            <button type="button" onClick={() => setDibujando(true)} disabled={guardando} className="underline-offset-2 hover:underline disabled:opacity-40">Dibujarla</button>
+            <button type="button" onClick={() => archivo.current?.click()} disabled={guardando} className="underline-offset-2 hover:underline disabled:opacity-40">Subir foto</button>
+            {marca.firmaImagen && <button type="button" onClick={() => void guardarImagen(null)} disabled={guardando} className="text-apagado underline-offset-2 hover:underline disabled:opacity-40">Quitar</button>}
+          </span>
+          <input ref={archivo} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { void subirFoto(e.target.files?.[0]); e.target.value = '' }} />
+        </span>
+      </Fila>
+      <PadFirma abierta={dibujando} onCerrar={() => setDibujando(false)} onUsar={(img) => void guardarImagen(img)} />
     </Seccion>
   )
 }

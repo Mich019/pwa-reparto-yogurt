@@ -52,6 +52,7 @@ CREATE TABLE empresas (
   codigo_fiado   varchar(120),                           -- sal:sha256: con él, fiar de más pide el código del administrador (037)
   firma_nombre   varchar(120),                           -- quién firma el informe del cierre de mes; NULL = quien lo genera (038)
   firma_cargo    varchar(80),                            -- debajo de la firma; NULL = «Administrador» (038)
+  firma_imagen   text,                                   -- firma dibujada o fotografiada (data URL) sobre la línea (039)
   color_marca    char(7),
   logo           text,
   lema           varchar(80),                            -- marca: lema y contacto en los PDF (migración 013)
