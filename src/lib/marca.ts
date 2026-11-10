@@ -16,6 +16,8 @@ export interface Marca {
   ritmoMetaPct?: number // por debajo de qué % del ritmo del mes una meta va atrasada (migración 034)
   limiteFiado?: number | null // límite de fiado de los clientes sin uno propio (migración 036); null = sin límite
   codigoFiado?: string | null // `sal:sha256`: con él, fiar de más pide el código del administrador (037); al guardar se manda el código
+  firmaNombre?: string | null // quién firma el informe del cierre de mes (038); null = quien lo genera
+  firmaCargo?: string | null // debajo de la firma; null = «Administrador»
   de?: string // id de la cuenta con la que se guardó la copia
 }
 

@@ -31,11 +31,14 @@ const bodyMarca = z.object({
   limiteFiado: z.number().finite().min(0, 'El límite no puede ser negativo').max(99999999).nullable().optional(),
   // Código para fiar de más (migración 037); null lo quita y vuelve a sólo avisar.
   codigoFiado: z.string().regex(/^\d{4,8}$/, 'El código lleva de 4 a 8 números').nullable().optional(),
+  // Quién firma el informe del cierre de mes (migración 038); '' o null vuelve a «quien lo genera» / «Administrador».
+  firmaNombre: z.string().trim().max(120, 'El nombre es de 120 letras como máximo').nullable().optional(),
+  firmaCargo: z.string().trim().max(80, 'El cargo es de 80 letras como máximo').nullable().optional(),
 }).refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
 
 export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { requiereSesionAunConPasswordPendiente, requiereAdmin }: { requiereSesionAunConPasswordPendiente: Guardia; requiereAdmin: Guardia }) {
   const leer = async (id: string) => {
-    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente, ritmo_meta_pct, limite_fiado, codigo_fiado FROM empresas WHERE id_empresa = $1`, [id])
+    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente, ritmo_meta_pct, limite_fiado, codigo_fiado, firma_nombre, firma_cargo FROM empresas WHERE id_empresa = $1`, [id])
     return {
       nombre: e.nombre as string,
       color: (e.color_marca as string | null) ?? null,
@@ -49,6 +52,8 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
       // Va a todos los teléfonos para revisarlo sin señal: es un freno para el día a día, no una contraseña (con 4 a 8
       // números, quien saque esto del teléfono lo adivina probando). Lo serio sigue siendo el aviso al administrador.
       codigoFiado: (e.codigo_fiado as string | null) ?? null,
+      firmaNombre: (e.firma_nombre as string | null) ?? null,
+      firmaCargo: (e.firma_cargo as string | null) ?? null,
     }
   }
 
@@ -58,7 +63,7 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
   app.patch('/empresa', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyMarca.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
-    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente, ritmoMetaPct, limiteFiado, codigoFiado } = b.data
+    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente, ritmoMetaPct, limiteFiado, codigoFiado, firmaNombre, firmaCargo } = b.data
     const sal = randomBytes(8).toString('hex')
     const codigo = codigoFiado ? `${sal}:${createHash('sha256').update(`${sal}:${codigoFiado}`).digest('hex')}` : null
     await db.query(
@@ -72,10 +77,12 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
               ritmo_meta_pct = coalesce($13::smallint, ritmo_meta_pct),
               limite_fiado = CASE WHEN $14 THEN $15::numeric ELSE limite_fiado END,
               codigo_fiado = CASE WHEN $16 THEN $17 ELSE codigo_fiado END,
+              firma_nombre = CASE WHEN $18 THEN $19 ELSE firma_nombre END,
+              firma_cargo = CASE WHEN $20 THEN $21 ELSE firma_cargo END,
               actualizado_en = now()
         WHERE id_empresa = $1`,
       [req.usuario.empresa, nombre ?? null, c !== undefined, c ?? null, l !== undefined, l ?? null,
-        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null, ritmoMetaPct ?? null, limiteFiado !== undefined, limiteFiado ?? null, codigoFiado !== undefined, codigo],
+        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null, ritmoMetaPct ?? null, limiteFiado !== undefined, limiteFiado ?? null, codigoFiado !== undefined, codigo, firmaNombre !== undefined, firmaNombre || null, firmaCargo !== undefined, firmaCargo || null],
     )
     if (zonaHoraria) olvidarZona(req.usuario.empresa)
     return leer(req.usuario.empresa)

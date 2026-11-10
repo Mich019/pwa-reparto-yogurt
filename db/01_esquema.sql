@@ -50,6 +50,8 @@ CREATE TABLE empresas (
   ritmo_meta_pct smallint NOT NULL DEFAULT 70 CHECK (ritmo_meta_pct BETWEEN 30 AND 100),   -- aviso de meta atrasada (034)
   limite_fiado   numeric(12, 2) CONSTRAINT empresas_limite_fiado_valido CHECK (limite_fiado IS NULL OR limite_fiado >= 0),   -- para clientes sin límite propio (036)
   codigo_fiado   varchar(120),                           -- sal:sha256: con él, fiar de más pide el código del administrador (037)
+  firma_nombre   varchar(120),                           -- quién firma el informe del cierre de mes; NULL = quien lo genera (038)
+  firma_cargo    varchar(80),                            -- debajo de la firma; NULL = «Administrador» (038)
   color_marca    char(7),
   logo           text,
   lema           varchar(80),                            -- marca: lema y contacto en los PDF (migración 013)

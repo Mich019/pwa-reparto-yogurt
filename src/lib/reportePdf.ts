@@ -267,6 +267,23 @@ class Informe {
     tabla('Por vendedor', 3, false)
   }
 
+  // Líneas para firmar, dos por renglón: la línea, el nombre (si va impreso) y su cargo. Un renglón nunca se parte.
+  firmas(quienes: { nombre?: string; cargo: string }[]) {
+    const { pdf } = this
+    const ancho = (this.util - 16) / 2
+    for (let k = 0; k < quienes.length; k += 2) {
+      this.asegurar(30)
+      quienes.slice(k, k + 2).forEach((q, j) => {
+        const x = M + j * (ancho + 16)
+        pdf.linea(x, this.y + 18, x + ancho, this.y + 18, { color: TINTA, grosor: 0.35 })
+        pdf.texto(ajustarTexto(q.nombre ?? 'Nombre y firma', q.nombre ? 'negrita' : 'normal', 8.5, ancho, 1)[0] ?? '', x, this.y + 22.5, { fuente: q.nombre ? 'negrita' : 'normal', tam: 8.5, color: q.nombre ? TINTA : TENUE })
+        pdf.texto(ajustarTexto(q.cargo, 'normal', 7.5, ancho, 1)[0] ?? '', x, this.y + 26.3, { tam: 7.5, color: TENUE })
+      })
+      this.y += 32
+    }
+    this.y += 2
+  }
+
   nota(texto: string) {
     this.asegurar(8)
     for (const r of ajustarTexto(texto, 'normal', 7.5, this.util, 3)) {
@@ -511,7 +528,7 @@ export function informeAnualPdf(r: AnioPdf, ahora = new Date()): PdfListo {
 // ganadas con ese mes y las mejores rachas de todos los tiempos (a la fecha en que se genera).
 export interface LogrosMes { medallas: { nombre: string; medalla: number }[]; fama: { nombre: string; mejorRacha: number; cumplidos: number; racha: number }[] }
 
-export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: LogrosMes): PdfListo {
+export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: LogrosMes, firma?: { nombre?: string | null; cargo?: string | null }): PdfListo {
   const c = i.cifras
   const [anio, mesNum] = i.mes.split('-').map(Number)
   const nombreMes = `${MESES[mesNum - 1]} de ${anio}`
@@ -591,6 +608,10 @@ export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: Lo
   }
   inf.nota('Notas: se consideran los pedidos entregados por su fecha de entrega. La comisión es el porcentaje de cada vendedor sobre lo vendido en el mes. '
     + '"Por cobrar" es lo vendido a crédito menos los abonos, al último día del mes. Una diferencia negativa es efectivo que faltó.')
+
+  inf.asegurar(48) // que el título no quede solo al pie y la firma en la hoja siguiente
+  inf.tituloSeccion('Firma', `Conformidad con las cifras de ${nombreMes}`)
+  inf.firmas([{ nombre: firma?.nombre || undefined, cargo: firma?.cargo || 'Administrador' }])
   return inf.listo()
 }
 type CifrasMes_Vendedor = InformeMes['cifras']['vendedores'][number]

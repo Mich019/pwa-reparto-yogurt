@@ -21,12 +21,12 @@ describe('marca de la empresa', () => {
 
     const r = await cambiar(admin, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO })
     assert.equal(r.status, 200)
-    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null })
+    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null })
     assert.deepEqual((await get(vend, '/empresa')).body, r.body)
-    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null })
+    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null })
 
     // Cambiar sólo una cosa deja las demás; null quita el logo.
-    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null })
+    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null })
   })
 
   it('lema y contacto: se guardan sin espacios de sobra y vacíos se quitan', async () => {
@@ -37,6 +37,19 @@ describe('marca de la empresa', () => {
     assert.equal(r.body.contacto, 'Tel. 55 1234 5678 · Calle 5 #12')
     assert.equal((await cambiar(admin, { lema: '' })).body.lema, null)
     assert.equal((await cambiar(admin, { lema: 'x'.repeat(81) })).status, 400)
+  })
+
+  it('quién firma el informe del mes: se guarda, cambiar otra cosa no lo toca y vacío vuelve a quien lo genera', async () => {
+    const admin = await sesion('administrador', 'panel', await crearEmpresa('Con firma'))
+    const r = await cambiar(admin, { firmaNombre: '  Rosa Pérez ', firmaCargo: 'Dueña' })
+    assert.equal(r.status, 200)
+    assert.equal(r.body.firmaNombre, 'Rosa Pérez')
+    assert.equal(r.body.firmaCargo, 'Dueña')
+    assert.equal((await cambiar(admin, { lema: 'Hola' })).body.firmaNombre, 'Rosa Pérez')
+    const vacio = (await cambiar(admin, { firmaNombre: '', firmaCargo: null })).body
+    assert.equal(vacio.firmaNombre, null)
+    assert.equal(vacio.firmaCargo, null)
+    assert.equal((await cambiar(admin, { firmaCargo: 'x'.repeat(81) })).status, 400)
   })
 
   it('sólo el administrador la cambia y con datos válidos', async () => {

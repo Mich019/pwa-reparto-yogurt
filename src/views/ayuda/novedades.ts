@@ -19,6 +19,7 @@ export const NOVEDADES: Novedad[] = [
       { texto: 'A quien te debe le mandas su estado de cuenta por WhatsApp desde su ficha.' },
       { texto: 'Mejores clientes del mes en el Resumen, y quiénes compraron (y cuántos por primera vez) en Reportes.', para: 'administrador', guia: 'reportes' },
       { texto: 'Por cobrar se ordena por deuda, por antigüedad o por nombre; el pronóstico de producción se baja a Excel.', para: 'administrador', donde: 'panel' },
+      { texto: 'El informe del cierre de mes termina con un espacio para firmar; en Preferencias eliges de quién sale el nombre y su cargo.', para: 'administrador', donde: 'panel' },
       { texto: 'Cada guía tiene un «¿Te sirvió?», el administrador puede mandar una guía a su equipo por WhatsApp y la «h» abre la ayuda de la sección en el panel.' },
     ],
   },

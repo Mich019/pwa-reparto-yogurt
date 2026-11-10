@@ -18,6 +18,7 @@ import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/pr
 import { guardarOrdenMenu, useMenu, type SeccionAdmin } from './menu'
 import { guardarMarca, useMarca } from '../../lib/marca'
 import { Selector } from '../../components/Selector'
+import { cargarEquipo, useEquipo } from '../../lib/equipo'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -435,6 +436,57 @@ function LimiteFiadoEmpresa() {
   )
 }
 
+// También de la empresa: de quién sale el nombre en la firma del informe del cierre de mes (migración 038).
+const OTRA = '__otra'
+function FirmaCierre() {
+  const marca = useMarca()
+  const equipo = useEquipo()
+  useEffect(() => { if (!equipo) void cargarEquipo().catch(() => {}) }, [equipo])
+  const [eleccion, setEleccion] = useState<string | null>(null)
+  const [otra, setOtra] = useState<string | null>(null)
+  const [cargo, setCargo] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  if (!marca?.zonaHoraria) return null // copia vieja de la marca, sin los ajustes de la empresa
+  const admins = (equipo?.usuarios ?? []).filter((u) => u.rol === 'administrador' && u.activo).map((u) => u.nombre)
+  const guardado = marca.firmaNombre ?? ''
+  const valor = eleccion ?? (guardado === '' || admins.includes(guardado) ? guardado : OTRA)
+  const nombre = valor === OTRA ? (otra ?? (admins.includes(guardado) ? '' : guardado)).trim() : valor
+  const cargoTexto = cargo ?? marca.firmaCargo ?? ''
+  const cambio = nombre !== guardado || cargoTexto.trim() !== (marca.firmaCargo ?? '')
+  async function guardar() {
+    setGuardando(true)
+    try {
+      await guardarMarca({ firmaNombre: nombre || null, firmaCargo: cargoTexto.trim() || null })
+      setEleccion(null); setOtra(null); setCargo(null)
+      aviso('Guardado')
+    } catch (e) {
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <Seccion id="firma" titulo="Cierre de mes" descripcion="El informe del mes en PDF termina con una firma. Vale para toda tu empresa, también en el que llega por correo.">
+      <Fila titulo="Quién firma" ayuda={nombre ? `Sale impreso «${nombre}» debajo de la línea.` : 'Sale el nombre del administrador que genera el informe.'}>
+        <span className="flex flex-col gap-2">
+          <Selector valor={valor} deshabilitado={guardando} onCambiar={setEleccion} className={`${claseInputRecto} w-56`} etiqueta="Quién firma el informe del mes"
+            opciones={[{ valor: '', texto: 'Quien genera el informe' }, ...admins.map((n) => ({ valor: n, texto: n })), { valor: OTRA, texto: 'Otra persona…' }]} />
+          {valor === OTRA && (
+            <input value={otra ?? (admins.includes(guardado) ? '' : guardado)} onChange={(e) => setOtra(e.target.value)} maxLength={120} placeholder="Nombre completo"
+              aria-label="Nombre de quien firma" className={`${claseInputRecto} w-56`} />
+          )}
+        </span>
+      </Fila>
+      <Fila titulo="Cargo" ayuda="Va debajo del nombre.">
+        <span className="flex items-center gap-2">
+          <input value={cargoTexto} onChange={(e) => setCargo(e.target.value)} maxLength={80} placeholder="Administrador" aria-label="Cargo de quien firma" className={`${claseInputRecto} w-44`} />
+          {cambio && <button type="button" onClick={() => void guardar()} disabled={guardando || (valor === OTRA && !nombre)} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>}
+        </span>
+      </Fila>
+    </Seccion>
+  )
+}
+
 function Interruptor({ encendido, deshabilitado, etiqueta, alCambiar }: { encendido: boolean; deshabilitado: boolean; etiqueta: string; alCambiar: (si: boolean) => void }) {
   return (
     <label className="relative inline-flex cursor-pointer items-center">
@@ -502,6 +554,7 @@ function Preferencias() {
       <MinutosUrgente />
       <RitmoMeta />
       <LimiteFiadoEmpresa />
+      <FirmaCierre />
       <Seccion id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>
           <Interruptor encendido={!!silencio} deshabilitado={!prefs} etiqueta="Silenciar avisos" alCambiar={(si) => void cambiarSilencio(si ? SILENCIO_NOCHE : null)} />

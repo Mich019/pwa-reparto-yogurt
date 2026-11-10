@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEnVivo, type AreaEnVivo } from './enVivo'
-import { descargarAutenticado, llamarAutenticado } from './sesion'
+import { descargarAutenticado, llamarAutenticado, sesionActual } from './sesion'
+import { marcaActual } from './marca'
 import { descargarArchivo } from './pdf'
 import { mostrarPdf } from '../components/VisorPdf'
 
@@ -119,6 +120,12 @@ async function logrosDelMes(mes: string) {
   }
 }
 
+// Quién firma el informe: la persona elegida en Preferencias → Cierre de mes o, sin elegir, el administrador que lo genera.
+const firmaDelInforme = () => {
+  const m = marcaActual()
+  return { nombre: m?.firmaNombre || sesionActual()?.usuario.nombre, cargo: m?.firmaCargo }
+}
+
 // El informe mensual: el Excel lo arma el servidor; el PDF, este equipo con las mismas cifras (se abre en la vista previa).
 export async function exportarInforme(informe: InformeMes, formato: 'pdf' | 'xlsx'): Promise<void> {
   const nombre = `informe-mensual-${informe.mes}.${formato}`
@@ -128,7 +135,7 @@ export async function exportarInforme(informe: InformeMes, formato: 'pdf' | 'xls
   }
   const pdf = await import('./reportePdf')
   const [, logros] = await Promise.all([pdf.prepararLogoPdf(), logrosDelMes(informe.mes)])
-  mostrarPdf(pdf.informeMensualPdf(informe, new Date(), logros), nombre)
+  mostrarPdf(pdf.informeMensualPdf(informe, new Date(), logros, firmaDelInforme()), nombre)
 }
 
 // Al cerrar el mes: arma aquí el PDF del informe y el servidor lo manda a los administradores que lo pidieron.
@@ -136,7 +143,7 @@ export async function mandarInformePorCorreo(mes: string) {
   const informe = await llamarAutenticado<InformeMes>(`/cierres/${mes}/informe`)
   const pdf = await import('./reportePdf')
   const [, logros] = await Promise.all([pdf.prepararLogoPdf(), logrosDelMes(mes)])
-  const { bytes } = pdf.informeMensualPdf(informe, new Date(), logros)
+  const { bytes } = pdf.informeMensualPdf(informe, new Date(), logros, firmaDelInforme())
   let s = ''
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   return enviar<{ enviados: number }>(`/cierres/${mes}/correo`, { pdf: btoa(s) })
