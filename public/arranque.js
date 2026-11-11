@@ -1,5 +1,5 @@
 // Pantalla de carga (index.html): le pone el logo y el color de la empresa recordada en este navegador, y el fondo
-// oscuro si el panel se usa así. Va en un archivo aparte porque la política de contenido no deja scripts dentro de la
+// oscuro si la cuenta lo usa así. Va en un archivo aparte porque la política de contenido no deja scripts dentro de la
 // página. Sin empresa recordada (o si algo falla) queda el logo de Delisy.
 (function () {
   try {
@@ -7,8 +7,8 @@
     if (!pantalla) return
     var tema = localStorage.getItem('tema-panel')
     var ruta = location.pathname + location.hash
-    var enPanel = /\/(admin|plataforma)/.test(ruta)
-    var oscuro = enPanel && (tema === 'oscuro' || (!tema && matchMedia('(prefers-color-scheme: dark)').matches))
+    // El tema es de la cuenta y vale en el panel y en la app de reparto (copia en este navegador, src/lib/tema.ts).
+    var oscuro = tema === 'oscuro' || (!tema && matchMedia('(prefers-color-scheme: dark)').matches)
     if (oscuro) pantalla.classList.add('oscuro')
     else {
       var fondo = (JSON.parse(localStorage.getItem('preferencias-panel') || '{}') || {}).fondo

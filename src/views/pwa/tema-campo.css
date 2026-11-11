@@ -1,11 +1,12 @@
 /* App de reparto con la imagen del panel: App.tsx la envuelve en `.tema-admin .tema-campo`, así toma los colores, la letra
- * de los títulos y el verde de la marca de views/admin/tema.css (siempre en claro: el modo oscuro es sólo del panel).
+ * de los títulos y el verde de la marca de views/admin/tema.css, también su modo oscuro (`.oscuro`, el tema de la cuenta).
  *
  * Excepción: la hoja de «Nuevo pedido» (EditorPedido) conserva el diseño de antes, en blanco y negro con las tarjetas de
  * sabor. Lleva `.diseno-original`, que dentro de `.tema-campo` devuelve la paleta de src/index.css. En el panel, donde no
- * hay `.tema-campo`, esa hoja sigue con los colores del panel como hasta ahora. */
+ * hay `.tema-campo`, esa hoja sigue con los colores del panel como hasta ahora. En el modo oscuro tampoco: ahí la hoja
+ * toma la paleta oscura, para no encender un blanco a media ruta de noche. */
 
-.tema-campo .diseno-original {
+.tema-campo:not(.oscuro) .diseno-original {
   --color-papel: #ffffff;
   --color-niebla: #f3f3f3;
   --color-linea: #e2e2e2;
@@ -31,11 +32,11 @@
   }
 }
 @layer utilities {
-  :where(.tema-campo) .diseno-original .bg-tinta {
+  :where(.tema-campo:not(.oscuro)) .diseno-original .bg-tinta {
     background-color: var(--color-tinta);
   }
-  :where(.tema-campo) .diseno-original .border-tinta,
-  :where(.tema-campo) .diseno-original .focus\:border-tinta:focus {
+  :where(.tema-campo:not(.oscuro)) .diseno-original .border-tinta,
+  :where(.tema-campo:not(.oscuro)) .diseno-original .focus\:border-tinta:focus {
     border-color: var(--color-tinta);
   }
 }

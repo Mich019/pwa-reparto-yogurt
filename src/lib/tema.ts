@@ -35,8 +35,10 @@ const suscribir = (f: () => void) => { oyentes.add(f); return () => { oyentes.de
 export const usePreferenciaTema = () => useSyncExternalStore(suscribir, () => preferencia)
 export const preferenciaTema = () => preferencia
 // true si el panel debe verse oscuro ahora mismo (en «sistema», según el sistema operativo).
-export const useTemaOscuro = () =>
-  useSyncExternalStore(suscribir, () => preferencia === 'oscuro' || (preferencia === 'sistema' && !!sistemaOscuro?.matches))
+const esOscuro = () => preferencia === 'oscuro' || (preferencia === 'sistema' && !!sistemaOscuro?.matches)
+export const useTemaOscuro = () => useSyncExternalStore(suscribir, esOscuro)
+// Lo mismo fuera de React: los mapas eligen su estilo al crearse (views/pwa/Mapa.tsx).
+export const temaOscuroAhora = esOscuro
 
 // Más preferencias del panel, también de cada navegador: el tamaño del texto (todo va en rem, así que basta con el
 // tamaño de la raíz), menos movimiento (tema.css) y el orden del menú del panel (views/admin/menu.ts).
@@ -77,7 +79,7 @@ export function useAplicarFondo() {
     const raiz = document.documentElement
     raiz.classList.toggle('fondo-blanco', fondo === 'blanco')
     raiz.classList.toggle('fondo-gris', fondo === 'gris')
-    if (!oscuro) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', COLOR_FONDO[fondo] ?? COLOR_FONDO.crema)
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', oscuro ? '#0e1611' : COLOR_FONDO[fondo] ?? COLOR_FONDO.crema)
   }, [fondo, oscuro])
 }
 

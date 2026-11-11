@@ -93,6 +93,8 @@ CREATE TABLE usuarios (
                           CONSTRAINT usuarios_fondo_valido CHECK (fondo IN ('crema', 'blanco', 'gris')),
   tema                  varchar(10) NOT NULL DEFAULT 'sistema' -- claro, oscuro o el del sistema (041_tema.sql)
                           CONSTRAINT usuarios_tema_valido CHECK (tema IN ('claro', 'oscuro', 'sistema')),
+  tamano_texto          varchar(12) NOT NULL DEFAULT 'normal' -- letra del panel: normal, grande o más grande (042_tamano_texto.sql)
+                          CONSTRAINT usuarios_tamano_texto_valido CHECK (tamano_texto IN ('normal', 'grande', 'mas-grande')),
   avisos_apagados       text[],                             -- tipos de aviso que la cuenta no quiere (027_avisos_apagados.sql)
   silencio_desde        smallint,                           -- horario de silencio del push, horas 0–23 en la zona de la empresa
   silencio_hasta        smallint,                           -- (028_horario_silencio.sql; null = sin horario)

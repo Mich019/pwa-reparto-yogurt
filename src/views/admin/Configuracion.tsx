@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { EsqueletoLista, type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
-import { elegirFondo, elegirTema, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
+import { elegirFondo, elegirTema, elegirTexto, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
 import { aviso, claseInputRecto } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
@@ -736,7 +736,7 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
   const p = usePreferenciasPanel()
   return (
     <>
-      <Seccion id="tema" titulo="Tema" descripcion="Se guarda en tu cuenta, igual que el color del fondo: lo ves igual en todos tus dispositivos. «Lectura y movimiento» es de cada navegador.">
+      <Seccion id="tema" titulo="Tema" descripcion="Se guarda en tu cuenta, igual que el color del fondo: lo ves igual en todos tus dispositivos (también en la app de reparto).">
         <div role="radiogroup" aria-label="Tema del panel" className="grid gap-3 sm:grid-cols-3">
           {TEMAS.map(({ valor, texto, ayuda, icono: Icono }) => {
             const elegido = tema === valor
@@ -782,17 +782,17 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
       </Seccion>
 
       <Seccion id="lectura" titulo="Lectura y movimiento">
-        <Fila titulo="Tamaño del texto" ayuda="Agranda letras, botones y tablas del panel.">
+        <Fila titulo="Tamaño del texto" ayuda="Agranda letras, botones y tablas del panel. Se guarda en tu cuenta: lo ves así en cualquier computadora.">
           <div role="radiogroup" aria-label="Tamaño del texto" className="flex gap-1.5">
             {TAMANOS.map(({ valor, texto, muestra }) => (
-              <button key={valor} type="button" role="radio" aria-checked={p.texto === valor} onClick={() => cambiarPreferencias({ texto: valor })}
+              <button key={valor} type="button" role="radio" aria-checked={p.texto === valor} onClick={() => void elegirTexto(valor).catch(() => aviso('Cambió en este navegador, pero no se pudo guardar en tu cuenta'))}
                 className={`flex items-baseline gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors ${anillo} ${p.texto === valor ? 'bg-tinta text-white' : 'bg-niebla hover:bg-linea'}`}>
                 <span className={`${muestra} leading-none`} aria-hidden="true">A</span>{texto}
               </button>
             ))}
           </div>
         </Fila>
-        <Fila titulo="Menos movimiento" ayuda="Quita animaciones y transiciones al abrir y cambiar de pantalla.">
+        <Fila titulo="Menos movimiento" ayuda="Quita animaciones y transiciones al abrir y cambiar de pantalla. Sólo en este navegador.">
           <label className="relative inline-flex cursor-pointer items-center">
             <input type="checkbox" role="switch" checked={p.menosMovimiento} onChange={(e) => cambiarPreferencias({ menosMovimiento: e.target.checked })} className="peer sr-only" aria-label="Menos movimiento" />
             <span className="h-7 w-12 rounded-full bg-linea transition-colors peer-checked:bg-marca peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-marca" />

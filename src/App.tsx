@@ -177,10 +177,10 @@ export default function App() {
   // =========================================================================
   // VISTA PWA MÓVIL DE REPARTO (/)
   // =========================================================================
-  // Con la imagen del panel (`.tema-admin`, siempre en claro); `.tema-campo` deja la hoja de «Nuevo pedido» con su
-  // diseño de antes (views/pwa/tema-campo.css).
+  // Con la imagen del panel (`.tema-admin`) y su modo oscuro si la cuenta lo eligió; `.tema-campo` deja la hoja de
+  // «Nuevo pedido» con su diseño de antes en claro (views/pwa/tema-campo.css).
   return (
-    <div className="tema-admin tema-campo" style={colorMarca}>
+    <div className={`tema-admin tema-campo ${oscuro ? 'oscuro' : ''}`} style={colorMarca}>
       <Avisos />
       {MODO_SERVIDOR && !sesion ? <Login onIrAAdmin={irAAdmin} />
         : MODO_SERVIDOR && sesion?.usuario.debeCambiarPassword ? <CambioObligatorio />

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { api, apiArchivo, COOKIES_POSIBLES, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
-import { cambiarPreferencias, cambiarTema, preferenciaTema, preferenciasPanel, type Fondo, type PreferenciaTema } from './tema'
+import { cambiarPreferencias, cambiarTema, preferenciaTema, preferenciasPanel, type Fondo, type PreferenciaTema, type TamanoTexto } from './tema'
 import { CLAVE_REVOCAR, CLAVE_SESION_SW, REVOCAR_COOKIE, guardarRevocacion, olvidarRevocacionCookie, revocarPendientes, type SesionSegundoPlano } from './envio'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
@@ -236,7 +236,7 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
 }
 
 // El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
-export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; fondo?: Fondo; tema?: PreferenciaTema; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; fondo?: Fondo; tema?: PreferenciaTema; tamanoTexto?: TamanoTexto; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
   const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
   if (datos.silencio !== undefined) void recordarSilencio(datos.silencio)
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
@@ -253,6 +253,11 @@ export async function elegirTema(tema: PreferenciaTema) {
   cambiarTema(tema)
   if (actual) await guardarPerfil({ tema })
 }
+// Y con el tamaño de la letra del panel.
+export async function elegirTexto(texto: TamanoTexto) {
+  cambiarPreferencias({ texto })
+  if (actual) await guardarPerfil({ tamanoTexto: texto })
+}
 
 // Trae el nombre y la foto de la cuenta (la foto no viaja al entrar, para que la sesión pese poco). Sin señal no pasa
 // nada: se queda lo guardado.
@@ -262,7 +267,7 @@ const recordarSilencio = (s: { desde: number; hasta: number } | null) => db.meta
 export async function refrescarPerfil() {
   if (!actual) return
   try {
-    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; fondo?: Fondo; tema?: PreferenciaTema; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
+    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; fondo?: Fondo; tema?: PreferenciaTema; tamanoTexto?: TamanoTexto; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
     if (r.silencio !== undefined) void recordarSilencio(r.silencio)
     // Los mensajes de WhatsApp viven en la cuenta; el dispositivo guarda una copia para usarlos sin señal.
     if (r.mensajes) void copiarMensajes(r.mensajes)
@@ -283,6 +288,14 @@ export async function refrescarPerfil() {
       try { heredar = r.tema === 'sistema' && local !== 'sistema' && !localStorage.getItem('tema-en-cuenta'); localStorage.setItem('tema-en-cuenta', '1') } catch { /* sin almacenamiento */ }
       if (heredar) void guardarPerfil({ tema: local }).catch(() => {})
       else cambiarTema(r.tema)
+    }
+    // Y el tamaño de la letra: la cuenta en «normal» hereda una vez el que este navegador ya usaba.
+    if (r.tamanoTexto) {
+      const local = preferenciasPanel().texto
+      let heredar = false
+      try { heredar = r.tamanoTexto === 'normal' && local !== 'normal' && !localStorage.getItem('texto-en-cuenta'); localStorage.setItem('texto-en-cuenta', '1') } catch { /* sin almacenamiento */ }
+      if (heredar) void guardarPerfil({ tamanoTexto: local }).catch(() => {})
+      else cambiarPreferencias({ texto: r.tamanoTexto })
     }
     // El orden del menú del panel vive en la cuenta; el navegador guarda una copia para pintarlo sin esperar.
     // Sin orden en la cuenta va el de fábrica; sólo la primera vez, este navegador le pasa el que ya tenía de antes de

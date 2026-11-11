@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { COLOR_FONDO, usePreferenciasPanel } from '../../lib/tema'
+import { COLOR_FONDO, usePreferenciaTema, usePreferenciasPanel } from '../../lib/tema'
 import { type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { reparte } from '../../lib/reparto'
 import { Selector } from '../../components/Selector'
@@ -11,7 +11,7 @@ import { HORA_CIERRE, useHoraCierre } from '../../lib/alertas'
 import { dinero, hace } from '../../lib/fechas'
 import { fijarMiMeta, useServidor, type MiMeta } from '../../lib/cobranza'
 import { activarPush, desactivarPush, enviarPrueba, marcarLeidosEnServidor, renovarSuscripcion, useEstadoPush } from '../../lib/push'
-import { cambiarPassword, cerrarSesion, elegirFondo, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
+import { cambiarPassword, cerrarSesion, elegirFondo, elegirTema, obtenerUltimoPassword, sesionActual, useSesion } from '../../lib/sesion'
 import { HORAS, SILENCIO_NOCHE, hora, usePreferenciasAvisos } from '../../lib/preferencias'
 import { useEnVivoConectado } from '../../lib/enVivo'
 import { sincronizar, useEstadoSync } from '../../lib/sync'
@@ -349,6 +349,7 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
   const silencio = prefs?.silencio ?? null
   const claseHora = 'rounded-md bg-niebla px-3 py-2 text-sm font-semibold'
   const { fondo } = usePreferenciasPanel()
+  const tema = usePreferenciaTema()
   return (
     <>
       {sinSenal && <p className="mt-4 border-t border-linea pt-3 text-xs text-apagado">Sin conexión: lo de abajo se puede cambiar cuando haya señal.</p>}
@@ -391,11 +392,25 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
         )}
       </div>
       <div className="mt-4 border-t border-linea pt-3">
-        {/* No va en <Opcion> (un label): tocar su texto elegiría el primer botón. */}
+        {/* No van en <Opcion> (un label): tocar su texto elegiría el primer botón. */}
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">Tema</span>
+            <span className="block text-xs text-apagado">Oscuro para repartir de noche sin deslumbrarte. Automático sigue al teléfono.</span>
+          </span>
+          <span role="radiogroup" aria-label="Tema" className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            {(['claro', 'oscuro', 'sistema'] as const).map((t) => (
+              <button key={t} type="button" role="radio" aria-checked={tema === t} onClick={() => void elegirTema(t).catch(() => aviso('Cambió en este teléfono, pero no se pudo guardar en tu cuenta'))}
+                className={`rounded-md px-2.5 py-2 text-sm font-semibold ${tema === t ? 'bg-tinta text-white' : 'bg-niebla'}`}>
+                {t === 'claro' ? 'Claro' : t === 'oscuro' ? 'Oscuro' : 'Automático'}
+              </button>
+            ))}
+          </span>
+        </div>
         <div className="mt-3 flex items-center justify-between gap-3">
           <span className="min-w-0">
             <span className="block text-sm font-medium">Color del fondo</span>
-            <span className="block text-xs text-apagado">Se guarda en tu cuenta. Aparte de los colores de tu empresa.</span>
+            <span className="block text-xs text-apagado">Se guarda en tu cuenta. Aparte de los colores de tu empresa; con el tema oscuro no se usa.</span>
           </span>
           <span role="radiogroup" aria-label="Color del fondo" className="flex shrink-0 gap-1.5">
             {(['blanco', 'crema', 'gris'] as const).map((f) => (

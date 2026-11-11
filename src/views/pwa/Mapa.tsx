@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 import { LngLatBounds, Map as MapaML, Marker, type StyleSpecification } from 'maplibre-gl'
 import type { EstadoPedido } from '../../lib/db'
 import type { Punto } from '../../lib/ruteo'
+import { temaOscuroAhora } from '../../lib/tema'
 
-// Estilo libre de OpenFreeMap (sin llave): gris claro y limpio, como el mapa de Uber. Los edificios 3D se agregan abajo.
-export const ESTILO_MAPA = 'https://tiles.openfreemap.org/styles/positron'
+// Estilo libre de OpenFreeMap (sin llave): gris claro y limpio, como el mapa de Uber, o su versión oscura con el modo
+// oscuro (se elige al crear el mapa; cambiar el tema lo aplica al volver a abrirlo). Los edificios 3D se agregan abajo.
+export const estiloMapa = () => `https://tiles.openfreemap.org/styles/${temaOscuroAhora() ? 'dark' : 'positron'}`
 
 export interface Pin {
   id: string
@@ -55,7 +57,7 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
   useEffect(() => {
     const m = new MapaML({
       container: div.current!,
-      style: ESTILO_MAPA,
+      style: estiloMapa(),
       center: enfoque ?? yo ?? [-99.1332, 19.4326],
       zoom: 14,
       pitch: modo3D ? 60 : 0,
@@ -67,7 +69,7 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
       asegurarEdificios3D(m)
       // Ruta azul que se aclara hacia el final, con un borde blanco para que destaque sobre las calles.
       m.addSource('ruta', { type: 'geojson', data: lineaGeo(lineaPendiente.current), lineMetrics: true })
-      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 9 } })
+      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': temaOscuroAhora() ? '#0e1611' : '#ffffff', 'line-width': 9 } })
       m.addLayer({
         id: 'ruta', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-width': 5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#035d38', 1, '#34a96f'] },
