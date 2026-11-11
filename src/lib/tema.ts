@@ -1,7 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react'
 
-// Tema del panel de administración (claro, oscuro o el del sistema). Es una preferencia de cada navegador: se guarda
-// aquí y no en el servidor. La app de reparto no la usa (views/admin/tema.css).
+// Tema del panel de administración (claro, oscuro o el del sistema). Vive en la cuenta (usuarios.tema, migración 041;
+// se elige con `elegirTema` en sesion.ts) y aquí queda una copia para pintarlo al instante. La app de reparto no la usa
+// (views/admin/tema.css).
 
 export type PreferenciaTema = 'claro' | 'oscuro' | 'sistema'
 const CLAVE = 'tema-panel'
@@ -32,6 +33,7 @@ export function cambiarTema(p: PreferenciaTema) {
 
 const suscribir = (f: () => void) => { oyentes.add(f); return () => { oyentes.delete(f) } }
 export const usePreferenciaTema = () => useSyncExternalStore(suscribir, () => preferencia)
+export const preferenciaTema = () => preferencia
 // true si el panel debe verse oscuro ahora mismo (en «sistema», según el sistema operativo).
 export const useTemaOscuro = () =>
   useSyncExternalStore(suscribir, () => preferencia === 'oscuro' || (preferencia === 'sistema' && !!sistemaOscuro?.matches))

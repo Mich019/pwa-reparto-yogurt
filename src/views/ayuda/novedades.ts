@@ -5,7 +5,8 @@ import type { Donde, Para } from './guias'
 // guía. Al agregar una versión, va hasta arriba con su fecha (AAAA-MM-DD): la Ayuda marca «Nuevo» lo que esa persona
 // todavía no vio en este dispositivo. Las pruebas (api/_test/guias.test.ts) revisan el orden y que cada guía exista.
 
-export interface PuntoNovedad { texto: string; para?: Para; donde?: Donde; guia?: string }
+// `probar: 'fondo'`: un botón para probar el fondo blanco (o volver al crema) en un toque, sin ir a Configuración.
+export interface PuntoNovedad { texto: string; para?: Para; donde?: Donde; guia?: string; probar?: 'fondo' }
 export interface Novedad { fecha: string; titulo: string; puntos: PuntoNovedad[] }
 
 export const NOVEDADES: Novedad[] = [
@@ -13,7 +14,7 @@ export const NOVEDADES: Novedad[] = [
     fecha: '2026-11-10', titulo: 'Clientes que dejaron de comprar y más WhatsApp',
     puntos: [
       { texto: '«Cobranza» ahora se llama «Finanzas», con pestañas más claras: Por cobrar, Envases, Cortes del día y Cierre de mes; debajo del título dice para qué sirve cada una. Arriba, cuatro cifras de un vistazo (lo que te deben, el efectivo de hoy por confirmar, los envases prestados y lo vendido en el mes) y «Cortes del día» trae un numerito con los que faltan por confirmar (también junto a «Finanzas» en el menú). Lo vendido en el mes se compara con el mes pasado a la misma fecha, y con «Confirmar los que cuadran» confirmas de un toque los cortes que entregaron justo lo que debían. Su atajo es «g f».', para: 'administrador', donde: 'panel', guia: 'cobranza' },
-      { texto: 'Puedes elegir el color del fondo: blanco, crema o gris. Se guarda en tu cuenta, así lo ves igual en todos tus dispositivos, y no cambia los colores de tu empresa (Configuración → Apariencia en el panel, Cuenta → Preferencias en el teléfono). Las cuentas nuevas empiezan en blanco.' },
+      { texto: 'Puedes elegir el color del fondo: blanco, crema o gris. Se guarda en tu cuenta, así lo ves igual en todos tus dispositivos, y no cambia los colores de tu empresa (Configuración → Apariencia en el panel, Cuenta → Preferencias en el teléfono). Las cuentas nuevas empiezan en blanco. El modo oscuro también se guarda en tu cuenta.', probar: 'fondo' },
       { texto: 'Mientras algo carga ves en gris la forma de lo que va a aparecer, y los botones muestran un circulito mientras guardan, generan o envían; al guardar, el botón dice «Guardado» un momento (o «No se pudo» si falló), y lo mismo junto a las preferencias que se guardan solas. Las cifras que cambian solas brillan un instante para que veas qué se movió.' },
       { texto: 'La primera vez que entras, un recorrido corto te muestra para qué sirve cada parte, señalando cada botón. Lo repites cuando quieras con «Ver la guía otra vez», aquí en Ayuda.' },
       { texto: 'En Clientes ves quiénes dejaron de comprar (más de un mes sin pedido) y les escribes desde ahí.', guia: 'sin-comprar' },

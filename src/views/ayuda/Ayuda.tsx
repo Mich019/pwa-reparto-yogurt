@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { COLOR_FONDO, usePreferenciasPanel } from '../../lib/tema'
 import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { verGuia } from '../../lib/guiaInicio'
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Compass, MessageCircle, Search, Sparkles, X } from 'lucide-react'
 import { db } from '../../lib/db'
-import { useSesion } from '../../lib/sesion'
+import { elegirFondo, useSesion } from '../../lib/sesion'
 import { useMarca } from '../../lib/marca'
 import { useLogoEtiqueta } from '../admin/marca'
 import { useSuscripcion } from '../../lib/suscripcion'
@@ -188,6 +189,19 @@ export function Ayuda({ donde, ir }: { donde: Donde; ir?: (destino: string) => v
 // este dispositivo sale con «Nuevo»; al verlo, queda visto para la próxima.
 const CLAVE_VISTO = 'delisy:novedades-vistas'
 const leerVisto = () => { try { return localStorage.getItem(CLAVE_VISTO) ?? '' } catch { return '' } }
+// En «¿Qué hay de nuevo?»: prueba el fondo blanco de un toque (o vuelve al crema si ya está en blanco). Se guarda en la
+// cuenta como si se eligiera en Configuración.
+function ProbarFondo() {
+  const { fondo } = usePreferenciasPanel()
+  const otro = fondo === 'blanco' ? 'crema' : 'blanco'
+  return (
+    <button type="button" onClick={() => void elegirFondo(otro).catch(() => {})} className={`inline-flex items-center gap-1.5 font-semibold text-tinta underline underline-offset-2 ${anillo}`}>
+      <span aria-hidden="true" className="inline-block h-3 w-3 rounded-full border border-linea align-[-1px]" style={{ background: COLOR_FONDO[otro] }} />
+      {fondo === 'blanco' ? 'Volver al crema' : 'Probar el fondo blanco'}
+    </button>
+  )
+}
+
 const novedadesPara = (rol: string, donde: Donde): Novedad[] => NOVEDADES
   .map((n) => ({ ...n, puntos: n.puntos.filter((p) => (!p.para || p.para === rol) && (!p.donde || p.donde === donde || donde === 'panel')) }))
   .filter((n) => n.puntos.length)
@@ -232,7 +246,7 @@ function QueHayDeNuevo({ donde, rol, guias, onAbrir }: { donde: Donde; rol: stri
                 return (
                   <li key={p.texto} className="flex gap-2 text-sm text-apagado">
                     <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-apagado" />
-                    <span>{p.texto}{g && <> <button type="button" onClick={() => onAbrir(g.id)} className={`font-semibold text-tinta underline underline-offset-2 ${anillo}`}>Ver cómo</button></>}</span>
+                    <span>{p.texto}{g && <> <button type="button" onClick={() => onAbrir(g.id)} className={`font-semibold text-tinta underline underline-offset-2 ${anillo}`}>Ver cómo</button></>}{p.probar === 'fondo' && <> <ProbarFondo /></>}</span>
                   </li>
                 )
               })}

@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { EsqueletoLista, type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
-import { elegirFondo, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
-import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
+import { elegirFondo, elegirTema, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
+import { cambiarPreferencias, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
 import { aviso, claseInputRecto } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
@@ -736,7 +736,7 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
   const p = usePreferenciasPanel()
   return (
     <>
-      <Seccion id="tema" titulo="Tema" descripcion="Se guarda en este navegador, igual que lo de abajo: cada computadora o teléfono puede tener el suyo.">
+      <Seccion id="tema" titulo="Tema" descripcion="Se guarda en tu cuenta, igual que el color del fondo: lo ves igual en todos tus dispositivos. «Lectura y movimiento» es de cada navegador.">
         <div role="radiogroup" aria-label="Tema del panel" className="grid gap-3 sm:grid-cols-3">
           {TEMAS.map(({ valor, texto, ayuda, icono: Icono }) => {
             const elegido = tema === valor
@@ -746,7 +746,7 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
                 type="button"
                 role="radio"
                 aria-checked={elegido}
-                onClick={() => cambiarTema(valor)}
+                onClick={() => void elegirTema(valor).catch(() => aviso('Cambió en este navegador, pero no se pudo guardar en tu cuenta'))}
                 className={`flex flex-col gap-3 rounded-lg p-3 text-left transition-colors ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}
               >
                 <Muestra valor={valor} />

@@ -105,7 +105,7 @@ describe('login y sesiones (M01)', () => {
     const editar = (payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${s.token}` }, payload })
     const r = await editar({ nombre: '  Rosa Pérez ', telefono: '555 123 4567' })
     assert.equal(r.statusCode, 200)
-    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null, fondo: 'blanco', avisosApagados: [], silencio: null, resumenCorreo: false, resumenSemanal: false, resumenSemanalDia: 1, resumenMensual: false, mensajes: {} })
+    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null, fondo: 'blanco', tema: 'sistema', avisosApagados: [], silencio: null, resumenCorreo: false, resumenSemanal: false, resumenSemanalDia: 1, resumenMensual: false, mensajes: {} })
     const yo = await get(s, '/me')
     assert.equal(yo.body.nombre, 'Rosa Pérez')
     assert.equal(yo.body.telefono, '555 123 4567')
@@ -133,6 +133,10 @@ describe('login y sesiones (M01)', () => {
     assert.equal((await get(s, '/me')).body.fondo, 'gris')
     assert.equal((await editar({ fondo: 'rojo' })).statusCode, 400)
     assert.equal((await editar({ nombre: 'Rosa Pérez' })).json().fondo, 'gris')
+    // El tema (041): claro, oscuro o sistema.
+    assert.equal((await editar({ tema: 'oscuro' })).json().tema, 'oscuro')
+    assert.equal((await get(s, '/me')).body.tema, 'oscuro')
+    assert.equal((await editar({ tema: 'azul' })).statusCode, 400)
   })
 
   it('lista sus sesiones abiertas y cierra una o todas las demás, nunca la propia ni las de otro', async () => {
