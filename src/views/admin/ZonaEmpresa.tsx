@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { guardarMarca, useMarca } from '../../lib/marca'
-import { aviso, claseInputRecto } from '../../components/ui'
+import { aviso, claseInputPanel } from '../../components/ui'
 import { Fila, Seccion } from './Configuracion'
 import { Selector } from '../../components/Selector'
 
@@ -36,7 +36,7 @@ export function ZonaEmpresa() {
   return (
     <Seccion id="zona" titulo="Zona horaria">
       <Fila titulo="Dónde está tu negocio" ayuda="Decide cuándo empieza y termina «hoy» para la ruta, el stock y los reportes.">
-        <Selector valor={zona} deshabilitado={guardando} onCambiar={(z) => void cambiar(z)} className={claseInputRecto} etiqueta="Zona horaria de tu negocio"
+        <Selector valor={zona} deshabilitado={guardando} onCambiar={(z) => void cambiar(z)} className={claseInputPanel} etiqueta="Zona horaria de tu negocio"
           opciones={opciones.map(([z, n]) => ({ valor: z, texto: n }))} />
       </Fila>
     </Seccion>

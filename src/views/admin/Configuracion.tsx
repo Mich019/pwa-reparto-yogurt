@@ -4,7 +4,7 @@ import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, 
 import { ErrorApi } from '../../lib/api'
 import { elegirFondo, elegirTema, elegirTexto, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
-import { aviso, claseInputRecto } from '../../components/ui'
+import { aviso, claseInputPanel } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
 import { DosPasos } from '../pwa/DosPasos'
@@ -231,19 +231,19 @@ function Cuenta({ plataforma }: { plataforma: boolean }) {
         </button>
       } descripcion={plataforma ? 'Tu foto, tu nombre y tu teléfono, como los ven las demás cuentas de la plataforma.' : 'Así te ven tu equipo y los avisos de la app: tu foto, tu nombre y tu teléfono.'}>
         <FotoPerfil />
-        <form id="form-perfil" onSubmit={(e) => { e.preventDefault(); if (cambios) void guardar() }} className="mt-6 grid gap-4 sm:grid-cols-2">
+        <form id="form-perfil" onSubmit={(e) => { e.preventDefault(); if (cambios) void guardar() }} className="mt-6 grid max-w-2xl gap-x-4 gap-y-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-apagado">Nombre</span>
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={claseInputRecto} maxLength={100} autoComplete="name" />
+            <span className="mb-1 block text-xs font-medium text-apagado">Nombre</span>
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className={claseInputPanel} maxLength={100} autoComplete="name" />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-apagado">Teléfono</span>
-            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} className={claseInputRecto} maxLength={20} inputMode="tel" autoComplete="tel" placeholder="Opcional" />
+            <span className="mb-1 block text-xs font-medium text-apagado">Teléfono</span>
+            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} className={claseInputPanel} maxLength={20} inputMode="tel" autoComplete="tel" placeholder="Opcional" />
           </label>
           <label className="block sm:col-span-2">
-            <span className="mb-1.5 block text-xs font-medium text-apagado">Correo</span>
-            <input value={u.correo} readOnly className={`${claseInputRecto} cursor-default opacity-70`} />
-            <span className="mt-1.5 block text-xs text-apagado">{plataforma ? 'Es con lo que entras al panel de la plataforma.' : 'Es con lo que entras. Si necesitas cambiarlo, otro administrador lo hace desde Vendedores.'}</span>
+            <span className="mb-1 block text-xs font-medium text-apagado">Correo</span>
+            <input value={u.correo} readOnly className={`${claseInputPanel} cursor-default opacity-70`} />
+            <span className="mt-1 block text-xs text-apagado">{plataforma ? 'Es con lo que entras al panel de la plataforma.' : 'Es con lo que entras. Si necesitas cambiarlo, otro administrador lo hace desde Vendedores.'}</span>
           </label>
           {error && <p role="alert" className="text-sm font-medium text-rojo sm:col-span-2">{error}</p>}
         </form>
@@ -359,7 +359,7 @@ function MinutosUrgente() {
   return (
     <Seccion listo={listo} id="urgentes" titulo="Pedidos urgentes" descripcion="Vale para toda tu empresa: lo ven igual los demás administradores.">
       <Fila titulo="Recordar si siguen pendientes" ayuda={`Después de ${texto(actual)} se le recuerda al vendedor y te avisa a ti.`}>
-        <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputRecto} etiqueta="Tiempo antes de recordar un urgente"
+        <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputPanel} etiqueta="Tiempo antes de recordar un urgente"
           opciones={opciones.map((n) => ({ valor: n, texto: texto(n) }))} />
       </Fila>
     </Seccion>
@@ -391,7 +391,7 @@ function RitmoMeta() {
   return (
     <Seccion listo={listo} id="metas" titulo="Metas de los vendedores" descripcion="Vale para toda tu empresa. El aviso sale del 15 al 20 de cada mes, una vez por vendedor.">
       <Fila titulo="Avisar si alguien va atrasado" ayuda={`Si lleva menos del ${actual}% de lo que debería a esas alturas. Por ejemplo, a mitad de mes, menos del ${Math.round(actual / 2)}% de su meta.`}>
-        <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputRecto} etiqueta="Qué tan atrasado avisar"
+        <Selector valor={actual} deshabilitado={guardando} onCambiar={(n) => void cambiar(n)} className={claseInputPanel} etiqueta="Qué tan atrasado avisar"
           opciones={opciones.map((n) => ({ valor: n, texto: `Menos del ${n}%` }))} />
       </Fila>
     </Seccion>
@@ -443,7 +443,7 @@ function LimiteFiadoEmpresa() {
     <Seccion listo={listo} id="fiado" titulo="Fiado" descripcion="El límite vale para los clientes que no tienen uno propio (se pone en la ficha de cada cliente). Sin código sólo avisa; con código, fiar de más lo necesita.">
       <Fila titulo="Límite de fiado" ayuda={actual === null ? 'Sin límite.' : `Al elegir «Fiado», el teléfono avisa si el cliente pasaría de ${'$'}${actual.toLocaleString('es-MX')}. En Por cobrar sale en rojo quien ya lo pasó.`}>
         <span className="flex items-center gap-2">
-          <input inputMode="decimal" value={valor} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-label="Límite de fiado de la empresa" aria-invalid={!valido} className={`${claseInputRecto} w-32`} />
+          <input inputMode="decimal" value={valor} onChange={(e) => setTexto(e.target.value)} placeholder="Sin límite" aria-label="Límite de fiado de la empresa" aria-invalid={!valido} className={`${claseInputPanel} w-32`} />
           {valor !== (actual === null ? '' : String(actual)) && (
             <button type="button" onClick={() => void guardar()} disabled={guardando || !valido} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>
           )}
@@ -452,7 +452,7 @@ function LimiteFiadoEmpresa() {
       <Fila titulo="Código para fiar de más" ayuda={marca.codigoFiado ? 'Puesto: el teléfono no deja entregar a «Fiado» a quien pasaría de su límite hasta que el vendedor escribe el código. Escribe otro para cambiarlo.' : 'Sin código: el teléfono sólo avisa. Con uno (de 4 a 8 números), fiar de más lo pide; dáselo al vendedor cuando lo autorices.'}>
         <span className="flex items-center gap-2">
           <input type="password" inputMode="numeric" autoComplete="new-password" maxLength={8} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-            placeholder={marca.codigoFiado ? '••••' : 'Sin código'} aria-label="Código para fiar de más" className={`${claseInputRecto} w-32`} />
+            placeholder={marca.codigoFiado ? '••••' : 'Sin código'} aria-label="Código para fiar de más" className={`${claseInputPanel} w-32`} />
           {codigo.length >= 4 && <button type="button" onClick={() => void guardarCodigo(codigo)} disabled={guardando} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>}
           {marca.codigoFiado && !codigo && <button type="button" onClick={() => void guardarCodigo(null)} disabled={guardando} className="text-sm font-semibold text-apagado underline-offset-2 hover:underline disabled:opacity-40">Quitar</button>}
         </span>
@@ -523,17 +523,17 @@ function FirmaCierre() {
     <Seccion listo={listo} id="firma" titulo="Firma de los informes" descripcion="El informe del cierre de mes, el del año y la hoja de producción terminan con una firma y un espacio para la fecha. Vale para toda tu empresa, también en el informe que llega por correo.">
       <Fila titulo="Quién firma" ayuda={nombre ? `Sale impreso «${nombre}» debajo de la línea.` : 'Sale el nombre del administrador que genera el informe.'}>
         <span className="flex flex-col gap-2">
-          <Selector valor={valor} deshabilitado={guardando} onCambiar={setEleccion} className={`${claseInputRecto} w-56`} etiqueta="Quién firma el informe del mes"
+          <Selector valor={valor} deshabilitado={guardando} onCambiar={setEleccion} className={`${claseInputPanel} w-56`} etiqueta="Quién firma el informe del mes"
             opciones={[{ valor: '', texto: 'Quien genera el informe' }, ...admins.map((n) => ({ valor: n, texto: n })), { valor: OTRA, texto: 'Otra persona…' }]} />
           {valor === OTRA && (
             <input value={otra ?? (admins.includes(guardado) ? '' : guardado)} onChange={(e) => setOtra(e.target.value)} maxLength={120} placeholder="Nombre completo"
-              aria-label="Nombre de quien firma" className={`${claseInputRecto} w-56`} />
+              aria-label="Nombre de quien firma" className={`${claseInputPanel} w-56`} />
           )}
         </span>
       </Fila>
       <Fila titulo="Cargo" ayuda="Va debajo del nombre.">
         <span className="flex items-center gap-2">
-          <input value={cargoTexto} onChange={(e) => setCargo(e.target.value)} maxLength={80} placeholder="Administrador" aria-label="Cargo de quien firma" className={`${claseInputRecto} w-44`} />
+          <input value={cargoTexto} onChange={(e) => setCargo(e.target.value)} maxLength={80} placeholder="Administrador" aria-label="Cargo de quien firma" className={`${claseInputPanel} w-44`} />
           {cambio && <button type="button" onClick={() => void guardar()} disabled={guardando || (valor === OTRA && !nombre)} className="text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Guardar</button>}
         </span>
       </Fila>
@@ -695,7 +695,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
       </Seccion>
       <Seccion id="dos-pasos" titulo="Inicio de sesión" descripcion={plataforma ? 'Obligatoria para entrar al panel de la plataforma: sin ella sólo ves esta configuración.' : 'Protege la cuenta aunque alguien conozca tu contraseña.'}>
         {/* DosPasos trae su propia tarjeta; aquí sólo se le quita el margen de arriba. */}
-        <div className="-mt-3"><DosPasos /></div>
+        <div className="-mt-3"><DosPasos compacto /></div>
       </Seccion>
       <Seccion id="sesiones" titulo="Sesiones abiertas" descripcion="Dónde está abierta tu cuenta ahora. Si no reconoces una, ciérrala y cambia tu contraseña.">
         {!sesiones ? <EsqueletoLista filas={2} /> : (

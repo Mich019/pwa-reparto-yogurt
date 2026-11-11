@@ -21,7 +21,9 @@ type Paso =
 
 const mensaje = (e: unknown) => (e instanceof ErrorRed ? 'Necesitas conexión para esto' : e instanceof Error ? e.message : 'No se pudo')
 
-export function DosPasos() {
+// `compacto`: en el panel (computadora) los botones van del tamaño de los demás del panel, no a lo ancho y del alto del dedo.
+export function DosPasos({ compacto = false }: { compacto?: boolean }) {
+  const chico = compacto ? 'px-5! py-2.5! text-sm!' : ''
   const rol = useRol()
   const [estado, setEstado] = useState<Estado | null>(null)
   const [sinRed, setSinRed] = useState(false)
@@ -57,16 +59,16 @@ export function DosPasos() {
       {sinRed && !estado ? (
         <p className="mt-1 text-sm text-apagado">Conéctate a internet para ver o cambiar esta opción.</p>
       ) : !estado ? (
-        <Esqueleto className="mt-2 space-y-2"><Hueso className="h-3.5 w-3/4" /><Hueso className="mt-3 h-12 w-full" /></Esqueleto>
+        <Esqueleto className="mt-2 space-y-2"><Hueso className="h-3.5 w-3/4" /><Hueso className={`mt-3 ${compacto ? 'h-10 w-28' : 'h-12 w-full'}`} /></Esqueleto>
       ) : estado.activa ? (
         <>
           <p className="mt-1 text-sm text-apagado">
             Activa. Al entrar se pide tu contraseña y el código de tu app de autenticación.
             {' '}{estado.respaldoRestante === 0 ? 'Ya no te quedan códigos de respaldo: genera otros.' : `Te ${estado.respaldoRestante === 1 ? 'queda 1 código' : `quedan ${estado.respaldoRestante} códigos`} de respaldo.`}
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Boton variante="secundario" className="bg-white" onClick={() => setPaso({ t: 'renovando' })}>Nuevos códigos</Boton>
-            <Boton variante="peligro" onClick={() => setPaso({ t: 'desactivando' })}>Desactivar</Boton>
+          <div className={`mt-3 gap-2 ${compacto ? 'flex flex-wrap' : 'grid grid-cols-2'}`}>
+            <Boton variante="secundario" className={chico} onClick={() => setPaso({ t: 'renovando' })}>Nuevos códigos</Boton>
+            <Boton variante="peligro" className={chico} onClick={() => setPaso({ t: 'desactivando' })}>Desactivar</Boton>
           </div>
         </>
       ) : (
@@ -76,7 +78,7 @@ export function DosPasos() {
               ? 'Recomendada para administradores: aunque alguien sepa tu contraseña, sin tu teléfono no puede entrar.'
               : 'Además de la contraseña, al entrar se pide un código de una app en tu teléfono.'}
           </p>
-          <Boton className="mt-3 w-full" onClick={empezar} disabled={ocupado}>{ocupado ? <Ocupado texto="Preparando…" /> : <><ShieldCheck size={18} /> Activar</>}</Boton>
+          <Boton className={`mt-3 ${compacto ? chico : 'w-full'}`} onClick={empezar} disabled={ocupado}>{ocupado ? <Ocupado texto="Preparando…" /> : <><ShieldCheck size={compacto ? 16 : 18} /> Activar</>}</Boton>
         </>
       )}
 

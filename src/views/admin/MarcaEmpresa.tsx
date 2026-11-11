@@ -6,7 +6,7 @@ import { prepararLogo, revisarLogo, type RevisionLogo } from '../../lib/logo'
 import { COLORES_MARCA } from '../../lib/registro'
 import { hojaDeMuestra } from '../../lib/reportePdf'
 import { imagenParaPdf, type ImagenPdf } from '../../lib/pdf'
-import { aviso, claseInputRecto } from '../../components/ui'
+import { aviso, claseInputPanel } from '../../components/ui'
 import { Seccion } from './Configuracion'
 
 // Configuración → Marca: nombre, lema, logo, color y contacto de la empresa (src/lib/marca.ts). Se ven en el panel, en
@@ -146,11 +146,11 @@ export function MarcaEmpresa() {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-apagado">Nombre del negocio</span>
-          <input value={borrador.nombre} onChange={(e) => poner({ nombre: e.target.value })} maxLength={120} className={claseInputRecto} />
+          <input value={borrador.nombre} onChange={(e) => poner({ nombre: e.target.value })} maxLength={120} className={claseInputPanel} />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-apagado">Lema <span className="font-normal">(opcional)</span></span>
-          <input value={borrador.lema} onChange={(e) => poner({ lema: e.target.value })} maxLength={80} placeholder="Ej. Frescura que llega a tu puerta" className={claseInputRecto} />
+          <input value={borrador.lema} onChange={(e) => poner({ lema: e.target.value })} maxLength={80} placeholder="Ej. Frescura que llega a tu puerta" className={claseInputPanel} />
         </label>
       </div>
 
@@ -254,7 +254,7 @@ export function MarcaEmpresa() {
       <label className="block">
         <span className="mb-1.5 block text-sm font-semibold text-apagado">Contacto en los documentos <span className="font-normal">(opcional)</span></span>
         <input value={borrador.contacto} onChange={(e) => poner({ contacto: e.target.value })} maxLength={160}
-          placeholder="Ej. Tel. 55 1234 5678 · Av. Juárez 12, Centro · tunegocio.mx" className={claseInputRecto} />
+          placeholder="Ej. Tel. 55 1234 5678 · Av. Juárez 12, Centro · tunegocio.mx" className={claseInputPanel} />
         <span className="mt-1 block text-xs text-apagado">Sale al pie de los reportes y la libreta de clientes en PDF.</span>
       </label>
 

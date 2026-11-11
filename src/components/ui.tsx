@@ -127,6 +127,8 @@ export const claseInput =
   'w-full rounded-md border-2 border-transparent bg-niebla px-4 py-3.5 text-base text-tinta outline-none placeholder:text-apagado focus:border-tinta'
 // Las pantallas de entrada (login, código, recuperar contraseña) van con esquinas apenas redondeadas.
 export const claseInputRecto = claseInput.replace('rounded-md', 'rounded-md')
+// En el panel (computadora) los campos van compactos: con el ratón no hace falta el alto del dedo.
+export const claseInputPanel = 'w-full rounded-md border border-linea bg-niebla px-3 py-2 text-sm text-tinta outline-none placeholder:text-apagado focus:border-tinta'
 
 let avisar: (t: string) => void = () => {}
 export const aviso = (t: string) => avisar(t)
