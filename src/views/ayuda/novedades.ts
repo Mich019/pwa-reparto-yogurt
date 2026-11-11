@@ -11,6 +11,15 @@ export interface Novedad { fecha: string; titulo: string; puntos: PuntoNovedad[]
 
 export const NOVEDADES: Novedad[] = [
   {
+    fecha: '2026-11-11', titulo: 'Mapa de noche y botones más claros',
+    puntos: [
+      { texto: 'En modo oscuro el mapa se ve mejor: calles claras, agua y parques con color, la ruta encendida en verde y las paradas en claro para que resalten.', donde: 'app' },
+      { texto: 'Las pestañas de abajo ahora dicen su nombre siempre, no sólo el icono.' },
+      { texto: 'En la Ruta, el botón del mapa dice «2D» o «3D», y junto a «Pedido Realizado» hay un «Más» para ver las otras opciones.', donde: 'app' },
+      { texto: 'En Clientes, la etiqueta de cada quien dice de qué es: «Pedido hoy», «Pedido mañana».' },
+    ],
+  },
+  {
     fecha: '2026-11-10', titulo: 'Clientes que dejaron de comprar y más WhatsApp',
     puntos: [
       { texto: '«Cobranza» ahora se llama «Finanzas», con pestañas más claras: Por cobrar, Envases, Cortes del día y Cierre de mes; debajo del título dice para qué sirve cada una. Arriba, cuatro cifras de un vistazo (lo que te deben, el efectivo de hoy por confirmar, los envases prestados y lo vendido en el mes) y «Cortes del día» trae un numerito con los que faltan por confirmar (también junto a «Finanzas» en el menú). Lo vendido en el mes se compara con el mes pasado a la misma fecha, y con «Confirmar los que cuadran» confirmas de un toque los cortes que entregaron justo lo que debían. Su atajo es «g f».', para: 'administrador', donde: 'panel', guia: 'cobranza' },

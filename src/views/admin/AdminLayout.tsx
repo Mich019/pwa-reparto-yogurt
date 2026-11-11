@@ -261,14 +261,14 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
       <AtajosTeclado onIr={setSeccion} seccion={seccion} />
       {pasoGuia !== null && <GuiaInicio pasos={PASOS_PANEL} paso={pasoGuia} onPaso={(n) => irAPasoGuia('panel', n)} onTerminar={() => { terminarGuia('panel'); setSeccion('resumen') }} />}
 
-      {/* En el teléfono, las secciones flotan abajo: la elegida se abre con su nombre y las demás quedan en icono.
-          Configuración no va aquí (con siete no cabe el nombre de la elegida): se abre con el círculo de la cuenta. */}
-      <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:hidden">
-        <ul className="pointer-events-auto flex w-full max-w-md items-center gap-0.5 rounded-full border border-linea/80 bg-papel/90 p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.16)] backdrop-blur-xl">
+      {/* En el teléfono, las secciones flotan abajo, cada una con su icono y su nombre debajo (un icono solo obliga a
+          adivinar); la elegida, en verde. Configuración no va aquí: se abre con el círculo de la cuenta. */}
+      <nav aria-label="Secciones del panel" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:hidden">
+        <ul className="pointer-events-auto flex w-full max-w-lg items-stretch rounded-2xl border border-linea/80 bg-papel/90 p-1 shadow-[0_10px_32px_rgba(0,32,20,0.16)] backdrop-blur-xl">
           {menu.filter((p) => p.id !== 'configuracion').map(({ id, texto, icono: Icono }) => {
             const activa = seccion === id
             return (
-              <li key={id} className={activa ? 'shrink-0 min-[430px]:min-w-0 min-[430px]:flex-1' : 'shrink-0'}>
+              <li key={id} className="min-w-0 flex-1">
                 <button
                   type="button"
                   onClick={() => setSeccion(id)}
@@ -276,16 +276,15 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
                   aria-label={texto}
                   aria-current={activa ? 'page' : undefined}
                   title={texto}
-                  className={`flex h-11 items-center justify-center gap-2 rounded-full transition-colors ${anillo} ${
-                    activa ? 'bg-tinta text-white max-[429px]:w-11 min-[430px]:w-full min-[430px]:px-3' : 'w-11 text-apagado hover:bg-niebla max-[380px]:w-10'
+                  className={`flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl transition-colors ${anillo} ${
+                    activa ? 'bg-tinta text-white' : 'text-apagado hover:bg-niebla'
                   }`}
                 >
                   <span className="relative">
-                    <Icono size={20} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
+                    <Icono size={19} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
                     {id === 'cobranza' && <NumeritoCortes n={cortes.porAtender} flotante />}
                   </span>
-                  {/* Con siete secciones, en el teléfono angosto sólo cabe el ícono (el título de la sección ya dice cuál es). */}
-                  {activa && <span className="truncate text-[13px] font-semibold max-[429px]:hidden">{texto}</span>}
+                  <span className="max-w-full overflow-hidden text-[9px] leading-none font-semibold tracking-tighter whitespace-nowrap min-[390px]:text-[9.5px] min-[390px]:tracking-tight min-[430px]:text-[10.5px]">{texto}</span>
                 </button>
               </li>
             )

@@ -622,7 +622,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
             <p className="font-semibold">¿Restablecer la contraseña de {m.nombre}?</p>
             <p className="text-sm text-apagado">Se cierran sus sesiones en todos sus teléfonos y, al entrar con la contraseña temporal, tendrá que elegir una propia.</p>
             <div className="grid grid-cols-2 gap-2">
-              <Boton variante="secundario" className="bg-white" onClick={() => setConfirmar(null)} disabled={trabajando}>Cancelar</Boton>
+              <Boton variante="secundario" onClick={() => setConfirmar(null)} disabled={trabajando}>Cancelar</Boton>
               <Boton onClick={() => void restablecer()} disabled={trabajando}>{trabajando ? 'Un momento…' : 'Restablecer'}</Boton>
             </div>
           </div>
@@ -639,7 +639,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
               </Campo>
             )}
             <div className="grid grid-cols-2 gap-2">
-              <Boton variante="secundario" className="bg-white" onClick={() => setConfirmar(null)} disabled={trabajando}>Cancelar</Boton>
+              <Boton variante="secundario" onClick={() => setConfirmar(null)} disabled={trabajando}>Cancelar</Boton>
               <Boton variante="primario" className="!bg-rojo" onClick={() => void baja()} disabled={trabajando}>{trabajando ? 'Un momento…' : 'Dar de baja'}</Boton>
             </div>
           </div>

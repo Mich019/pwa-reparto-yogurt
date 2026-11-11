@@ -16,7 +16,8 @@ import { DIAS_CORTOS, DIAS_LARGOS, dinero, hoy, sumarDias, textoFecha, textoFrec
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
 import { exportarLibreta, type Formato } from '../../lib/reportes'
-import { estiloMapa, useEstiloDelTema } from './Mapa'
+import { temaOscuroAhora } from '../../lib/tema'
+import { estiloMapa, useEstiloDelTema, vestirMapa } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { CambiarVendedor } from './Equipo'
@@ -169,9 +170,9 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
         </>
       ) : (
       <div className="px-4 pt-safe">
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <h1 className="flex items-center gap-1 text-3xl font-bold tracking-tight">Clientes<BotonAyuda seccion="clientes" /></h1>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setEscaner(true)} aria-label="Escanear QR o tarjeta" className="grid h-10 w-10 place-items-center rounded-full bg-niebla active:bg-linea">
               <ScanLine size={20} />
             </button>
@@ -236,7 +237,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
                 </div>
                 {dejo(c) && s?.ultima && <div className="mt-0.5 flex items-center gap-1 text-xs font-semibold"><TriangleAlert size={12} className="text-ambar" aria-hidden="true" /> Sin comprar desde el {textoFecha(s.ultima).toLowerCase()}</div>}
               </div>
-              {s?.proximo && <div className="rounded-md bg-azul/10 px-2.5 py-1 text-xs font-semibold text-azul">{textoFecha(s.proximo)}</div>}
+              {s?.proximo && <div className="shrink-0 rounded-md bg-azul/10 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-azul" title="Su próximo pedido">Pedido {textoFecha(s.proximo).toLowerCase()}</div>}
               <ChevronRight size={18} className="shrink-0 text-apagado/60" />
             </button>
           )
@@ -547,6 +548,7 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
 
   useEffect(() => {
     const m = new MapaML({ container: div.current!, style: estiloMapa(), center: punto ?? [-99.1332, 19.4326], zoom: punto ? 16 : 11, attributionControl: false })
+    m.on('style.load', () => vestirMapa(m)) // la noche de la app sobre el estilo oscuro
     m.on('click', (e) => cb.current([e.lngLat.lng, e.lngLat.lat]))
     mapa.current = m
     return () => m.remove()
@@ -557,7 +559,7 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
     const m = mapa.current
     if (!m || !punto) return
     if (!marca.current) {
-      marca.current = new Marker({ color: '#035d38', draggable: true }).setLngLat(punto).addTo(m)
+      marca.current = new Marker({ color: temaOscuroAhora() ? '#35d07f' : '#035d38', draggable: true }).setLngLat(punto).addTo(m)
       marca.current.on('dragend', () => {
         const ll = marca.current!.getLngLat()
         cb.current([ll.lng, ll.lat])

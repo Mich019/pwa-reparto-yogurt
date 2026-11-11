@@ -459,7 +459,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
           <div className="truncate font-semibold">{u.nombre}</div>
           <div className="truncate text-sm text-apagado">{u.correo}</div>
         </div>
-        <span className="flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} />{ROL[u.rol]}</span>
+        <span className="flex items-center gap-1 rounded-md bg-niebla px-3 py-1.5 text-xs font-semibold"><ShieldCheck size={14} />{ROL[u.rol]}</span>
       </div>
 
       {MODO_SERVIDOR && reparte() && <MiDia />}
@@ -475,7 +475,7 @@ export function Cuenta({ irA }: { irA?: (p: PestanaAviso) => void }) {
         <p className="mt-0.5 text-sm text-apagado">
           {pendientes ? `${pendientes} ${pendientes === 1 ? 'cambio' : 'cambios'} por enviar` : 'Nada pendiente por enviar'}
         </p>
-        <Boton variante="secundario" className="mt-3 w-full bg-white" onClick={() => { setAMano(true); void sincronizar().finally(() => setAMano(false)) }} disabled={aMano}>Sincronizar ahora</Boton>
+        <Boton variante="secundario" className="mt-3 w-full" onClick={() => { setAMano(true); void sincronizar().finally(() => setAMano(false)) }} disabled={aMano}>Sincronizar ahora</Boton>
       </div>
 
       <DosPasos />

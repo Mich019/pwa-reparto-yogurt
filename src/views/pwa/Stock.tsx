@@ -37,7 +37,7 @@ export function Stock() {
   return (
     <div className="h-full overflow-y-auto px-4 pt-safe pb-24">
       <h1 className="mt-3 flex items-center gap-1 text-3xl font-bold tracking-tight">Mi carga de hoy<BotonAyuda seccion="stock" /></h1>
-      <div className="text-sm text-apagado">{textoFecha(hoy())}</div>
+      <div className="text-sm text-apagado first-letter:uppercase">{new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
 
       {filas === undefined ? (
         <Esqueleto className="mt-4" etiqueta="Cargando tu carga">
