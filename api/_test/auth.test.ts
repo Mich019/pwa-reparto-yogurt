@@ -105,7 +105,7 @@ describe('login y sesiones (M01)', () => {
     const editar = (payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${s.token}` }, payload })
     const r = await editar({ nombre: '  Rosa Pérez ', telefono: '555 123 4567' })
     assert.equal(r.statusCode, 200)
-    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null, avisosApagados: [], silencio: null, resumenCorreo: false, resumenSemanal: false, resumenSemanalDia: 1, resumenMensual: false, mensajes: {} })
+    assert.deepEqual(r.json(), { nombre: 'Rosa Pérez', telefono: '555 123 4567', foto: null, ordenMenu: null, fondo: 'blanco', avisosApagados: [], silencio: null, resumenCorreo: false, resumenSemanal: false, resumenSemanalDia: 1, resumenMensual: false, mensajes: {} })
     const yo = await get(s, '/me')
     assert.equal(yo.body.nombre, 'Rosa Pérez')
     assert.equal(yo.body.telefono, '555 123 4567')
@@ -128,6 +128,11 @@ describe('login y sesiones (M01)', () => {
     assert.deepEqual((await get(s, '/me')).body.ordenMenu, ['cobranza', 'clientes'])
     assert.equal((await editar({ ordenMenu: ['<script>'] })).statusCode, 400)
     assert.equal((await editar({ ordenMenu: [] })).json().ordenMenu, null)
+    // El fondo (040): las cuentas nuevas empiezan en blanco; sólo crema, blanco o gris.
+    assert.equal((await editar({ fondo: 'gris' })).json().fondo, 'gris')
+    assert.equal((await get(s, '/me')).body.fondo, 'gris')
+    assert.equal((await editar({ fondo: 'rojo' })).statusCode, 400)
+    assert.equal((await editar({ nombre: 'Rosa Pérez' })).json().fondo, 'gris')
   })
 
   it('lista sus sesiones abiertas y cierra una o todas las demás, nunca la propia ni las de otro', async () => {

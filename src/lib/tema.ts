@@ -39,9 +39,11 @@ export const useTemaOscuro = () =>
 // Más preferencias del panel, también de cada navegador: el tamaño del texto (todo va en rem, así que basta con el
 // tamaño de la raíz), menos movimiento (tema.css) y el orden del menú del panel (views/admin/menu.ts).
 export type TamanoTexto = 'normal' | 'grande' | 'mas-grande'
-// El color del fondo en el tema claro: crema (el de siempre) o blanco. Es de cada navegador y aparte de los colores de la
-// empresa (Marca): no cambia el logo ni el color de la marca, sólo el lienzo de atrás.
-export type Fondo = 'crema' | 'blanco'
+// El color del fondo en el tema claro: crema, blanco o gris. Vive en la cuenta (usuarios.fondo, migración 040; las
+// cuentas nuevas empiezan en blanco) con una copia aquí para pintarlo al instante; aparte de los colores de la empresa
+// (Marca): no cambia el logo ni el color de la marca, sólo el lienzo de atrás. Se elige con `elegirFondo` (sesion.ts).
+export type Fondo = 'crema' | 'blanco' | 'gris'
+export const COLOR_FONDO: Record<Fondo, string> = { crema: '#f8f6ec', blanco: '#ffffff', gris: '#f1f2f0' }
 export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean; ordenMenu: string[]; fondo: Fondo }
 const CLAVE_PREF = 'preferencias-panel'
 const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false, ordenMenu: [], fondo: 'crema' }
@@ -65,13 +67,15 @@ export const usePreferenciasPanel = () => useSyncExternalStore(suscribir, () => 
 export const preferenciasPanel = () => preferencias
 
 // El fondo vale en el panel y en la app de reparto (los dos usan `.tema-admin`), por eso lo pone App.tsx siempre:
-// `html.fondo-blanco` (views/admin/tema.css), y el color de la barra del navegador a juego.
+// `html.fondo-blanco` / `html.fondo-gris` (views/admin/tema.css), y el color de la barra del navegador a juego.
 export function useAplicarFondo() {
   const { fondo } = usePreferenciasPanel()
   const oscuro = useTemaOscuro()
   useEffect(() => {
-    document.documentElement.classList.toggle('fondo-blanco', fondo === 'blanco')
-    if (!oscuro) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', fondo === 'blanco' ? '#ffffff' : '#f8f6ec')
+    const raiz = document.documentElement
+    raiz.classList.toggle('fondo-blanco', fondo === 'blanco')
+    raiz.classList.toggle('fondo-gris', fondo === 'gris')
+    if (!oscuro) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', COLOR_FONDO[fondo] ?? COLOR_FONDO.crema)
   }, [fondo, oscuro])
 }
 

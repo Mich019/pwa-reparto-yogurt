@@ -10,7 +10,11 @@
     var enPanel = /\/(admin|plataforma)/.test(ruta)
     var oscuro = enPanel && (tema === 'oscuro' || (!tema && matchMedia('(prefers-color-scheme: dark)').matches))
     if (oscuro) pantalla.classList.add('oscuro')
-    else if ((JSON.parse(localStorage.getItem('preferencias-panel') || '{}') || {}).fondo === 'blanco') pantalla.style.background = '#ffffff'
+    else {
+      var fondo = (JSON.parse(localStorage.getItem('preferencias-panel') || '{}') || {}).fondo
+      if (fondo === 'blanco') pantalla.style.background = '#ffffff'
+      else if (fondo === 'gris') pantalla.style.background = '#f1f2f0'
+    }
     if (/\/plataforma/.test(ruta)) return // el panel de la plataforma es de Delisy
     var marca = JSON.parse(localStorage.getItem('marca-empresa') || 'null')
     if (!marca || !marca.nombre) return

@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { EsqueletoLista, type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
-import { guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
-import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto } from '../../lib/tema'
+import { elegirFondo, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
+import { cambiarPreferencias, cambiarTema, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
 import { aviso, claseInputRecto } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
@@ -45,8 +45,9 @@ const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: type
   { valor: 'sistema', texto: 'Automático', ayuda: 'Igual que tu computadora o teléfono', icono: Monitor },
 ]
 const FONDOS: { valor: Fondo; texto: string; ayuda: string; color: string }[] = [
-  { valor: 'crema', texto: 'Crema', ayuda: 'El de siempre, más cálido', color: '#f8f6ec' },
-  { valor: 'blanco', texto: 'Blanco', ayuda: 'Más limpio y luminoso', color: '#ffffff' },
+  { valor: 'blanco', texto: 'Blanco', ayuda: 'Limpio y luminoso', color: COLOR_FONDO.blanco },
+  { valor: 'crema', texto: 'Crema', ayuda: 'Más cálido', color: COLOR_FONDO.crema },
+  { valor: 'gris', texto: 'Gris', ayuda: 'Descansa la vista en jornadas largas', color: COLOR_FONDO.gris },
 ]
 const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
   { valor: 'normal', texto: 'Normal', muestra: 'text-base' },
@@ -762,12 +763,12 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
         </div>
       </Seccion>
 
-      <Seccion id="fondo" titulo="Color del fondo" descripcion="Sólo en el tema claro y en este navegador. Es aparte de los colores de tu empresa: el logo y el color de la marca no cambian.">
+      <Seccion id="fondo" titulo="Color del fondo" descripcion="Sólo en el tema claro. Se guarda en tu cuenta: lo ves igual en todos tus dispositivos. Es aparte de los colores de tu empresa: el logo y el color de la marca no cambian.">
         <div role="radiogroup" aria-label="Color del fondo" className="flex flex-wrap gap-3">
           {FONDOS.map(({ valor, texto, ayuda, color }) => {
             const elegido = p.fondo === valor
             return (
-              <button key={valor} type="button" role="radio" aria-checked={elegido} onClick={() => cambiarPreferencias({ fondo: valor })}
+              <button key={valor} type="button" role="radio" aria-checked={elegido} onClick={() => void elegirFondo(valor).catch(() => aviso('Cambió en este navegador, pero no se pudo guardar en tu cuenta'))}
                 className={`flex min-w-[13rem] flex-1 items-center gap-3 rounded-lg p-3 text-left transition-colors sm:flex-none ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}>
                 <span aria-hidden="true" className="h-10 w-14 shrink-0 rounded-md border border-linea" style={{ background: color }} />
                 <span className="min-w-0">

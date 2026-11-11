@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { api, apiArchivo, COOKIES_POSIBLES, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
-import { cambiarPreferencias, preferenciasPanel } from './tema'
+import { cambiarPreferencias, preferenciasPanel, type Fondo } from './tema'
 import { CLAVE_REVOCAR, CLAVE_SESION_SW, REVOCAR_COOKIE, guardarRevocacion, olvidarRevocacionCookie, revocarPendientes, type SesionSegundoPlano } from './envio'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
@@ -236,11 +236,17 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
 }
 
 // El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
-export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; fondo?: Fondo; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
   const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
   if (datos.silencio !== undefined) void recordarSilencio(datos.silencio)
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
   return r
+}
+
+// Elegir el fondo: se ve al momento y se guarda en la cuenta (si falla, se queda en este navegador y avisa quien llama).
+export async function elegirFondo(fondo: Fondo) {
+  cambiarPreferencias({ fondo })
+  if (actual) await guardarPerfil({ fondo })
 }
 
 // Trae el nombre y la foto de la cuenta (la foto no viaja al entrar, para que la sesión pese poco). Sin señal no pasa
@@ -251,11 +257,20 @@ const recordarSilencio = (s: { desde: number; hasta: number } | null) => db.meta
 export async function refrescarPerfil() {
   if (!actual) return
   try {
-    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
+    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; fondo?: Fondo; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
     if (r.silencio !== undefined) void recordarSilencio(r.silencio)
     // Los mensajes de WhatsApp viven en la cuenta; el dispositivo guarda una copia para usarlos sin señal.
     if (r.mensajes) void copiarMensajes(r.mensajes)
     if (actual && (actual.usuario.nombre !== r.nombre || actual.usuario.foto !== r.foto)) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
+    // El fondo vive en la cuenta. La primera vez en este navegador, si aquí ya se había elegido otro que el crema (antes de
+    // guardarse en la cuenta) y la cuenta sigue en crema, se le pasa a la cuenta; después manda siempre la cuenta.
+    if (r.fondo) {
+      const local = preferenciasPanel().fondo
+      let heredar = false
+      try { heredar = r.fondo === 'crema' && local !== 'crema' && !localStorage.getItem('fondo-en-cuenta'); localStorage.setItem('fondo-en-cuenta', '1') } catch { /* sin almacenamiento */ }
+      if (heredar) void guardarPerfil({ fondo: local }).catch(() => {})
+      else cambiarPreferencias({ fondo: r.fondo })
+    }
     // El orden del menú del panel vive en la cuenta; el navegador guarda una copia para pintarlo sin esperar.
     // Sin orden en la cuenta va el de fábrica; sólo la primera vez, este navegador le pasa el que ya tenía de antes de
     // guardarse en la cuenta (una vez por navegador, para que otra cuenta que entre aquí no herede el de la primera).

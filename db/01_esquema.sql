@@ -89,6 +89,8 @@ CREATE TABLE usuarios (
   telefono              varchar(20),
   foto                  text,                               -- foto de perfil (data URL de 256 px; 012_foto_perfil.sql)
   orden_menu            text[],                             -- orden del menú del panel (null = de fábrica; 026_orden_menu.sql)
+  fondo                 varchar(10) NOT NULL DEFAULT 'blanco' -- color del fondo en claro (040_fondo.sql; las cuentas viejas, crema)
+                          CONSTRAINT usuarios_fondo_valido CHECK (fondo IN ('crema', 'blanco', 'gris')),
   avisos_apagados       text[],                             -- tipos de aviso que la cuenta no quiere (027_avisos_apagados.sql)
   silencio_desde        smallint,                           -- horario de silencio del push, horas 0–23 en la zona de la empresa
   silencio_hasta        smallint,                           -- (028_horario_silencio.sql; null = sin horario)
