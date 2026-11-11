@@ -20,6 +20,55 @@ export function useEstiloDelTema(mapa: RefObject<MapaML | null>) {
   }, [oscuro, mapa])
 }
 
+// El estilo oscuro de OpenFreeMap es casi negro y sus calles apenas se distinguen. Al cargarlo se viste con la noche de
+// la app: tierra verde muy oscura, calles claras según su importancia, agua azul petróleo, parques verdes y letreros
+// legibles. Va por tipo de capa y por lo que dibuja (`source-layer` y la clase de su filtro), no por su nombre, así que
+// aguanta que el estilo cambie; una capa que no se deje pintar se queda como venía.
+const NOCHE = {
+  tierra: '#0f1813', barrio: '#121d17', agua: '#0c2b33', parque: '#17301f', bosque: '#152a1c',
+  edificio: '#1a2720', bordeEdificio: '#26372d', pista: '#1b2921',
+  autopista: '#647f6d', avenida: '#4d6355', calle: '#33443a', vereda: '#26332b', via: '#2a362f', orilla: '#0a110d',
+  limite: '#3f5145', lugar: '#d5dccf', letrero: '#94a598', letreroAgua: '#62a6b0',
+}
+const clasesDe = (filtro: unknown) => JSON.stringify(filtro ?? '')
+const tiene = (texto: string, ...clases: string[]) => clases.some((c) => texto.includes(`"${c}"`))
+
+export function vestirMapa(m: MapaML) {
+  if (!temaOscuroAhora()) return
+  for (const capa of m.getStyle().layers) {
+    const pintar = (propiedad: string, valor: string | number) => {
+      try { m.setPaintProperty(capa.id, propiedad as Parameters<MapaML['setPaintProperty']>[1], valor) } catch { /* esa capa no tiene esa propiedad: queda igual */ }
+    }
+    const de = ('source-layer' in capa && capa['source-layer']) || ''
+    const clases = clasesDe('filter' in capa ? capa.filter : null)
+    if (capa.type === 'background') pintar('background-color', NOCHE.tierra)
+    else if (capa.type === 'fill') {
+      if (de === 'water') pintar('fill-color', NOCHE.agua)
+      else if (de === 'park') pintar('fill-color', NOCHE.parque)
+      else if (de === 'landcover') pintar('fill-color', NOCHE.bosque)
+      else if (de === 'landuse') pintar('fill-color', tiene(clases, 'park', 'cemetery', 'pitch', 'stadium') ? NOCHE.parque : NOCHE.barrio)
+      else if (de === 'aeroway') pintar('fill-color', NOCHE.pista)
+      else if (de === 'building') { pintar('fill-color', NOCHE.edificio); pintar('fill-outline-color', NOCHE.bordeEdificio) }
+    } else if (capa.type === 'line') {
+      if (de === 'waterway' || de === 'water') pintar('line-color', NOCHE.agua)
+      else if (de === 'boundary') pintar('line-color', NOCHE.limite)
+      else if (de === 'aeroway') pintar('line-color', NOCHE.pista)
+      else if (de === 'transportation') {
+        if (/casing|borde/i.test(capa.id)) pintar('line-color', NOCHE.orilla)
+        else if (tiene(clases, 'rail', 'transit')) pintar('line-color', NOCHE.via)
+        else if (tiene(clases, 'motorway')) pintar('line-color', NOCHE.autopista)
+        else if (tiene(clases, 'trunk', 'primary', 'secondary', 'tertiary')) pintar('line-color', NOCHE.avenida)
+        else if (tiene(clases, 'path', 'track')) pintar('line-color', NOCHE.vereda)
+        else pintar('line-color', NOCHE.calle)
+      }
+    } else if (capa.type === 'symbol') {
+      pintar('text-color', de === 'place' ? NOCHE.lugar : de === 'water_name' || de === 'waterway' ? NOCHE.letreroAgua : NOCHE.letrero)
+      pintar('text-halo-color', NOCHE.tierra)
+      pintar('text-halo-width', 1.2)
+    }
+  }
+}
+
 export interface Pin {
   id: string
   punto: Punto
@@ -41,7 +90,7 @@ function asegurarEdificios3D(mapa: MapaML) {
     'source-layer': 'building',
     minzoom: 14,
     paint: {
-      'fill-extrusion-color': temaOscuroAhora() ? '#2a332d' : '#e6e6e6',
+      'fill-extrusion-color': temaOscuroAhora() ? '#22332a' : '#e6e6e6',
       'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
       'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
       'fill-extrusion-opacity': 0.7,
@@ -81,13 +130,18 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
     // También después de cambiar de estilo por el tema (useEstiloDelTema): el estilo nuevo llega sin estas capas.
     m.on('style.load', () => {
       if (m.getSource('ruta')) return
+      vestirMapa(m)
       asegurarEdificios3D(m)
-      // Ruta azul que se aclara hacia el final, con un borde blanco para que destaque sobre las calles.
+      // La ruta: en claro, verde de la marca que se aclara hacia el final con un borde blanco; de noche, verde encendido
+      // con un resplandor, para que se distinga de las calles de un vistazo.
+      const noche = temaOscuroAhora()
       m.addSource('ruta', { type: 'geojson', data: lineaGeo(lineaPendiente.current), lineMetrics: true })
-      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': temaOscuroAhora() ? '#0e1611' : '#ffffff', 'line-width': 9 } })
+      const trazo = { 'line-cap': 'round', 'line-join': 'round' } as const
+      if (noche) m.addLayer({ id: 'ruta-brillo', type: 'line', source: 'ruta', layout: trazo, paint: { 'line-color': '#35d07f', 'line-width': 16, 'line-blur': 10, 'line-opacity': 0.35 } })
+      m.addLayer({ id: 'ruta-borde', type: 'line', source: 'ruta', layout: trazo, paint: { 'line-color': noche ? '#07100b' : '#ffffff', 'line-width': 9 } })
       m.addLayer({
-        id: 'ruta', type: 'line', source: 'ruta', layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-width': 5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#035d38', 1, '#34a96f'] },
+        id: 'ruta', type: 'line', source: 'ruta', layout: trazo,
+        paint: { 'line-width': 5, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, noche ? '#35d07f' : '#035d38', 1, noche ? '#b7f0cd' : '#34a96f'] },
       })
       listo.current = true
     })

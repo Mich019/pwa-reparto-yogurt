@@ -53,3 +53,13 @@
   100% { box-shadow: 0 0 0 0 rgba(249, 220, 7, 0); }
 }
 .tema-campo .yo { background: #035d38; box-shadow: 0 0 0 10px rgba(3, 93, 56, 0.2); }
+
+/* De noche (`.oscuro`): el mapa es verde muy oscuro, así que los pines van claros para que salten a la vista. Por
+ * entregar en crema con el número oscuro, entregados en verde encendido, omitidos apagados; el siguiente sigue amarillo. */
+.tema-campo.oscuro .pin { background: #f4f1e4; color: #0e1611; border-color: #0e1611; box-shadow: 0 0 0 1.5px rgba(244, 241, 228, 0.3), 0 3px 10px rgba(0, 0, 0, 0.6); }
+.tema-campo.oscuro .pin-ENTREGADO { background: #2fb673; color: #04130b; }
+.tema-campo.oscuro .pin-OMITIDO { background: #4a554e; color: #c8d0c8; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6); }
+.tema-campo.oscuro .pin-activo { background: #f9dc07; color: #002014; }
+.tema-campo.oscuro .yo { background: #5ee6a0; border-color: #f4f1e4; box-shadow: 0 0 0 10px rgba(94, 230, 160, 0.22), 0 0 14px rgba(94, 230, 160, 0.6); }
+.tema-admin.oscuro .maplibregl-ctrl-attrib { background: rgba(14, 22, 17, 0.78); color: #9fb0a4; }
+.tema-admin.oscuro .maplibregl-ctrl-attrib a { color: inherit; }

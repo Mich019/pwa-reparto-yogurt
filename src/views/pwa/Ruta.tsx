@@ -306,13 +306,14 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
 
         {ruta && !ruta.porCalles && orden.length > 0 && (
           <div className="pointer-events-auto mt-2 rounded-md bg-ambar px-3 py-2 text-xs font-semibold text-tinta">
-            Sin conexión al ruteador: orden aproximado en línea recta. Toca ↻ al tener señal.
+            Sin señal para trazar la ruta por las calles: va en línea recta. Toca ↻ cuando tengas señal.
           </div>
         )}
 
-        <div className={`mt-3 flex flex-col items-end gap-2 transition-opacity duration-200 ${expandida ? 'pointer-events-none opacity-0' : 'pointer-events-auto'}`}>
-          <BotonRedondo onClick={() => setModo3D(!modo3D)} etiqueta="Vista 2D/3D">
-            {modo3D ? <MapIcon size={20} /> : <Box size={20} />}
+        <div className={`mt-3 flex items-center justify-end gap-2 transition-opacity duration-200 ${expandida ? 'pointer-events-none opacity-0' : 'pointer-events-auto'}`}>
+          {/* Dice a qué vista cambia: «2D» (plano, desde arriba) o «3D» (inclinado, con edificios). */}
+          <BotonRedondo onClick={() => setModo3D(!modo3D)} etiqueta={modo3D ? 'Ver el mapa plano (2D)' : 'Ver el mapa inclinado (3D)'}>
+            <span className="text-[13px] font-bold tracking-tight">{modo3D ? '2D' : '3D'}</span>
           </BotonRedondo>
           <BotonRedondo onClick={() => recalcular(true)} etiqueta="Recalcular ruta">
             <RefreshCw size={20} className={calculando ? 'animate-spin' : ''} />
@@ -425,9 +426,10 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                 <button
                   onClick={() => setExpandida(!expandida)}
                   aria-label={expandida ? 'Ver menos' : 'Ver más'}
-                  className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-niebla active:bg-linea"
+                  className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-md bg-niebla active:bg-linea"
                 >
-                  <ChevronUp size={24} className={`transition-transform ${expandida ? 'rotate-180' : ''}`} />
+                  <ChevronUp size={20} className={`transition-transform ${expandida ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  <span className="text-[11px] leading-none font-semibold">{expandida ? 'Menos' : 'Más'}</span>
                 </button>
                 <Boton onClick={pedidoRealizado} disabled={pago === 'CREDITO' && !fiadoPermitido} className="h-14 flex-1 !py-0 text-lg">
                   <CheckCircle2 size={22} /> Pedido Realizado
@@ -598,7 +600,7 @@ function Recordatorios({ abierta, onCerrar, porId, onPedido }: {
 
 function BotonRedondo({ children, onClick, etiqueta }: { children: ReactNode; onClick: () => void; etiqueta: string }) {
   return (
-    <button onClick={onClick} aria-label={etiqueta} className="relative grid h-11 w-11 place-items-center rounded-full bg-papel shadow-tarjeta active:bg-niebla">
+    <button onClick={onClick} aria-label={etiqueta} title={etiqueta} className="relative grid h-11 w-11 place-items-center rounded-full bg-papel shadow-tarjeta active:bg-niebla">
       {children}
     </button>
   )

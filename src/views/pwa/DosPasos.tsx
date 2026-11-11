@@ -65,7 +65,7 @@ export function DosPasos() {
             {' '}{estado.respaldoRestante === 0 ? 'Ya no te quedan códigos de respaldo: genera otros.' : `Te ${estado.respaldoRestante === 1 ? 'queda 1 código' : `quedan ${estado.respaldoRestante} códigos`} de respaldo.`}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Boton variante="secundario" className="bg-white" onClick={() => setPaso({ t: 'renovando' })}>Nuevos códigos</Boton>
+            <Boton variante="secundario" onClick={() => setPaso({ t: 'renovando' })}>Nuevos códigos</Boton>
             <Boton variante="peligro" onClick={() => setPaso({ t: 'desactivando' })}>Desactivar</Boton>
           </div>
         </>

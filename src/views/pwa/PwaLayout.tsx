@@ -135,8 +135,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
         {actual === 'cuenta' && <Cuenta irA={irA} />}
       </main>
 
-      {/* Barra inferior, como la del panel en el teléfono: una píldora donde la pestaña elegida se abre en verde con su
-          nombre y las demás quedan en icono. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin
+      {/* Barra inferior: cada pestaña con su icono y su nombre (un icono solo obliga a adivinar); la elegida, en verde. Con servidor: Ruta, Clientes, Cuenta y, para el vendedor, Stock. Sin
           servidor: Ruta, Clientes, Producción y Sabores. */}
       <nav aria-label="Secciones" className="z-30 flex justify-center bg-lienzo px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <ul className="flex w-full max-w-md items-center gap-0.5 rounded-md border border-linea/80 bg-papel p-1.5 shadow-[0_10px_32px_rgba(0,32,20,0.12)]">
@@ -144,19 +143,19 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
             const activa = actual === id
             const punto = id === 'cuenta' && sinVer + avisosSinLeer > 0
             return (
-              <li key={id} className={activa ? 'min-w-0 flex-1' : 'shrink-0'}>
+              <li key={id} className="min-w-0 flex-1">
                 <button
                   onClick={() => setPestana(id)}
                   data-seccion={id}
                   aria-label={texto}
                   aria-current={activa ? 'page' : undefined}
-                  className={`relative flex h-12 items-center justify-center gap-2 rounded-md transition-colors ${
-                    activa ? 'w-full bg-tinta px-3 text-white' : 'w-14 text-apagado active:bg-niebla'
+                  className={`relative flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-md px-1 transition-colors ${
+                    activa ? 'bg-tinta text-white' : 'text-apagado active:bg-niebla'
                   }`}
                 >
                   <Icono size={21} strokeWidth={activa ? 2.2 : 1.9} aria-hidden="true" />
-                  {activa && <span className="truncate text-sm font-semibold">{texto}</span>}
-                  {punto && <span className="absolute top-2 right-2.5 h-2.5 w-2.5 rounded-full bg-rojo ring-2 ring-papel" />}
+                  <span className="max-w-full truncate text-[11px] leading-tight font-semibold">{texto}</span>
+                  {punto && <span className="absolute top-1.5 right-[calc(50%-1.1rem)] h-2.5 w-2.5 rounded-full bg-rojo ring-2 ring-papel" />}
                 </button>
               </li>
             )
