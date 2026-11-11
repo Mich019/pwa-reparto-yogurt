@@ -16,7 +16,7 @@ import { DIAS_CORTOS, DIAS_LARGOS, dinero, hoy, sumarDias, textoFecha, textoFrec
 import { ubicacionActual, type Punto } from '../../lib/ruteo'
 import { useRol } from '../../lib/sesion'
 import { exportarLibreta, type Formato } from '../../lib/reportes'
-import { estiloMapa } from './Mapa'
+import { estiloMapa, useEstiloDelTema } from './Mapa'
 import { EditorPedido } from './EditorPedido'
 import { aCantidades, type Cantidades } from './SelectorSabores'
 import { CambiarVendedor } from './Equipo'
@@ -543,6 +543,7 @@ function MapaSelector({ punto, onCambio }: { punto: Punto | null; onCambio: (p: 
   const marca = useRef<Marker | null>(null)
   const cb = useRef(onCambio)
   cb.current = onCambio
+  useEstiloDelTema(mapa)
 
   useEffect(() => {
     const m = new MapaML({ container: div.current!, style: estiloMapa(), center: punto ?? [-99.1332, 19.4326], zoom: punto ? 16 : 11, attributionControl: false })

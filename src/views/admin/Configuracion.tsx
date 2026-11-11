@@ -127,7 +127,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
       </header>
 
       <div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
-        <nav aria-label="Apartados de la configuración" className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible">
+        <nav aria-label="Apartados de la configuración" className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:mb-0 lg:max-h-full lg:flex-col lg:self-start lg:overflow-y-auto lg:p-1">
           {menu.map(({ id, texto, ayuda, icono: Icono }) => {
             const elegido = visible === id
             return (
@@ -148,7 +148,8 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
           })}
         </nav>
 
-        {/* Lo único que se desplaza en la computadora; el margen deja ver completo el anillo de foco. */}
+        {/* Lo que se desplaza en la computadora (el menú de al lado también, si con la letra grande no cabe); el margen
+            deja ver completo el anillo de foco. */}
         <div id="apartado-config" className="min-w-0 space-y-7 lg:-mx-2 lg:overflow-y-auto lg:px-2 lg:pb-12">
           {visible === 'cuenta' && <Cuenta plataforma={plataforma} />}
           {visible === 'seguridad' && <Seguridad plataforma={plataforma} />}

@@ -38,7 +38,9 @@ export function Selector<T extends string | number>({ valor, opciones, onCambiar
   function abrir() {
     if (deshabilitado || !boton.current) return
     const r = boton.current.getBoundingClientRect()
-    const alto = Math.min(opciones.length * ALTO_OPCION + 10, ALTO_MAXIMO)
+    // Las medidas son con la letra normal; con «Grande» o «Más grande» la lista crece igual (está en rem).
+    const escala = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1
+    const alto = Math.min(opciones.length * ALTO_OPCION + 10, ALTO_MAXIMO) * escala
     const abajo = innerHeight - r.bottom
     setLado({ arriba: abajo < alto + 12 && r.top > abajo, derecha: r.left + Math.max(r.width, 240) > innerWidth - 8 })
     setActivo(indice >= 0 ? indice : siguiente(-1, 1))

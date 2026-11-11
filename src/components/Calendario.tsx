@@ -39,7 +39,8 @@ function Flotante({ ancla, onCerrar, children }: { ancla: HTMLElement | null; on
     const w = caja.current.offsetWidth
     const h = caja.current.offsetHeight
     const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) // alineado a la derecha del botón, sin salirse
-    const top = r.bottom + 6 + h > innerHeight - 8 && r.top - 6 - h > 8 ? r.top - 6 - h : r.bottom + 6
+    const cabeAbajo = r.bottom + 6 + h <= innerHeight - 8
+    const top = cabeAbajo ? r.bottom + 6 : r.top - 6 - h > 8 ? r.top - 6 - h : Math.max(8, innerHeight - 8 - h)
     setPos({ top, left })
   }, [ancla])
 

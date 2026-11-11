@@ -360,13 +360,13 @@ export function Escena({ escena, valores, className = '' }: { escena: TEscena; v
                 ))}
               </span>
             </div>
-            <div className="relative min-h-[300px] space-y-3 p-4 pt-5">
+            <div className="relative min-h-[18.75rem] space-y-3 p-4 pt-5">
               {piezas}
               {escena.hoja && <Hoja {...escena.hoja} compacto={false} panel />}
             </div>
           </div>
         ) : (
-          <div className="relative mx-auto h-[460px] w-[236px] overflow-hidden rounded-[34px] border-[7px] border-tinta/85 bg-[var(--color-lienzo)] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+          <div className="relative mx-auto h-[28.75rem] w-[14.75rem] overflow-hidden rounded-[34px] border-[7px] border-tinta/85 bg-[var(--color-lienzo)] shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
             <span className="absolute left-1/2 top-1.5 z-[4] h-3.5 w-16 -translate-x-1/2 rounded-full bg-tinta/85" />
             <div className="space-y-3 px-3 pt-7">
               {escena.pestana !== '' && <div className="flex items-center justify-between"><Marca valores={valores} /><span className="h-5 w-5 rounded-full bg-niebla" /></div>}

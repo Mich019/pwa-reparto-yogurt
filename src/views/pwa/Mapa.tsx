@@ -1,12 +1,24 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { LngLatBounds, Map as MapaML, Marker, type StyleSpecification } from 'maplibre-gl'
 import type { EstadoPedido } from '../../lib/db'
 import type { Punto } from '../../lib/ruteo'
-import { temaOscuroAhora } from '../../lib/tema'
+import { temaOscuroAhora, useTemaOscuro } from '../../lib/tema'
 
 // Estilo libre de OpenFreeMap (sin llave): gris claro y limpio, como el mapa de Uber, o su versión oscura con el modo
-// oscuro (se elige al crear el mapa; cambiar el tema lo aplica al volver a abrirlo). Los edificios 3D se agregan abajo.
+// oscuro. Los edificios 3D se agregan abajo.
 export const estiloMapa = () => `https://tiles.openfreemap.org/styles/${temaOscuroAhora() ? 'dark' : 'positron'}`
+
+// Al cambiar el tema con el mapa abierto, le cambia el estilo ahí mismo (sin `diff`: así vuelve a sonar «style.load» y
+// quien agregó capas propias las pone otra vez). Los marcadores son HTML y se quedan.
+export function useEstiloDelTema(mapa: RefObject<MapaML | null>) {
+  const oscuro = useTemaOscuro()
+  const puesto = useRef(oscuro)
+  useEffect(() => {
+    if (puesto.current === oscuro) return
+    puesto.current = oscuro
+    mapa.current?.setStyle(estiloMapa(), { diff: false })
+  }, [oscuro, mapa])
+}
 
 export interface Pin {
   id: string
@@ -29,7 +41,7 @@ function asegurarEdificios3D(mapa: MapaML) {
     'source-layer': 'building',
     minzoom: 14,
     paint: {
-      'fill-extrusion-color': '#e6e6e6',
+      'fill-extrusion-color': temaOscuroAhora() ? '#2a332d' : '#e6e6e6',
       'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
       'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
       'fill-extrusion-opacity': 0.7,
@@ -53,6 +65,7 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
   const ultimoEnfoque = useRef<string>('')
   const lineaPendiente = useRef<Punto[]>(linea)
   lineaPendiente.current = linea
+  useEstiloDelTema(mapa)
 
   useEffect(() => {
     const m = new MapaML({
@@ -65,7 +78,9 @@ export function Mapa({ pines, linea, yo, enfoque, modo3D, onSeleccionar }: {
       attributionControl: { compact: true },
     })
     mapa.current = m
-    m.on('load', () => {
+    // También después de cambiar de estilo por el tema (useEstiloDelTema): el estilo nuevo llega sin estas capas.
+    m.on('style.load', () => {
+      if (m.getSource('ruta')) return
       asegurarEdificios3D(m)
       // Ruta azul que se aclara hacia el final, con un borde blanco para que destaque sobre las calles.
       m.addSource('ruta', { type: 'geojson', data: lineaGeo(lineaPendiente.current), lineMetrics: true })
