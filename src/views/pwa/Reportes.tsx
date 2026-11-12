@@ -1,3 +1,4 @@
+import { usePreferenciasPanel } from '../../lib/tema'
 import { useId, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -379,6 +380,7 @@ function Tendencia({ vista, rango, unidades, onElegir, vendedor, chico }: { vist
     : { desde: sumarDias(contexto.desde, -364), hasta: sumarDias(contexto.hasta, -364) }
   const { reporte: antes } = useReporte(haceUnAnio, c.agrupar, undefined, { vendedor, activo: comparar })
   const [medida, setMedida] = useState<Medida>('ingreso')
+  const estiloGraficas = usePreferenciasPanel().graficas
   const u = unidades?.length === 1 ? unidades[0] : null // con varias unidades no se suman litros con kilos
   const medidas: { valor: Medida; texto: string }[] = [
     { valor: 'ingreso', texto: 'Ingresos' }, { valor: 'utilidad', texto: 'Utilidad' },
@@ -429,7 +431,7 @@ function Tendencia({ vista, rango, unidades, onElegir, vendedor, chico }: { vist
         <BarrasPeriodo key={m} datos={datos} formato={formato} alto={150} descripcion={`${medidas.find((x) => x.valor === m)?.texto}: ${c.titulo.toLowerCase()}`}
           leyenda={[c.otros, c.este]} textoActual="el que ves" onElegir={onElegir} previo={previo} />
         {comparar && !previoListo && <p className="mt-2 text-xs text-apagado">Cargando hace un año…</p>}
-        <p className="mt-2 text-xs text-apagado">Toca una barra para ver ese periodo.</p>
+        <p className="mt-2 text-xs text-apagado">{estiloGraficas === 'barras' ? 'Toca una barra' : 'Toca un punto'} para ver ese periodo.</p>
       </div>
     </section>
   )
