@@ -11,6 +11,13 @@ export interface Novedad { fecha: string; titulo: string; puntos: PuntoNovedad[]
 
 export const NOVEDADES: Novedad[] = [
   {
+    fecha: '2026-11-13', titulo: 'Gráficas a tu gusto',
+    puntos: [
+      { texto: 'Las gráficas de ventas ahora pueden ser de línea con puntos o de barras: lo eliges en Configuración → Apariencia → «Estilo de las gráficas», viendo cómo queda cada una. Se guarda en tu cuenta.', para: 'administrador', donde: 'panel' },
+      { texto: 'En «Ventas por día» del Resumen, una línea gris muestra los mismos días de hace un año (y cuánto subiste o bajaste), y el mejor día lleva su monto escrito.', para: 'administrador', donde: 'panel' },
+    ],
+  },
+  {
     fecha: '2026-11-12', titulo: 'Para no olvidar los envases',
     puntos: [
       { texto: 'En la ruta, las paradas de clientes con envases de hace más de un mes llevan un iconito de envase, y la parada te recuerda recogerlos. Al terminar la ruta te dice a quién se le quedaron sin recoger.', donde: 'app', guia: 'envases-corte' },

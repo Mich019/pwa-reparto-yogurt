@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { api, apiArchivo, COOKIES_POSIBLES, ErrorApi, ErrorRed, MODO_SERVIDOR } from './api'
 import { db } from './db'
-import { cambiarPreferencias, cambiarTema, preferenciaTema, preferenciasPanel, type Fondo, type PreferenciaTema, type TamanoTexto } from './tema'
+import { cambiarPreferencias, cambiarTema, preferenciaTema, preferenciasPanel, type EstiloGraficas, type Fondo, type PreferenciaTema, type TamanoTexto } from './tema'
 import { CLAVE_REVOCAR, CLAVE_SESION_SW, REVOCAR_COOKIE, guardarRevocacion, olvidarRevocacionCookie, revocarPendientes, type SesionSegundoPlano } from './envio'
 
 // Sesión del usuario en este teléfono. Se guarda en el teléfono para que la app abra sin internet:
@@ -236,7 +236,7 @@ export async function cambiarPassword(actualPassword: string, nueva: string) {
 }
 
 // El perfil propio (PATCH /me): el nombre y la foto nuevos se ven enseguida en toda la app.
-export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; fondo?: Fondo; tema?: PreferenciaTema; tamanoTexto?: TamanoTexto; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
+export async function guardarPerfil(datos: { nombre?: string; telefono?: string; foto?: string | null; ordenMenu?: string[]; fondo?: Fondo; graficas?: EstiloGraficas; tema?: PreferenciaTema; tamanoTexto?: TamanoTexto; avisosApagados?: string[]; silencio?: { desde: number; hasta: number } | null; resumenCorreo?: boolean; resumenSemanal?: boolean; resumenSemanalDia?: number; resumenMensual?: boolean; mensajes?: Record<string, string | null> }) {
   const r = await llamarAutenticado<{ nombre: string; telefono: string; foto: string | null }>('/me', { metodo: 'PATCH', cuerpo: datos })
   if (datos.silencio !== undefined) void recordarSilencio(datos.silencio)
   if (actual) fijar({ ...actual, usuario: { ...actual.usuario, nombre: r.nombre, foto: r.foto } })
@@ -247,6 +247,11 @@ export async function guardarPerfil(datos: { nombre?: string; telefono?: string;
 export async function elegirFondo(fondo: Fondo) {
   cambiarPreferencias({ fondo })
   if (actual) await guardarPerfil({ fondo })
+}
+// Lo mismo con el estilo de las gráficas (línea o barras).
+export async function elegirGraficas(graficas: EstiloGraficas) {
+  cambiarPreferencias({ graficas })
+  if (actual) await guardarPerfil({ graficas })
 }
 // Lo mismo con el tema (claro, oscuro o el del sistema).
 export async function elegirTema(tema: PreferenciaTema) {
@@ -267,7 +272,7 @@ const recordarSilencio = (s: { desde: number; hasta: number } | null) => db.meta
 export async function refrescarPerfil() {
   if (!actual) return
   try {
-    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; fondo?: Fondo; tema?: PreferenciaTema; tamanoTexto?: TamanoTexto; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
+    const r = await llamarAutenticado<{ nombre: string; foto: string | null; ordenMenu?: string[] | null; fondo?: Fondo; graficas?: EstiloGraficas; tema?: PreferenciaTema; tamanoTexto?: TamanoTexto; silencio?: { desde: number; hasta: number } | null; mensajes?: Record<string, string> }>('/me')
     if (r.silencio !== undefined) void recordarSilencio(r.silencio)
     // Los mensajes de WhatsApp viven en la cuenta; el dispositivo guarda una copia para usarlos sin señal.
     if (r.mensajes) void copiarMensajes(r.mensajes)
@@ -281,6 +286,7 @@ export async function refrescarPerfil() {
       if (heredar) void guardarPerfil({ fondo: local }).catch(() => {})
       else cambiarPreferencias({ fondo: r.fondo })
     }
+    if (r.graficas) cambiarPreferencias({ graficas: r.graficas })
     // El tema también, con la misma regla: la cuenta en «sistema» hereda una vez lo que este navegador ya tenía elegido.
     if (r.tema) {
       const local = preferenciaTema()

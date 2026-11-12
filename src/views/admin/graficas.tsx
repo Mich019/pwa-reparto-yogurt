@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChartColumn, Table2 } from 'lucide-react'
 import { techo } from '../../components/graficas'
 import { compacto } from '../../lib/admin-datos'
+import { usePreferenciasPanel } from '../../lib/tema'
 
 // Gráficos del panel, hechos con la skill dataviz: una sola serie (verde #1b8d5a) y el periodo en curso en dorado
 // (#d2a408, bajo 3:1 sobre el beige: por eso lleva su valor escrito encima, tooltip y tabla). Barras de 24 px como
@@ -16,10 +17,11 @@ export interface BarraDato {
 }
 
 // `linea`: puntos unidos por una línea en vez de barras (el tramo hacia el periodo en curso, punteado: todavía no
-// termina). Con `previo`, éste va como una línea gris delgada sin puntos.
+// termina); sin decirlo, el estilo que eligió la cuenta (Configuración → Apariencia). En la línea, el mejor periodo
+// lleva su valor escrito. Con `previo`, éste va como una línea gris delgada sin puntos.
 // `previo`: una segunda serie (p. ej. el mismo periodo hace un año), alineada por posición: una barra delgada en gris
 // junto a cada barra, con su valor en el globo y en la tabla.
-export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112, ejeEn = 1, textoActual = 'en curso', onElegir, previo, linea = false }: {
+export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112, ejeEn = 1, textoActual = 'en curso', onElegir, previo, linea: lineaPedida }: {
   datos: BarraDato[]
   formato: (n: number) => string // valor exacto
   descripcion: string // lo que mide, para lectores de pantalla y encabezado de la tabla
@@ -31,6 +33,8 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
   previo?: { valores: (number | undefined)[]; nombres: (string | undefined)[]; leyenda: string }
   linea?: boolean
 }) {
+  const estilo = usePreferenciasPanel().graficas
+  const linea = lineaPedida ?? estilo !== 'barras'
   const [tabla, setTabla] = useState(false)
   const [activa, setActiva] = useState<string | null>(null)
   const maximo = techo(Math.max(0, ...datos.map((d) => d.valor), ...(previo?.valores ?? []).map((v) => v ?? 0)))
@@ -39,6 +43,8 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
   const punto = (i: number) => `${i + 0.5},${100 - (datos[i].valor / maximo) * 100}`
   const cerrados = datos.map((d, i) => (d.actual ? null : punto(i))).filter(Boolean).join(' ')
   const iActual = datos.findIndex((d) => d.actual)
+  // El mejor periodo ya cerrado (sin contar el que está en curso, que lleva su propio número).
+  const mejor = datos.reduce<BarraDato | null>((m, d) => (!d.actual && d.valor > 0 && (!m || d.valor > m.valor) ? d : m), null)
   const lineaPrevia = (previo?.valores ?? []).flatMap((v, i) => (v === undefined || i >= datos.length ? [] : [`${i + 0.5},${100 - (v / maximo) * 100}`])).join(' ')
 
   return (
@@ -125,6 +131,11 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
                           className={`block w-full max-w-5 rounded-t-[4px] transition-[filter] group-focus-visible:ring-2 group-focus-visible:ring-tinta ${d.actual ? 'bg-oro' : 'bg-serie'} ${activa === d.clave ? 'brightness-110' : ''}`}
                           style={{ height: d.valor > 0 ? `max(3px, ${pct}%)` : 0 }}
                         />
+                      )}
+                      {linea && mejor?.clave === d.clave && activa !== d.clave && (
+                        <span aria-hidden="true" className="pointer-events-none absolute z-10 -translate-x-1/2 left-1/2 whitespace-nowrap text-[11px] font-semibold leading-none tabular-nums text-serie" style={{ bottom: `calc(${pct}% + 10px)` }}>
+                          {compacto(d.valor)}
+                        </span>
                       )}
                       {d.actual && d.valor > 0 && activa !== d.clave && (
                         <span aria-hidden="true" className="pointer-events-none absolute z-10 -translate-x-1/2 left-1/2 whitespace-nowrap text-[11px] font-semibold leading-none tabular-nums" style={{ bottom: `calc(${pct}% + ${linea ? 10 : 6}px)` }}>

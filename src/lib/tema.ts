@@ -48,9 +48,12 @@ export type TamanoTexto = 'normal' | 'grande' | 'mas-grande'
 // (Marca): no cambia el logo ni el color de la marca, sólo el lienzo de atrás. Se elige con `elegirFondo` (sesion.ts).
 export type Fondo = 'crema' | 'blanco' | 'gris'
 export const COLOR_FONDO: Record<Fondo, string> = { crema: '#f8f6ec', blanco: '#ffffff', gris: '#f1f2f0' }
-export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean; ordenMenu: string[]; fondo: Fondo }
+// Las gráficas de periodos (views/admin/graficas.tsx): línea con puntos o barras. En la cuenta (usuarios.graficas,
+// migración 046), con copia aquí; se elige con `elegirGraficas` (sesion.ts).
+export type EstiloGraficas = 'linea' | 'barras'
+export interface PreferenciasPanel { texto: TamanoTexto; menosMovimiento: boolean; ordenMenu: string[]; fondo: Fondo; graficas: EstiloGraficas }
 const CLAVE_PREF = 'preferencias-panel'
-const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false, ordenMenu: [], fondo: 'crema' }
+const PREF_INICIAL: PreferenciasPanel = { texto: 'normal', menosMovimiento: false, ordenMenu: [], fondo: 'crema', graficas: 'linea' }
 export const TAMANOS: Record<TamanoTexto, string> = { normal: '100%', grande: '112.5%', 'mas-grande': '125%' }
 
 let preferencias: PreferenciasPanel = (() => {

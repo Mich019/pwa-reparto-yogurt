@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { EsqueletoLista, type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
 import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
-import { elegirFondo, elegirTema, elegirTexto, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
-import { cambiarPreferencias, usePreferenciasPanel, usePreferenciaTema, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
+import { elegirFondo, elegirGraficas, elegirTema, elegirTexto, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
+import { cambiarPreferencias, usePreferenciasPanel, usePreferenciaTema, type EstiloGraficas, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
 import { aviso, claseInputPanel } from '../../components/ui'
 import { FotoPerfil } from '../../components/Avatar'
 import { FormPassword } from '../pwa/Cuenta'
@@ -48,6 +48,10 @@ const FONDOS: { valor: Fondo; texto: string; ayuda: string; color: string }[] = 
   { valor: 'blanco', texto: 'Blanco', ayuda: 'Limpio y luminoso', color: COLOR_FONDO.blanco },
   { valor: 'crema', texto: 'Crema', ayuda: 'Más cálido', color: COLOR_FONDO.crema },
   { valor: 'gris', texto: 'Gris', ayuda: 'Descansa la vista en jornadas largas', color: COLOR_FONDO.gris },
+]
+const GRAFICAS: { valor: EstiloGraficas; texto: string; ayuda: string }[] = [
+  { valor: 'linea', texto: 'Línea con puntos', ayuda: 'Se ve mejor cómo suben y bajan las ventas' },
+  { valor: 'barras', texto: 'Barras', ayuda: 'Se compara mejor cuánto fue cada día o mes' },
 ]
 const TAMANOS: { valor: TamanoTexto; texto: string; muestra: string }[] = [
   { valor: 'normal', texto: 'Normal', muestra: 'text-base' },
@@ -95,6 +99,27 @@ function Muestra({ valor }: { valor: PreferenciaTema }) {
   )
 }
 
+// Vista previa de cada estilo de gráfica: catorce días de mentira con hoy en dorado, en los colores del tema.
+const MUESTRA_GRAFICA = [38, 52, 44, 30, 58, 47, 62, 40, 55, 70, 49, 64, 72, 34]
+function MuestraGrafica({ valor }: { valor: EstiloGraficas }) {
+  const n = MUESTRA_GRAFICA.length
+  const y = (v: number) => 46 - (v / 80) * 40
+  const x = (i: number) => (i + 0.5) * (120 / n)
+  return (
+    <svg aria-hidden="true" viewBox="0 0 120 50" className="h-16 w-full rounded-md border border-linea bg-papel">
+      <line x1="4" x2="116" y1="46" y2="46" stroke="var(--color-apagado)" strokeOpacity="0.4" strokeWidth="0.6" />
+      <line x1="4" x2="116" y1="26" y2="26" stroke="var(--color-linea)" strokeWidth="0.6" />
+      {valor === 'barras'
+        ? MUESTRA_GRAFICA.map((v, i) => <rect key={i} x={x(i) - 2.2} y={y(v)} width="4.4" height={46 - y(v)} rx="1" fill={i === n - 1 ? 'var(--color-oro)' : 'var(--color-serie)'} />)
+        : <>
+            <polyline points={MUESTRA_GRAFICA.slice(0, -1).map((v, i) => `${x(i)},${y(v)}`).join(' ')} fill="none" stroke="var(--color-serie)" strokeWidth="1.2" strokeLinejoin="round" />
+            <line x1={x(n - 2)} y1={y(MUESTRA_GRAFICA[n - 2])} x2={x(n - 1)} y2={y(MUESTRA_GRAFICA[n - 1])} stroke="var(--color-oro)" strokeWidth="1.2" strokeDasharray="2 2" />
+            {MUESTRA_GRAFICA.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r="1.8" fill={i === n - 1 ? 'var(--color-oro)' : 'var(--color-serie)'} stroke="var(--color-papel)" strokeWidth="0.8" />)}
+          </>}
+    </svg>
+  )
+}
+
 // `irA`: abre otra sección del panel (el «Ir a…» de las guías de Ayuda).
 export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = [], irA }: { inicial?: ApartadoConfig; plataforma?: boolean; extra?: ApartadoExtra[]; irA?: (seccion: string) => void }) {
   const u = useSesion()?.usuario
@@ -109,7 +134,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
     ...extra,
     { id: 'privacidad', texto: 'Privacidad y datos', ayuda: 'Descargar, eliminar, avisos', icono: LockKeyhole },
-    { id: 'apariencia', texto: 'Apariencia', ayuda: plataforma ? 'Tema, texto y movimiento' : 'Tema, texto y orden del menú', icono: Palette },
+    { id: 'apariencia', texto: 'Apariencia', ayuda: plataforma ? 'Tema, gráficas y texto' : 'Tema, gráficas y orden del menú', icono: Palette },
     ...(plataforma ? [] : [{ id: 'ayuda', texto: 'Ayuda', ayuda: 'Guías paso a paso', icono: LifeBuoy }]),
   ]
   const visible = menu.some((m) => m.id === apartado) ? apartado : 'cuenta'
@@ -805,6 +830,24 @@ function Apariencia({ plataforma }: { plataforma: boolean }) {
                 className={`flex min-w-[13rem] flex-1 items-center gap-3 rounded-lg p-3 text-left transition-colors sm:flex-none ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}>
                 <span aria-hidden="true" className="h-10 w-14 shrink-0 rounded-md border border-linea" style={{ background: color }} />
                 <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{texto}</span>
+                  <span className="block text-xs text-apagado">{ayuda}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </Seccion>
+
+      <Seccion id="graficas" titulo="Estilo de las gráficas" descripcion="Para las ventas por día del Resumen, la tendencia de Reportes, los sabores y la plataforma. Se guarda en tu cuenta: lo ves igual en todas tus computadoras.">
+        <div role="radiogroup" aria-label="Estilo de las gráficas" className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
+          {GRAFICAS.map(({ valor, texto, ayuda }) => {
+            const elegido = p.graficas === valor
+            return (
+              <button key={valor} type="button" role="radio" aria-checked={elegido} onClick={() => void elegirGraficas(valor).catch(() => aviso('Cambió en este navegador, pero no se pudo guardar en tu cuenta'))}
+                className={`flex flex-col gap-3 rounded-lg p-3 text-left transition-colors ${anillo} ${elegido ? 'bg-papel ring-2 ring-marca' : 'bg-niebla hover:bg-linea/60'}`}>
+                <MuestraGrafica valor={valor} />
+                <span className="px-1">
                   <span className="block text-sm font-semibold">{texto}</span>
                   <span className="block text-xs text-apagado">{ayuda}</span>
                 </span>

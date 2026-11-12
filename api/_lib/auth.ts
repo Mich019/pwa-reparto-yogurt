@@ -36,6 +36,8 @@ const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional
   ordenMenu: z.array(z.string().regex(/^[a-z]{1,20}$/)).max(20).optional(),
   // El color del fondo en el tema claro (src/lib/tema.ts).
   fondo: z.enum(['crema', 'blanco', 'gris']).optional(),
+  // Gráficas de línea con puntos o de barras (src/lib/tema.ts).
+  graficas: z.enum(['linea', 'barras']).optional(),
   // Claro, oscuro o el del sistema (src/lib/tema.ts).
   tema: z.enum(['claro', 'oscuro', 'sistema']).optional(),
   // El tamaño de la letra del panel (src/lib/tema.ts).
@@ -253,7 +255,7 @@ export async function rutasAuth(
 
   app.get('/me', { preHandler: requiereSesionAunConPasswordPendiente }, async (req) => {
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, u.fondo, u.tema, u.tamano_texto, u.avisos_apagados, u.silencio_desde, u.silencio_hasta, u.resumen_correo, u.resumen_semanal, u.resumen_semanal_dia, u.resumen_mensual, u.mensajes, e.interna, e.nombre AS empresa
+      `SELECT u.id_usuario, u.nombre, u.correo, u.telefono, u.foto, u.rol, u.debe_cambiar_password, u.es_plataforma, u.creado_en, u.ultimo_acceso, u.password_cambiado_en, u.legal_version, u.orden_menu, u.fondo, u.graficas, u.tema, u.tamano_texto, u.avisos_apagados, u.silencio_desde, u.silencio_hasta, u.resumen_correo, u.resumen_semanal, u.resumen_semanal_dia, u.resumen_mensual, u.mensajes, e.interna, e.nombre AS empresa
          FROM usuarios u JOIN empresas e USING (id_empresa) WHERE u.id_usuario = $1`,
       [req.usuario.id],
     )
@@ -265,6 +267,7 @@ export async function rutasAuth(
       legalPendiente: u.legal_version !== VERSION_LEGAL, versionLegal: VERSION_LEGAL,
       ordenMenu: u.orden_menu ?? null,
       fondo: u.fondo,
+      graficas: u.graficas,
       tema: u.tema,
       tamanoTexto: u.tamano_texto,
       avisosApagados: u.avisos_apagados ?? [],
@@ -299,15 +302,16 @@ export async function rutasAuth(
               mensajes = CASE WHEN $18::jsonb IS NULL THEN mensajes ELSE jsonb_strip_nulls(mensajes || $18::jsonb) END,
               fondo = COALESCE($19, fondo),
               tema = COALESCE($20, tema),
-              tamano_texto = COALESCE($21, tamano_texto)
-        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu, fondo, tema, tamano_texto, avisos_apagados, silencio_desde, silencio_hasta, resumen_correo, resumen_semanal, resumen_semanal_dia, resumen_mensual, mensajes`,
+              tamano_texto = COALESCE($21, tamano_texto),
+              graficas = COALESCE($22, graficas)
+        WHERE id_usuario = $1 RETURNING nombre, telefono, foto, orden_menu, fondo, graficas, tema, tamano_texto, avisos_apagados, silencio_desde, silencio_hasta, resumen_correo, resumen_semanal, resumen_semanal_dia, resumen_mensual, mensajes`,
       [req.usuario.id, b.data.nombre ?? null, b.data.telefono !== undefined, b.data.telefono ?? null, b.data.foto !== undefined, b.data.foto ?? null,
         b.data.ordenMenu !== undefined, b.data.ordenMenu?.length ? b.data.ordenMenu : null,
         b.data.avisosApagados !== undefined, b.data.avisosApagados?.length ? [...new Set(b.data.avisosApagados)] : null,
         b.data.silencio !== undefined, b.data.silencio?.desde ?? null, b.data.silencio?.hasta ?? null, b.data.resumenCorreo ?? null, b.data.resumenSemanal ?? null, b.data.resumenSemanalDia ?? null, b.data.resumenMensual ?? null,
-        b.data.mensajes ? JSON.stringify(b.data.mensajes) : null, b.data.fondo ?? null, b.data.tema ?? null, b.data.tamanoTexto ?? null],
+        b.data.mensajes ? JSON.stringify(b.data.mensajes) : null, b.data.fondo ?? null, b.data.tema ?? null, b.data.tamanoTexto ?? null, b.data.graficas ?? null],
     )).rows[0])
-    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null, fondo: u.fondo, tema: u.tema, tamanoTexto: u.tamano_texto, avisosApagados: u.avisos_apagados ?? [], silencio: silencioDe(u), resumenCorreo: u.resumen_correo, resumenSemanal: u.resumen_semanal, resumenSemanalDia: u.resumen_semanal_dia, resumenMensual: u.resumen_mensual, mensajes: u.mensajes ?? {} }
+    return { nombre: u.nombre, telefono: u.telefono ?? '', foto: u.foto ?? null, ordenMenu: u.orden_menu ?? null, fondo: u.fondo, graficas: u.graficas, tema: u.tema, tamanoTexto: u.tamano_texto, avisosApagados: u.avisos_apagados ?? [], silencio: silencioDe(u), resumenCorreo: u.resumen_correo, resumenSemanal: u.resumen_semanal, resumenSemanalDia: u.resumen_semanal_dia, resumenMensual: u.resumen_mensual, mensajes: u.mensajes ?? {} }
   })
 
   // Las sesiones abiertas de la cuenta (la de esta petición marcada) y cerrar una o todas las demás.

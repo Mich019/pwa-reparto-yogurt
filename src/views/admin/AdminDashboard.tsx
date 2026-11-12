@@ -329,7 +329,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
                   No se pudieron traer las ventas. <button className="font-semibold underline underline-offset-2" onClick={recargarVentas}>Reintentar</button>
                 </p>
               ) : !reporte ? esperando : (
-                <BarrasPeriodo linea previo={previoSemana} datos={semana} formato={dinero} alto={190} descripcion="Ventas entregadas de cada uno de los últimos 14 días" leyenda={['Días previos', 'Hoy']} />
+                <BarrasPeriodo previo={previoSemana} datos={semana} formato={dinero} alto={190} descripcion="Ventas entregadas de cada uno de los últimos 14 días" leyenda={['Días previos', 'Hoy']} />
               )}
             </div>
           </Tarjeta>

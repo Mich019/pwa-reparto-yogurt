@@ -91,6 +91,8 @@ CREATE TABLE usuarios (
   orden_menu            text[],                             -- orden del menú del panel (null = de fábrica; 026_orden_menu.sql)
   fondo                 varchar(10) NOT NULL DEFAULT 'blanco' -- color del fondo en claro (040_fondo.sql; las cuentas viejas, crema)
                           CONSTRAINT usuarios_fondo_valido CHECK (fondo IN ('crema', 'blanco', 'gris')),
+  graficas              varchar(10) NOT NULL DEFAULT 'linea' -- gráficas de línea o de barras (046_graficas.sql)
+                          CONSTRAINT usuarios_graficas_valido CHECK (graficas IN ('linea', 'barras')),
   tema                  varchar(10) NOT NULL DEFAULT 'sistema' -- claro, oscuro o el del sistema (041_tema.sql)
                           CONSTRAINT usuarios_tema_valido CHECK (tema IN ('claro', 'oscuro', 'sistema')),
   tamano_texto          varchar(12) NOT NULL DEFAULT 'normal' -- letra del panel: normal, grande o más grande (042_tamano_texto.sql)
