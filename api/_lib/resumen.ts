@@ -285,7 +285,7 @@ async function detalleDeLaSemana(db: Db, idEmpresa: string, desde: string, hasta
   const entregados = `SELECT p.id_pedido, p.total, p.id_vendedor, (p.fecha_entregado_real AT TIME ZONE e.zona_horaria)::date AS dia
                         FROM pedidos p JOIN empresas e ON e.id_empresa = p.id_empresa
                        WHERE p.id_empresa = $1 AND p.estado = 'entregado'`
-  const [dia, sabor, vendedores, cobro, fiado] = await Promise.all([
+  const [dia, sabor, vendedores, cobro, fiado, envases] = await Promise.all([
     db.query(`SELECT to_char(dia, 'YYYY-MM-DD') AS dia, sum(total)::float8 AS vendido FROM (${entregados}) v
                WHERE dia BETWEEN $2::date AND $3::date GROUP BY dia ORDER BY 2 DESC, 1 LIMIT 1`, [idEmpresa, desde, hasta]),
     db.query(`SELECT pr.sabor AS nombre, sum(dp.subtotal)::float8 AS vendido FROM (${entregados}) v
@@ -310,6 +310,11 @@ async function detalleDeLaSemana(db: Db, idEmpresa: string, desde: string, hasta
                       SELECT id_vendedor, 0, monto FROM abonos WHERE id_empresa = $1 AND anulado_en IS NULL AND fecha BETWEEN $2::date AND $3::date) x
                 LEFT JOIN usuarios u ON u.id_usuario = x.id_vendedor
                GROUP BY x.id_vendedor, u.nombre ORDER BY sum(x.abonos) - sum(x.fiado) DESC, 1`, [idEmpresa, desde, hasta]),
+    // Envases que no cuadraron en los cortes de la semana (los que el vendedor anotó), si la empresa lleva su cuenta.
+    db.query(`SELECT u.nombre, sum(c.envases_entregados - c.envases_esperados)::int AS diferencia
+                FROM cortes_dia c JOIN usuarios u ON u.id_usuario = c.id_vendedor JOIN empresas e ON e.id_empresa = c.id_empresa
+               WHERE c.id_empresa = $1 AND e.control_retornables AND c.envases_entregados IS NOT NULL AND c.fecha BETWEEN $2::date AND $3::date
+               GROUP BY u.id_usuario, u.nombre HAVING sum(c.envases_entregados - c.envases_esperados) <> 0 ORDER BY 2, 1`, [idEmpresa, desde, hasta]),
   ])
   return {
     mejorDia: dia.rows[0] ? { dia: dia.rows[0].dia, vendido: dia.rows[0].vendido } : null,
@@ -317,6 +322,7 @@ async function detalleDeLaSemana(db: Db, idEmpresa: string, desde: string, hasta
     vendedores: vendedores.rows.map((v) => ({ nombre: v.nombre, semana: v.semana, mes: v.mes, meta: v.meta })),
     porCobrar: Math.max(0, Math.round(Number(cobro.rows[0].saldo) * 100) / 100),
     fiadoPorVendedor: fiado.rows.map((v) => ({ nombre: v.nombre, fiado: v.fiado, abonos: v.abonos })),
+    envasesCortes: envases.rows.map((v) => ({ nombre: v.nombre as string, diferencia: v.diferencia as number })),
   }
 }
 

@@ -40,6 +40,7 @@ describe('envases retornables', () => {
     await x.entrega(x.botella, 6)
     const { body } = await llamar(x.ana, 'GET', '/envases')
     assert.equal(body.total, 3)
+    assert.equal(body.clientes[0].desde, hoyEn(config.zonaHoraria)) // desde cuándo los tiene: la entrega más vieja sin devolver
     assert.equal(body.clientes.length, 1)
     assert.equal(body.clientes[0].envases[0].prestados, 3)
     const cat = (await pull(x.ana)).body.productos as { id: string; retornable?: boolean }[]

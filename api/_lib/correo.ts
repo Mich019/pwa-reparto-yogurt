@@ -145,6 +145,9 @@ export interface CifrasResumen {
     vendedores: { nombre: string; semana: number; mes: number; meta: number | null }[]
     porCobrar: number // todo lo fiado que sigue sin cobrarse, al terminar la semana
     fiadoPorVendedor?: { nombre: string; fiado: number; abonos: number }[] // lo que cada quien fió y cobró de fiado en la semana
+    // Envases que faltaron (negativo) o sobraron en los cortes de la semana, por vendedor; sólo quien no cuadró y sólo
+    // si la empresa lleva la cuenta de envases.
+    envasesCortes?: { nombre: string; diferencia: number }[]
   } | null
 }
 const pesos = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -201,6 +204,12 @@ export function correoResumen(nombre: string, empresa: string, c: CifrasResumen,
   if (c.fiado) renglones.push(['Fiado', pesos(c.fiado)])
   if (c.abonos) renglones.push(['Abonos cobrados', pesos(c.abonos)])
   if (c.semana?.porCobrar) renglones.push(['Queda por cobrar', pesos(c.semana.porCobrar)])
+  const envases = c.semana?.envasesCortes ?? []
+  if (envases.length) {
+    const lado = (filas: typeof envases, palabra: string) => filas.length
+      ? `${palabra} ${filas.reduce((s, x) => s + Math.abs(x.diferencia), 0)} (${filas.map((x) => `${x.nombre} ${Math.abs(x.diferencia)}`).join(', ')})` : ''
+    renglones.push(['Envases en los cortes', [lado(envases.filter((x) => x.diferencia < 0), 'faltaron'), lado(envases.filter((x) => x.diferencia > 0), 'sobraron')].filter(Boolean).join(' · ')])
+  }
   // Cada vendedor: lo de la semana y, si tiene meta, cómo va el mes.
   const vendedores: [string, string][] = (c.semana?.vendedores ?? []).map((v) => [v.nombre,
     `${pesos(v.semana)}${v.meta ? ` · mes: ${pesos(v.mes)} de ${pesos(v.meta)} (${Math.round((v.mes / v.meta) * 100)}%)` : ''}`])

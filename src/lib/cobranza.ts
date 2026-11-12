@@ -18,7 +18,7 @@ export interface CuentaCliente {
 }
 export interface EnvasesClientes {
   total: number
-  clientes: { id: string; nombre: string; vendedorId: string | null; total: number; envases: { productoId: string; sabor: string; envase: string | null; prestados: number }[] }[]
+  clientes: { id: string; nombre: string; vendedorId: string | null; total: number; desde?: string | null; envases: { productoId: string; sabor: string; envase: string | null; prestados: number }[] }[]
   productos: { productoId: string; sabor: string; envase: string | null; prestados: number }[]
 }
 export interface CuentaEnvases {

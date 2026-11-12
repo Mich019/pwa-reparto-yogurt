@@ -69,7 +69,25 @@ export async function rutasEnvases(app: FastifyInstance, { db, config }: Context
       const p = productos.get(f.productoId) ?? productos.set(f.productoId, { productoId: f.productoId, sabor: f.sabor, envase: f.envase, prestados: 0 }).get(f.productoId)!
       p.prestados += f.prestados
     }
-    return { total: pendientes.reduce((s, f) => s + f.prestados, 0), clientes: [...clientes.values()], productos: [...productos.values()] }
+    // Desde cuándo tiene cada cliente envases prestados: la entrega más vieja que lo devuelto todavía no cubre.
+    const { rows: desdes } = clientes.size ? await db.query(
+      `WITH ent AS (
+         SELECT pe.id_cliente, d.id_producto, pe.fecha, sum(d.cantidad) AS n
+           FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)
+          WHERE pe.estado = 'entregado' AND pr.retornable AND pe.id_cliente = ANY($1::uuid[]) GROUP BY 1, 2, 3
+       ), acum AS (SELECT *, sum(n) OVER (PARTITION BY id_cliente, id_producto ORDER BY fecha) AS hasta FROM ent),
+       rec AS (SELECT id_cliente, id_producto, sum(cantidad) AS n FROM envases_recogidos WHERE anulado_en IS NULL AND id_cliente = ANY($1::uuid[]) GROUP BY 1, 2)
+       SELECT a.id_cliente, min(a.fecha)::text AS desde FROM acum a
+         LEFT JOIN rec r ON r.id_cliente = a.id_cliente AND r.id_producto = a.id_producto
+        WHERE a.hasta > coalesce(r.n, 0) GROUP BY 1`,
+      [[...clientes.keys()]],
+    ) : { rows: [] }
+    const desde = new Map(desdes.map((r) => [r.id_cliente as string, r.desde as string]))
+    return {
+      total: pendientes.reduce((s, f) => s + f.prestados, 0),
+      clientes: [...clientes.values()].map((c) => ({ ...c, desde: desde.get(c.id) ?? null })),
+      productos: [...productos.values()],
+    }
   })
 
   // La cuenta de envases de un cliente: lo que tiene de cada producto y cada devolución.

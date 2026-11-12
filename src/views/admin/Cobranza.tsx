@@ -257,8 +257,13 @@ function PorCobrar({ q }: { q: string }) {
 function Envases() {
   const lista = useServidor<EnvasesClientes>('/envases')
   const [abierto, setAbierto] = useState<string | null>(null)
-  const clientes = lista.datos?.clientes ?? []
-  const vista = usePaginas(clientes, 30)
+  // «Más de un mes»: sólo quienes tienen envases prestados desde hace más de 30 días (los más viejos primero).
+  const [viejos, setViejos] = useState(false)
+  const hace30 = sumarDias(hoy(), -30)
+  const todos = lista.datos?.clientes ?? []
+  const clientes = viejos ? todos.filter((c) => c.desde && c.desde < hace30).sort((a, b) => (a.desde ?? '').localeCompare(b.desde ?? '')) : todos
+  const hayViejos = todos.some((c) => c.desde && c.desde < hace30)
+  const vista = usePaginas(clientes, 30, viejos)
   return (
     <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !clientes.length ? 'Nadie tiene envases prestados.' : undefined}>
       {lista.datos && (
@@ -267,12 +272,20 @@ function Envases() {
             Prestados <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{lista.datos.total}</span>
             {lista.datos.productos.length > 0 && ` · ${lista.datos.productos.map((p) => `${p.prestados} de ${p.sabor}`).join(', ')}`}
           </p>
+          {(hayViejos || viejos) && (
+            <div className="mb-3">
+              <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${clientes.length})` : ''}</button>
+            </div>
+          )}
           <div ref={vista.ancla} className="scroll-mt-4">
             {vista.visibles.map((c) => (
               <Fila key={c.id} onClick={() => setAbierto(c.id)}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{c.nombre}</span>
-                  <span className="block truncate text-sm text-apagado">{c.envases.map((e) => `${e.prestados} de ${e.sabor}`).join(', ')}</span>
+                  <span className="block truncate text-sm text-apagado">
+                    {c.envases.map((e) => `${e.prestados} de ${e.sabor}`).join(', ')}
+                    {c.desde && <span className={c.desde < hace30 ? 'font-semibold text-rojo' : ''}> · desde el {textoFecha(c.desde).toLowerCase()}</span>}
+                  </span>
                 </span>
                 <span className="font-semibold tabular-nums">{c.total}</span>
                 <ChevronRight size={18} className="shrink-0 text-apagado/60" />

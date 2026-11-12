@@ -93,6 +93,16 @@ describe('resumen diario por correo', () => {
     const fiado = await cifrasDeLaSemana(db, empresa)
     assert.deepEqual(fiado.semana?.fiadoPorVendedor?.map((v) => [v.fiado, v.abonos]), [[semana.vendido, 0]])
     assert.match(correoResumen('Ana', 'Lácteos Semana', fiado, 'https://ejemplo.test/admin').texto, /fió \$[\d,.]+ · cobró \$0\.00/)
+    // Envases en los cortes: sólo con la cuenta de envases encendida y si alguien no cuadró.
+    assert.deepEqual(fiado.semana?.envasesCortes, [])
+    await db.query(
+      `INSERT INTO cortes_dia (id_empresa, fecha, id_vendedor, efectivo_esperado, efectivo_entregado, envases_esperados, envases_entregados)
+       VALUES ($1, current_date - 2, $2, 0, 0, 5, 3)`, [empresa, vend.id])
+    assert.deepEqual((await cifrasDeLaSemana(db, empresa)).semana?.envasesCortes, [])
+    await db.query(`UPDATE empresas SET control_retornables = true WHERE id_empresa = $1`, [empresa])
+    const conEnvases = await cifrasDeLaSemana(db, empresa)
+    assert.deepEqual(conEnvases.semana?.envasesCortes?.map((v) => v.diferencia), [-2])
+    assert.match(correoResumen('Ana', 'X', conEnvases, 'u').texto, /Envases en los cortes: faltaron 2 \(.+ 2\)/)
     assert.match(correo.texto, /del .+ al .+:/)
     assert.match(correo.texto, /Contra la semana anterior: Igual/)
     assert.match(correoResumen('Ana', 'X', { ...semana, vendidoAntes: semana.vendido / 2 }, 'u').texto, /100% más/)
