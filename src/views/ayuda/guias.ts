@@ -480,10 +480,10 @@ export const GUIAS: Guia[] = [
   },
   {
     id: 'envases', tema: 'clientes', titulo: 'Recoger envases retornables', icono: Boxes, donde: 'app', para: 'todos',
-    resumen: 'Los garrafones y botellas que se prestan quedan a cuenta del cliente hasta que los devuelve. Necesita conexión.',
+    resumen: 'Los garrafones y botellas que se prestan quedan a cuenta del cliente hasta que los devuelve. Necesita conexión y que tu empresa lleve la cuenta de envases.',
     palabras: 'envases retornables garrafon botella prestados recoger devolver saldo vacios',
     pasos: [
-      { texto: 'Abre al cliente: si tiene envases prestados, lo dice arriba. Toca ese renglón.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Tienda La Esquina', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar'] }, { t: 'caja', titulo: '6', texto: 'Envases prestados', icono: Boxes, foco: true }] }) },
+      { texto: 'En la Ruta, la parada que estás entregando dice cuántos envases tiene prestados el cliente: toca «Recoger». También desde Clientes: abre al cliente y toca el renglón de sus envases.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Tienda La Esquina', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar'] }, { t: 'caja', titulo: '6', texto: 'Envases prestados', icono: Boxes, foco: true }] }) },
       { texto: 'Elige el producto, cuántos te devuelve y toca «Registrar». No puede devolver más de los que tiene.', escena: tel('Clientes', [{ t: 'titulo', texto: 'Clientes' }], { titulo: 'Recoger envases', piezas: [{ t: 'campos', items: [{ etiqueta: 'Producto', valor: 'Garrafón 20 L' }, { etiqueta: 'Cantidad', valor: '3', foco: true }] }, { t: 'boton', texto: 'Registrar' }] }) },
     ],
   },

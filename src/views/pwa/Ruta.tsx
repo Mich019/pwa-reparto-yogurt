@@ -1,4 +1,5 @@
 import { AvisoLimiteFiado } from '../../components/LimiteFiado'
+import { EnvasesEnLaParada } from '../../components/CuentaDelCliente'
 import { abrirAyuda } from '../ayuda/AyudaRapida'
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { EditorMensaje, enlaceWhatsApp, llenar, useMensaje } from '../../components/Mensajes'
@@ -388,6 +389,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                       ]}
                     />
                     {pago === 'CREDITO' && <AvisoLimiteFiado key={activo.id} cliente={clienteActivo} total={activo.total} onPermitir={setFiadoPermitido} />}
+                    {MODO_SERVIDOR && <EnvasesEnLaParada key={clienteActivo.id} clienteId={clienteActivo.id} />}
                     {clienteActivo.notas && (
                       <div className="mt-4 flex gap-2.5 rounded-md bg-niebla p-3 text-sm">
                         <StickyNote size={18} className="mt-0.5 shrink-0 text-apagado" />

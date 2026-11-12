@@ -144,6 +144,30 @@ export function HojaAbono({ cuenta, onCerrar, onHecho }: { cuenta: CuentaCliente
   )
 }
 
+// En la parada activa de la Ruta: los envases que el cliente tiene prestados, para recogerlos al entregar sin ir a su
+// ficha. Sólo con «Envases» encendido en la empresa, con conexión y si tiene alguno; si no, nada.
+export function EnvasesEnLaParada({ clienteId }: { clienteId: string }) {
+  const envases = useServidor<CuentaEnvases>(useConEnvases() ? `/envases/clientes/${clienteId}` : null)
+  const [abierta, setAbierta] = useState(false)
+  const c = envases.datos
+  if (!c || c.cliente.id !== clienteId || c.total <= 0) return null
+  const detalle = c.envases.filter((e) => e.prestados > 0).map((e) => `${e.prestados} de ${e.sabor}`).join(', ')
+  return (
+    <>
+      <button onClick={() => setAbierta(true)} className="mt-4 flex w-full items-center gap-3 rounded-md bg-niebla px-4 py-3 text-left active:bg-linea">
+        <Boxes size={20} className="shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs text-apagado">Tiene {c.total} {c.total === 1 ? 'envase prestado' : 'envases prestados'}</span>
+          <span className="block truncate text-sm font-semibold">{detalle}</span>
+        </span>
+        <span className="text-sm font-semibold">Recoger</span>
+        <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+      </button>
+      {abierta && <HojaEnvases cuenta={c} onCerrar={() => setAbierta(false)} onHecho={envases.recargar} />}
+    </>
+  )
+}
+
 export function HojaEnvases({ cuenta, onCerrar, onHecho }: { cuenta: CuentaEnvases; onCerrar: () => void; onHecho: () => void }) {
   const pendientes = cuenta.envases.filter((e) => e.prestados > 0)
   const [productoId, setProductoId] = useState(pendientes[0]?.productoId ?? '')
