@@ -16,7 +16,7 @@ import { cargarDemo } from '../../lib/demo'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { baseDelUltimoPedido } from '../../lib/codigos'
 import { enlaceComprobante } from '../../lib/comprobante'
-import { marcaActual } from '../../lib/marca'
+import { marcaActual, useConEnvases } from '../../lib/marca'
 import { AlertasRuta } from './AlertasRuta'
 import { pasoSuLimite, useServidor, type Deudor, type MiMeta } from '../../lib/cobranza'
 import { sesionActual, useSesion } from '../../lib/sesion'
@@ -629,20 +629,25 @@ function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: React
 }
 
 // Al terminar la ruta: cuánto entró en efectivo (lo que va en el corte), por transferencia y a fiado.
+// Con «Envases» encendido y conexión, también los envases que recogió hoy.
 function ComoTePagaron({ entregados }: { entregados: Pedido[] }) {
   const nombre = useSesion()?.usuario.nombre
+  const conEnvases = useConEnvases()
+  const recogidos = useServidor<{ total: number; productos: { sabor: string; cantidad: number }[] }>(MODO_SERVIDOR && conEnvases ? '/envases/recogidas/hoy' : null).datos
+  const envases = recogidos?.total ? `${recogidos.total} (${recogidos.productos.map((p) => `${p.cantidad} de ${p.sabor}`).join(', ')})` : null
   const suma = (m: string) => entregados.reduce((s, p) => s + (p.metodo_pago === m ? p.total : 0), 0)
   const partes = ([['EFECTIVO', 'Efectivo'], ['TRANSFERENCIA', 'Transferencia'], ['CREDITO', 'Fiado']] as const)
     .map(([m, texto]) => ({ texto, monto: suma(m) })).filter((x) => x.monto > 0)
-  if (!partes.length) return null
+  if (!partes.length && !envases) return null
   const efectivo = suma('EFECTIVO')
   return (
     <div className="mt-3 border-t border-linea pt-3 text-sm">
       <dl className="flex flex-wrap gap-x-5 gap-y-1">
         {partes.map((x) => <div key={x.texto}><dt className="inline text-apagado">{x.texto} </dt><dd className="inline font-semibold tabular-nums">{dinero(x.monto)}</dd></div>)}
       </dl>
+      {envases && <p className="mt-1"><span className="text-apagado">Envases recogidos </span><span className="font-semibold tabular-nums">{envases}</span></p>}
       {efectivo > 0 && <p className="mt-1 text-apagado">Cuenta el efectivo antes de entregar tu corte: deberías traer {dinero(efectivo)} (más los abonos en efectivo).</p>}
-      <a href={`https://wa.me/?text=${encodeURIComponent([`Ruta terminada${nombre ? ` (${nombre})` : ''}: ${entregados.length} ${entregados.length === 1 ? 'entrega' : 'entregas'}, ${dinero(entregados.reduce((s, p) => s + p.total, 0))}.`, ...partes.map((x) => `${x.texto}: ${dinero(x.monto)}`)].join('\n'))}`}
+      <a href={`https://wa.me/?text=${encodeURIComponent([`Ruta terminada${nombre ? ` (${nombre})` : ''}: ${entregados.length} ${entregados.length === 1 ? 'entrega' : 'entregas'}, ${dinero(entregados.reduce((s, p) => s + p.total, 0))}.`, ...partes.map((x) => `${x.texto}: ${dinero(x.monto)}`), ...envases ? [`Envases recogidos: ${envases}`] : []].join('\n'))}`}
         target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 font-semibold underline-offset-2 hover:underline">
         <MessageCircle size={16} aria-hidden="true" /> Mandar este resumen por WhatsApp
       </a>

@@ -96,6 +96,19 @@ export async function rutasEnvases(app: FastifyInstance, { db, config }: Context
     }
   })
 
+  // Los envases que recogió quien pregunta hoy (día de la empresa), por producto, sin los anulados: «¡Ruta terminada!».
+  app.get('/envases/recogidas/hoy', { preHandler: requiereSesion }, async (req) => {
+    const fecha = hoyEn(await zonaDeEmpresa(db, config.zonaHoraria))
+    const { rows } = await db.query(
+      `SELECT pr.sabor, sum(r.cantidad)::int AS cantidad
+         FROM envases_recogidos r JOIN productos pr USING (id_producto)
+        WHERE r.id_vendedor = $1 AND r.fecha = $2 AND r.anulado_en IS NULL
+        GROUP BY pr.sabor ORDER BY 2 DESC, 1`,
+      [req.usuario.id, fecha],
+    )
+    return { fecha, total: rows.reduce((s, r) => s + r.cantidad, 0), productos: rows.map((r) => ({ sabor: r.sabor as string, cantidad: r.cantidad as number })) }
+  })
+
   // Lo que el cliente devuelve. No puede devolver más de lo que tiene prestado.
   app.post('/envases/recogidas', { preHandler: requiereSesion, config: { rateLimit: { max: 120, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyRecogida.safeParse(req.body)

@@ -70,4 +70,16 @@ describe('envases retornables', () => {
     assert.equal((await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)).status, 200)
     assert.equal((await llamar(x.admin, 'GET', '/envases')).body.total, 2)
   })
+
+  it('lo recogido hoy por cada quien, sin lo anulado (para «¡Ruta terminada!»)', async () => {
+    const x = await escenario()
+    await x.entrega(x.garrafon, 5)
+    const recoger = (cantidad: number) => llamar(x.ana, 'POST', '/envases/recogidas', { clienteId: x.c.id, productoId: x.garrafon.id, cantidad })
+    await recoger(2)
+    const { body: r } = await recoger(1)
+    assert.deepEqual((await llamar(x.ana, 'GET', '/envases/recogidas/hoy')).body.productos, [{ sabor: 'Agua 20 L', cantidad: 3 }])
+    assert.equal((await llamar(x.beto, 'GET', '/envases/recogidas/hoy')).body.total, 0)
+    await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)
+    assert.equal((await llamar(x.ana, 'GET', '/envases/recogidas/hoy')).body.total, 2)
+  })
 })
