@@ -21,6 +21,7 @@ npm run db:admin       # create an admin user (-- correo "Nombre" [--empresa "Em
 npm run db:plataforma  # create a platform (super admin) account, or move an existing one there (-- correo "Nombre")
 npm run db:probar      # read-only check: env vars, DB connection, SSL, schema/migrations state
 npm run db:test        # drop and recreate the local API test DB (DATABASE_URL or the tests' default), like CI
+npm run db:datos       # test data INSIDE an existing company (-- "Empresa" [--quitar]): sellers @prueba.delisy.test, clients tagged nfc_uid «prueba:N», orders from after the last closed month; --quitar deletes only that (and phones drop it via eliminaciones)
 npm run db:vista       # local demo copy (VISTA_URL on localhost only; -- --rehacer): demo + «Delisy Pruebas» data, every account with one known password (see header of db/vista-local.ts)
 npm run push:claves    # generate VAPID keys
 ```
