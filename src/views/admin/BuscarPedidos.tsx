@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TextoCargando } from '../../components/Esqueleto'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { FileSpreadsheet, Search } from 'lucide-react'
+import { FileSpreadsheet, Search, X } from 'lucide-react'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { Hoja, claseInput } from '../../components/ui'
 import { usePaginas } from '../../components/Paginas'
@@ -122,7 +122,13 @@ export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; o
         <p className="text-sm text-apagado" aria-live="polite">
           {datos ? <>{lista.length} {lista.length === 1 ? 'pedido' : 'pedidos'}{lista.length > 0 && <> · <b className="font-semibold text-tinta tabular-nums">{dinero(suma)}</b>{mezclados && <> · entregado <b className="font-semibold text-tinta tabular-nums">{dinero(entregado)}</b></>}</>}</> : <TextoCargando ancho="9rem" />}
         </p>
-        {lista.length > 0 && <button type="button" onClick={exportar} className={botonPanelSuave}><FileSpreadsheet size={18} aria-hidden="true" /> Excel</button>}
+        <span className="flex items-center gap-2">
+          {/* Como se recuerda la última búsqueda, un toque para empezar de cero. */}
+          {(q || estado !== 'todos' || pago !== 'todos') && (
+            <button type="button" onClick={() => { setQ(''); setEstado('todos'); setPago('todos') }} className={botonPanelSuave}><X size={18} aria-hidden="true" /> Limpiar</button>
+          )}
+          {lista.length > 0 && <button type="button" onClick={exportar} className={botonPanelSuave}><FileSpreadsheet size={18} aria-hidden="true" /> Excel</button>}
+        </span>
       </div>
       <ul ref={pagina.ancla} className="mt-1 scroll-mt-4 divide-y divide-linea border-y border-linea">
         {pagina.visibles.map((p) => (

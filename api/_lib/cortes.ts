@@ -81,7 +81,8 @@ interface FilaCorte {
   // Confirmado, pero el efectivo de ese día cambió después (una venta que sincronizó tarde, un abono anulado): cuánto
   // más (o menos, negativo) se debería entregar hoy contra lo que se confirmó. Es la señal para reabrirlo.
   cambioDespues: number | null
-  envases: number // los que recogió ese día (sin los anulados), para que los entregue junto con el efectivo
+  envases: number // los que recogió ese día (sin los anulados; congelado al confirmar), para que los entregue con el efectivo
+  envasesEntregados: number | null // los que dijo que entrega; null = no los anotó
 }
 
 const ultimaReapertura = (h: { accion: string; en: string; motivo?: string }[] | null) => {
@@ -89,7 +90,13 @@ const ultimaReapertura = (h: { accion: string; en: string; motivo?: string }[] |
   return r ? { motivo: r.motivo ?? '', en: r.en } : null
 }
 
-const bodyCorte = z.object({ fecha: fechaIso.optional(), efectivoEntregado: dinero, nota: z.string().trim().max(300).optional(), vendedorId: z.uuid().optional() })
+const bodyCorte = z.object({ fecha: fechaIso.optional(), efectivoEntregado: dinero, envasesEntregados: z.number().int().min(0).max(100000).nullable().optional(), nota: z.string().trim().max(300).optional(), vendedorId: z.uuid().optional() })
+
+// Los envases que recogió un vendedor un día (sin los anulados): los que debe entregar con su corte.
+async function envasesDelDia(c: { query: Db['query'] }, fecha: string, vendedor: string) {
+  const { rows: [r] } = await c.query(`SELECT coalesce(sum(cantidad), 0)::int AS n FROM envases_recogidos WHERE fecha = $1 AND id_vendedor = $2 AND anulado_en IS NULL`, [fecha, vendedor])
+  return r.n as number
+}
 const bodyConfirmar = z.object({ nota: z.string().trim().max(300).optional() })
 
 // ------------------------------------------------------------------ cifras del mes
@@ -415,7 +422,8 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         estado: c ? c.estado : 'sin_corte', confirmadoPor: c?.conf_por ?? null, confirmadoEn: c?.conf_en ?? null, notaAdmin: c?.nota_admin ?? null,
         reabierto: c?.estado === 'pendiente' ? ultimaReapertura(c.historial) : null,
         cambioDespues: c?.estado === 'confirmado' && Math.abs(hoy.esperado - c.esp) >= 0.01 ? redondear(hoy.esperado - c.esp) : null,
-        envases: envases.get(v.id_usuario) ?? 0,
+        envases: c?.estado === 'confirmado' ? c.envases_esperados : envases.get(v.id_usuario) ?? 0,
+        envasesEntregados: c?.envases_entregados ?? null,
       })
     }
     return { fecha, filas }
@@ -460,20 +468,26 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         const { rows: [u] } = await c.query(`SELECT 1 AS ok FROM usuarios WHERE id_usuario = $1 AND ${vende()}`, [vendedor])
         if (!u) throw new Falla(404, 'Ese vendedor no existe')
         const x = await cifrasDelDia(c, fecha, vendedor)
-        const { rows: [ex] } = await c.query(`SELECT id_corte, estado FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 FOR UPDATE`, [fecha, vendedor])
+        const envEsperados = await envasesDelDia(c, fecha, vendedor)
+        const { rows: [ex] } = await c.query(`SELECT id_corte, estado, envases_entregados FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 FOR UPDATE`, [fecha, vendedor])
         if (ex?.estado === 'confirmado') throw new Falla(409, 'Ese corte ya está confirmado')
+        // Sin el dato (teléfono viejo, empresa sin envases) se queda lo que había.
+        const envEntregados: number | null = b.data.envasesEntregados === undefined ? (ex?.envases_entregados ?? null) : b.data.envasesEntregados
         const { rows: [corte] } = ex
           ? await c.query(
-              `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, efectivo_entregado = $5, nota = $6, actualizado_en = now()
+              `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, efectivo_entregado = $5, nota = $6, envases_esperados = $7, envases_entregados = $8, actualizado_en = now()
                 WHERE id_corte = $1 RETURNING id_corte, diferencia::float8 AS dif`,
-              [ex.id_corte, x.esperado, x.transferencias, x.credito, b.data.efectivoEntregado, b.data.nota || null],
+              [ex.id_corte, x.esperado, x.transferencias, x.credito, b.data.efectivoEntregado, b.data.nota || null, envEsperados, envEntregados],
             )
           : await c.query(
-              `INSERT INTO cortes_dia (fecha, id_vendedor, efectivo_esperado, transferencias, credito, efectivo_entregado, nota)
-               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_corte, diferencia::float8 AS dif`,
-              [fecha, vendedor, x.esperado, x.transferencias, x.credito, b.data.efectivoEntregado, b.data.nota || null],
+              `INSERT INTO cortes_dia (fecha, id_vendedor, efectivo_esperado, transferencias, credito, efectivo_entregado, nota, envases_esperados, envases_entregados)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id_corte, diferencia::float8 AS dif`,
+              [fecha, vendedor, x.esperado, x.transferencias, x.credito, b.data.efectivoEntregado, b.data.nota || null, envEsperados, envEntregados],
             )
-        return { id: corte.id_corte as string, esperado: x.esperado, entregado: b.data.efectivoEntregado, diferencia: redondear(corte.dif) }
+        return {
+          id: corte.id_corte as string, esperado: x.esperado, entregado: b.data.efectivoEntregado, diferencia: redondear(corte.dif),
+          envases: envEsperados, envasesEntregados: envEntregados, envasesDiferencia: envEntregados === null ? null : envEntregados - envEsperados,
+        }
       })
       // El vendedor entregó (o corrigió) su corte: los administradores se enteran para confirmarlo. Si lo capturó un
       // administrador, no hace falta.
@@ -504,12 +518,13 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         if (!k) throw new Falla(404, 'Ese corte no existe')
         if (k.estado === 'confirmado') throw new Falla(409, 'Ese corte ya está confirmado')
         const x = await cifrasDelDia(c, k.fecha, k.id_vendedor)
+        const envEsperados = await envasesDelDia(c, k.fecha, k.id_vendedor)
         const { rows: [corte] } = await c.query(
           `UPDATE cortes_dia SET efectivo_esperado = $2, transferencias = $3, credito = $4, estado = 'confirmado', confirmado_por = $5, confirmado_en = now(), nota_admin = $6, actualizado_en = now(),
-                  historial = historial || $7::jsonb
+                  historial = historial || $7::jsonb, envases_esperados = $8
             WHERE id_corte = $1 RETURNING diferencia::float8 AS dif`,
           [p.data.id, x.esperado, x.transferencias, x.credito, req.usuario.id, b.data.nota || null,
-            JSON.stringify([{ accion: 'confirmado', por: req.usuario.id, en: new Date().toISOString(), esperado: x.esperado }])],
+            JSON.stringify([{ accion: 'confirmado', por: req.usuario.id, en: new Date().toISOString(), esperado: x.esperado }]), envEsperados],
         )
         return { ok: true, esperado: x.esperado, diferencia: redondear(corte.dif) }
       })

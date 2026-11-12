@@ -35,6 +35,7 @@ export interface FilaCorte {
   confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
   reabierto: { motivo: string; en: string } | null
   envases?: number // recogidos ese día por el vendedor (falta en respuestas de antes)
+  envasesEntregados?: number | null // los que dijo que entrega; null = no los anotó
   cambioDespues: number | null // confirmado, pero el efectivo de ese día cambió después: conviene reabrirlo
 }
 export interface Descuadre { id: string; fecha: string; vendedorId: string; vendedor: string; confirmado: number; ahora: number; cambio: number }
@@ -94,7 +95,10 @@ export const registrarAbono = (b: { clienteId: string; monto: number; metodo: 'e
 export const anularAbono = (id: string, motivo: string) => enviar(`/cobranza/abonos/${id}/anular`, { motivo })
 export const registrarRecogida = (b: { clienteId: string; productoId: string; cantidad: number; nota?: string }) => enviar<{ id: string; prestados: number }>('/envases/recogidas', b)
 export const anularRecogida = (id: string) => enviar(`/envases/recogidas/${id}/anular`)
-export const entregarCorte = (b: { efectivoEntregado: number; nota?: string; fecha?: string; vendedorId?: string }) => enviar<{ id: string; esperado: number; entregado: number; diferencia: number }>('/cortes', b)
+export const entregarCorte = (b: { efectivoEntregado: number; envasesEntregados?: number | null; nota?: string; fecha?: string; vendedorId?: string }) =>
+  enviar<{ id: string; esperado: number; entregado: number; diferencia: number; envases: number; envasesEntregados: number | null; envasesDiferencia: number | null }>('/cortes', b)
+// Los envases cuadran si no los anotó (no aplica) o si entregó justo los que recogió.
+export const envasesCuadran = (f: Pick<FilaCorte, 'envases' | 'envasesEntregados'>) => f.envasesEntregados == null || f.envasesEntregados === (f.envases ?? 0)
 export const confirmarCorte = (id: string, nota?: string) => enviar<{ ok: true; esperado: number; diferencia: number }>(`/cortes/${id}/confirmar`, { nota })
 export const cerrarMes = (mes: string) => enviar<{ ok: true; porCorreo: number }>(`/cierres/${mes}/cerrar`)
 export const reabrirCorte = (id: string, motivo: string) => enviar<{ ok: true }>(`/cortes/${id}/reabrir`, { motivo })

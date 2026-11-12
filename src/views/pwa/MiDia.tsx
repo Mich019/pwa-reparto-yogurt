@@ -1,3 +1,4 @@
+import { useConEnvases } from '../../lib/marca'
 import { useEffect, useState } from 'react'
 import { useSesion } from '../../lib/sesion'
 import { Medallas } from '../../components/Medallas'
@@ -120,17 +121,22 @@ function MiAnio() {
   )
 }
 
+// Con «Envases» encendido, también cuántos envases entrega contra los que recogió ese día.
 function HojaCorte({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: () => void; onHecho: () => void }) {
   const [monto, setMonto] = useState(String(fila.entregado ?? fila.esperado))
   const [nota, setNota] = useState(fila.nota ?? '')
+  const conEnvases = useConEnvases()
+  const [envases, setEnvases] = useState(String(fila.envasesEntregados ?? fila.envases ?? 0))
   const [enviando, setEnviando] = useState(false)
   const valor = Number(monto)
-  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor >= 0
+  const nEnvases = Number(envases)
+  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor >= 0 && (!conEnvases || (envases.trim() !== '' && Number.isInteger(nEnvases) && nEnvases >= 0))
   async function enviar() {
     setEnviando(true)
     try {
-      const r = await entregarCorte({ efectivoEntregado: valor, nota: nota.trim() || undefined })
-      aviso(r.diferencia === 0 ? 'Corte entregado, cuadra' : `Corte entregado: ${r.diferencia < 0 ? 'faltan' : 'sobran'} ${dinero(Math.abs(r.diferencia))}`)
+      const r = await entregarCorte({ efectivoEntregado: valor, nota: nota.trim() || undefined, ...conEnvases ? { envasesEntregados: nEnvases } : {} })
+      const env = r.envasesDiferencia ? `; envases: ${r.envasesDiferencia < 0 ? 'faltan' : 'sobran'} ${Math.abs(r.envasesDiferencia)}` : ''
+      aviso(r.diferencia === 0 ? `Corte entregado, cuadra${env}` : `Corte entregado: ${r.diferencia < 0 ? 'faltan' : 'sobran'} ${dinero(Math.abs(r.diferencia))}${env}`)
       onHecho()
       onCerrar()
     } catch (e) {
@@ -155,6 +161,11 @@ function HojaCorte({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: () 
         <Campo etiqueta="Efectivo que entregas">
           <input inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value.replace(',', '.'))} className={claseInput} autoFocus />
         </Campo>
+        {conEnvases && (
+          <Campo etiqueta={`Envases que entregas (recogiste ${fila.envases ?? 0} hoy)`}>
+            <input inputMode="numeric" value={envases} onChange={(e) => setEnvases(e.target.value.replace(/\D/g, ''))} className={claseInput} />
+          </Campo>
+        )}
         <Campo etiqueta="Nota (opcional)">
           <input value={nota} onChange={(e) => setNota(e.target.value)} maxLength={300} className={claseInput} />
         </Campo>

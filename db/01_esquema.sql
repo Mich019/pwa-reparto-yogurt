@@ -695,10 +695,13 @@ CREATE TABLE cortes_dia (
   confirmado_en      timestamptz,
   nota_admin         varchar(300),
   historial          jsonb NOT NULL DEFAULT '[]', -- confirmaciones y reaperturas (con motivo)
+  envases_esperados  integer NOT NULL DEFAULT 0, -- recogidos ese día (045); se congela al confirmar, como el efectivo
+  envases_entregados integer,                    -- los que dice que entrega; NULL = no los anotó
   creado_en          timestamptz NOT NULL DEFAULT now(),
   actualizado_en     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT cortes_estado_valido CHECK (estado IN ('pendiente', 'confirmado')),
   CONSTRAINT cortes_entregado_no_negativo CHECK (efectivo_entregado >= 0 AND efectivo_esperado >= 0),
+  CONSTRAINT cortes_envases_no_negativos CHECK (envases_esperados >= 0 AND (envases_entregados IS NULL OR envases_entregados >= 0)),
   CONSTRAINT cortes_unico_por_dia UNIQUE (id_empresa, fecha, id_vendedor),
   CONSTRAINT cortes_vendedor_misma_empresa FOREIGN KEY (id_empresa, id_vendedor) REFERENCES usuarios (id_empresa, id_usuario)
 );

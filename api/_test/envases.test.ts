@@ -85,5 +85,14 @@ describe('envases retornables', () => {
     const filas = (await llamar(x.admin, 'GET', '/cortes')).body.filas as { vendedorId: string; envases: number }[]
     assert.equal(filas.find((f) => f.vendedorId === x.ana.id)?.envases, 2)
     assert.equal(filas.find((f) => f.vendedorId === x.beto.id)?.envases, 0)
+    // Se cuadran como el efectivo: entrega 1 de 2 → falta 1; sin el dato se queda lo anotado; al confirmar se congela.
+    const corte = (await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 0, envasesEntregados: 1 })).body
+    assert.equal(corte.envases, 2)
+    assert.equal(corte.envasesDiferencia, -1)
+    assert.equal((await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 0 })).body.envasesEntregados, 1)
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${corte.id}/confirmar`)).status, 200)
+    await llamar(x.ana, 'POST', '/envases/recogidas', { clienteId: x.c.id, productoId: x.garrafon.id, cantidad: 1 })
+    const conf = ((await llamar(x.admin, 'GET', '/cortes')).body.filas as { vendedorId: string; envases: number; envasesEntregados: number }[]).find((f) => f.vendedorId === x.ana.id)
+    assert.deepEqual([conf?.envases, conf?.envasesEntregados], [2, 1])
   })
 })

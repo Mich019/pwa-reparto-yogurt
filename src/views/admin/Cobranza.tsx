@@ -8,7 +8,7 @@ import { BotonWhatsApp, EditorMensaje, MandarATodos, textoCobro, useMensaje } fr
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
-  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre, pasoSuLimite } from '../../lib/cobranza'
+  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre, pasoSuLimite, envasesCuadran } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { textoPorUnidad } from '../../lib/unidades'
 import { usePaginas } from '../../components/Paginas'
@@ -302,7 +302,7 @@ function Cortes({ onCambio }: { onCambio: () => void }) {
   const filas = lista.datos?.filas ?? []
   const [confirmando, setConfirmando] = useState<string | null>(null)
   // Entregados por confirmar que cuadran al centavo (y sin cambios después): se confirman uno por uno, de un toque.
-  const cuadran = filas.filter((f) => f.estado === 'pendiente' && f.diferencia === 0 && f.cambioDespues === null)
+  const cuadran = filas.filter((f) => f.estado === 'pendiente' && f.diferencia === 0 && f.cambioDespues === null && envasesCuadran(f))
   async function confirmarTodos() {
     setConfirmando('todos')
     let hechos = 0
@@ -373,7 +373,13 @@ function Cortes({ onCambio }: { onCambio: () => void }) {
                   Aparte del efectivo: {f.credito > 0 && <span className="font-semibold text-tinta">fiado {dinero(f.credito)}</span>}{f.credito > 0 && f.transferencias > 0 && ' · '}{f.transferencias > 0 && `transferencias ${dinero(f.transferencias)}`}
                 </span>
               )}
-              {conEnvases && !!f.envases && <span className="block text-sm text-apagado">Recogió <span className="font-semibold text-tinta">{f.envases} {f.envases === 1 ? 'envase' : 'envases'}</span>: que los entregue con el efectivo</span>}
+              {conEnvases && (!!f.envases || f.envasesEntregados != null) && (
+                <span className="block text-sm text-apagado">
+                  Envases: recogió {f.envases ?? 0}
+                  {f.envasesEntregados == null ? ' · aún no dice cuántos entrega' : ` · entregó ${f.envasesEntregados}`}
+                  {!envasesCuadran(f) && <span className="font-semibold text-rojo"> · {f.envasesEntregados! < (f.envases ?? 0) ? 'faltan' : 'sobran'} {Math.abs(f.envasesEntregados! - (f.envases ?? 0))}</span>}
+                </span>
+              )}
               {f.nota && <span className="block text-sm text-apagado">“{f.nota}”</span>}
               {f.reabierto && <span className="block text-sm text-apagado">Reabierto: {f.reabierto.motivo}</span>}
               {f.cambioDespues !== null && (
@@ -431,13 +437,16 @@ function HojaReabrirCorte({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerr
 
 function HojaCaptura({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: () => void; onHecho: () => void }) {
   const [monto, setMonto] = useState(String(fila.esperado))
+  const conEnvases = useConEnvases()
+  const [envases, setEnvases] = useState(String(fila.envasesEntregados ?? fila.envases ?? 0))
   const [enviando, setEnviando] = useState(false)
   const valor = Number(monto)
-  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor >= 0
+  const nEnvases = Number(envases)
+  const valido = monto.trim() !== '' && Number.isFinite(valor) && valor >= 0 && (!conEnvases || (envases.trim() !== '' && Number.isInteger(nEnvases) && nEnvases >= 0))
   async function guardar() {
     setEnviando(true)
     try {
-      await entregarCorte({ efectivoEntregado: valor, fecha: fila.fecha, vendedorId: fila.vendedorId })
+      await entregarCorte({ efectivoEntregado: valor, fecha: fila.fecha, vendedorId: fila.vendedorId, ...conEnvases ? { envasesEntregados: nEnvases } : {} })
       aviso('Corte capturado')
       onHecho()
       onCerrar()
@@ -454,6 +463,13 @@ function HojaCaptura({ fila, onCerrar, onHecho }: { fila: FilaCorte; onCerrar: (
         <Campo etiqueta={`Efectivo entregado (debía ${dinero(fila.esperado)})`}>
           <input inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value.replace(',', '.'))} className={claseInput} autoFocus />
         </Campo>
+        {conEnvases && (
+          <div className="mt-4">
+            <Campo etiqueta={`Envases entregados (recogió ${fila.envases ?? 0})`}>
+              <input inputMode="numeric" value={envases} onChange={(e) => setEnvases(e.target.value.replace(/\D/g, ''))} className={claseInput} />
+            </Campo>
+          </div>
+        )}
       </div>
     </Hoja>
   )
