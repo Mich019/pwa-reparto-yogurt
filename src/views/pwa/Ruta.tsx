@@ -452,7 +452,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
               <div className="mt-1 text-apagado">
                 {entregados.length} entregas · {litrosEntregados} · {dinero(totalDia)}
               </div>
-              <ComoTePagaron entregados={entregados} />
+              <ComoTePagaron entregados={entregados} sinRecoger={(envasesR.datos?.clientes ?? []).filter((c) => envasesViejos.has(c.id) && entregados.some((p) => p.clienteId === c.id)).map((c) => c.nombre)} />
             </div>
           ) : (
             <div className="px-5 pt-3 pb-5">
@@ -639,7 +639,8 @@ function OpcionGrande({ icono, titulo, sub, destacada, onClick }: { icono: React
 
 // Al terminar la ruta: cuánto entró en efectivo (lo que va en el corte), por transferencia y a fiado.
 // Con «Envases» encendido y conexión, también los envases que recogió hoy.
-function ComoTePagaron({ entregados }: { entregados: Pedido[] }) {
+// `sinRecoger`: clientes de hoy que siguen con envases de hace más de un mes, para recogerlos en la próxima vuelta.
+function ComoTePagaron({ entregados, sinRecoger }: { entregados: Pedido[]; sinRecoger: string[] }) {
   const nombre = useSesion()?.usuario.nombre
   const conEnvases = useConEnvases()
   const recogidos = useServidor<{ total: number; productos: { sabor: string; cantidad: number }[] }>(MODO_SERVIDOR && conEnvases ? '/envases/recogidas/hoy' : null).datos
@@ -647,7 +648,7 @@ function ComoTePagaron({ entregados }: { entregados: Pedido[] }) {
   const suma = (m: string) => entregados.reduce((s, p) => s + (p.metodo_pago === m ? p.total : 0), 0)
   const partes = ([['EFECTIVO', 'Efectivo'], ['TRANSFERENCIA', 'Transferencia'], ['CREDITO', 'Fiado']] as const)
     .map(([m, texto]) => ({ texto, monto: suma(m) })).filter((x) => x.monto > 0)
-  if (!partes.length && !envases) return null
+  if (!partes.length && !envases && !sinRecoger.length) return null
   const efectivo = suma('EFECTIVO')
   return (
     <div className="mt-3 border-t border-linea pt-3 text-sm">
@@ -655,8 +656,13 @@ function ComoTePagaron({ entregados }: { entregados: Pedido[] }) {
         {partes.map((x) => <div key={x.texto}><dt className="inline text-apagado">{x.texto} </dt><dd className="inline font-semibold tabular-nums">{dinero(x.monto)}</dd></div>)}
       </dl>
       {envases && <p className="mt-1"><span className="text-apagado">Envases recogidos </span><span className="font-semibold tabular-nums">{envases}</span></p>}
+      {sinRecoger.length > 0 && (
+        <p className="mt-1 flex items-start gap-1.5"><Boxes size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-ambar" />
+          <span><span className="text-apagado">Quedaron sin recoger envases de más de un mes: </span><span className="font-semibold">{sinRecoger.join(', ')}</span>. Recógelos en la próxima vuelta.</span>
+        </p>
+      )}
       {efectivo > 0 && <p className="mt-1 text-apagado">Cuenta el efectivo antes de entregar tu corte: deberías traer {dinero(efectivo)} (más los abonos en efectivo).</p>}
-      <a href={`https://wa.me/?text=${encodeURIComponent([`Ruta terminada${nombre ? ` (${nombre})` : ''}: ${entregados.length} ${entregados.length === 1 ? 'entrega' : 'entregas'}, ${dinero(entregados.reduce((s, p) => s + p.total, 0))}.`, ...partes.map((x) => `${x.texto}: ${dinero(x.monto)}`), ...envases ? [`Envases recogidos: ${envases}`] : []].join('\n'))}`}
+      <a href={`https://wa.me/?text=${encodeURIComponent([`Ruta terminada${nombre ? ` (${nombre})` : ''}: ${entregados.length} ${entregados.length === 1 ? 'entrega' : 'entregas'}, ${dinero(entregados.reduce((s, p) => s + p.total, 0))}.`, ...partes.map((x) => `${x.texto}: ${dinero(x.monto)}`), ...envases ? [`Envases recogidos: ${envases}`] : [], ...sinRecoger.length ? [`Envases de más de un mes sin recoger: ${sinRecoger.join(', ')}`] : []].join('\n'))}`}
         target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 font-semibold underline-offset-2 hover:underline">
         <MessageCircle size={16} aria-hidden="true" /> Mandar este resumen por WhatsApp
       </a>

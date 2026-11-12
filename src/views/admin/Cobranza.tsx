@@ -268,6 +268,8 @@ function Envases() {
   const msjEnvases = useMensaje('envases')
   const [editarMsj, setEditarMsj] = useState(false)
   const telefonos = useLiveQuery(async () => new Map((await db.clientes.toArray()).map((c) => [c.id, c.telefono])), [])
+  const [mandadosEnv, setMandadosEnv] = useState<Set<string>>(new Set())
+  const textoDe = (c: (typeof todos)[number]) => llenar(msjEnvases, { nombre: c.nombre, envases: textoEnvases(c.envases) })
   // Lo que se ve (con «Más de un mes» puesto, sólo esos), con desde cuándo los tiene; en el navegador (lib/xlsx.ts).
   const equipo = useEquipo()
   useEffect(() => { if (!equipo) void cargarEquipo().catch(() => {}) }, [equipo])
@@ -295,6 +297,9 @@ function Envases() {
             )}
             <button type="button" onClick={exportar} disabled={!clientes.length} className="py-1 text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Bajar a Excel</button>
             <button type="button" onClick={() => setEditarMsj(!editarMsj)} aria-expanded={editarMsj} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editarMsj ? 'Listo' : 'Mensaje para pedir envases'}</button>
+            {/* De uno en uno (los navegadores bloquean varias ventanas a la vez); con «Más de un mes», sólo esos. */}
+            <MandarATodos lista={clientes.map((c) => ({ id: c.id, nombre: c.nombre, telefono: telefonos?.get(c.id), texto: textoDe(c) }))}
+              mandados={mandadosEnv} onEnviar={(id) => setMandadosEnv((m) => new Set(m).add(id))} />
           </div>
           {editarMsj && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="envases" /></div>}
           <div ref={vista.ancla} className="scroll-mt-4">
@@ -313,7 +318,7 @@ function Envases() {
                 <ChevronRight size={18} className="shrink-0 text-apagado/60" />
               </Fila>
               </div>
-              {telefonos?.get(c.id) && <BotonWhatsApp chico telefono={telefonos.get(c.id)} texto={llenar(msjEnvases, { nombre: c.nombre, envases: textoEnvases(c.envases) })} />}
+              {telefonos?.get(c.id) && <BotonWhatsApp chico telefono={telefonos.get(c.id)} texto={textoDe(c)} enviado={mandadosEnv.has(c.id)} onEnviar={() => setMandadosEnv((m) => new Set(m).add(c.id))} />}
               </div>
             ))}
             {vista.control}
