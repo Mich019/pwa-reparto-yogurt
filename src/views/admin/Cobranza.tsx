@@ -291,6 +291,7 @@ function Envases() {
 const ETIQUETA_CORTE = { sin_corte: 'Sin entregar', pendiente: 'Por confirmar', confirmado: 'Confirmado' } as const
 
 function Cortes({ onCambio }: { onCambio: () => void }) {
+  const conEnvases = useConEnvases()
   const [fecha, setFecha] = useState(hoy)
   const lista = useServidor<{ fecha: string; filas: FilaCorte[] }>(`/cortes?fecha=${fecha}`)
   const [captura, setCaptura] = useState<FilaCorte | null>(null)
@@ -372,6 +373,7 @@ function Cortes({ onCambio }: { onCambio: () => void }) {
                   Aparte del efectivo: {f.credito > 0 && <span className="font-semibold text-tinta">fiado {dinero(f.credito)}</span>}{f.credito > 0 && f.transferencias > 0 && ' · '}{f.transferencias > 0 && `transferencias ${dinero(f.transferencias)}`}
                 </span>
               )}
+              {conEnvases && !!f.envases && <span className="block text-sm text-apagado">Recogió <span className="font-semibold text-tinta">{f.envases} {f.envases === 1 ? 'envase' : 'envases'}</span>: que los entregue con el efectivo</span>}
               {f.nota && <span className="block text-sm text-apagado">“{f.nota}”</span>}
               {f.reabierto && <span className="block text-sm text-apagado">Reabierto: {f.reabierto.motivo}</span>}
               {f.cambioDespues !== null && (

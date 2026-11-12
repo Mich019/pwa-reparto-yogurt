@@ -81,5 +81,9 @@ describe('envases retornables', () => {
     assert.equal((await llamar(x.beto, 'GET', '/envases/recogidas/hoy')).body.total, 0)
     await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)
     assert.equal((await llamar(x.ana, 'GET', '/envases/recogidas/hoy')).body.total, 2)
+    // El corte del día del administrador dice cuántos recogió cada vendedor.
+    const filas = (await llamar(x.admin, 'GET', '/cortes')).body.filas as { vendedorId: string; envases: number }[]
+    assert.equal(filas.find((f) => f.vendedorId === x.ana.id)?.envases, 2)
+    assert.equal(filas.find((f) => f.vendedorId === x.beto.id)?.envases, 0)
   })
 })

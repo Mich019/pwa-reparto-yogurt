@@ -10,6 +10,7 @@ import { coincide, limpiarBusqueda, propsBuscador } from '../../lib/busqueda'
 import { db, type EstadoPedido } from '../../lib/db'
 import { DIAS_LARGOS, desdeIso, dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { MODO_SERVIDOR } from '../../lib/api'
+import { sesionActual } from '../../lib/sesion'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { ChipEstado, grupoPanel, botonPanel, botonPanelSuave } from './piezas'
 
@@ -34,12 +35,32 @@ function fechaBuscable(f: string) {
   return `${relativa} ${DIAS_LARGOS[d.getDay()]} ${d.getDate()} ${d.toLocaleDateString('es-MX', { month: 'long' })} ${d.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '')} ${f}`
 }
 
+// La última búsqueda (texto y filtros) de cada cuenta en este navegador: al volver a abrir sigue donde se quedó.
+type Guardada = { q: string; estado: EstadoPedido | 'todos'; pago: Pago | 'todos' }
+const claveGuardada = () => `delisy:buscar-pedidos:${sesionActual()?.usuario.id ?? 'local'}`
+function leerGuardada(): Guardada {
+  try {
+    const g = JSON.parse(localStorage.getItem(claveGuardada()) ?? 'null') as Partial<Guardada> | null
+    return {
+      q: typeof g?.q === 'string' ? g.q.slice(0, 60) : '',
+      estado: FILTROS.some((f) => f.clave === g?.estado) ? g!.estado! : 'todos',
+      pago: PAGOS.some((f) => f.clave === g?.pago) ? g!.pago! : 'todos',
+    }
+  } catch {
+    return { q: '', estado: 'todos', pago: 'todos' }
+  }
+}
+
 // `onCliente`: tocar un pedido abre la ficha de su cliente (en Clientes).
 export function BuscarPedidos({ onCerrar, onCliente }: { onCerrar: () => void; onCliente: (id: string) => void }) {
-  const [q, setQ] = useState('')
-  const [estado, setEstado] = useState<EstadoPedido | 'todos'>('todos')
+  const [inicial] = useState(leerGuardada)
+  const [q, setQ] = useState(inicial.q)
+  const [estado, setEstado] = useState<EstadoPedido | 'todos'>(inicial.estado)
   // La forma de pago sólo la tienen los pedidos entregados: elegir una deja fuera los demás.
-  const [pago, setPago] = useState<Pago | 'todos'>('todos')
+  const [pago, setPago] = useState<Pago | 'todos'>(inicial.pago)
+  useEffect(() => {
+    try { localStorage.setItem(claveGuardada(), JSON.stringify({ q, estado, pago })) } catch { /* sin almacenamiento: no se recuerda */ }
+  }, [q, estado, pago])
   const [enBuscador, setEnBuscador] = useState(false)
   const recientes = useRecientes('pedidos')
   // Los nombres de los vendedores vienen del equipo (servidor); sin él, el pedido sólo no muestra quién lo lleva.

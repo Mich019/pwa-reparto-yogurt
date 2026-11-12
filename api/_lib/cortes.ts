@@ -81,6 +81,7 @@ interface FilaCorte {
   // Confirmado, pero el efectivo de ese día cambió después (una venta que sincronizó tarde, un abono anulado): cuánto
   // más (o menos, negativo) se debería entregar hoy contra lo que se confirmó. Es la señal para reabrirlo.
   cambioDespues: number | null
+  envases: number // los que recogió ese día (sin los anulados), para que los entregue junto con el efectivo
 }
 
 const ultimaReapertura = (h: { accion: string; en: string; motivo?: string }[] | null) => {
@@ -397,6 +398,11 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       [fecha],
     )
     const porVendedor = new Map(cortes.map((c) => [c.id_vendedor as string, c]))
+    const { rows: recogidos } = await db.query(
+      `SELECT id_vendedor, sum(cantidad)::int AS n FROM envases_recogidos WHERE fecha = $1 AND anulado_en IS NULL AND id_vendedor IS NOT NULL GROUP BY 1`,
+      [fecha],
+    )
+    const envases = new Map(recogidos.map((r) => [r.id_vendedor as string, r.n as number]))
     const cifras = await cifrasPorVendedor(db, fecha, esAdmin ? null : req.usuario.id)
     const filas: FilaCorte[] = []
     for (const v of vend) {
@@ -409,6 +415,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         estado: c ? c.estado : 'sin_corte', confirmadoPor: c?.conf_por ?? null, confirmadoEn: c?.conf_en ?? null, notaAdmin: c?.nota_admin ?? null,
         reabierto: c?.estado === 'pendiente' ? ultimaReapertura(c.historial) : null,
         cambioDespues: c?.estado === 'confirmado' && Math.abs(hoy.esperado - c.esp) >= 0.01 ? redondear(hoy.esperado - c.esp) : null,
+        envases: envases.get(v.id_usuario) ?? 0,
       })
     }
     return { fecha, filas }

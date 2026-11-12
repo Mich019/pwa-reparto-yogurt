@@ -34,6 +34,7 @@ export interface FilaCorte {
   estado: 'sin_corte' | 'pendiente' | 'confirmado'
   confirmadoPor: string | null; confirmadoEn: string | null; notaAdmin: string | null
   reabierto: { motivo: string; en: string } | null
+  envases?: number // recogidos ese día por el vendedor (falta en respuestas de antes)
   cambioDespues: number | null // confirmado, pero el efectivo de ese día cambió después: conviene reabrirlo
 }
 export interface Descuadre { id: string; fecha: string; vendedorId: string; vendedor: string; confirmado: number; ahora: number; cambio: number }
