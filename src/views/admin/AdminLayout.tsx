@@ -129,14 +129,14 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
           {onIrAPwa && (
             <button
               onClick={onIrAPwa}
-              className={`flex-1 rounded-full bg-tinta py-3.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro ${anillo}`}
+              className={`flex-1 rounded-full bg-tinta py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro ${anillo}`}
             >
               Ir a la app de reparto
             </button>
           )}
           <button
             onClick={() => void cerrarSesion()}
-            className={`flex-1 rounded-full border border-linea bg-papel py-3.5 text-sm font-semibold text-tinta transition-colors hover:bg-niebla ${anillo}`}
+            className={`flex-1 rounded-full border border-linea bg-papel py-2.5 text-sm font-semibold text-tinta transition-colors hover:bg-niebla ${anillo}`}
           >
             Cerrar sesión
           </button>

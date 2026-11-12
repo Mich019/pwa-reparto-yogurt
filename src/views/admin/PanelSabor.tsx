@@ -151,14 +151,14 @@ function PanelSabor({ foto, onCerrar, onEditar }: { foto: Foto | null; onCerrar:
           <button
             type="button"
             onClick={() => onEditar(p)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-tinta px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-tinta px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-marca-oscuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
           >
             <Pencil size={16} aria-hidden="true" /> Editar sabor
           </button>
           <button
             type="button"
             onClick={() => void alternarDisponible()}
-            className="flex-1 rounded-md border border-tinta/25 bg-papel/60 px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-papel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
+            className="flex-1 rounded-md border border-tinta/25 bg-papel/60 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-papel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
           >
             {sinPedir ? 'Dejar de producir' : p.disponible ? 'Marcar sin stock' : 'Poner a la venta'}
           </button>

@@ -40,9 +40,9 @@ function BotonSuscribirse({ s, grande = false }: { s: Suscripcion; grande?: bool
         type="button"
         onClick={() => void ir()}
         disabled={yendo || !s.cobroDisponible}
-        className={`flex items-center justify-center gap-2 rounded-md bg-tinta font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${grande ? 'w-full py-4 text-base' : 'px-5 py-3 text-sm'} ${anillo}`}
+        className={`flex items-center justify-center gap-2 rounded-md bg-tinta font-semibold text-white transition-colors hover:bg-marca-oscuro disabled:opacity-40 ${grande ? 'w-full py-2.5 text-sm' : 'px-5 py-2.5 text-sm'} ${anillo}`}
       >
-        <CreditCard size={grande ? 18 : 16} aria-hidden="true" /> {yendo ? 'Abriendo Mercado Pago…' : 'Suscribirme con Mercado Pago'}
+        <CreditCard size={16} aria-hidden="true" /> {yendo ? 'Abriendo Mercado Pago…' : 'Suscribirme con Mercado Pago'}
       </button>
       {!s.cobroDisponible && (
         <p className="mt-2 text-sm text-apagado">
@@ -116,7 +116,7 @@ export function SeccionSuscripcion({ s }: { s: Suscripcion }) {
       </div>
       {s.estado !== 'activa' && <BotonSuscribirse s={s} />}
       {(s.suscripcion === 'authorized' || s.suscripcion === 'pending') && (
-        <button type="button" onClick={() => void cancelar()} disabled={cancelando} className={`rounded-md border border-rojo/40 px-5 py-3 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
+        <button type="button" onClick={() => void cancelar()} disabled={cancelando} className={`rounded-md border border-rojo/40 px-5 py-2.5 text-sm font-semibold text-rojo transition-colors hover:bg-rojo/10 disabled:opacity-40 ${anillo}`}>
           {cancelando ? <Ocupado texto="Cancelando…" /> : 'Cancelar suscripción'}
         </button>
       )}

@@ -678,7 +678,7 @@ function Seguridad({ plataforma }: { plataforma: boolean }) {
         {cambiando ? (
           <div className="max-w-md">
             <FormPassword onListo={() => { aviso('Contraseña cambiada'); setCambiando(false); setCambiada(new Date().toISOString()); void cargar() }} />
-            <button type="button" onClick={() => setCambiando(false)} className={`mt-1 w-full rounded-md py-3 text-sm font-semibold text-apagado transition-colors hover:bg-niebla hover:text-tinta ${anillo}`}>Cancelar</button>
+            <button type="button" onClick={() => setCambiando(false)} className={`mt-1 w-full rounded-md py-2.5 text-sm font-semibold text-apagado transition-colors hover:bg-niebla hover:text-tinta ${anillo}`}>Cancelar</button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-4">
