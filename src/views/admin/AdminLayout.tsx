@@ -48,8 +48,9 @@ function seccionGuardada(): SeccionAdmin {
   if (irAEquipo()) return 'equipo'
   // `?ir=cobrar`: el aviso de fiado de más de un mes abre Cobranza → Por cobrar (con el mensaje de cobro de cada cliente).
   if (new URLSearchParams(location.search).get('ir') === 'cobrar') {
+    const cliente = new URLSearchParams(location.search).get('cliente') // aviso de un solo cliente: su ficha
     history.replaceState(history.state, '', location.pathname + location.hash)
-    marcarCobrarViejos()
+    marcarCobrarViejos(cliente)
     return 'cobranza'
   }
   // `?ir=produccion`: el aviso de la tarde de que falta producir para mañana.

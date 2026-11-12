@@ -121,7 +121,8 @@ export async function avisarFiadoAtrasado(db: Db, despachador: Despachador, dias
       if (!suyos.length) return []
       return [{
         para: p.id_usuario as string, tipo: 'fiado_atrasado' as const, ...texto(suyos),
-        datos: p.rol === 'administrador' ? { url: '/admin?ir=cobrar', clienteIds: suyos.map((d) => d.id) } : { pestana: 'clientes' as const, clienteIds: suyos.map((d) => d.id) },
+        // De un solo cliente, el del administrador abre directo su ficha en Por cobrar (`&cliente=`).
+        datos: p.rol === 'administrador' ? { url: suyos.length === 1 ? `/admin?ir=cobrar&cliente=${suyos[0].id}` : '/admin?ir=cobrar', clienteIds: suyos.map((d) => d.id) } : { pestana: 'clientes' as const, clienteIds: suyos.map((d) => d.id) },
       }]
     })
   }))

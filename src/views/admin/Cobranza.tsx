@@ -34,8 +34,10 @@ type Parte = 'cobrar' | 'envases' | 'cortes' | 'meses'
 // `?ir=cortes` (lo pone el aviso de un corte que ya no cuadra) abre Finanzas → Cortes del día.
 // `?ir=cobrar` (el aviso de fiado de más de un mes) abre Por cobrar sólo con quienes deben desde hace más de 30 días;
 // AdminLayout quita el parámetro de la dirección y deja la marca aquí.
+// Con `cliente` (el aviso era de uno solo) también abre su ficha.
 let cobrarViejos = false
-export const marcarCobrarViejos = () => { cobrarViejos = true }
+let cobrarCliente: string | null = null
+export const marcarCobrarViejos = (cliente?: string | null) => { cobrarViejos = true; cobrarCliente = cliente ?? null }
 export const irACortes = () => new URLSearchParams(location.search).get('ir') === 'cortes'
 // `corto`: en el teléfono, para que las cuatro quepan en una fila. `detalle`: qué es cada una, bajo el título.
 const PARTES: { id: Parte; texto: string; corto?: string; detalle: string }[] = [
@@ -180,13 +182,13 @@ const Fila = ({ onClick, children }: { onClick?: () => void; children: ReactNode
 // `q`: el buscador del encabezado (cliente o vendedor); el total sigue siendo el de todos.
 function PorCobrar({ q }: { q: string }) {
   const lista = useServidor<{ total: number; deudores: Deudor[] }>('/cobranza')
-  const [abierto, setAbierto] = useState<string | null>(null)
+  const [abierto, setAbierto] = useState<string | null>(() => cobrarCliente)
   const deudores = lista.datos?.deudores ?? []
   const t = limpiarBusqueda(q)
   // `?ir=cobrar` (el aviso de fiado de más de un mes) abre con «Más de un mes» puesto.
   const [viejos, setViejos] = useState(() => cobrarViejos)
   const [pasados, setPasados] = useState(false)
-  useEffect(() => { cobrarViejos = false }, []) // sólo la primera vez que se abre (no al volver a la sección)
+  useEffect(() => { cobrarViejos = false; cobrarCliente = null }, []) // sólo la primera vez que se abre (no al volver a la sección)
   const limite = sumarDias(hoy(), -30)
   const [orden, setOrden] = useState<'saldo' | 'antiguo' | 'nombre'>('saldo')
   const filtrados = deudores.filter((d) => coincide(t, d.nombre, d.vendedor) && (!viejos || (!!d.desde && d.desde < limite)) && (!pasados || pasoSuLimite(d)))
