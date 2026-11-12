@@ -53,7 +53,7 @@ const bodyPerfil = z.object({ nombre: z.string().trim().min(2).max(100).optional
   // El informe del mes por correo al cerrarlo.
   resumenMensual: z.boolean().optional(),
   // Sus mensajes de WhatsApp (components/Mensajes.tsx); null en uno lo vuelve al de fábrica. Sólo se cambian los que vienen.
-  mensajes: z.object({ visita: z.string().trim().min(1).max(500).nullable().optional(), cobro: z.string().trim().min(1).max(500).nullable().optional(), limite: z.string().trim().min(1).max(500).nullable().optional(), camino: z.string().trim().min(1).max(500).nullable().optional() }).strict().optional() }).strict()
+  mensajes: z.object({ visita: z.string().trim().min(1).max(500).nullable().optional(), cobro: z.string().trim().min(1).max(500).nullable().optional(), limite: z.string().trim().min(1).max(500).nullable().optional(), camino: z.string().trim().min(1).max(500).nullable().optional(), envases: z.string().trim().min(1).max(500).nullable().optional() }).strict().optional() }).strict()
 const silencioDe = (u: { silencio_desde: number | null; silencio_hasta: number | null }) =>
   u.silencio_desde === null ? null : { desde: u.silencio_desde, hasta: u.silencio_hasta }
 const bodyCerrarSesion = z.object({ id: z.string().uuid().optional() }).strict()

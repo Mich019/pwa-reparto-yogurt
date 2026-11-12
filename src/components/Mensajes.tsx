@@ -10,11 +10,12 @@ import { aviso, claseInput, telLimpio } from './ui'
 // así lo siguen del teléfono a la computadora, y el dispositivo tiene una copia (db.meta) para usarlos sin señal.
 // Se mandan con un enlace wa.me: abre WhatsApp con el texto ya escrito, sin API ni cuentas. Las palabras entre llaves se
 // cambian por los datos de cada cliente.
-export type TipoMensaje = 'visita' | 'cobro' | 'limite' | 'camino'
+export type TipoMensaje = 'visita' | 'cobro' | 'limite' | 'camino' | 'envases'
 export const MENSAJES: Record<TipoMensaje, { porDefecto: string; variables: string[]; titulo: string }> = {
   visita: { porDefecto: 'Hola {nombre}, ¿te llevo yogurt hoy? 🍓', variables: ['{nombre}'], titulo: 'Tu mensaje' },
   cobro: { porDefecto: 'Hola {nombre}, te recuerdo tu saldo pendiente de {saldo}. ¡Gracias!', variables: ['{nombre}', '{saldo}'], titulo: 'Mensaje para cobrar' },
   camino: { porDefecto: 'Hola {nombre}, voy en camino con tu pedido. ¡Nos vemos en un rato!', variables: ['{nombre}'], titulo: 'Mensaje de «voy en camino»' },
+  envases: { porDefecto: 'Hola {nombre}, tienes {envases} prestados. ¿Me los tienes listos para mi próxima visita? ¡Gracias!', variables: ['{nombre}', '{envases}'], titulo: 'Mensaje para pedir los envases' },
   limite: { porDefecto: 'Hola {nombre}, tu saldo pendiente es de {saldo} y ya pasó tu límite de {limite}. ¿Me ayudas con un abono? ¡Gracias!', variables: ['{nombre}', '{saldo}', '{limite}'], titulo: 'Mensaje para quien pasó su límite' },
 }
 const clave = (t: TipoMensaje) => `mensaje:${t}`
@@ -24,8 +25,14 @@ export function useMensaje(tipo: TipoMensaje) {
 }
 
 // {nombre} va con el primer nombre: suena a que uno lo escribió.
-export const llenar = (plantilla: string, datos: { nombre: string; saldo?: string; limite?: string }) =>
-  plantilla.replaceAll('{nombre}', datos.nombre.split(' ')[0] || datos.nombre).replaceAll('{saldo}', datos.saldo ?? '').replaceAll('{limite}', datos.limite ?? '')
+export const llenar = (plantilla: string, datos: { nombre: string; saldo?: string; limite?: string; envases?: string }) =>
+  plantilla.replaceAll('{nombre}', datos.nombre.split(' ')[0] || datos.nombre).replaceAll('{saldo}', datos.saldo ?? '').replaceAll('{limite}', datos.limite ?? '').replaceAll('{envases}', datos.envases ?? '')
+
+// «3 garrafones» / «2 de Garrafón 20 L y 1 de Botella»: lo que tiene prestado, para {envases}.
+export const textoEnvases = (envases: { prestados: number; sabor: string }[]) => {
+  const partes = envases.filter((e) => e.prestados > 0).map((e) => `${e.prestados} de ${e.sabor}`)
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0] ?? ''
+}
 
 // Cobro por WhatsApp a un deudor: a quien pasó su límite le va su propio mensaje (con {limite}).
 export const textoCobro = (d: { nombre: string; saldo: number; limite?: number | null }, cobro: string, limite: string, pasado: boolean, dinero: (n: number) => string) =>

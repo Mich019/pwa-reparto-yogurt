@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Boxes, ChevronRight, HandCoins, MessageCircle } from 'lucide-react'
-import { enlaceWhatsApp } from './Mensajes'
+import { enlaceWhatsApp, llenar, textoEnvases, useMensaje } from './Mensajes'
 import { textoEstadoCuenta } from '../lib/comprobante'
 import { marcaActual, useConEnvases } from '../lib/marca'
 import { anularAbono, registrarAbono, registrarRecogida, useServidor, type CuentaCliente, type CuentaEnvases } from '../lib/cobranza'
@@ -15,6 +15,7 @@ export function CuentaDelCliente({ clienteId, limite, telefono }: { clienteId: s
   const cuenta = useServidor<CuentaCliente>(`/cobranza/clientes/${clienteId}`)
   const envases = useServidor<CuentaEnvases>(useConEnvases() ? `/envases/clientes/${clienteId}` : null)
   const [hoja, setHoja] = useState<'abono' | 'envases' | null>(null)
+  const msjEnvases = useMensaje('envases')
   const saldo = cuenta.datos?.saldo ?? 0
   const prestados = envases.datos?.total ?? 0
   if (saldo <= 0 && prestados <= 0) return null
@@ -52,6 +53,14 @@ export function CuentaDelCliente({ clienteId, limite, telefono }: { clienteId: s
           <ChevronRight size={18} className="shrink-0 text-apagado/60" />
         </button>
       )}
+      {prestados > 0 && envases.datos && (() => {
+        const href = enlaceWhatsApp(telefono, llenar(msjEnvases, { nombre: envases.datos.cliente.nombre, envases: textoEnvases(envases.datos.envases) }))
+        return href && (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-1 py-1 text-sm font-semibold underline-offset-2 hover:underline">
+            <MessageCircle size={16} aria-hidden="true" /> Pedirle sus envases
+          </a>
+        )
+      })()}
       {hoja === 'abono' && cuenta.datos && <HojaAbono cuenta={cuenta.datos} onCerrar={() => setHoja(null)} onHecho={recargar} />}
       {hoja === 'envases' && envases.datos && <HojaEnvases cuenta={envases.datos} onCerrar={() => setHoja(null)} onHecho={recargar} />}
     </div>

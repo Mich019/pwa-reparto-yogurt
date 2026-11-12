@@ -310,7 +310,7 @@ export async function refrescarPerfil() {
 }
 
 async function copiarMensajes(m: Record<string, string>) {
-  for (const tipo of ['visita', 'cobro', 'limite', 'camino']) {
+  for (const tipo of ['visita', 'cobro', 'limite', 'camino', 'envases']) {
     if (m[tipo]) await db.meta.put({ clave: `mensaje:${tipo}`, valor: m[tipo] })
     else await db.meta.delete(`mensaje:${tipo}`)
   }

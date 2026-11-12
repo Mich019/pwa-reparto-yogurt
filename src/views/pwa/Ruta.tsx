@@ -7,10 +7,10 @@ import { esMio, reparte } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Banknote, Bell, Box, Check, CheckCircle2, ChevronRight, ChevronUp, CircleSlash, Clock, Copy, Map as MapIcon, MessageCircle, Moon,
-  CircleHelp, Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, TriangleAlert, WifiOff, X, ArrowRight,
+  Boxes, CircleHelp, Flame, MapPin, Navigation, NotebookPen, Pencil, Phone, RefreshCw, ScanLine, ShoppingBag, CircleDashed, Smartphone, Sparkles, StickyNote, Sun, TriangleAlert, WifiOff, X, ArrowRight,
 } from 'lucide-react'
 import { db, guardar, uid, type Cliente, type Pedido } from '../../lib/db'
-import { dinero, hoy, iso, textoFecha } from '../../lib/fechas'
+import { dinero, hoy, iso, sumarDias, textoFecha } from '../../lib/fechas'
 import { calcularRuta, distancia, enlaceNavegar, posicionActual, ubicacionActual, type Punto, type Ruta as RutaCalc } from '../../lib/ruteo'
 import { cargarDemo } from '../../lib/demo'
 import { MODO_SERVIDOR } from '../../lib/api'
@@ -18,7 +18,7 @@ import { baseDelUltimoPedido } from '../../lib/codigos'
 import { enlaceComprobante } from '../../lib/comprobante'
 import { marcaActual, useConEnvases } from '../../lib/marca'
 import { AlertasRuta } from './AlertasRuta'
-import { pasoSuLimite, useServidor, type Deudor, type MiMeta } from '../../lib/cobranza'
+import { pasoSuLimite, useServidor, type Deudor, type EnvasesClientes, type MiMeta } from '../../lib/cobranza'
 import { sesionActual, useSesion } from '../../lib/sesion'
 import { Mapa, type Pin } from './Mapa'
 import { EditorPedido } from './EditorPedido'
@@ -177,6 +177,11 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
   // Clientes que ya pasaron su límite de fiado (con conexión): se marcan en la ruta antes de llegar con ellos.
   const cobro = useServidor<{ deudores: Deudor[] }>(MODO_SERVIDOR ? '/cobranza' : null)
   const pasados = new Set((cobro.datos?.deudores ?? []).filter(pasoSuLimite).map((d) => d.id))
+  // Clientes con envases prestados desde hace más de un mes (con «Envases» encendido y conexión): para no olvidar recogerlos.
+  const conEnvases = useConEnvases()
+  const envasesR = useServidor<EnvasesClientes>(MODO_SERVIDOR && conEnvases ? '/envases' : null)
+  const hace30 = sumarDias(hoy(), -30)
+  const envasesViejos = new Set((envasesR.datos?.clientes ?? []).filter((c) => c.desde && c.desde < hace30).map((c) => c.id))
 
   const entregados = (pedidosHoy ?? []).filter((p) => p.estado === 'ENTREGADO')
   const msjCamino = useMensaje('camino')
@@ -345,6 +350,9 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                     {pasados.has(clienteActivo.id) && (
                       <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-rojo"><TriangleAlert size={14} aria-hidden="true" /> Pasó su límite de fiado</div>
                     )}
+                    {envasesViejos.has(clienteActivo.id) && (
+                      <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold"><Boxes size={14} aria-hidden="true" className="text-ambar" /> Tiene envases de hace más de un mes: recógelos</div>
+                    )}
                     <div className="mt-1 flex items-center gap-1.5 truncate text-sm text-apagado">
                       {clienteActivo.ventana === 'MAÑANA' ? <Sun size={14} /> : <Moon size={14} />}
                       {clienteActivo.ventana === 'MAÑANA' ? 'Mañana' : 'Tarde'}
@@ -409,6 +417,7 @@ export function Ruta({ irAClientes, irAStock, irACuenta }: { irAClientes: () => 
                                 <span className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-niebla text-xs font-semibold ring-4 ring-papel">{orden.indexOf(id) + 1}</span>
                                 <span className="min-w-0 flex-1 truncate font-medium">{c.nombre}</span>
                                 {pasados.has(c.id) && <TriangleAlert size={16} className="shrink-0 text-rojo" aria-label="Pasó su límite de fiado" />}
+                                {envasesViejos.has(c.id) && <Boxes size={16} className="shrink-0 text-apagado" aria-label="Tiene envases de hace más de un mes" />}
                                 <span className="text-apagado tabular-nums">{dinero(p.total)}</span>
                               </button>
                             )

@@ -269,6 +269,7 @@ function Notificaciones() {
         <p className="mt-1 text-sm text-apagado">Es el que se abre al tocar «Voy en camino» en la parada de la ruta.</p>
         <div className="mt-2"><EditorMensaje tipo="camino" /></div>
       </details>
+      <MensajeEnvases />
       {MODO_SERVIDOR && sesionActual()?.usuario.rol === 'administrador' && reparte() && <MiMetaPropia />}
     </div>
   )
@@ -304,6 +305,18 @@ function MiMetaPropia() {
         <Boton className="!py-3 text-sm" onClick={() => void guardar()} disabled={guardando || texto === null}>Guardar</Boton>
       </div>
     </div>
+  )
+}
+
+// Con «Envases» encendido: el mensaje para pedirle sus envases a un cliente (ficha del cliente, Finanzas → Envases).
+function MensajeEnvases() {
+  if (!useConEnvases()) return null
+  return (
+    <details className="mt-4 border-t border-linea pt-3">
+      <summary className="cursor-pointer py-1 text-sm font-semibold">Mensaje para pedir los envases</summary>
+      <p className="mt-1 text-sm text-apagado">Es el que se abre con «Pedirle sus envases» en la ficha del cliente.</p>
+      <div className="mt-2"><EditorMensaje tipo="envases" /></div>
+    </details>
   )
 }
 

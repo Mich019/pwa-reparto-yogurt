@@ -420,6 +420,7 @@ describe('mensajes de WhatsApp en la cuenta', () => {
     assert.deepEqual((await llamar(v, 'GET', '/me')).body.mensajes, { cobro: 'Debes {saldo}' })
     assert.deepEqual((await llamar(v, 'PATCH', '/me', { mensajes: { limite: 'Pasaste tu límite de {limite}' } })).body.mensajes, { cobro: 'Debes {saldo}', limite: 'Pasaste tu límite de {limite}' })
     assert.deepEqual((await llamar(v, 'PATCH', '/me', { mensajes: { camino: 'Voy para allá, {nombre}' } })).body.mensajes, { cobro: 'Debes {saldo}', limite: 'Pasaste tu límite de {limite}', camino: 'Voy para allá, {nombre}' })
+    assert.equal((await llamar(v, 'PATCH', '/me', { mensajes: { envases: 'Tienes {envases}' } })).body.mensajes.envases, 'Tienes {envases}')
     assert.equal((await llamar(v, 'PATCH', '/me', { mensajes: { otro: 'x' } })).status, 400)
     assert.equal((await llamar(v, 'PATCH', '/me', { mensajes: { cobro: 'x'.repeat(501) } })).status, 400)
   })

@@ -5,7 +5,7 @@ import { descargar, xlsx } from '../../lib/xlsx'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda } from '../../lib/busqueda'
-import { BotonWhatsApp, EditorMensaje, MandarATodos, textoCobro, useMensaje } from '../../components/Mensajes'
+import { BotonWhatsApp, EditorMensaje, MandarATodos, llenar, textoCobro, textoEnvases, useMensaje } from '../../components/Mensajes'
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
@@ -265,6 +265,9 @@ function Envases() {
   const clientes = viejos ? todos.filter((c) => c.desde && c.desde < hace30).sort((a, b) => (a.desde ?? '').localeCompare(b.desde ?? '')) : todos
   const hayViejos = todos.some((c) => c.desde && c.desde < hace30)
   const vista = usePaginas(clientes, 30, viejos)
+  const msjEnvases = useMensaje('envases')
+  const [editarMsj, setEditarMsj] = useState(false)
+  const telefonos = useLiveQuery(async () => new Map((await db.clientes.toArray()).map((c) => [c.id, c.telefono])), [])
   // Lo que se ve (con «Más de un mes» puesto, sólo esos), con desde cuándo los tiene; en el navegador (lib/xlsx.ts).
   const equipo = useEquipo()
   useEffect(() => { if (!equipo) void cargarEquipo().catch(() => {}) }, [equipo])
@@ -291,10 +294,14 @@ function Envases() {
               <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${clientes.length})` : ''}</button>
             )}
             <button type="button" onClick={exportar} disabled={!clientes.length} className="py-1 text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Bajar a Excel</button>
+            <button type="button" onClick={() => setEditarMsj(!editarMsj)} aria-expanded={editarMsj} className="py-1 text-sm font-semibold underline-offset-2 hover:underline">{editarMsj ? 'Listo' : 'Mensaje para pedir envases'}</button>
           </div>
+          {editarMsj && <div className="desplegar mb-4 max-w-xl"><EditorMensaje tipo="envases" /></div>}
           <div ref={vista.ancla} className="scroll-mt-4">
             {vista.visibles.map((c) => (
-              <Fila key={c.id} onClick={() => setAbierto(c.id)}>
+              <div key={c.id} className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+              <Fila onClick={() => setAbierto(c.id)}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{c.nombre}</span>
                   <span className="block truncate text-sm text-apagado">
@@ -305,6 +312,9 @@ function Envases() {
                 <span className="font-semibold tabular-nums">{c.total}</span>
                 <ChevronRight size={18} className="shrink-0 text-apagado/60" />
               </Fila>
+              </div>
+              {telefonos?.get(c.id) && <BotonWhatsApp chico telefono={telefonos.get(c.id)} texto={llenar(msjEnvases, { nombre: c.nombre, envases: textoEnvases(c.envases) })} />}
+              </div>
             ))}
             {vista.control}
           </div>
