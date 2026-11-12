@@ -186,6 +186,27 @@ html:has(.tema-admin.oscuro) #root {
   }
 }
 
+/* Campos y botones de las hojas compartidas con el teléfono (`campo`/`boton` en components/ui.tsx): en el panel y con
+ * ratón van compactos, como el resto del panel; con el dedo (también el panel abierto en un teléfono) siguen grandes.
+ * La fuerza del selector les gana a las utilidades de tamaño; sólo se toca el alto y la letra, no el relleno de los
+ * lados (hay campos con ícono que lo usan), y los campos de letra grande a propósito (códigos) se quedan así. */
+@media (pointer: fine) {
+  @layer utilities {
+    .tema-admin:not(.tema-campo) .campo {
+      padding-block: 0.5rem;
+    }
+    .tema-admin:not(.tema-campo) .campo:not([class*='text-lg'], [class*='text-xl'], [class*='text-2xl']) {
+      font-size: var(--text-sm);
+      line-height: var(--text-sm--line-height);
+    }
+    .tema-admin:not(.tema-campo) .boton {
+      padding-block: 0.625rem;
+      font-size: var(--text-sm);
+      line-height: var(--text-sm--line-height);
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tema-admin * {
     transition-duration: 0.01ms !important;

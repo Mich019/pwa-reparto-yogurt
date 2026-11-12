@@ -69,7 +69,7 @@ export function Boton({ children, onClick, variante = 'primario', className = ''
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center justify-center gap-2 rounded-md px-4 py-4 text-base font-semibold transition-colors disabled:opacity-40 ${estilos} ${className}`}
+      className={`boton flex items-center justify-center gap-2 rounded-md px-4 py-4 text-base font-semibold transition-colors disabled:opacity-40 ${estilos} ${className}`}
     >
       {children}
     </button>
@@ -123,10 +123,11 @@ export function Campo({ etiqueta, children }: { etiqueta: string; children: Reac
   )
 }
 
+// `campo` y `boton` marcan los del tamaño del dedo: en el panel con ratón se achican (views/admin/tema.css).
 export const claseInput =
-  'w-full rounded-md border-2 border-transparent bg-niebla px-4 py-3.5 text-base text-tinta outline-none placeholder:text-apagado focus:border-tinta'
+  'campo w-full rounded-md border-2 border-transparent bg-niebla px-4 py-3.5 text-base text-tinta outline-none placeholder:text-apagado focus:border-tinta'
 // Las pantallas de entrada (login, código, recuperar contraseña) van con esquinas apenas redondeadas.
-export const claseInputRecto = claseInput.replace('rounded-md', 'rounded-md')
+export const claseInputRecto = claseInput.replace('campo ', '') // siempre grandes, también en la computadora
 // En el panel (computadora) los campos van compactos: con el ratón no hace falta el alto del dedo.
 export const claseInputPanel = 'w-full rounded-md border border-linea bg-niebla px-3 py-2 text-sm text-tinta outline-none placeholder:text-apagado focus:border-tinta'
 
