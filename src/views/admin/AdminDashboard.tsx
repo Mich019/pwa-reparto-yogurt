@@ -183,6 +183,9 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
   // Los últimos 30 días del servidor (los mismos números que Reportes) para las cifras y el gráfico de la semana.
   const rango = useMemo(() => ({ desde: sumarDias(dia, -29), hasta: dia }), [dia])
   const ventas = useReporte(rango, 'dia')
+  // Los mismos 14 días hace un año (364 días antes: el mismo día de la semana), como línea gris en «Ventas por día».
+  const rangoAnio = useMemo(() => ({ desde: sumarDias(dia, -364 - 13), hasta: sumarDias(dia, -364) }), [dia])
+  const anioPasado = useReporte(rangoAnio, 'dia').reporte
   const recargarVentas = ventas.recargar
 
   // Lo que ya se ve se queda mientras llega lo nuevo: nada parpadea ni dice «actualizando».
@@ -243,6 +246,15 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
     }
   })
   const totalSemana = semana.reduce((s, x) => s + x.valor, 0)
+  const porDiaAntes = new Map((anioPasado?.periodos ?? []).map((x) => [x.periodo, x]))
+  const valoresAntes = semana.map((x) => porDiaAntes.get(sumarDias(x.clave, -364))?.ingreso ?? 0)
+  const totalAntes = valoresAntes.reduce((s, v) => s + v, 0)
+  // Sólo si hace un año hubo ventas (una empresa nueva no tiene con qué comparar).
+  const previoSemana = anioPasado && totalAntes > 0 ? {
+    valores: valoresAntes,
+    nombres: semana.map((x) => desdeIso(sumarDias(x.clave, -364)).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
+    leyenda: 'Hace un año',
+  } : undefined
 
   const segmentos = [
     { nombre: 'Entregados', n: p?.entregados ?? 0, color: 'var(--color-serie)' },
@@ -309,7 +321,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
       <div className="space-y-12 pb-14">
         <div className="grid gap-x-12 gap-y-12 lg:grid-cols-3">
           <Tarjeta id="t-semana" titulo="Ventas por día" className="lg:col-span-2"
-            subtitulo={reporte ? `${dinero(totalSemana)} en los últimos 14 días` : 'Últimos 14 días'}
+            subtitulo={reporte ? `${dinero(totalSemana)} en los últimos 14 días${previoSemana ? ` · ${totalSemana >= totalAntes ? '+' : '−'}${Math.round(Math.abs((totalSemana - totalAntes) / totalAntes) * 100)}% contra hace un año` : ''}` : 'Últimos 14 días'}
             accion={<button type="button" onClick={() => onNavegar('reportes')} className="whitespace-nowrap rounded-md py-1 text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">Ver reportes</button>}>
             <div className="mt-6">
               {ventas.error && !reporte ? (
@@ -317,7 +329,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
                   No se pudieron traer las ventas. <button className="font-semibold underline underline-offset-2" onClick={recargarVentas}>Reintentar</button>
                 </p>
               ) : !reporte ? esperando : (
-                <BarrasPeriodo linea datos={semana} formato={dinero} alto={190} descripcion="Ventas entregadas de cada uno de los últimos 14 días" leyenda={['Días previos', 'Hoy']} />
+                <BarrasPeriodo linea previo={previoSemana} datos={semana} formato={dinero} alto={190} descripcion="Ventas entregadas de cada uno de los últimos 14 días" leyenda={['Días previos', 'Hoy']} />
               )}
             </div>
           </Tarjeta>

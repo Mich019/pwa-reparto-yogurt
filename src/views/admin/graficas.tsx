@@ -16,7 +16,7 @@ export interface BarraDato {
 }
 
 // `linea`: puntos unidos por una línea en vez de barras (el tramo hacia el periodo en curso, punteado: todavía no
-// termina). Sin `previo`.
+// termina). Con `previo`, éste va como una línea gris delgada sin puntos.
 // `previo`: una segunda serie (p. ej. el mismo periodo hace un año), alineada por posición: una barra delgada en gris
 // junto a cada barra, con su valor en el globo y en la tabla.
 export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112, ejeEn = 1, textoActual = 'en curso', onElegir, previo, linea = false }: {
@@ -39,6 +39,7 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
   const punto = (i: number) => `${i + 0.5},${100 - (datos[i].valor / maximo) * 100}`
   const cerrados = datos.map((d, i) => (d.actual ? null : punto(i))).filter(Boolean).join(' ')
   const iActual = datos.findIndex((d) => d.actual)
+  const lineaPrevia = (previo?.valores ?? []).flatMap((v, i) => (v === undefined || i >= datos.length ? [] : [`${i + 0.5},${100 - (v / maximo) * 100}`])).join(' ')
 
   return (
     <figure>
@@ -78,6 +79,7 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
               <div className="absolute inset-x-0 bottom-0 border-t border-apagado/40" />
               {linea && (
                 <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox={`0 0 ${datos.length} 100`} preserveAspectRatio="none" aria-hidden="true">
+                  {lineaPrevia && <polyline points={lineaPrevia} fill="none" stroke="var(--color-apagado)" strokeOpacity={0.5} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
                   <polyline points={cerrados} fill="none" stroke="var(--color-serie)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                   {iActual > 0 && (
                     <polyline points={`${punto(iActual - 1)} ${punto(iActual)}`} fill="none" stroke="var(--color-oro)" strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
@@ -163,7 +165,7 @@ export function BarrasPeriodo({ datos, formato, descripcion, leyenda, alto = 112
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 bg-serie ${linea ? 'rounded-full' : 'rounded-sm'}`} aria-hidden="true" />{leyenda[0]}</span>
           {hayActual && <span className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 bg-oro ${linea ? 'rounded-full' : 'rounded-sm'}`} aria-hidden="true" />{leyenda[1]}</span>}
-          {previo && <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-apagado/45" aria-hidden="true" />{previo.leyenda}</span>}
+          {previo && <span className="flex items-center gap-1.5"><span className={linea ? 'h-0.5 w-3.5 rounded-full bg-apagado/50' : 'h-2.5 w-2.5 rounded-sm bg-apagado/45'} aria-hidden="true" />{previo.leyenda}</span>}
         </span>
         <button
           type="button"

@@ -280,7 +280,7 @@ function Resumen({ d, ir, recargar }: { d: Datos; ir: (v: Vista) => void; recarg
 
       <div className="mt-10 grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel titulo="Pedidos entregados por día" detalle="Todas las empresas, últimos 30 días">
-          <BarrasPeriodo datos={barrasDias(d.series.pedidosPorDia)} formato={(n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`} descripcion="Pedidos entregados por día en toda la plataforma" leyenda={['Días anteriores', 'Hoy']} alto={180} ejeEn={5} />
+          <BarrasPeriodo linea datos={barrasDias(d.series.pedidosPorDia)} formato={(n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`} descripcion="Pedidos entregados por día en toda la plataforma" leyenda={['Días anteriores', 'Hoy']} alto={180} ejeEn={5} />
         </Panel>
         <Panel titulo="Estado de las empresas" detalle={`${r.total} en total`}>
           <BarraSegmentada segmentos={segmentos} descripcion={segmentos.map((s) => `${s.nombre}: ${s.n}`).join(', ')} />
@@ -516,7 +516,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
 
       <div className="mt-10 grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel titulo="Actividad" detalle="Pedidos entregados por día, últimos 30 días">
-          {e.pedidosPorDia.every((x) => !x.n) ? <p className="py-16 text-center text-sm text-apagado">Sin pedidos entregados en los últimos 30 días.</p> : <BarrasPeriodo datos={barrasDias(e.pedidosPorDia)} formato={(n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`} descripcion={`Pedidos entregados por día de ${e.nombre}`} leyenda={['Días anteriores', 'Hoy']} alto={160} ejeEn={5} />}
+          {e.pedidosPorDia.every((x) => !x.n) ? <p className="py-16 text-center text-sm text-apagado">Sin pedidos entregados en los últimos 30 días.</p> : <BarrasPeriodo linea datos={barrasDias(e.pedidosPorDia)} formato={(n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`} descripcion={`Pedidos entregados por día de ${e.nombre}`} leyenda={['Días anteriores', 'Hoy']} alto={160} ejeEn={5} />}
         </Panel>
         <Panel titulo="Ajustes" detalle="Sólo para la plataforma: la empresa no los ve.">
           <Ajustes e={e} alGuardar={async () => { await Promise.all([cargar(), alCambiar()]) }} />
