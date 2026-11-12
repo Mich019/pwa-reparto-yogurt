@@ -193,7 +193,7 @@ function Encabezado({ titulo, detalle, children }: { titulo: ReactNode; detalle?
   return (
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[2.25rem] font-semibold leading-none tracking-tight lg:text-[2.75rem]">{titulo}</h1>
+        <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight lg:text-[2rem]">{titulo}</h1>
         {detalle && <p className="mt-2 text-sm text-apagado">{detalle}</p>}
       </div>
       {children && <div className="flex flex-wrap gap-2">{children}</div>}
@@ -479,7 +479,7 @@ function DetalleEmpresa({ id, ir, alCambiar }: { id: string; ir: (v: Vista) => v
           : <span className="grid h-16 w-16 place-items-center rounded-lg text-2xl font-bold text-white" style={{ background: e.color ?? 'var(--plat)' }}>{e.nombre.charAt(0).toUpperCase()}</span>}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[2.25rem] font-semibold leading-none tracking-tight">{e.nombre}</h1>
+            <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight">{e.nombre}</h1>
             <ChipEstado estado={e.estado} />
           </div>
           <p className="mt-2 text-sm text-apagado">

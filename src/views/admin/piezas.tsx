@@ -28,7 +28,7 @@ export function Delta({ valor, className = 'text-xs' }: { valor: number | null; 
   )
 }
 
-// Encabezado de una sección del panel: título grande, una línea de detalle y, a la derecha, sus acciones. Las acciones
+// Encabezado de una sección del panel: título (mediano: el panel va compacto), una línea de detalle y, a la derecha, sus acciones. Las acciones
 // siempre llevan texto (Nuevo cliente, Invitar…), nunca un «+» suelto. En el teléfono, si no caben junto al título,
 // bajan a su propia fila y la llenan (los grupos con `grupoPanel` se reparten el ancho).
 // `ayuda`: la sección cuyas guías abre el «?» junto al título (AYUDA_DE en views/ayuda/guias.ts).
@@ -37,7 +37,7 @@ export function Encabezado({ titulo, detalle, children, ayuda }: { titulo: strin
     // Las acciones se centran con el título (no con el título y el detalle juntos); el detalle va debajo.
     <header className="pb-6 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="flex items-center gap-1 text-[2.25rem] font-semibold leading-none sm:text-[2.5rem] lg:text-[3.25rem]">{titulo}{ayuda && <BotonAyuda seccion={ayuda} className="self-center" />}</h1>
+        <h1 className="flex items-center gap-1 text-[1.75rem] font-semibold leading-tight lg:text-[2rem]">{titulo}{ayuda && <BotonAyuda seccion={ayuda} className="self-center" />}</h1>
         {children && <div className="flex flex-wrap items-center gap-2 max-sm:grow max-sm:justify-end">{children}</div>}
       </div>
       {detalle && <p className="mt-3 text-sm text-apagado">{detalle}</p>}

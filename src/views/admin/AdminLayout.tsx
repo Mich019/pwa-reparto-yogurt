@@ -28,6 +28,13 @@ export type { SeccionAdmin } from './menu'
 
 // La sección abierta sobrevive a recargar la página (sólo en esta pestaña del navegador).
 const CLAVE_SECCION = 'admin-seccion'
+// El plan de la empresa como un círculo alrededor de la foto: dorado si paga; verde de la marca con un ∞ si está becada
+// (exenta: sin límite). En prueba o vencida, sin círculo.
+const PLAN: Record<string, { anillo: string; texto: string }> = {
+  activa: { anillo: 'ring-2 ring-oro ring-offset-2 ring-offset-lienzo', texto: 'Plan de paga' },
+  exenta: { anillo: 'ring-2 ring-marca ring-offset-2 ring-offset-lienzo', texto: 'Plan becado, sin límite' },
+}
+
 // `?ir=suscripcion` lo pone el aviso de que la prueba gratis está por vencer: abre Configuración → Suscripción.
 const irASuscripcion = () => {
   if (new URLSearchParams(location.search).get('ir') !== 'suscripcion') return false
@@ -214,9 +221,13 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
             onClick={() => setSeccion('configuracion')}
             data-seccion="configuracion"
             aria-label="Configuración"
+            aria-current={seccion === 'configuracion' ? 'page' : undefined}
             title="Configuración"
-            className={`group hidden h-10 w-10 shrink-0 place-items-center rounded-full text-tinta transition-colors hover:text-marca xl:grid 2xl:hidden ${anillo}`}
+            className={`group grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors 2xl:hidden ${anillo} ${
+              seccion === 'configuracion' ? 'bg-marca/12 text-marca' : 'text-tinta hover:text-marca'
+            }`}
           >
+            {/* En Configuración el engrane va en el color de la marca, con su fondito: así se sabe dónde estás. */}
             {/* Sin fondo; el engrane gira al pasar encima y un poco más al tocarlo (sólo transform: no repinta nada). */}
             <Settings size={19} aria-hidden="true" className="transition-transform duration-500 ease-out group-hover:rotate-90 group-active:rotate-180 group-active:duration-200 motion-reduce:transition-none" />
           </button>
@@ -225,10 +236,14 @@ export function AdminLayout({ onIrAPwa }: { onIrAPwa?: () => void }) {
             onClick={() => abrirConfiguracion('cuenta')}
             data-seccion="configuracion"
             aria-label="Configuración de tu cuenta"
-            title={sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : 'Mi cuenta'}
-            className={`h-10 w-10 shrink-0 rounded-full transition-opacity hover:opacity-85 ${anillo}`}
+            title={[sesion ? `${sesion.usuario.nombre} · ${sesion.usuario.correo}` : 'Mi cuenta', PLAN[suscripcion?.estado ?? '']?.texto].filter(Boolean).join(' · ')}
+            className={`relative h-10 w-10 shrink-0 rounded-full transition-opacity hover:opacity-85 ${anillo}`}
           >
-            <Avatar nombre={sesion?.usuario.nombre ?? 'A'} foto={sesion?.usuario.foto} className="h-10 w-10 bg-tinta text-sm text-white" />
+            <Avatar nombre={sesion?.usuario.nombre ?? 'A'} foto={sesion?.usuario.foto}
+              className={`h-10 w-10 rounded-full! bg-tinta text-sm text-white ${PLAN[suscripcion?.estado ?? '']?.anillo ?? ''}`} />
+            {suscripcion?.estado === 'exenta' && (
+              <span aria-hidden="true" className="absolute -bottom-1 -right-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-marca text-[13px] font-bold leading-none text-white ring-2 ring-lienzo">∞</span>
+            )}
           </button>
           <button
             type="button"

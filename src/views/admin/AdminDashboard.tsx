@@ -263,7 +263,7 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
       <section className="flex flex-col gap-x-12 gap-y-7 pb-8 pt-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <h1 className="text-[2.5rem] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-5xl xl:text-[3.5rem]">
+          <h1 className="text-[1.75rem] font-semibold leading-[1.05] tracking-[-0.02em] lg:text-[2.25rem]">
             {saludo()},
             <br />
             <Subrayado>{nombre || 'equipo'}</Subrayado>

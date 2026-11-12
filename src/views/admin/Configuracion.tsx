@@ -122,7 +122,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
   return (
     <div className="mx-auto max-w-[1280px] 2xl:max-w-[1600px] px-4 pt-2 sm:px-8 lg:flex lg:h-full lg:flex-col">
       <header className="pb-6 pt-4 lg:shrink-0">
-        <h1 className="text-[2.5rem] font-semibold leading-none lg:text-[3.25rem]">Configuración</h1>
+        <h1 className="text-[1.75rem] font-semibold leading-tight lg:text-[2rem]">Configuración</h1>
         <p className="mt-3 text-sm text-apagado">{plataforma ? 'Tu cuenta y su seguridad, cómo está configurado el servicio y cómo se ve el panel.' : 'Tu cuenta y su seguridad, la marca de tu negocio, tu plan, cómo se ve el panel y la ayuda.'}</p>
       </header>
 
