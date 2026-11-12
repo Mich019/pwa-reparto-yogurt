@@ -11,6 +11,14 @@ export interface Novedad { fecha: string; titulo: string; puntos: PuntoNovedad[]
 
 export const NOVEDADES: Novedad[] = [
   {
+    fecha: '2026-11-11', titulo: 'Envases en la ruta y en el corte',
+    puntos: [
+      { texto: 'Si tu empresa lleva la cuenta de envases (se enciende o apaga en Preferencias → Envases), la parada de la ruta dice cuántos tiene prestados el cliente y los recoges ahí mismo con «Recoger». Al terminar la ruta ves cuántos recogiste.', guia: 'envases-corte' },
+      { texto: 'En el corte del día también anotas cuántos envases entregas, y se cuadran igual que el efectivo.', para: 'vendedor', donde: 'app', guia: 'envases-corte' },
+      { texto: 'En «Cortes del día» ves cuántos envases recogió y entregó cada vendedor; el cierre del mes y la ficha de cada vendedor suman los que faltaron. En «Vendedores del mes» una flechita dice quién subió o bajó de lugar, y «Buscar pedidos» recuerda tu última búsqueda (con «Limpiar» para empezar de cero).', para: 'administrador', donde: 'panel' },
+    ],
+  },
+  {
     fecha: '2026-11-10', titulo: 'Clientes que dejaron de comprar y más WhatsApp',
     puntos: [
       { texto: '«Cobranza» ahora se llama «Finanzas», con pestañas más claras: Por cobrar, Envases, Cortes del día y Cierre de mes; debajo del título dice para qué sirve cada una. Arriba, cuatro cifras de un vistazo (lo que te deben, el efectivo de hoy por confirmar, los envases prestados y lo vendido en el mes) y «Cortes del día» trae un numerito con los que faltan por confirmar (también junto a «Finanzas» en el menú). Lo vendido en el mes se compara con el mes pasado a la misma fecha, y con «Confirmar los que cuadran» confirmas de un toque los cortes que entregaron justo lo que debían. Su atajo es «g f».', para: 'administrador', donde: 'panel', guia: 'cobranza' },

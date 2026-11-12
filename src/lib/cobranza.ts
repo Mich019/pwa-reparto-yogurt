@@ -53,7 +53,7 @@ export interface CifrasMes {
   cortes: {
     dias: number; confirmados: number; pendientes: number; sinCorte: number; diferencia: number
     detalle: { fecha: string; vendedor: string; esperado: number; entregado: number; diferencia: number; estado: string; envases?: number | null }[]
-    envases?: { vendedor: string; diferencia: number }[] // envases que faltaron (negativo) o sobraron, por vendedor (045)
+    envases?: { id?: string; vendedor: string; diferencia: number }[] // envases que faltaron (negativo) o sobraron, por vendedor (045)
   }
 }
 // «faltaron 3 (Ana 2, Beto 1)»: lo que faltó y lo que sobró de envases en los cortes del mes, o null si cuadraron.

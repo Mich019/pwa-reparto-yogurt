@@ -109,7 +109,7 @@ export const AYUDA_DE = {
   clientes: ['cliente-panel', 'cliente-app', 'sin-comprar', 'pedido', 'limites-fiado', 'fiado', 'precio-especial', 'cambiar-vendedor', 'historial', 'envases', 'escanear', 'ubicacion', 'archivar', 'qr', 'libreta'],
   produccion: ['pronostico', 'produccion'],
   sabores: ['sabor'],
-  cobranza: ['cobranza', 'limites-fiado', 'cortes', 'cierre-mes'],
+  cobranza: ['cobranza', 'limites-fiado', 'cortes', 'envases-corte', 'cierre-mes'],
   reportes: ['reportes'],
   ruta: ['entregar', 'avisos-ruta', 'fiado', 'omitir', 'editar-pedido', 'recordatorios', 'ruta', 'escanear', 'urgente', 'sin-senal'],
   stock: ['carga'],
@@ -494,6 +494,16 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Cuenta, toca «Corte de hoy»: te dice cuánto efectivo debes entregar (sin transferencias ni fiado).', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }, { t: 'caja', titulo: 'Corte de hoy', texto: 'Efectivo a entregar $1,240', icono: Wallet, foco: true }]) },
       { texto: 'Escribe lo que entregas y toca «Entregar corte». Puedes corregirlo hasta que el administrador lo confirme.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }], { titulo: 'Corte de hoy', piezas: [{ t: 'campos', items: [{ etiqueta: 'Efectivo que entregas', valor: '1240', foco: true }] }, { t: 'boton', texto: 'Entregar corte' }] }) },
+    ],
+  },
+  {
+    id: 'envases-corte', tema: 'pedidos', titulo: 'Cuadrar los envases en el corte', icono: Boxes, donde: 'app', para: 'todos',
+    resumen: 'Los envases que recoges en el día se entregan con el efectivo y se cuadran igual. Sólo si tu empresa lleva la cuenta de envases.',
+    palabras: 'envases corte cuadrar entregar recogidos garrafon faltan sobran retornables',
+    pasos: [
+      { texto: 'En la Ruta, recoge los envases del cliente con «Recoger» en su parada. Al terminar, «¡Ruta terminada!» dice cuántos recogiste.', escena: tel('Ruta', [{ t: 'titulo', texto: 'Ruta' }, { t: 'caja', titulo: 'Tiene 6 envases prestados', texto: '4 de Garrafón 20 L, 2 de Botella', icono: Boxes, foco: true }]) },
+      { texto: 'En Cuenta, toca «Corte de hoy», escribe el efectivo y en «Envases que entregas» cuántos entregas. Si no cuadran con los que recogiste, el corte dice cuántos faltan o sobran.', escena: tel('Cuenta', [{ t: 'titulo', texto: 'Mi cuenta' }], { titulo: 'Corte de hoy', piezas: [{ t: 'campos', items: [{ etiqueta: 'Efectivo que entregas', valor: '1240' }, { etiqueta: 'Envases que entregas', valor: '6', foco: true }] }, { t: 'boton', texto: 'Entregar corte' }] }) },
+      { texto: 'El administrador lo ve en Finanzas → «Cortes del día»: cuántos recogió y cuántos entregó cada vendedor. el botón para confirmar de un toque los que cuadran sólo junta los que cuadran en efectivo y en envases, y el cierre del mes suma los envases que faltaron.', escena: panel('Finanzas', [{ t: 'titulo', texto: 'Finanzas' }, { t: 'botones', items: [{ texto: 'Por cobrar' }, { texto: 'Envases' }, { texto: 'Cortes del día', primario: true, foco: true }, { texto: 'Cierre de mes' }] }, { t: 'filas', n: 3 }]) },
     ],
   },
   {

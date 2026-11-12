@@ -120,7 +120,7 @@ export interface CifrasMes {
     detalle: { fecha: string; vendedor: string; esperado: number; entregado: number; diferencia: number; estado: string; envases?: number | null }[]
     // Envases que faltaron (negativo) o sobraron en los cortes del mes, por vendedor; sólo quien no cuadró. Falta en
     // las cifras congeladas antes de la migración 045.
-    envases?: { vendedor: string; diferencia: number }[]
+    envases?: { id: string; vendedor: string; diferencia: number }[]
   }
 }
 
@@ -166,7 +166,7 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
     q.query(`SELECT id_usuario, nombre, activo, comision_pct::float8 AS pct, meta_mensual::float8 AS meta FROM usuarios WHERE ${vende()}`),
     q.query(
       `SELECT c.fecha::text, u.nombre, c.efectivo_esperado::float8 AS esperado, c.efectivo_entregado::float8 AS entregado, c.diferencia::float8 AS diferencia, c.estado,
-              c.envases_entregados - c.envases_esperados AS dif_envases
+              c.envases_entregados - c.envases_esperados AS dif_envases, c.id_vendedor
          FROM cortes_dia c JOIN usuarios u ON u.id_usuario = c.id_vendedor WHERE c.fecha BETWEEN $1 AND $2 ORDER BY c.fecha, lower(u.nombre)`,
       [desde, hasta],
     ),
@@ -201,8 +201,12 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
     .sort((x, y) => y.ventas - x.ventas || x.nombre.localeCompare(y.nombre))
 
   const diasCorte = cortes.map((c) => ({ fecha: c.fecha as string, vendedor: c.nombre as string, esperado: redondear(c.esperado), entregado: redondear(c.entregado), diferencia: redondear(c.diferencia), estado: c.estado as string, envases: c.dif_envases as number | null }))
-  const envasesPorVendedor = new Map<string, number>()
-  for (const c of diasCorte) if (c.envases) envasesPorVendedor.set(c.vendedor, (envasesPorVendedor.get(c.vendedor) ?? 0) + c.envases)
+  const envasesPorVendedor = new Map<string, { id: string; vendedor: string; diferencia: number }>()
+  for (const c of cortes) {
+    if (!c.dif_envases) continue
+    const e = envasesPorVendedor.get(c.id_vendedor) ?? envasesPorVendedor.set(c.id_vendedor, { id: c.id_vendedor, vendedor: c.nombre, diferencia: 0 }).get(c.id_vendedor)!
+    e.diferencia += c.dif_envases
+  }
   // Días con efectivo por entregar que nadie cortó: vendedor y día con ventas en efectivo o abonos en efectivo sin corte.
   const { rows: [{ n: sinCorte }] } = await q.query(
     `SELECT count(*)::int AS n FROM (
@@ -229,7 +233,7 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
       sinCorte,
       diferencia: redondear(diasCorte.reduce((s, c) => s + c.diferencia, 0)),
       detalle: diasCorte,
-      envases: [...envasesPorVendedor].filter(([, d]) => d !== 0).map(([vendedor, diferencia]) => ({ vendedor, diferencia })).sort((a, b) => a.diferencia - b.diferencia),
+      envases: [...envasesPorVendedor.values()].filter((e) => e.diferencia !== 0).sort((a, b) => a.diferencia - b.diferencia),
     },
   }
 }

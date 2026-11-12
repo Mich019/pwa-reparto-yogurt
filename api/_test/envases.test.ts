@@ -96,6 +96,6 @@ describe('envases retornables', () => {
     assert.deepEqual([conf?.envases, conf?.envasesEntregados], [2, 1])
     // El informe del mes junta lo que faltó por vendedor.
     const mes = (await llamar(x.admin, 'GET', `/cierres/${hoyEn(config.zonaHoraria).slice(0, 7)}`)).body.cifras.cortes
-    assert.deepEqual(mes.envases.map((e: { diferencia: number }) => e.diferencia), [-1])
+    assert.deepEqual(mes.envases.map((e: { id: string; diferencia: number }) => [e.id, e.diferencia]), [[x.ana.id, -1]])
   })
 })

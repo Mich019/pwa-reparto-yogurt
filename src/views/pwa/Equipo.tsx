@@ -11,6 +11,7 @@ import {
   type Miembro, type Rachas, type Trofeos,
 } from '../../lib/equipo'
 import { useServidor, type CifrasMes, type Deudor } from '../../lib/cobranza'
+import { useConEnvases } from '../../lib/marca'
 import { dinero, hace, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { descargar, xlsx } from '../../lib/xlsx'
 import { copiarDelicado } from '../../lib/portapapeles'
@@ -471,6 +472,10 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
   const masViejo = suyos.map((d) => d.desde).filter((f): f is string => !!f).sort()[0]
   const deMas = useServidor<{ vendedores: { id: string; veces: number }[] }>(m.rol === 'vendedor' ? '/cobranza/fiado-de-mas' : null, 'cobranza')
   const vecesDeMas = deMas.datos?.vendedores.find((v) => v.id === m.id)?.veces ?? 0
+  // Los envases que le faltaron (o sobraron) en sus cortes del mes, del mismo cálculo del informe del cierre.
+  const conEnvases = useConEnvases()
+  const mesCifras = useServidor<{ cifras: CifrasMes }>(m.rol === 'vendedor' && conEnvases ? `/cierres/${hoy().slice(0, 7)}` : null, 'cobranza')
+  const envasesCortes = mesCifras.datos?.cifras.cortes.envases?.find((e) => e.id === m.id)?.diferencia ?? 0
   // Sus clientes activos que ya compraban, sin pedido pendiente y con la última entrega hace más de 30 días.
   const sinComprar = useLiveQuery(async () => {
     if (m.rol !== 'vendedor') return 0
@@ -576,6 +581,7 @@ function FichaMiembro({ m, esYo, otros, onCerrar, onEditar, onClave, onCartera }
           {fiado > 0 && <Linea t="Fiado por cobrar" v={`${dinero(fiado)} en ${plural(suyos.length, 'cliente', 'clientes')}${masViejo ? ` · desde el ${textoFecha(masViejo).toLowerCase()}` : ''}`} />}
           {sinComprar > 0 && <Linea t="Dejaron de comprar" v={`${plural(sinComprar, 'cliente', 'clientes')} de su cartera, más de un mes sin pedido`} />}
           {vecesDeMas > 0 && <Linea t="Fió de más" v={`${plural(vecesDeMas, 'vez', 'veces')} este mes: el cliente quedó arriba de su límite`} />}
+          {envasesCortes !== 0 && <Linea t="Envases en sus cortes" v={`${envasesCortes < 0 ? 'le faltaron' : 'le sobraron'} ${plural(Math.abs(envasesCortes), 'envase', 'envases')} este mes`} />}
           <Linea t="Avisos" v={textoAvisos(m)} />
           {!!metas?.length && <Linea t="Llegó a su meta" v={metas.slice(0, 6).map(mesCorto).join(', ') + (metas.length > 6 ? ` y ${metas.length - 6} más` : '')} />}
         </dl>
