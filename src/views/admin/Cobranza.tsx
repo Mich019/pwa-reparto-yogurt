@@ -1,3 +1,4 @@
+import { useConEnvases } from '../../lib/marca'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Brilla } from '../../components/Brillo'
 import { descargar, xlsx } from '../../lib/xlsx'
@@ -66,12 +67,14 @@ export function Cobranza({ onNavegar, cortes }: { onNavegar?: (s: SeccionAdmin) 
   })
   const [q, setQ] = useState('')
   const { cortesHoy, porAtender } = cortes
+  const conEnvases = useConEnvases()
+  const partes = PARTES.filter((p) => conEnvases || p.id !== 'envases')
   return (
     <div className="mx-auto max-w-[1280px] px-4 pt-2 sm:px-8">
-      <Encabezado titulo="Finanzas" ayuda="cobranza" detalle={PARTES.find((p) => p.id === parte)?.detalle}>
+      <Encabezado titulo="Finanzas" ayuda="cobranza" detalle={partes.find((p) => p.id === parte)?.detalle}>
         {parte === 'cobrar' && <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="cobranza" />}
         <div className={grupoPanel} role="group" aria-label="Apartado" data-seccion="finanzas-pestanas">
-          {PARTES.map((p) => (
+          {partes.map((p) => (
             <button key={p.id} onClick={() => setParte(p.id)} aria-pressed={parte === p.id} className={`${parte === p.id ? botonPanel : botonPanelSuave} max-sm:px-3`}>
               {p.corto ? <><span className="sm:hidden">{p.corto}</span><span className="max-sm:hidden">{p.texto}</span></> : p.texto}
               {p.id === 'cortes' && porAtender > 0 && (
@@ -82,9 +85,9 @@ export function Cobranza({ onNavegar, cortes }: { onNavegar?: (s: SeccionAdmin) 
           ))}
         </div>
       </Encabezado>
-      <FranjaFinanzas cortesHoy={cortesHoy?.filas} onElegir={setParte} />
+      <FranjaFinanzas cortesHoy={cortesHoy?.filas} onElegir={setParte} conEnvases={conEnvases} />
       {parte === 'cobrar' && <PorCobrar q={q} />}
-      {parte === 'envases' && <Envases />}
+      {parte === 'envases' && conEnvases && <Envases />}
       {parte === 'cortes' && <Cortes onCambio={cortes.recargar} />}
       {parte === 'meses' && <Meses onNavegar={onNavegar} />}
     </div>
@@ -93,9 +96,9 @@ export function Cobranza({ onNavegar, cortes }: { onNavegar?: (s: SeccionAdmin) 
 
 // Cuatro cifras de un vistazo, entre dos líneas (sin tarjetas): lo que te deben, el efectivo de hoy que falta
 // confirmar, los envases prestados y lo vendido en el mes. Cada una lleva a su pestaña.
-function FranjaFinanzas({ cortesHoy, onElegir }: { cortesHoy?: FilaCorte[]; onElegir: (p: Parte) => void }) {
+function FranjaFinanzas({ cortesHoy, onElegir, conEnvases }: { cortesHoy?: FilaCorte[]; onElegir: (p: Parte) => void; conEnvases: boolean }) {
   const deben = useServidor<{ total: number; deudores: Deudor[] }>('/cobranza').datos
-  const envases = useServidor<EnvasesClientes>('/envases').datos
+  const envases = useServidor<EnvasesClientes>(conEnvases ? '/envases' : null).datos
   const mes = hoy().slice(0, 7)
   const cifras = useServidor<InformeMes>(`/cierres/${mes}`, ['datos', 'cobranza']).datos?.cifras
   const sinConfirmar = (cortesHoy ?? []).filter((f) => f.estado !== 'confirmado')
@@ -123,14 +126,14 @@ function FranjaFinanzas({ cortesHoy, onElegir }: { cortesHoy?: FilaCorte[]; onEl
       pie: !deben ? '' : deben.deudores.length ? `${deben.deudores.length} ${deben.deudores.length === 1 ? 'cliente' : 'clientes'}` : 'Nadie te debe' },
     { parte: 'cortes', etiqueta: 'Efectivo de hoy por confirmar', valor: cortesHoy ? dinero(falta) : null,
       pie: !cortesHoy ? '' : !cortesHoy.length ? 'Nadie ha vendido hoy' : falta > 0 ? `de ${dinero(efectivoHoy)} del día` : sinConfirmar.length ? 'Sin efectivo por entregar' : 'Todo confirmado' },
-    { parte: 'envases', etiqueta: 'Envases prestados', valor: envases ? envases.total.toLocaleString('es-MX') : null,
-      pie: !envases ? '' : envases.clientes.length ? `en ${envases.clientes.length} ${envases.clientes.length === 1 ? 'cliente' : 'clientes'}` : 'Todos devueltos' },
+    ...!conEnvases ? [] : [{ parte: 'envases' as const, etiqueta: 'Envases prestados', valor: envases ? envases.total.toLocaleString('es-MX') : null,
+      pie: !envases ? '' : envases.clientes.length ? `en ${envases.clientes.length} ${envases.clientes.length === 1 ? 'cliente' : 'clientes'}` : 'Todos devueltos' }],
     { parte: 'meses', etiqueta: `Vendido en ${textoMes(mes).split(' ')[0].toLowerCase()}`, valor: cifras ? dinero(cifras.ventas.ingreso) : null,
       pie: crecimiento !== null ? <><Delta valor={crecimiento} /> <span>vs. {nombreAntes} a esta fecha</span></> : cifras ? `cobrado ${dinero(cobradoMes)}` : '' },
   ]
   return (
     <section aria-label="Finanzas de un vistazo" aria-busy={items.some((c) => c.valor === null)} className="mb-6 border-y border-linea py-5">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-x-6 gap-y-5 ${conEnvases ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
         {items.map((c) => (
           <button key={c.parte} type="button" onClick={() => onElegir(c.parte)}
             className="min-w-0 rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-marca">

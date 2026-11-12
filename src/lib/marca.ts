@@ -19,6 +19,7 @@ export interface Marca {
   firmaNombre?: string | null // quién firma el informe del cierre de mes (038); null = quien lo genera
   firmaCargo?: string | null // debajo de la firma; null = «Administrador»
   firmaImagen?: string | null // la firma dibujada o fotografiada, sobre la línea (039)
+  controlRetornables?: boolean // sus clientes devuelven envases (registro, migración 008): sin esto no se ven Envases
   de?: string // id de la cuenta con la que se guardó la copia
 }
 
@@ -41,6 +42,9 @@ function fijar(m: Marca | null) {
 }
 
 export const marcaActual = () => actual
+
+// ¿La empresa lleva la cuenta de envases que se devuelven? Sin la respuesta todavía (copia vieja), como antes: sí.
+export const useConEnvases = () => useMarca()?.controlRetornables ?? true
 
 export function useMarca() {
   return useSyncExternalStore(

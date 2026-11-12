@@ -260,7 +260,8 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
         for (const p of productos) {
           await cx.query(
             `INSERT INTO productos (nombre, sabor, presentacion_litros, unidad, envase, precio_unitario, costo_produccion, color_hex, retornable) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [p.nombre, p.sabor, p.presentacion, p.unidad, p.envase, p.precio, p.costo, p.color, p.retornable && e.controlRetornables],
+            // Se guarda lo que marcó aunque diga «No por ahora»: al encender Envases en Preferencias ya están listos.
+            [p.nombre, p.sabor, p.presentacion, p.unidad, p.envase, p.precio, p.costo, p.color, p.retornable],
           )
         }
         const enlaces = []

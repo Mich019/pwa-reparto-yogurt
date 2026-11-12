@@ -27,7 +27,7 @@ import { VisitasSinPedido } from './VisitasSinPedido'
 import { CuentaDelCliente } from '../../components/CuentaDelCliente'
 import { PreciosDelCliente } from '../../components/PreciosDelCliente'
 import { HojaLimitesSugeridos, LimiteFiado } from '../../components/LimiteFiado'
-import { useMarca } from '../../lib/marca'
+import { marcaActual, useMarca } from '../../lib/marca'
 import { PorCobrar } from '../../components/PorCobrar'
 import { textoCantidad, totalOCero } from '../../lib/unidades'
 import { Accion, Boton, Campo, Hoja, PuntoSabor, Segmentado, aviso, claseInput, telLimpio } from '../../components/ui'
@@ -120,7 +120,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
     const [cobro, envases] = MODO_SERVIDOR
       ? await Promise.all([
         llamarAutenticado<{ deudores: Deudor[] }>('/cobranza').catch(() => null),
-        llamarAutenticado<EnvasesClientes>('/envases').catch(() => null),
+        marcaActual()?.controlRetornables === false ? null : llamarAutenticado<EnvasesClientes>('/envases').catch(() => null),
       ])
       : [null, null]
     const saldo = cobro && new Map(cobro.deudores.map((d) => [d.id, d.saldo]))

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Boxes, ChevronRight, HandCoins, MessageCircle } from 'lucide-react'
 import { enlaceWhatsApp } from './Mensajes'
 import { textoEstadoCuenta } from '../lib/comprobante'
-import { marcaActual } from '../lib/marca'
+import { marcaActual, useConEnvases } from '../lib/marca'
 import { anularAbono, registrarAbono, registrarRecogida, useServidor, type CuentaCliente, type CuentaEnvases } from '../lib/cobranza'
 import { dinero, textoFecha } from '../lib/fechas'
 import { useRol } from '../lib/sesion'
@@ -13,7 +13,7 @@ import { Boton, Campo, Hoja, Segmentado, aviso, claseInput } from './ui'
 
 export function CuentaDelCliente({ clienteId, limite, telefono }: { clienteId: string; limite?: number | null; telefono?: string }) {
   const cuenta = useServidor<CuentaCliente>(`/cobranza/clientes/${clienteId}`)
-  const envases = useServidor<CuentaEnvases>(`/envases/clientes/${clienteId}`)
+  const envases = useServidor<CuentaEnvases>(useConEnvases() ? `/envases/clientes/${clienteId}` : null)
   const [hoja, setHoja] = useState<'abono' | 'envases' | null>(null)
   const saldo = cuenta.datos?.saldo ?? 0
   const prestados = envases.datos?.total ?? 0

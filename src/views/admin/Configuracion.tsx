@@ -398,6 +398,37 @@ function RitmoMeta() {
   )
 }
 
+// También de la empresa: si sus clientes devuelven los envases (lo contestó al registrarse, empresas.control_retornables).
+// Apagado no se ve Finanzas → Envases ni «Envase retornable» en los sabores; lo anotado se queda guardado.
+function EnvasesEmpresa() {
+  const marca = useMarca()
+  const [guardando, setGuardando] = useState(false)
+  const [listo, marcarListo] = useListo()
+  if (marca?.controlRetornables === undefined) return null // copia vieja de la marca
+  async function cambiar(controlRetornables: boolean) {
+    setGuardando(true)
+    try {
+      await guardarMarca({ controlRetornables })
+      aviso(controlRetornables ? 'Ya llevas la cuenta de los envases' : 'Ya no se lleva la cuenta de los envases')
+      marcarListo()
+    } catch (e) {
+      marcarListo(false)
+      aviso(mensaje(e))
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <Seccion listo={listo} id="envases" titulo="Envases" descripcion="Vale para toda tu empresa: garrafones, botellas y demás que tus clientes te regresan.">
+      <Fila titulo="Mis clientes devuelven los envases" ayuda={marca.controlRetornables
+        ? 'Cada cliente tiene su saldo de envases prestados (Finanzas → Envases). Marca en cada sabor si su envase es retornable.'
+        : 'Apagado: no se lleva la cuenta de envases prestados. Lo que ya estaba anotado se guarda por si lo vuelves a encender.'}>
+        <Interruptor encendido={marca.controlRetornables} deshabilitado={guardando} etiqueta="Mis clientes devuelven los envases" alCambiar={(si) => void cambiar(si)} />
+      </Fila>
+    </Seccion>
+  )
+}
+
 // También de la empresa: el límite de fiado de los clientes que no tienen uno propio (migración 036). Sólo avisa.
 function LimiteFiadoEmpresa() {
   const marca = useMarca()
@@ -621,6 +652,7 @@ function Preferencias() {
       <MinutosUrgente />
       <RitmoMeta />
       <LimiteFiadoEmpresa />
+      <EnvasesEmpresa />
       <FirmaCierre />
       <Seccion listo={listo.silencio} id="silencio" titulo="Horario de silencio" descripcion="En esas horas los avisos no suenan; los ves después en la app. Cuenta la hora de tu empresa.">
         <Fila titulo="Silenciar avisos" ayuda={silencio ? `De ${hora(silencio.desde)} a ${hora(silencio.hasta)}.` : 'Los avisos suenan a cualquier hora.'}>

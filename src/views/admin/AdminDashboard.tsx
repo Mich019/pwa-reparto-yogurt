@@ -4,7 +4,7 @@ import { BarrasHueso, Esqueleto, EsqueletoLista, Hueso, TextoCargando } from '..
 import { abrirCliente, verSinComprar } from '../pwa/Clientes'
 import { BuscarPedidos } from './BuscarPedidos'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarHeart, ChevronRight, Crown, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, CalendarHeart, ChevronRight, Crown, Flame, RefreshCw, TriangleAlert } from 'lucide-react'
 import { Medallas } from '../../components/Medallas'
 import type { Rachas } from '../../lib/equipo'
 import { abrirFicha } from '../pwa/Equipo'
@@ -635,6 +635,18 @@ const moverMes = (mes: string, n: number) => {
 }
 const TOP_RANKING = 5
 
+// ▲2 en verde si subió dos lugares contra el mes anterior, ▼1 en rojo si bajó; igual o nuevo, nada.
+function CambioDeLugar({ antes, ahora }: { antes?: number; ahora: number }) {
+  if (antes === undefined || antes === ahora) return null
+  const subio = antes > ahora, n = Math.abs(antes - ahora)
+  const texto = `${subio ? 'Subió' : 'Bajó'} ${n} ${n === 1 ? 'lugar' : 'lugares'} contra el mes anterior`
+  return (
+    <span title={texto} className={`flex items-center text-xs font-semibold tabular-nums ${subio ? 'text-verde' : 'text-rojo'}`}>
+      {subio ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />}<span aria-hidden="true">{n}</span><span className="sr-only"> {texto}</span>
+    </span>
+  )
+}
+
 function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
   const yo = useSesion()?.usuario.id
   const actual = hoy().slice(0, 7)
@@ -644,7 +656,12 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
   const r = useServidor<{ cifras: CifrasMes }>(`/cierres/${mes}`, ['datos', 'cobranza', 'equipo'])
   // La racha de hoy (meses seguidos en la meta hasta el mes pasado) y la mejor medalla de cada quien.
   const rachas = useServidor<Rachas>('/usuarios/rachas', 'cobranza').datos ?? {}
-  const filas = (r.datos?.cifras.mes === mes ? r.datos.cifras.vendedores : []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
+  const ordenar = (c?: CifrasMes) => (c?.vendedores ?? []).filter((v) => v.activo || v.ventas > 0).sort((a, b) => b.ventas - a.ventas)
+  const filas = ordenar(r.datos?.cifras.mes === mes ? r.datos.cifras : undefined)
+  // El lugar de cada quien el mes anterior, para la flechita (sube o baja de lugar). Quien no vendió ese mes no lleva.
+  const mesAntes = moverMes(mes, -1)
+  const previo = useServidor<{ cifras: CifrasMes }>(`/cierres/${mesAntes}`, ['datos', 'cobranza']).datos?.cifras
+  const lugarAntes = new Map(previo?.mes === mesAntes ? ordenar(previo).filter((v) => v.ventas > 0).map((v, i) => [v.id, i] as const) : [])
   const nombreMes = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-MX', atras ? { month: 'long', year: 'numeric' } : { month: 'long' })
   const flecha = `grid h-8 w-8 place-items-center rounded-full transition-colors hover:bg-niebla disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca`
   return (
@@ -692,7 +709,10 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
                       )}
                       <Medallas mejorRacha={rachas[v.id]?.mejorRacha ?? 0} soloMejor />
                     </span>
-                    <span className="shrink-0 font-semibold tabular-nums">{dinero(v.ventas)}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <CambioDeLugar antes={lugarAntes.get(v.id)} ahora={i} />
+                      <span className="font-semibold tabular-nums">{dinero(v.ventas)}</span>
+                    </span>
                   </div>
                   {pct !== null ? (
                     <div className="mt-1.5 flex items-center gap-2">

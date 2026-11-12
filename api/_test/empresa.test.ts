@@ -21,12 +21,24 @@ describe('marca de la empresa', () => {
 
     const r = await cambiar(admin, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO })
     assert.equal(r.status, 200)
-    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null })
+    assert.deepEqual(r.body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: LOGO, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null, controlRetornables: false })
     assert.deepEqual((await get(vend, '/empresa')).body, r.body)
-    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null })
+    assert.deepEqual((await get(otra, '/empresa')).body, { nombre: 'Otra', color: null, logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null, controlRetornables: false })
 
     // Cambiar sólo una cosa deja las demás; null quita el logo.
-    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null })
+    assert.deepEqual((await cambiar(admin, { logo: null })).body, { nombre: 'Agua La Fuente SA', color: '#1d4ed8', logo: null, lema: null, contacto: null, zonaHoraria: 'America/Mexico_City', minutosUrgente: 30, ritmoMetaPct: 70, limiteFiado: null, codigoFiado: null, firmaNombre: null, firmaCargo: null, firmaImagen: null, controlRetornables: false })
+  })
+
+  it('envases: el administrador enciende y apaga la cuenta de envases, el vendedor no', async () => {
+    const empresa = await crearEmpresa('Con garrafones')
+    const admin = await sesion('administrador', 'panel', empresa)
+    const vend = await sesion('vendedor', 'tel', empresa)
+    assert.equal((await cambiar(admin, { controlRetornables: true })).body.controlRetornables, true)
+    assert.equal((await get(vend, '/empresa')).body.controlRetornables, true)
+    assert.equal((await cambiar(vend, { controlRetornables: false })).status, 403)
+    // Cambiar otra cosa no la toca.
+    assert.equal((await cambiar(admin, { lema: 'Agua pura' })).body.controlRetornables, true)
+    assert.equal((await cambiar(admin, { controlRetornables: false })).body.controlRetornables, false)
   })
 
   it('lema y contacto: se guardan sin espacios de sobra y vacíos se quitan', async () => {

@@ -35,12 +35,14 @@ const bodyMarca = z.object({
   firmaNombre: z.string().trim().max(120, 'El nombre es de 120 letras como máximo').nullable().optional(),
   firmaCargo: z.string().trim().max(80, 'El cargo es de 80 letras como máximo').nullable().optional(),
   // La firma como imagen (migración 039), sin SVG: se imprime en los PDF. null la quita.
+  // ¿Sus clientes le devuelven los envases? Se contesta en el registro; sin esto no se ven Envases ni «retornable».
+  controlRetornables: z.boolean().optional(),
   firmaImagen: z.string().max(300_000, 'La firma pesa demasiado').regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/, 'La firma debe ser una imagen PNG, JPG o WEBP').nullable().optional(),
 }).refine((b) => Object.values(b).some((v) => v !== undefined), 'Nada que cambiar')
 
 export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { requiereSesionAunConPasswordPendiente, requiereAdmin }: { requiereSesionAunConPasswordPendiente: Guardia; requiereAdmin: Guardia }) {
   const leer = async (id: string) => {
-    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente, ritmo_meta_pct, limite_fiado, codigo_fiado, firma_nombre, firma_cargo, firma_imagen FROM empresas WHERE id_empresa = $1`, [id])
+    const { rows: [e] } = await db.query(`SELECT nombre, color_marca, logo, lema, contacto, zona_horaria, minutos_urgente, ritmo_meta_pct, limite_fiado, codigo_fiado, firma_nombre, firma_cargo, firma_imagen, control_retornables FROM empresas WHERE id_empresa = $1`, [id])
     return {
       nombre: e.nombre as string,
       color: (e.color_marca as string | null) ?? null,
@@ -57,6 +59,7 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
       firmaNombre: (e.firma_nombre as string | null) ?? null,
       firmaCargo: (e.firma_cargo as string | null) ?? null,
       firmaImagen: (e.firma_imagen as string | null) ?? null,
+      controlRetornables: e.control_retornables as boolean,
     }
   }
 
@@ -66,7 +69,7 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
   app.patch('/empresa', { preHandler: requiereAdmin, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, rep) => {
     const b = bodyMarca.safeParse(req.body)
     if (!b.success) return rep.code(400).send({ error: b.error.issues[0]?.message ?? 'Datos no válidos' })
-    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente, ritmoMetaPct, limiteFiado, codigoFiado, firmaNombre, firmaCargo, firmaImagen } = b.data
+    const { nombre, color: c, logo: l, lema, contacto, zonaHoraria, minutosUrgente, ritmoMetaPct, limiteFiado, codigoFiado, firmaNombre, firmaCargo, firmaImagen, controlRetornables } = b.data
     const sal = randomBytes(8).toString('hex')
     const codigo = codigoFiado ? `${sal}:${createHash('sha256').update(`${sal}:${codigoFiado}`).digest('hex')}` : null
     await db.query(
@@ -83,10 +86,11 @@ export async function rutasEmpresa(app: FastifyInstance, { db }: Contexto, { req
               firma_nombre = CASE WHEN $18 THEN $19 ELSE firma_nombre END,
               firma_cargo = CASE WHEN $20 THEN $21 ELSE firma_cargo END,
               firma_imagen = CASE WHEN $22 THEN $23 ELSE firma_imagen END,
+              control_retornables = coalesce($24, control_retornables),
               actualizado_en = now()
         WHERE id_empresa = $1`,
       [req.usuario.empresa, nombre ?? null, c !== undefined, c ?? null, l !== undefined, l ?? null,
-        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null, ritmoMetaPct ?? null, limiteFiado !== undefined, limiteFiado ?? null, codigoFiado !== undefined, codigo, firmaNombre !== undefined, firmaNombre || null, firmaCargo !== undefined, firmaCargo || null, firmaImagen !== undefined, firmaImagen ?? null],
+        lema !== undefined, lema || null, contacto !== undefined, contacto || null, zonaHoraria ?? null, minutosUrgente ?? null, ritmoMetaPct ?? null, limiteFiado !== undefined, limiteFiado ?? null, codigoFiado !== undefined, codigo, firmaNombre !== undefined, firmaNombre || null, firmaCargo !== undefined, firmaCargo || null, firmaImagen !== undefined, firmaImagen ?? null, controlRetornables ?? null],
     )
     if (zonaHoraria) olvidarZona(req.usuario.empresa)
     return leer(req.usuario.empresa)

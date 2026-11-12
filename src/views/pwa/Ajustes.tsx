@@ -10,6 +10,7 @@ import { borrarTodo } from '../../lib/demo'
 import { MODO_SERVIDOR } from '../../lib/api'
 import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
 import { TIPOS_ENVASE } from '../../lib/registro'
+import { useConEnvases } from '../../lib/marca'
 import { formato, nombreUnidad, presentacionDe, unidadDe } from '../../lib/unidades'
 
 const COLORES = ['#f472b6', '#f5ecd7', '#fdba74', '#facc15', '#b45309', '#7e22ce', '#ef4444', '#22c55e', '#38bdf8', '#a3e635']
@@ -166,6 +167,7 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
   const [disponible, setDisponible] = useState(producto?.disponible ?? true)
   // El cliente devuelve el envase: se lleva su saldo de envases prestados. Se puede cambiar cuando sea.
   const [retornable, setRetornable] = useState(producto?.retornable ?? false)
+  const conEnvases = useConEnvases()
   const conEnvase = !!(producto ? producto.envase : tipoEnvase)
   // RF-032: contenido por envase. Se elige al crear el sabor y ya no cambia: lo vendido se guarda en envases de ese tamaño.
   const envase = producto ? (producto.presentacion ?? 1) : Math.round(Number(presentacion.replace(',', '.')) * 100) / 100
@@ -230,7 +232,8 @@ export function FormSabor({ producto, tieneVentas, onCerrar }: { producto?: Prod
             <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded-full bg-transparent" />
           </div>
         </div>
-        {conEnvase && (
+        {/* Sólo si la empresa lleva la cuenta de envases (Preferencias → Envases); si no, se guarda como estaba. */}
+        {conEnvase && conEnvases && (
           <label className="flex items-center justify-between gap-3 rounded-md bg-niebla px-4 py-3">
             <span>
               <span className="block font-semibold">Envase retornable</span>

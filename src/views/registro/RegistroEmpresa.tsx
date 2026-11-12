@@ -408,7 +408,7 @@ function armarPantallas(
       contenido: (
         <div className="grid gap-3">
           <Opcion elegida={r.controlRetornables} onClick={() => { cambiar((x) => ({ ...x, controlRetornables: true })); avanzar() }} titulo="Sí, llevar la cuenta" detalle="Cada cliente tendrá su saldo de envases." />
-          <Opcion elegida={!r.controlRetornables} onClick={() => { cambiar((x) => ({ ...x, controlRetornables: false })); avanzar() }} titulo="No por ahora" detalle="Lo puedes activar después en Configuración." />
+          <Opcion elegida={!r.controlRetornables} onClick={() => { cambiar((x) => ({ ...x, controlRetornables: false })); avanzar() }} titulo="No por ahora" detalle="Lo enciendes cuando quieras en Configuración → Preferencias → Envases." />
         </div>
       ),
     })
