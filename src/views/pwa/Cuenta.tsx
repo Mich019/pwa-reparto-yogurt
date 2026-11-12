@@ -1,3 +1,4 @@
+import { useConEnvases } from '../../lib/marca'
 import { useState } from 'react'
 import { COLOR_FONDO, usePreferenciaTema, usePreferenciasPanel } from '../../lib/tema'
 import { type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
@@ -317,6 +318,7 @@ const TIPOS_AVISO = [
   { tipo: 'record_personal', titulo: 'Tus récords', ayuda: 'Cuando superas tu mejor racha de meses seguidos.' },
   { tipo: 'racha_en_riesgo', titulo: 'Tu racha en riesgo', ayuda: 'Al final del mes, si llegaste a tu meta el mes pasado y este todavía no.' },
   { tipo: 'fiado_atrasado', titulo: 'Fiado de más de un mes', ayuda: 'Una vez al día, si alguno de tus clientes debe desde hace más de 30 días.' },
+  { tipo: 'envases_atrasados', titulo: 'Envases de más de un mes', ayuda: 'Una vez al día, si alguno de tus clientes tiene envases prestados desde hace más de 30 días.' },
   { tipo: 'ruta_modificada', titulo: 'Cambios en tu ruta', ayuda: 'Pedidos de hoy que se agregan, cambian o quitan, y clientes que pasan a tu cartera.' },
 ] as const
 
@@ -350,6 +352,7 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
   const claseHora = 'rounded-md bg-niebla px-3 py-2 text-sm font-semibold'
   const { fondo } = usePreferenciasPanel()
   const tema = usePreferenciaTema()
+  const conEnvases = useConEnvases()
   return (
     <>
       {sinSenal && <p className="mt-4 border-t border-linea pt-3 text-xs text-apagado">Sin conexión: lo de abajo se puede cambiar cuando haya señal.</p>}
@@ -357,7 +360,7 @@ function PreferenciasAvisos({ vendedor }: { vendedor: boolean }) {
         <div className="mt-4 border-t border-linea pt-3">
           <div className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">Qué avisos recibes <span aria-live="polite"><MarcaGuardado estado={listo.avisos} /></span></div>
           <p className="text-xs text-apagado">Los pedidos urgentes siempre te llegan.</p>
-          {TIPOS_AVISO.map(({ tipo, titulo, ayuda }) => (
+          {TIPOS_AVISO.filter((t) => conEnvases || t.tipo !== 'envases_atrasados').map(({ tipo, titulo, ayuda }) => (
             <Opcion key={tipo} titulo={titulo} ayuda={ayuda}>
               <Interruptor encendido={encendido(tipo)} deshabilitado={!prefs} alCambiar={(si) => void alternar(tipo, si)} />
             </Opcion>

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
+import { avisarEnvasesAtrasados } from '../_lib/envases.js'
+import { crearDespachador } from '../_lib/notificaciones.js'
 import { app, cliente, config, crearEmpresa, db, op, pedido, pull, push, sesion } from './ayuda.js'
 
 // Saldo de envases retornables: lo entregado menos lo que el cliente devuelve.
@@ -30,7 +32,7 @@ async function escenario() {
     const o = pedido(c.id, p.id, { fecha: hoy, estado: 'ENTREGADO', metodo_pago: 'EFECTIVO', fecha_entregado_real: Date.now(), items: [{ productoId: p.id, litros: envases * p.presentacion, precio_litro: 2.5 }] })
     return push(ana, [op('pedidos', o.id, o)])
   }
-  return { admin, ana, beto, c, garrafon, botella, entrega }
+  return { empresa, admin, ana, beto, c, garrafon, botella, entrega }
 }
 
 describe('envases retornables', () => {
@@ -98,5 +100,23 @@ describe('envases retornables', () => {
     // El informe del mes junta lo que faltó por vendedor.
     const mes = (await llamar(x.admin, 'GET', `/cierres/${hoyEn(config.zonaHoraria).slice(0, 7)}`)).body.cifras.cortes
     assert.deepEqual(mes.envases.map((e: { id: string; diferencia: number }) => [e.id, e.diferencia]), [[x.ana.id, -1]])
+  })
+
+  it('aviso diario al vendedor: envases prestados desde hace más de un mes, una vez al mes y sólo con la cuenta de envases', async () => {
+    const x = await escenario()
+    await x.entrega(x.garrafon, 2)
+    await db.query(`UPDATE pedidos SET fecha = fecha - 40 WHERE id_cliente = $1`, [x.c.id])
+    const despachador = crearDespachador(db, null, { error: () => {} })
+    const avisos = async () => (await db.query(`SELECT datos FROM notificaciones WHERE id_usuario = $1 AND tipo = 'envases_atrasados'`, [x.ana.id])).rows
+    await avisarEnvasesAtrasados(db, despachador)
+    assert.equal((await avisos()).length, 0) // la empresa no lleva la cuenta de envases
+    await db.query(`UPDATE empresas SET control_retornables = true WHERE id_empresa = $1`, [x.empresa])
+    await avisarEnvasesAtrasados(db, despachador)
+    const r = await avisos()
+    assert.equal(r.length, 1)
+    assert.deepEqual(r[0].datos.clienteIds, [x.c.id])
+    await avisarEnvasesAtrasados(db, despachador)
+    assert.equal((await avisos()).length, 1) // no se repite en el mes
+    assert.equal((await db.query(`SELECT 1 FROM notificaciones WHERE id_usuario = $1 AND tipo = 'envases_atrasados'`, [x.admin.id])).rows.length, 0)
   })
 })

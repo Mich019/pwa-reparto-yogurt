@@ -4,6 +4,7 @@ import type { Contexto } from './app.js'
 import { clienteVisible, comoFalla, Falla } from './cobranza.js'
 import { tx, type Db } from './db.js'
 import { hoyEn, zonaDeEmpresa } from './fechas.js'
+import type { Despachador } from './notificaciones.js'
 
 // Saldo de envases retornables. Lo que un cliente tiene prestado de un producto retornable = los envases entregados
 // (pedidos entregados) − los que ya devolvió (envases_recogidos, sin las anuladas). Cada producto se marca retornable
@@ -40,6 +41,59 @@ export async function saldosEnvases(q: Consulta, f: { clienteId?: string; vended
   }))
 }
 
+// Desde cuándo tiene cada cliente envases prestados: la entrega más vieja que lo devuelto todavía no cubre (lo que
+// regresa cubre primero lo más viejo, como los abonos del fiado). `clienteIds` null = todos los que se vean.
+export async function desdeEnvases(q: Consulta, clienteIds: string[] | null): Promise<Map<string, string>> {
+  const { rows } = await q.query(
+    `WITH ent AS (
+       SELECT pe.id_cliente, d.id_producto, pe.fecha, sum(d.cantidad) AS n
+         FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)
+        WHERE pe.estado = 'entregado' AND pr.retornable AND ($1::uuid[] IS NULL OR pe.id_cliente = ANY($1::uuid[])) GROUP BY 1, 2, 3
+     ), acum AS (SELECT *, sum(n) OVER (PARTITION BY id_cliente, id_producto ORDER BY fecha) AS hasta FROM ent),
+     rec AS (SELECT id_cliente, id_producto, sum(cantidad) AS n FROM envases_recogidos
+              WHERE anulado_en IS NULL AND ($1::uuid[] IS NULL OR id_cliente = ANY($1::uuid[])) GROUP BY 1, 2)
+     SELECT a.id_cliente, min(a.fecha)::text AS desde FROM acum a
+       LEFT JOIN rec r ON r.id_cliente = a.id_cliente AND r.id_producto = a.id_producto
+      WHERE a.hasta > coalesce(r.n, 0) GROUP BY 1`,
+    [clienteIds],
+  )
+  return new Map(rows.map((r) => [r.id_cliente as string, r.desde as string]))
+}
+
+// Cron diario: al vendedor de cada cliente con envases prestados desde hace más de `dias` días le llega
+// `envases_atrasados` (se puede apagar) con los suyos, que abre Clientes. Sólo empresas que llevan la cuenta de envases.
+// Cada cliente vuelve a avisarse a los `dias` días si sigue igual (`datos.clienteIds`). Cruza empresas: conexión del
+// dueño. shortcut: calcula todas las empresas en una consulta; si llegan a ser muchas, recorrerlas una por una.
+export async function avisarEnvasesAtrasados(db: Db, despachador: Despachador, dias = 30): Promise<number> {
+  const limite = new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10)
+  const viejos = [...(await desdeEnvases(db, null))].filter(([, desde]) => desde < limite)
+  if (!viejos.length) return 0
+  const desde = new Map(viejos)
+  const { rows } = await db.query(
+    `SELECT c.id_cliente, c.nombre, c.id_vendedor FROM clientes c JOIN empresas e USING (id_empresa)
+       JOIN usuarios u ON u.id_usuario = c.id_vendedor AND u.activo AND u.rol = 'vendedor'
+      WHERE c.id_cliente = ANY($1::uuid[]) AND c.activo AND e.activa AND NOT e.interna AND e.control_retornables
+        AND NOT EXISTS (SELECT 1 FROM notificaciones n
+                         WHERE n.id_empresa = c.id_empresa AND n.tipo = 'envases_atrasados' AND n.creado_en > now() - make_interval(days => $2)
+                           AND coalesce(n.datos->'clienteIds', '[]') ? c.id_cliente::text)
+      ORDER BY lower(c.nombre)`,
+    [viejos.map(([id]) => id), dias],
+  )
+  if (!rows.length) return 0
+  const porVendedor = new Map<string, { id: string; nombre: string }[]>()
+  for (const r of rows) porVendedor.set(r.id_vendedor, [...(porVendedor.get(r.id_vendedor) ?? []), { id: r.id_cliente, nombre: r.nombre }])
+  const fecha = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
+  await despachador.despachar([...porVendedor].map(([vendedor, cs]) => ({
+    para: vendedor, tipo: 'envases_atrasados' as const,
+    titulo: cs.length === 1 ? 'Envases prestados de más de un mes' : `${cs.length} clientes tienen envases desde hace más de un mes`,
+    cuerpo: cs.length === 1
+      ? `${cs[0].nombre} tiene envases prestados desde el ${fecha(desde.get(cs[0].id)!)}: recógelos en su próxima visita`
+      : `${cs.slice(0, 3).map((c) => c.nombre).join(', ')}${cs.length > 3 ? ` y ${cs.length - 3} más` : ''}: recógelos en su próxima visita`,
+    datos: { pestana: 'clientes' as const, clienteIds: cs.map((c) => c.id) },
+  })))
+  return rows.length
+}
+
 const bodyRecogida = z.object({
   clienteId: z.uuid(),
   productoId: z.uuid(),
@@ -69,20 +123,7 @@ export async function rutasEnvases(app: FastifyInstance, { db, config }: Context
       const p = productos.get(f.productoId) ?? productos.set(f.productoId, { productoId: f.productoId, sabor: f.sabor, envase: f.envase, prestados: 0 }).get(f.productoId)!
       p.prestados += f.prestados
     }
-    // Desde cuándo tiene cada cliente envases prestados: la entrega más vieja que lo devuelto todavía no cubre.
-    const { rows: desdes } = clientes.size ? await db.query(
-      `WITH ent AS (
-         SELECT pe.id_cliente, d.id_producto, pe.fecha, sum(d.cantidad) AS n
-           FROM pedidos pe JOIN detalle_pedido d USING (id_pedido) JOIN productos pr USING (id_producto)
-          WHERE pe.estado = 'entregado' AND pr.retornable AND pe.id_cliente = ANY($1::uuid[]) GROUP BY 1, 2, 3
-       ), acum AS (SELECT *, sum(n) OVER (PARTITION BY id_cliente, id_producto ORDER BY fecha) AS hasta FROM ent),
-       rec AS (SELECT id_cliente, id_producto, sum(cantidad) AS n FROM envases_recogidos WHERE anulado_en IS NULL AND id_cliente = ANY($1::uuid[]) GROUP BY 1, 2)
-       SELECT a.id_cliente, min(a.fecha)::text AS desde FROM acum a
-         LEFT JOIN rec r ON r.id_cliente = a.id_cliente AND r.id_producto = a.id_producto
-        WHERE a.hasta > coalesce(r.n, 0) GROUP BY 1`,
-      [[...clientes.keys()]],
-    ) : { rows: [] }
-    const desde = new Map(desdes.map((r) => [r.id_cliente as string, r.desde as string]))
+    const desde = clientes.size ? await desdeEnvases(db, [...clientes.keys()]) : new Map<string, string>()
     return {
       total: pendientes.reduce((s, f) => s + f.prestados, 0),
       clientes: [...clientes.values()].map((c) => ({ ...c, desde: desde.get(c.id) ?? null })),

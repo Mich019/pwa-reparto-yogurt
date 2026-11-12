@@ -50,7 +50,7 @@ const bloqueada = (m: Miembro) => !!m.bloqueadoHasta && new Date(m.bloqueadoHast
 // Los que cada quien puede apagar en Preferencias (api/_lib/notificaciones.ts, AVISOS_ELEGIBLES).
 const NOMBRE_AVISO: Record<string, string> = {
   stock_asignado: 'carga del día', ruta_modificada: 'cambios de ruta', corte_entregado: 'cortes por confirmar',
-  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas', record_personal: 'récords', produccion_pendiente: 'producción pendiente', fiado_atrasado: 'fiado atrasado', fiado_sobre_limite: 'fiado de más',
+  corte_descuadrado: 'cortes que no cuadran', prueba_por_vencer: 'prueba por vencer', urgente_sin_atender: 'urgentes sin atender', meta_atrasada: 'metas atrasadas', meta_alcanzada: 'meta alcanzada', vendedor_en_meta: 'vendedores en meta', racha_en_riesgo: 'racha en riesgo', medalla_ganada: 'medallas', record_personal: 'récords', produccion_pendiente: 'producción pendiente', fiado_atrasado: 'fiado atrasado', fiado_sobre_limite: 'fiado de más', envases_atrasados: 'envases de más de un mes',
 }
 function textoAvisos(m: Miembro) {
   const donde = m.dispositivosPush ? `Activados en ${plural(m.dispositivosPush, 'dispositivo', 'dispositivos')}` : 'No los activó: se entera al abrir la app'

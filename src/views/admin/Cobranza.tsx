@@ -2,6 +2,7 @@ import { useConEnvases } from '../../lib/marca'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Brilla } from '../../components/Brillo'
 import { descargar, xlsx } from '../../lib/xlsx'
+import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { Resaltar } from '../../components/Busqueda'
 import { coincide, limpiarBusqueda } from '../../lib/busqueda'
 import { BotonWhatsApp, EditorMensaje, MandarATodos, textoCobro, useMensaje } from '../../components/Mensajes'
@@ -264,6 +265,19 @@ function Envases() {
   const clientes = viejos ? todos.filter((c) => c.desde && c.desde < hace30).sort((a, b) => (a.desde ?? '').localeCompare(b.desde ?? '')) : todos
   const hayViejos = todos.some((c) => c.desde && c.desde < hace30)
   const vista = usePaginas(clientes, 30, viejos)
+  // Lo que se ve (con «Más de un mes» puesto, sólo esos), con desde cuándo los tiene; en el navegador (lib/xlsx.ts).
+  const equipo = useEquipo()
+  useEffect(() => { if (!equipo) void cargarEquipo().catch(() => {}) }, [equipo])
+  function exportar() {
+    const vendedor = new Map((equipo?.usuarios ?? []).map((u) => [u.id, u.nombre]))
+    const dias = (f: string) => Math.round((Date.parse(`${hoy()}T12:00:00`) - Date.parse(`${f}T12:00:00`)) / 86_400_000)
+    descargar(xlsx({
+      nombre: 'Envases',
+      columnas: [{ titulo: 'Cliente', ancho: 30 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Envases prestados', ancho: 12 }, { titulo: 'De qué', ancho: 36 }, { titulo: 'Desde', ancho: 14 }, { titulo: 'Días', ancho: 8 }],
+      filas: clientes.map((c) => [c.nombre, c.vendedorId ? vendedor.get(c.vendedorId) ?? '' : 'Sin vendedor', c.total, c.envases.map((e) => `${e.prestados} de ${e.sabor}`).join(', '), c.desde ?? '', c.desde ? dias(c.desde) : null]),
+      total: ['Total', `${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'}`, clientes.reduce((s, c) => s + c.total, 0), null, null, null],
+    }), `envases-${hoy()}.xlsx`)
+  }
   return (
     <Estado cargando={lista.cargando && !lista.datos} error={lista.error} vacio={lista.datos && !clientes.length ? 'Nadie tiene envases prestados.' : undefined}>
       {lista.datos && (
@@ -272,11 +286,12 @@ function Envases() {
             Prestados <span className="ml-1 text-xl font-semibold tabular-nums text-tinta">{lista.datos.total}</span>
             {lista.datos.productos.length > 0 && ` · ${lista.datos.productos.map((p) => `${p.prestados} de ${p.sabor}`).join(', ')}`}
           </p>
-          {(hayViejos || viejos) && (
-            <div className="mb-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            {(hayViejos || viejos) && (
               <button type="button" onClick={() => setViejos(!viejos)} aria-pressed={viejos} className={viejos ? botonPanel : botonPanelSuave}>Más de un mes{viejos ? ` (${clientes.length})` : ''}</button>
-            </div>
-          )}
+            )}
+            <button type="button" onClick={exportar} disabled={!clientes.length} className="py-1 text-sm font-semibold underline-offset-2 hover:underline disabled:opacity-40">Bajar a Excel</button>
+          </div>
           <div ref={vista.ancla} className="scroll-mt-4">
             {vista.visibles.map((c) => (
               <Fila key={c.id} onClick={() => setAbierto(c.id)}>
