@@ -630,9 +630,12 @@ const moverMes = (mes: string, n: number) => {
   const f = new Date(a, m - 1 + n, 1)
   return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}`
 }
+const TOP_RANKING = 5
+
 function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
   const actual = hoy().slice(0, 7)
   const [atras, setAtras] = useState(0)
+  const [todos, setTodos] = useState(false)
   const mes = moverMes(actual, -atras)
   const r = useServidor<{ cifras: CifrasMes }>(`/cierres/${mes}`, ['datos', 'cobranza', 'equipo'])
   // La racha de hoy (meses seguidos en la meta hasta el mes pasado) y la mejor medalla de cada quien.
@@ -660,11 +663,13 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
       ) : !filas.length ? (
         <Vacio>{atras ? 'Ese mes no hubo ventas de vendedores.' : 'Cuando tus vendedores entreguen pedidos este mes aparecen aquí.'}</Vacio>
       ) : (
-        <ol className="mt-3 divide-y divide-linea">
-          {filas.map((v, i) => {
+        // Los primeros 5; con más vendedores, el resto se despliega aquí mismo (si no, empuja todo lo de abajo).
+        <>
+        <ol className="mt-2 divide-y divide-linea">
+          {(todos ? filas : filas.slice(0, TOP_RANKING)).map((v, i) => {
             const pct = v.meta ? Math.round(v.cumplimientoPct ?? 0) : null
             return (
-              <li key={v.id} className="flex items-center gap-3 py-3">
+              <li key={v.id} className="flex items-center gap-3 py-2.5">
                 <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 && v.ventas > 0 ? 'bg-marca text-white' : 'bg-niebla text-apagado'}`}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
@@ -684,7 +689,7 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-niebla" role="progressbar" aria-label={`${v.nombre}: ${pct}% de su meta`} aria-valuenow={Math.min(100, pct)} aria-valuemin={0} aria-valuemax={100}>
                         <div className={`h-full rounded-full ${pct >= 100 ? 'bg-verde' : 'bg-marca'}`} style={{ width: `${Math.min(100, pct)}%` }} />
                       </div>
-                      <span className="w-24 shrink-0 text-right text-xs text-apagado tabular-nums">{pct}% de {dinero(v.meta!)}</span>
+                      <span className="shrink-0 whitespace-nowrap text-right text-xs text-apagado tabular-nums">{pct}% de {dinero(v.meta!)}</span>
                     </div>
                   ) : (
                     <p className="mt-0.5 text-xs text-apagado">{v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'} · sin meta</p>
@@ -694,6 +699,13 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
             )
           })}
         </ol>
+        {filas.length > TOP_RANKING && (
+          <button type="button" onClick={() => setTodos(!todos)} aria-expanded={todos}
+            className="mt-1 rounded-md py-1.5 text-sm font-semibold text-apagado hover:text-tinta hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
+            {todos ? 'Ver sólo los primeros 5' : `Ver los ${filas.length - TOP_RANKING} demás`}
+          </button>
+        )}
+        </>
       )}
     </Tarjeta>
   )

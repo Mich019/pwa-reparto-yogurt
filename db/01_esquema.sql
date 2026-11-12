@@ -437,6 +437,7 @@ CREATE TABLE recordatorios (
 );
 CREATE INDEX recordatorios_pendientes ON recordatorios (id_vendedor) WHERE estado = 'pendiente';
 CREATE INDEX recordatorios_empresa ON recordatorios (id_empresa);
+CREATE INDEX recordatorios_origen ON recordatorios (id_pedido_origen) WHERE id_pedido_origen IS NOT NULL;
 
 -- =============================================================================
 -- M07 · Auditoría (RF-042)
@@ -674,6 +675,7 @@ CREATE TABLE abonos (
 CREATE INDEX abonos_cliente ON abonos (id_cliente, fecha DESC);
 CREATE INDEX abonos_fecha ON abonos (id_empresa, fecha);
 CREATE INDEX pedidos_credito ON pedidos (id_cliente) WHERE metodo_pago = 'credito';
+CREATE INDEX pedidos_origen ON pedidos (id_pedido_origen) WHERE id_pedido_origen IS NOT NULL;
 -- Corte del día: cuánto efectivo debía entregar cada vendedor (lo cobrado en efectivo: ventas y abonos) contra lo que dice
 -- que entrega; el administrador lo confirma. La diferencia queda a la vista. Uno por vendedor y día; mientras esté
 -- pendiente el vendedor lo puede corregir. El administrador puede reabrir uno confirmado anotando el motivo.
