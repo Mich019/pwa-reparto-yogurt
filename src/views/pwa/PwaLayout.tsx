@@ -3,7 +3,7 @@ import { fijarReparto } from '../../lib/reparto'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { BarChart3, IceCreamBowl, Map, Package, User, Users } from 'lucide-react'
 import { Ruta } from './Ruta'
-import { Clientes } from './Clientes'
+import { abrirCliente, Clientes } from './Clientes'
 import { Cuenta } from './Cuenta'
 import { Stock } from './Stock'
 import { Produccion } from './Produccion'
@@ -35,7 +35,10 @@ const PESTANAS_PWA: { id: PestanaPwa; texto: string; icono: typeof Map; solo?: '
 
 // Al tocar una notificación con la app cerrada, se abre en la pestaña que corresponde (?abrir=stock).
 function pestanaInicial(): PestanaPwa {
-  const p = new URLSearchParams(window.location.search).get('abrir')
+  const busqueda = new URLSearchParams(window.location.search)
+  const p = busqueda.get('abrir')
+  const cliente = busqueda.get('cliente') // aviso de un solo cliente: su ficha
+  if (p === 'clientes' && cliente) abrirCliente(cliente)
   return PESTANAS_PWA.find((x) => x.id === p)?.id ?? 'ruta'
 }
 
@@ -61,6 +64,8 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
     p.solo === 'vendedor' ? MODO_SERVIDOR : p.solo === 'servidor' ? MODO_SERVIDOR : p.solo === 'sinServidor' ? !MODO_SERVIDOR : true)
   const actual = visibles.some((p) => p.id === pestana) ? pestana : 'ruta'
   const irA = (p: PestanaPwa) => { if (visibles.some((v) => v.id === p)) setPestana(p) }
+  // Al abrir la ficha de un cliente desde una notificación, Clientes se vuelve a montar para leerla aunque ya estuviera abierta.
+  const [vezClientes, setVezClientes] = useState(0)
   const pasosGuia = PASOS_APP.filter((x) => !x.seccion || visibles.some((v) => v.id === x.seccion))
   useEffect(() => {
     if (pasoGuia !== null) setPestana((pasosGuia[pasoGuia]?.seccion ?? 'ruta') as PestanaPwa)
@@ -88,7 +93,10 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const alMensaje = (e: MessageEvent) => {
-      if (e.data?.tipo === 'abrir' && PESTANAS_PWA.some((p) => p.id === e.data.pestana)) irA(e.data.pestana)
+      if (e.data?.tipo === 'abrir' && PESTANAS_PWA.some((p) => p.id === e.data.pestana)) {
+        if (e.data.pestana === 'clientes' && typeof e.data.cliente === 'string') { abrirCliente(e.data.cliente); setVezClientes((n) => n + 1) }
+        irA(e.data.pestana)
+      }
     }
     navigator.serviceWorker.addEventListener('message', alMensaje)
     return () => navigator.serviceWorker.removeEventListener('message', alMensaje)
@@ -128,7 +136,7 @@ export function PwaLayout({ onIrAAdmin }: { onIrAAdmin?: () => void }) {
       {/* Contenido principal móvil */}
       <main className="relative min-h-0 flex-1">
         {actual === 'ruta' && <Ruta irAClientes={() => setPestana('clientes')} irAStock={visibles.some((p) => p.id === 'stock') ? () => setPestana('stock') : undefined} irACuenta={() => setPestana('cuenta')} />}
-        {actual === 'clientes' && <Clientes />}
+        {actual === 'clientes' && <Clientes key={vezClientes} />}
         {actual === 'stock' && <Stock />}
         {actual === 'produccion' && <Produccion />}
         {actual === 'sabores' && <Ajustes />}

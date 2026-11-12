@@ -1,4 +1,5 @@
 import { useConEnvases } from '../../lib/marca'
+import { abrirCliente } from './Clientes'
 import { useState } from 'react'
 import { COLOR_FONDO, usePreferenciaTema, usePreferenciasPanel } from '../../lib/tema'
 import { type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
@@ -158,6 +159,7 @@ function Avisos({ irA }: { irA?: (p: PestanaAviso) => void }) {
       if (!a.local) void marcarLeidosEnServidor([a.id])
     }
     if (a.url) location.assign(a.url)
+    else if (a.cliente && a.pestana === 'clientes') { abrirCliente(a.cliente); irA?.('clientes') }
     else if (a.pestana) irA?.(a.pestana)
   }
   async function leerTodo() {

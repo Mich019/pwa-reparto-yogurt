@@ -91,6 +91,7 @@ export interface Aviso {
   cuerpo: string
   pestana?: PestanaAviso // a dónde lleva al tocarlo
   url?: string // o a qué dirección (los del administrador llevan al panel)
+  cliente?: string // si es de un solo cliente (fiado o envases atrasados), abre su ficha en Clientes
   creado: number
   leida: boolean
   local?: boolean

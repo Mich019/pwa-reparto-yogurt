@@ -11,6 +11,15 @@ export interface Novedad { fecha: string; titulo: string; puntos: PuntoNovedad[]
 
 export const NOVEDADES: Novedad[] = [
   {
+    fecha: '2026-11-12', titulo: 'Para no olvidar los envases',
+    puntos: [
+      { texto: 'En la ruta, las paradas de clientes con envases de hace más de un mes llevan un iconito de envase, y la parada te recuerda recogerlos. Al terminar la ruta te dice a quién se le quedaron sin recoger.', donde: 'app', guia: 'envases-corte' },
+      { texto: 'Hay un mensaje de WhatsApp para pedirle al cliente que tenga listos sus envases: lo mandas desde su ficha y lo cambias a tu gusto en Cuenta.', guia: 'envases' },
+      { texto: 'En Finanzas → Envases, «Mandar a todos» le pide sus envases a cada cliente por WhatsApp, uno tras otro; con «Más de un mes» puesto, sólo a los atrasados.', para: 'administrador', donde: 'panel', guia: 'envases' },
+      { texto: 'Si te avisan de un solo cliente con fiado o envases de más de un mes, al tocar el aviso se abre directo su ficha.', para: 'vendedor', donde: 'app' },
+    ],
+  },
+  {
     fecha: '2026-11-11', titulo: 'Envases en la ruta y en el corte',
     puntos: [
       { texto: 'Si tu empresa lleva la cuenta de envases (se enciende o apaga en Preferencias → Envases), la parada de la ruta dice cuántos tiene prestados el cliente y los recoges ahí mismo con «Recoger». Al terminar la ruta ves cuántos recogiste.', guia: 'envases-corte' },

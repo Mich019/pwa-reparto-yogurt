@@ -67,7 +67,11 @@ self.addEventListener('push', (e) => {
       await self.registration.showNotification(aviso.titulo || 'Delisy', {
         body: aviso.cuerpo || '',
         tag: aviso.id || undefined,
-        data: { pestana: aviso.datos && aviso.datos.pestana, url: aviso.datos && aviso.datos.url },
+        data: {
+          pestana: aviso.datos && aviso.datos.pestana, url: aviso.datos && aviso.datos.url,
+          // De un solo cliente (fiado o envases atrasados): abre su ficha.
+          cliente: aviso.datos && Array.isArray(aviso.datos.clienteIds) && aviso.datos.clienteIds.length === 1 ? aviso.datos.clienteIds[0] : undefined,
+        },
       })
     })(),
   )
@@ -78,6 +82,7 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close()
   const pestana = e.notification.data && e.notification.data.pestana
   const url = e.notification.data && e.notification.data.url
+  const cliente = e.notification.data && e.notification.data.cliente
   e.waitUntil(
     (async () => {
       const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
@@ -86,11 +91,11 @@ self.addEventListener('notificationclick', (e) => {
       const v = ventanas.find((x) => x.visibilityState === 'visible') || ventanas[0]
       if (v) {
         try { await v.focus() } catch { /* el navegador no siempre lo permite */ }
-        if (pestana) v.postMessage({ tipo: 'abrir', pestana })
+        if (pestana) v.postMessage({ tipo: 'abrir', pestana, cliente })
         v.postMessage({ tipo: 'sincronizar' })
         return
       }
-      await self.clients.openWindow(pestana ? `./?abrir=${encodeURIComponent(pestana)}` : './')
+      await self.clients.openWindow(pestana ? `./?abrir=${encodeURIComponent(pestana)}${cliente ? `&cliente=${encodeURIComponent(cliente)}` : ''}` : './')
     })(),
   )
 })
