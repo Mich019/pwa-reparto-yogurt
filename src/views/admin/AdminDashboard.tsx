@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Brilla } from '../../components/Brillo'
 import { BarrasHueso, Esqueleto, EsqueletoLista, Hueso, TextoCargando } from '../../components/Esqueleto'
 import { abrirCliente, verSinComprar } from '../pwa/Clientes'
@@ -396,11 +396,14 @@ export function AdminDashboard({ onNavegar }: { onNavegar: (seccion: SeccionAdmi
         </Tarjeta>
 
         <div className="grid items-start gap-x-12 gap-y-12 lg:grid-cols-2">
-          {pedidosRecientes}
+          {/* Dos columnas parejas: pedidos y clientes a la izquierda, vendedores a la derecha. */}
+          <div className="space-y-12">
+            {pedidosRecientes}
+            <MejoresClientes onNavegar={onNavegar} />
+          </div>
           <div className="space-y-12">
             <RankingMes onNavegar={onNavegar} />
             <MedallasDelMes onNavegar={onNavegar} />
-            <MejoresClientes onNavegar={onNavegar} />
           </div>
         </div>
 
@@ -633,6 +636,7 @@ const moverMes = (mes: string, n: number) => {
 const TOP_RANKING = 5
 
 function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void }) {
+  const yo = useSesion()?.usuario.id
   const actual = hoy().slice(0, 7)
   const [atras, setAtras] = useState(0)
   const [todos, setTodos] = useState(false)
@@ -666,15 +670,21 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
         // Los primeros 5; con más vendedores, el resto se despliega aquí mismo (si no, empuja todo lo de abajo).
         <>
         <ol className="mt-2 divide-y divide-linea">
-          {(todos ? filas : filas.slice(0, TOP_RANKING)).map((v, i) => {
+          {filas.map((v, i) => {
+            // Cerrado: los primeros 5 y, si quien mira vende y quedó más abajo, su renglón tras unos puntos.
+            const mio = v.id === yo
+            if (!todos && i >= TOP_RANKING && !mio) return null
             const pct = v.meta ? Math.round(v.cumplimientoPct ?? 0) : null
             return (
-              <li key={v.id} className="flex items-center gap-3 py-2.5">
+              <Fragment key={v.id}>
+              {!todos && mio && i > TOP_RANKING && <li aria-hidden="true" className="py-1 pl-3 text-apagado">⋮</li>}
+              <li className={`flex items-center gap-3 py-2.5 ${mio ? '-mx-2 rounded-md bg-marca/8 px-2' : ''}`}>
                 <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums ${i === 0 && v.ventas > 0 ? 'bg-marca text-white' : 'bg-niebla text-apagado'}`}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate font-semibold">{v.nombre}</span>
+                      {mio && <span className="shrink-0 rounded-full bg-marca px-1.5 text-[0.6875rem] font-bold text-white">Tú</span>}
                       {(rachas[v.id]?.racha ?? 0) >= 2 && (
                         <span title={`${rachas[v.id].racha} meses seguidos en su meta`} className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-marca">
                           <Flame size={13} aria-hidden="true" />{rachas[v.id].racha}<span className="sr-only"> meses seguidos en su meta</span>
@@ -696,13 +706,14 @@ function RankingMes({ onNavegar }: { onNavegar: (seccion: SeccionAdmin) => void 
                   )}
                 </div>
               </li>
+              </Fragment>
             )
           })}
         </ol>
         {filas.length > TOP_RANKING && (
           <button type="button" onClick={() => setTodos(!todos)} aria-expanded={todos}
             className="mt-1 rounded-md py-1.5 text-sm font-semibold text-apagado hover:text-tinta hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca">
-            {todos ? 'Ver sólo los primeros 5' : `Ver los ${filas.length - TOP_RANKING} demás`}
+            {todos ? 'Ver sólo los primeros 5' : `Ver a los ${filas.length} vendedores`}
           </button>
         )}
         </>
