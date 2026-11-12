@@ -8,7 +8,7 @@ import { BotonWhatsApp, EditorMensaje, MandarATodos, textoCobro, useMensaje } fr
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Lock, LockOpen, TriangleAlert } from 'lucide-react'
 import {
   cerrarMes, confirmarCorte, mandarInformePorCorreo, entregarCorte, reabrirCorte, exportarInforme, reabrirMes, textoMes, useServidor,
-  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre, pasoSuLimite, envasesCuadran } from '../../lib/cobranza'
+  type Descuadre, type Deudor, type EnvasesClientes, type FilaCorte, type InformeMes, type MesCierre, pasoSuLimite, envasesCuadran, textoEnvasesCortes } from '../../lib/cobranza'
 import { dinero, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { textoPorUnidad } from '../../lib/unidades'
 import { usePaginas } from '../../components/Paginas'
@@ -619,6 +619,7 @@ function DetalleMes({ mes, actual, onCambio }: { mes: string; actual: boolean; o
                 {i.cifras.cortes.pendientes + i.cifras.cortes.sinCorte > 0 && ` · ${i.cifras.cortes.pendientes + i.cifras.cortes.sinCorte} sin confirmar`}
                 {i.cifras.cortes.diferencia !== 0 && ` · diferencia ${i.cifras.cortes.diferencia < 0 ? 'de' : 'a favor'} ${dinero(Math.abs(i.cifras.cortes.diferencia))}`}
               </p>
+              {textoEnvasesCortes(i.cifras.cortes.envases) && <p className="text-sm text-apagado">Envases: {textoEnvasesCortes(i.cifras.cortes.envases)}</p>}
             </section>
           )}
 

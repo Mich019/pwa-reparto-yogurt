@@ -2,7 +2,7 @@ import { ajustarTexto, anchoTexto, Documento, imagenParaPdf, type Color, type Fu
 import { colorLegible, marcaActual, type Marca } from './marca'
 import { sesionActual } from './sesion'
 import { textoPorUnidad, tituloUnidad } from './unidades'
-import type { InformeMes } from './cobranza'
+import { textoEnvasesCortes, type InformeMes } from './cobranza'
 import { cambio, textoPeriodo, type Periodo, type Reporte, type SaborVendido, type VendedorRendimiento } from './reportes'
 
 // Informes en PDF para leer o imprimir (RF-048): el reporte de ventas y la libreta de clientes. Estilo sobrio de
@@ -619,6 +619,8 @@ export function informeMensualPdf(i: InformeMes, ahora = new Date(), logros?: Lo
     { titulo: 'Diferencia', ancho: 0.14, der: true, valor: (k) => din(k.diferencia), color: (k) => (k.diferencia < 0 ? NEGATIVO : k.diferencia > 0 ? POSITIVO : undefined) },
     { titulo: 'Estado', ancho: 0.12, valor: (k) => (k.estado === 'confirmado' ? 'Confirmado' : 'Pendiente') },
   ], c.cortes.detalle, c.cortes.detalle.length ? ['Total', '', din(c.cortes.detalle.reduce((s, k) => s + k.esperado, 0)), din(c.cortes.detalle.reduce((s, k) => s + k.entregado, 0)), din(c.cortes.diferencia), ''] : undefined)
+  const envasesCortes = textoEnvasesCortes(c.cortes.envases)
+  if (envasesCortes) inf.nota(`Envases en los cortes: ${envasesCortes}.`)
   if (c.cortes.sinCorte > 0) inf.nota(`${ent(c.cortes.sinCorte)} ${c.cortes.sinCorte === 1 ? 'día con cobro en efectivo no tiene' : 'días con cobro en efectivo no tienen'} corte.`)
   if (logros && (logros.medallas.length || logros.fama.length)) {
     inf.tituloSeccion('Medallas y salón de la fama', 'Meses seguidos llegando a la meta')

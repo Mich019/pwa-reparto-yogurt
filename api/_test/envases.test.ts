@@ -94,5 +94,8 @@ describe('envases retornables', () => {
     await llamar(x.ana, 'POST', '/envases/recogidas', { clienteId: x.c.id, productoId: x.garrafon.id, cantidad: 1 })
     const conf = ((await llamar(x.admin, 'GET', '/cortes')).body.filas as { vendedorId: string; envases: number; envasesEntregados: number }[]).find((f) => f.vendedorId === x.ana.id)
     assert.deepEqual([conf?.envases, conf?.envasesEntregados], [2, 1])
+    // El informe del mes junta lo que faltó por vendedor.
+    const mes = (await llamar(x.admin, 'GET', `/cierres/${hoyEn(config.zonaHoraria).slice(0, 7)}`)).body.cifras.cortes
+    assert.deepEqual(mes.envases.map((e: { diferencia: number }) => e.diferencia), [-1])
   })
 })

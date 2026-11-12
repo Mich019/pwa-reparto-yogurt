@@ -117,7 +117,10 @@ export interface CifrasMes {
   }[]
   cortes: {
     dias: number; confirmados: number; pendientes: number; sinCorte: number; diferencia: number
-    detalle: { fecha: string; vendedor: string; esperado: number; entregado: number; diferencia: number; estado: string }[]
+    detalle: { fecha: string; vendedor: string; esperado: number; entregado: number; diferencia: number; estado: string; envases?: number | null }[]
+    // Envases que faltaron (negativo) o sobraron en los cortes del mes, por vendedor; sólo quien no cuadró. Falta en
+    // las cifras congeladas antes de la migración 045.
+    envases?: { vendedor: string; diferencia: number }[]
   }
 }
 
@@ -162,7 +165,8 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
     ),
     q.query(`SELECT id_usuario, nombre, activo, comision_pct::float8 AS pct, meta_mensual::float8 AS meta FROM usuarios WHERE ${vende()}`),
     q.query(
-      `SELECT c.fecha::text, u.nombre, c.efectivo_esperado::float8 AS esperado, c.efectivo_entregado::float8 AS entregado, c.diferencia::float8 AS diferencia, c.estado
+      `SELECT c.fecha::text, u.nombre, c.efectivo_esperado::float8 AS esperado, c.efectivo_entregado::float8 AS entregado, c.diferencia::float8 AS diferencia, c.estado,
+              c.envases_entregados - c.envases_esperados AS dif_envases
          FROM cortes_dia c JOIN usuarios u ON u.id_usuario = c.id_vendedor WHERE c.fecha BETWEEN $1 AND $2 ORDER BY c.fecha, lower(u.nombre)`,
       [desde, hasta],
     ),
@@ -196,7 +200,9 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
     })
     .sort((x, y) => y.ventas - x.ventas || x.nombre.localeCompare(y.nombre))
 
-  const diasCorte = cortes.map((c) => ({ fecha: c.fecha as string, vendedor: c.nombre as string, esperado: redondear(c.esperado), entregado: redondear(c.entregado), diferencia: redondear(c.diferencia), estado: c.estado as string }))
+  const diasCorte = cortes.map((c) => ({ fecha: c.fecha as string, vendedor: c.nombre as string, esperado: redondear(c.esperado), entregado: redondear(c.entregado), diferencia: redondear(c.diferencia), estado: c.estado as string, envases: c.dif_envases as number | null }))
+  const envasesPorVendedor = new Map<string, number>()
+  for (const c of diasCorte) if (c.envases) envasesPorVendedor.set(c.vendedor, (envasesPorVendedor.get(c.vendedor) ?? 0) + c.envases)
   // Días con efectivo por entregar que nadie cortó: vendedor y día con ventas en efectivo o abonos en efectivo sin corte.
   const { rows: [{ n: sinCorte }] } = await q.query(
     `SELECT count(*)::int AS n FROM (
@@ -223,6 +229,7 @@ export async function cifrasDelMes(q: Consulta, mes: string): Promise<CifrasMes>
       sinCorte,
       diferencia: redondear(diasCorte.reduce((s, c) => s + c.diferencia, 0)),
       detalle: diasCorte,
+      envases: [...envasesPorVendedor].filter(([, d]) => d !== 0).map(([vendedor, diferencia]) => ({ vendedor, diferencia })).sort((a, b) => a.diferencia - b.diferencia),
     },
   }
 }
@@ -259,6 +266,7 @@ function hojas(x: CifrasMes): Tabla[] {
       ['Abonos recibidos', pesos(x.abonos.total)], ['Por cobrar al cierre', pesos(x.porCobrar.saldo)],
       ['Envases prestados al cierre', { v: x.envases.prestados, t: 'entero' }],
       ['Diferencia total de los cortes', pesos(x.cortes.diferencia)],
+      ...(x.cortes.envases?.length ? [['Envases que faltaron en los cortes', { v: -x.cortes.envases.reduce((s, e) => s + Math.min(0, e.diferencia), 0), t: 'entero' as const }] as Valor[]] : []),
     ],
   }
   const vendedores: Tabla = {
@@ -273,8 +281,8 @@ function hojas(x: CifrasMes): Tabla[] {
   }
   const cortes: Tabla = {
     nombre: 'Cortes',
-    columnas: [{ titulo: 'Fecha', tipo: 'fecha' }, { titulo: 'Vendedor', tipo: 'texto', ancho: 26 }, { titulo: 'Esperado', tipo: 'dinero' }, { titulo: 'Entregado', tipo: 'dinero' }, { titulo: 'Diferencia', tipo: 'dinero' }, { titulo: 'Estado', tipo: 'texto' }],
-    filas: x.cortes.detalle.map((c) => [c.fecha, c.vendedor, c.esperado, c.entregado, c.diferencia, c.estado === 'confirmado' ? 'Confirmado' : 'Pendiente']),
+    columnas: [{ titulo: 'Fecha', tipo: 'fecha' }, { titulo: 'Vendedor', tipo: 'texto', ancho: 26 }, { titulo: 'Esperado', tipo: 'dinero' }, { titulo: 'Entregado', tipo: 'dinero' }, { titulo: 'Diferencia', tipo: 'dinero' }, { titulo: 'Estado', tipo: 'texto' }, { titulo: 'Envases (diferencia)', tipo: 'entero' }],
+    filas: x.cortes.detalle.map((c) => [c.fecha, c.vendedor, c.esperado, c.entregado, c.diferencia, c.estado === 'confirmado' ? 'Confirmado' : 'Pendiente', c.envases ?? null]),
   }
   return [resumen, vendedores, cortes]
 }
@@ -494,7 +502,8 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
       if (!esAdmin && despachador) {
         const { rows: [yo] } = await db.query(`SELECT nombre FROM usuarios WHERE id_usuario = $1`, [req.usuario.id])
         const { rows: admins } = await db.query(`SELECT id_usuario FROM usuarios WHERE rol = 'administrador' AND activo`)
-        const cuadre = r.diferencia === 0 ? 'cuadra' : `${r.diferencia < 0 ? 'faltan' : 'sobran'} $${Math.abs(r.diferencia).toFixed(2)}`
+        const env = r.envasesDiferencia ? `; ${r.envasesDiferencia < 0 ? 'faltan' : 'sobran'} ${Math.abs(r.envasesDiferencia)} ${Math.abs(r.envasesDiferencia) === 1 ? 'envase' : 'envases'}` : ''
+        const cuadre = (r.diferencia === 0 ? 'cuadra' : `${r.diferencia < 0 ? 'faltan' : 'sobran'} $${Math.abs(r.diferencia).toFixed(2)}`) + env
         const dia = fecha === hoy ? 'de hoy' : `del ${diaCorto(fecha)}`
         await despachador.despachar(admins.map((a) => ({
           para: a.id_usuario as string, tipo: 'corte_entregado' as const, titulo: 'Corte por confirmar',
