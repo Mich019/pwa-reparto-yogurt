@@ -74,7 +74,7 @@ const tel = (pestana: string, piezas: Pieza[], hoja?: Escena['hoja']): Escena =>
 const encClientes = (foco: 'nuevo' | 'mas' | null): Pieza => ({
   t: 'botones', items: [
     { texto: 'Activos', primario: true },
-    { texto: 'Archivados' },
+    { texto: 'Dados de baja' },
     { icono: MoreHorizontal, texto: 'Más', foco: foco === 'mas' },
     { icono: UserPlus, texto: 'Nuevo cliente', primario: true, foco: foco === 'nuevo' },
   ],
@@ -82,8 +82,8 @@ const encClientes = (foco: 'nuevo' | 'mas' | null): Pieza => ({
 const masClientes = (foco: number): Pieza => ({ t: 'menu', items: ['Escanear', 'Imprimir QR', 'Bajar a Excel', 'Libreta', 'Límite sugerido para todos'], foco })
 const encEquipo = (foco: 'mas' | 'nueva' | null): Pieza => ({
   t: 'botones', items: [
-    { texto: 'Activas', primario: true },
-    { texto: 'Dadas de baja' },
+    { texto: 'Activos', primario: true },
+    { texto: 'Dados de baja' },
     { icono: MoreHorizontal, texto: 'Más', foco: foco === 'mas' },
     { icono: UserPlus, texto: 'Nueva cuenta', primario: true, foco: foco === 'nueva' },
   ],
@@ -310,7 +310,7 @@ export const GUIAS: Guia[] = [
     pasos: [
       { texto: 'En Vendedores, toca a la persona y luego «Dar de baja».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Rosa Hernández', piezas: [{ t: 'acciones', items: ['Editar', 'Contraseña', 'Pasar cartera', 'Dar de baja'], foco: 3 }] }) },
       { texto: 'Decide qué pasa con sus clientes: pasarlos a otra persona, dejarlos sin vendedor o decidir después. Confirma.', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }], { titulo: 'Rosa Hernández', piezas: [{ t: 'caja', titulo: '¿Dar de baja a Rosa?', texto: 'Sus clientes y su historial se conservan' }, { t: 'campos', items: [{ etiqueta: '¿Qué hacemos con sus 12 clientes?', valor: 'Pasarlos a Juan Pérez', foco: true }] }, { t: 'botones', items: [{ texto: 'Cancelar' }, { texto: 'Dar de baja', primario: true }] }] }) },
-      { texto: 'Para que vuelva, búscala en «Dadas de baja» y toca «Reactivar».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'botones', items: [{ texto: 'Activas' }, { texto: 'Dadas de baja', primario: true, foco: true }] }, { t: 'filas', n: 2, avatar: true }]) },
+      { texto: 'Para que vuelva, búscala en «Dados de baja» y toca «Reactivar».', escena: panel('Vendedores', [{ t: 'titulo', texto: 'Equipo' }, { t: 'botones', items: [{ texto: 'Activos' }, { texto: 'Dados de baja', primario: true, foco: true }] }, { t: 'filas', n: 2, avatar: true }]) },
     ],
   },
   {
@@ -323,12 +323,12 @@ export const GUIAS: Guia[] = [
     ],
   },
   {
-    id: 'archivar', tema: 'clientes', titulo: 'Archivar a un cliente', icono: Archive, donde: 'panel', para: 'administrador', ir: 'clientes',
+    id: 'archivar', tema: 'clientes', titulo: 'Dar de baja a un cliente', icono: Archive, donde: 'panel', para: 'administrador', ir: 'clientes',
     resumen: 'Sale de la lista y de la ruta sin perder su historial; lo puedes volver a activar.',
-    palabras: 'archivar quitar borrar cliente inactivo activar archivados',
+    palabras: 'dar de baja archivar quitar borrar cliente inactivo reactivar dados de baja archivados',
     pasos: [
-      { texto: 'En Clientes, abre al cliente y toca «Archivar».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar', 'Archivar'], foco: 4 }] }) },
-      { texto: 'Para verlo otra vez, cambia a «Archivados», ábrelo y toca «Activar».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'botones', items: [{ texto: 'Activos' }, { texto: 'Archivados', primario: true, foco: true }] }, { t: 'filas', n: 2, avatar: true }]) },
+      { texto: 'En Clientes, abre al cliente y toca «Dar de baja».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'filas', n: 3, avatar: true }], { titulo: 'Doña Lupita', piezas: [{ t: 'acciones', items: ['Llamar', 'WhatsApp', 'Código QR', 'Editar', 'Dar de baja'], foco: 4 }] }) },
+      { texto: 'Para verlo otra vez, cambia a «Dados de baja», ábrelo y toca «Reactivar».', escena: panel('Clientes', [{ t: 'titulo', texto: 'Clientes' }, { t: 'botones', items: [{ texto: 'Activos' }, { texto: 'Dados de baja', primario: true, foco: true }] }, { t: 'filas', n: 2, avatar: true }]) },
     ],
   },
   {

@@ -128,7 +128,7 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
       return [v, m.metaMensual ? Math.max(0, m.metaMensual - v) : null]
     }
     descargar(xlsx({
-      nombre: verBaja ? 'Dadas de baja' : 'Equipo',
+      nombre: verBaja ? 'Dados de baja' : 'Equipo',
       columnas: [{ titulo: 'Nombre', ancho: 26 }, { titulo: 'Correo', ancho: 30 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Rol', ancho: 14 }, { titulo: 'Clientes activos', ancho: 10 }, { titulo: 'Meta mensual', dinero: true, ancho: 14 }, ...mesColumnas, { titulo: 'Comisión %', ancho: 10 }, { titulo: 'Último acceso', ancho: 18 }],
       filas: lista.map((m) => [m.nombre, m.correo, m.telefono, m.rol === 'administrador' ? 'Administrador' : 'Vendedor', m.clientesActivos, m.metaMensual, ...delMes(m), m.comisionPct, m.ultimoAcceso ? new Date(m.ultimoAcceso).toLocaleString('es-MX') : 'Nunca']),
     }), `equipo-${hoy()}.xlsx`)
@@ -180,8 +180,8 @@ export function Equipo({ panel = false }: { panel?: boolean } = {}) {
         <Encabezado titulo="Equipo" ayuda="equipo" detalle={equipo ? `${plural(activos.length, 'cuenta activa', 'cuentas activas')}${deBaja.length ? ` · ${plural(deBaja.length, 'dada de baja', 'dadas de baja')}` : ''}` : <TextoCargando ancho="11rem" />}>
           <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar persona" clave="equipo" />
           <div className={grupoPanel} role="group" aria-label="Mostrar">
-            <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activas</button>
-            <button onClick={() => setVerBaja(true)} aria-pressed={verBaja} className={verBaja ? botonPanel : botonPanelSuave}>Dadas de baja</button>
+            <button onClick={() => setVerBaja(false)} aria-pressed={!verBaja} className={verBaja ? botonPanelSuave : botonPanel}>Activos</button>
+            <button onClick={() => setVerBaja(true)} aria-pressed={verBaja} className={verBaja ? botonPanel : botonPanelSuave}>Dados de baja</button>
           </div>
           <Separador />
           <MenuMas opciones={[
@@ -871,7 +871,7 @@ function ReasignarCartera({ equipo, sinAsignar, desdeInicial, onCerrar }: { equi
                   <button onClick={() => alternar(c.id)} aria-pressed={elegidos.has(c.id)} className="flex w-full items-center gap-3 border-b border-linea py-3 text-left active:bg-niebla">
                     <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${elegidos.has(c.id) ? 'border-tinta bg-tinta text-white' : 'border-linea'}`}>{elegidos.has(c.id) && <Check size={16} />}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold"><Resaltar texto={c.nombre} t={limpiarBusqueda(q)} />{c.activo ? '' : ' (archivado)'}</span>
+                      <span className="block truncate font-semibold"><Resaltar texto={c.nombre} t={limpiarBusqueda(q)} />{c.activo ? '' : ' (dado de baja)'}</span>
                       <span className="block truncate text-sm text-apagado"><Resaltar texto={c.direccion} t={limpiarBusqueda(q)} /></span>
                     </span>
                   </button>

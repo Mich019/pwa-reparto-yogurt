@@ -36,7 +36,7 @@ export default function Escaner({ onCliente, onCerrar }: { onCliente: (c: Client
     const r = await buscar()
     if (resuelto.current) return
     if (!r.ok) return avisar(r.motivo === 'invalido' ? 'Ese código no es de un cliente.' : 'No encontré ese código entre tus clientes.')
-    if (!r.cliente.activo) return avisar(`${r.cliente.nombre} está archivado. Reactívalo desde Clientes.`)
+    if (!r.cliente.activo) return avisar(`${r.cliente.nombre} está dado de baja. Reactívalo desde Clientes.`)
     resuelto.current = true
     navigator.vibrate?.(80)
     alCliente.current(r.cliente)

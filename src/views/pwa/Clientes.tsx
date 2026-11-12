@@ -126,7 +126,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
     const saldo = cobro && new Map(cobro.deudores.map((d) => [d.id, d.saldo]))
     const prestados = envases && new Map(envases.clientes.map((c) => [c.id, c.total]))
     descargar(xlsx({
-      nombre: verInactivos ? 'Clientes archivados' : 'Clientes',
+      nombre: verInactivos ? 'Clientes dados de baja' : 'Clientes',
       columnas: [{ titulo: 'Cliente', ancho: 28 }, { titulo: 'Teléfono', ancho: 16 }, { titulo: 'Dirección', ancho: 40 }, { titulo: 'Vendedor', ancho: 22 }, { titulo: 'Visita', ancho: 22 }, { titulo: 'Último pedido entregado', ancho: 14 }, { titulo: 'Compra cada (días)', ancho: 12 },
         ...(saldo ? [{ titulo: 'Debe (fiado)', dinero: true, ancho: 14 }] : []), { titulo: 'Límite de fiado', dinero: true, ancho: 14 }, ...(prestados ? [{ titulo: 'Envases prestados', ancho: 12 }] : []), { titulo: 'Notas', ancho: 36 }],
       filas: lista.map((c) => [c.nombre, c.telefono, c.direccion, c.vendedorId ? vendedor.get(c.vendedorId) ?? '' : 'Sin vendedor', textoFrecuencia(c.frecuencia), stats.get(c.id)?.ultima ?? '', cadaCuanto(pedidos.filter((p) => p.clienteId === c.id)),
@@ -150,11 +150,11 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
       {panel ? (
         <>
           {/* Una sola fila a la altura del detalle: buscar y filtrar, y luego las acciones; todo de 40 px de alto. */}
-          <Encabezado titulo="Clientes" ayuda="clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} archivados` : ''}`}>
+          <Encabezado titulo="Clientes" ayuda="clientes" detalle={`${clientes.length - archivados} activos${archivados ? ` · ${archivados} dados de baja` : ''}`}>
             <BuscadorDesplegable valor={q} onChange={setQ} placeholder="Buscar cliente" clave="clientes" />
             <div className={grupoPanel} role="group" aria-label="Mostrar">
               <button onClick={() => setVerInactivos(false)} aria-pressed={!verInactivos} className={verInactivos ? botonPanelSuave : botonPanel}>Activos</button>
-              <button onClick={() => setVerInactivos(true)} aria-pressed={verInactivos} className={verInactivos ? botonPanel : botonPanelSuave}>Archivados</button>
+              <button onClick={() => setVerInactivos(true)} aria-pressed={verInactivos} className={verInactivos ? botonPanel : botonPanelSuave}>Dados de baja</button>
             </div>
             <Separador />
             <MenuMas opciones={[
@@ -185,7 +185,7 @@ export function Clientes({ panel = false }: { panel?: boolean } = {}) {
               </button>
             )}
             <button onClick={() => setVerInactivos(!verInactivos)} className="rounded-md bg-niebla px-3.5 py-2 text-sm font-semibold active:bg-linea">
-              {verInactivos ? 'Activos' : 'Archivados'}
+              {verInactivos ? 'Activos' : 'Dados de baja'}
             </button>
           </div>
         </div>
@@ -345,10 +345,10 @@ function Perfil({ cliente, pedidos, consumido, favorito, sabor, onCerrar, onEdit
           <Accion
             onClick={async () => {
               await guardar('clientes', { ...cliente, activo: !cliente.activo })
-              aviso(cliente.activo ? 'Cliente archivado' : 'Cliente reactivado')
+              aviso(cliente.activo ? 'Cliente dado de baja' : 'Cliente reactivado')
             }}
             icono={cliente.activo ? <UserX size={22} /> : <UserCheck size={22} />}
-            texto={cliente.activo ? 'Archivar' : 'Activar'}
+            texto={cliente.activo ? 'Dar de baja' : 'Reactivar'}
           />
         </div>
         {gestiona && (

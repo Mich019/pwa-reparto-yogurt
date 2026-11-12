@@ -49,8 +49,11 @@ const anilloFoco = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus
 const baseBoton = `flex h-10 items-center whitespace-nowrap justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors disabled:opacity-40 ${anilloFoco}`
 export const botonPanel = `${baseBoton} bg-tinta text-white hover:bg-marca-oscuro`
 export const botonPanelSuave = `${baseBoton} bg-niebla text-tinta hover:bg-linea`
-// Botones que van juntos (filtro, periodo, vista): en el teléfono se reparten el ancho de su fila; desde 640 px, a su medida.
-export const grupoPanel = 'flex grow gap-1 sm:grow-0 [&>*]:grow sm:[&>*]:grow-0'
+// Elegir una opción entre varias (filtro, periodo, vista, apartado): una sola barra del alto de los demás botones (40 px),
+// con la elegida rellena (`botonPanel`) y las otras (`botonPanelSuave`) fundidas en la barra. Es la misma pieza en
+// todo el panel: Clientes, Equipo, Producción, Reportes, Finanzas, Buscar pedidos. En el teléfono la barra se reparte
+// el ancho de su fila; desde 640 px, a su medida. Los botones que se prenden y apagan solos («Más de un mes») no van aquí.
+export const grupoPanel = 'flex grow gap-1 rounded-lg bg-niebla p-1 sm:grow-0 [&>*]:h-8 [&>*]:grow sm:[&>*]:grow-0 [&>*:not([aria-pressed=true])]:bg-transparent [&>*:not([aria-pressed=true])]:hover:bg-linea/70'
 // Texto de un botón secundario que en el teléfono queda en sólo ícono (el texto sigue para el lector de pantalla).
 export function TextoBoton({ children }: { children: ReactNode }) {
   return <span className="max-sm:sr-only">{children}</span>
