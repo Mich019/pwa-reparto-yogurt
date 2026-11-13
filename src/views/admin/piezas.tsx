@@ -54,10 +54,6 @@ export const botonPanelSuave = `${baseBoton} bg-niebla text-tinta hover:bg-linea
 // todo el panel: Clientes, Equipo, Producción, Reportes, Finanzas, Buscar pedidos. En el teléfono la barra se reparte
 // el ancho de su fila; desde 640 px, a su medida. Los botones que se prenden y apagan solos («Más de un mes») no van aquí.
 export const grupoPanel = 'flex grow gap-1 rounded-lg bg-niebla p-1 sm:grow-0 [&>*]:h-8 [&>*]:grow sm:[&>*]:grow-0 [&>*:not([aria-pressed=true])]:bg-transparent [&>*:not([aria-pressed=true])]:hover:bg-linea/70'
-// Texto de un botón secundario que en el teléfono queda en sólo ícono (el texto sigue para el lector de pantalla).
-export function TextoBoton({ children }: { children: ReactNode }) {
-  return <span className="max-sm:sr-only">{children}</span>
-}
 // Línea vertical entre grupos de acciones; en el teléfono, donde las acciones se acomodan en filas, no va.
 export function Separador() {
   return <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-linea sm:block" />

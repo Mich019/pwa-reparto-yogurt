@@ -1,11 +1,12 @@
+import type { Bitacora } from './bitacora.js'
 import type { Config } from './config.js'
 
 // Envío de correo con la API HTTP de Resend (https://resend.com/docs/api-reference/emails/send-email).
 // Sin dependencias: un fetch basta y funciona igual en local y en Vercel.
-export async function enviarCorreo(config: Config, msj: { para: string; asunto: string; html: string; texto: string }, log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }) {
+export async function enviarCorreo(config: Config, msj: { para: string; asunto: string; html: string; texto: string }, log: Bitacora) {
   if (!config.resendApiKey) {
     if (config.produccion) throw new Error('Falta RESEND_API_KEY para enviar correos')
-    log.warn({ para: msj.para, texto: msj.texto }, 'RESEND_API_KEY vacío: correo NO enviado (sólo desarrollo)')
+    log.warn({ para: msj.para, texto: msj.texto }, 'correo: sin RESEND_API_KEY, no se envió (sólo desarrollo)')
     return
   }
   const r = await fetch('https://api.resend.com/emails', {
@@ -15,7 +16,7 @@ export async function enviarCorreo(config: Config, msj: { para: string; asunto: 
     signal: AbortSignal.timeout(10_000),
   })
   if (!r.ok) throw new Error(`Resend respondió ${r.status}: ${await r.text().catch(() => '')}`)
-  log.info({ para: msj.para }, 'correo enviado')
+  log.info({ enviados: 1 }, 'correo: enviado')
 }
 
 const escapar = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
@@ -80,10 +81,10 @@ export function correoInvitacion(empresa: string, quien: string, url: string, di
 
 // Muchos correos de una vez (avisos de la plataforma): la API de lotes de Resend, de 100 en 100. Devuelve cuántos salieron;
 // si falla un lote, los anteriores ya se mandaron y el error dice cuántos.
-export async function enviarCorreos(config: Config, msjs: { para: string; asunto: string; html: string; texto: string; adjuntos?: { nombre: string; base64: string }[] }[], log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }) {
+export async function enviarCorreos(config: Config, msjs: { para: string; asunto: string; html: string; texto: string; adjuntos?: { nombre: string; base64: string }[] }[], log: Bitacora) {
   if (!config.resendApiKey) {
     if (config.produccion) throw new Error('Falta RESEND_API_KEY para enviar correos')
-    log.warn({ cuantos: msjs.length }, 'RESEND_API_KEY vacío: correos NO enviados (sólo desarrollo)')
+    log.warn({ cuantos: msjs.length }, 'correo: sin RESEND_API_KEY, no se enviaron (sólo desarrollo)')
     return msjs.length
   }
   // El envío por lotes de Resend no acepta adjuntos: con adjunto, uno por uno.
@@ -99,7 +100,7 @@ export async function enviarCorreos(config: Config, msjs: { para: string; asunto
       if (!r.ok) throw Object.assign(new Error(`Resend respondió ${r.status} tras ${n} correos: ${await r.text().catch(() => '')}`), { enviados: n })
       n++
     }
-    log.info({ enviados: n }, 'correos con adjunto enviados')
+    log.info({ enviados: n }, 'correo: enviados con adjunto')
     return n
   }
   let enviados = 0
@@ -114,7 +115,7 @@ export async function enviarCorreos(config: Config, msjs: { para: string; asunto
     if (!r.ok) throw Object.assign(new Error(`Resend respondió ${r.status} tras ${enviados} correos: ${await r.text().catch(() => '')}`), { enviados })
     enviados += lote.length
   }
-  log.info({ enviados }, 'correos enviados')
+  log.info({ enviados }, 'correo: enviados')
   return enviados
 }
 

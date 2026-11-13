@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { Bitacora } from './bitacora.js'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { AvisoPendiente, Despachador } from './notificaciones.js'
@@ -81,11 +82,11 @@ export async function avisarUrgentesSinAtender(db: Db, despachador: Despachador,
 
 // Desde la conexión en vivo: a lo más cada 2 minutos por instancia, sin esperar ni tumbar nada.
 let ultimaVez = 0
-export function revisarDeVezEnCuando(db: Db, despachador: Despachador, log: { error: (e: unknown, m?: string) => void }, horaProduccion: number | null) {
+export function revisarDeVezEnCuando(db: Db, despachador: Despachador, log: Bitacora, horaProduccion: number | null) {
   if (Date.now() - ultimaVez < CADA_MS) return
   ultimaVez = Date.now()
-  void avisarUrgentesSinAtender(db, despachador).catch((e) => log.error(e, 'No se pudieron revisar los urgentes sin atender'))
-  if (horaProduccion !== null) void avisarProduccionPendiente(db, despachador, { horaDesde: horaProduccion }).catch((e) => log.error(e, 'No se pudo revisar la producción de mañana'))
+  void avisarUrgentesSinAtender(db, despachador).catch((err) => log.error({ err }, 'cron: no se pudieron revisar los urgentes sin atender'))
+  if (horaProduccion !== null) void avisarProduccionPendiente(db, despachador, { horaDesde: horaProduccion }).catch((err) => log.error({ err }, 'cron: no se pudo revisar la producción de mañana'))
 }
 
 // El secreto del cron (CRON_SECRET, al menos 24 caracteres) comparado sin dar pistas por el tiempo de respuesta.

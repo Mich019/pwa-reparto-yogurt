@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
+import type { Bitacora } from './bitacora.js'
 import type { Config } from './config.js'
 import { correoAnual, correoMensual, correoResumen, correoVendedor, enviarCorreos, type CifrasResumen, type CifrasVendedor } from './correo.js'
 import { logrosDelMes, resumenDelAnio, xlsxDelMes } from './cortes.js'
@@ -23,13 +24,12 @@ import type { Db } from './db.js'
 // salen de la zona de cada empresa. Cada cuenta se reclama (`resumen_enviado_dia`, `resumen_semanal_enviado`) antes de
 // mandarle nada: aunque el cron corra dos veces, no le llega dos veces.
 
-type Log = { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }
 const RESUMENES = [
   { activo: 'resumen_correo', enviado: 'resumen_enviado_dia', dias: 1 },
   { activo: 'resumen_semanal', enviado: 'resumen_semanal_enviado', dias: 7 },
 ] as const
 
-export async function mandarResumenes(db: Db, config: Config, log: Log): Promise<number> {
+export async function mandarResumenes(db: Db, config: Config, log: Bitacora): Promise<number> {
   let mandados = 0
   for (const r of RESUMENES) {
     const semanal = r.dias > 1
@@ -165,7 +165,7 @@ export async function avisarMetasAtrasadas(db: Db, despachador: Despachador, dia
 // llega el aviso `resumen_anual` (abre el panel) y, si pidió el informe de cada mes, también por correo. Una vez por año
 // y empresa: el aviso guardado cuenta (no se puede apagar, para que sirva de marca). Sin meses cerrados no sale nada.
 // `cualquierDia` sólo para pruebas.
-export async function mandarResumenAnual(db: Db, config: Config, despachador: Despachador | null, log: Log, cualquierDia = false): Promise<number> {
+export async function mandarResumenAnual(db: Db, config: Config, despachador: Despachador | null, log: Bitacora, cualquierDia = false): Promise<number> {
   const { rows: empresas } = await db.query(
     `SELECT e.id_empresa, e.nombre, extract(year FROM now() AT TIME ZONE e.zona_horaria)::int - 1 AS anio
        FROM empresas e
@@ -368,7 +368,7 @@ export async function rutasResumen(app: FastifyInstance, { db, config }: Context
     }
     const adjuntos = [
       { nombre: `informe-mensual-${m.data.mes}.pdf`, base64: b.data.pdf },
-      { nombre: `informe-mensual-${m.data.mes}.xlsx`, base64: xlsxDelMes(f, m.data.mes, 'Mes cerrado', await logrosDelMes(db, config.zonaHoraria, m.data.mes).catch(() => undefined)).toString('base64') },
+      { nombre: `informe-mensual-${m.data.mes}.xlsx`, base64: xlsxDelMes(f, m.data.mes, 'Mes cerrado', await logrosDelMes(db, config.zonaHoraria, m.data.mes).catch((err) => { req.log.warn({ err }, 'cortes: el Excel del mes sale sin medallas'); return undefined })).toString('base64') },
     ]
     const enviados = await enviarCorreos(config, para.map((u) => ({ para: u.correo as string, ...correoMensual(u.nombre, u.empresa, m.data.mes, cifras, `${config.urlApp}/admin`), adjuntos })), req.log)
     return { enviados }

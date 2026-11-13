@@ -731,7 +731,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
         )
         return cifras
       })
-      await avisarLogros(antes, r).catch((e) => req.log.error(e, 'No se pudieron avisar las medallas'))
+      await avisarLogros(antes, r).catch((err) => req.log.error({ err }, 'cortes: no se pudieron avisar las medallas'))
       // Cuántos administradores quieren el informe por correo: el panel arma el PDF sólo si alguien lo quiere (resumen.ts).
       const { rows: [{ n: porCorreo }] } = await db.query(`SELECT count(*)::int AS n FROM usuarios WHERE rol = 'administrador' AND activo AND resumen_mensual`)
       return { ok: true, cifras: r, porCorreo }
@@ -811,7 +811,7 @@ export async function rutasCortes(app: FastifyInstance, { db, config }: Contexto
     if (f.data.formato === 'json') return mes
     const generado = new Date().toLocaleString('es-MX', { timeZone: await zonaDeEmpresa(db, config.zonaHoraria), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const estado = mes.estado === 'cerrado' ? 'Mes cerrado' : mes.estado === 'reabierto' ? 'Mes reabierto (cifras al momento de generarlo)' : 'Mes abierto (cifras al momento de generarlo)'
-    const logros = await logrosDelMes(db, config.zonaHoraria, m.data).catch(() => undefined)
+    const logros = await logrosDelMes(db, config.zonaHoraria, m.data).catch((err) => { req.log.warn({ err }, 'cortes: el Excel del mes sale sin medallas'); return undefined })
     const datos = xlsxDelMes(mes.cifras, m.data, `${estado} · Generado el ${generado}`, logros)
     return rep
       .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

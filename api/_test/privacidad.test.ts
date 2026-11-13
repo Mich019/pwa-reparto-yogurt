@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { after, describe, it } from 'node:test'
 import type { ClienteMp } from '../_lib/mercadopago.js'
 import { construirApp } from '../_lib/app.js'
+import { callado } from '../_lib/bitacora.js'
 import { purgarBajas, VERSION_LEGAL } from '../_lib/privacidad.js'
 import { app, cliente, config, crearEmpresa, db, login, op, PASSWORD, push, sesion } from './ayuda.js'
 
@@ -23,7 +24,6 @@ const pedir = async (s: S, method: 'GET' | 'POST', url: string, payload?: object
   const r = await srv.inject({ method, url, headers: { authorization: `Bearer ${s.token}` }, payload })
   return { status: r.statusCode, body: r.body ? r.json() : null }
 }
-const silencio = { info: () => {}, error: () => {} }
 
 describe('aviso de privacidad y términos', () => {
   it('la versión del servidor es la misma que muestra la app', () => {
@@ -126,10 +126,10 @@ describe('baja de la empresa', () => {
     assert.equal((await pedir(vend, 'GET', '/me')).status, 401) // sesiones cerradas
     assert.equal((await login(vend.correo)).body.codigo, 'EMPRESA_SUSPENDIDA')
 
-    await purgarBajas(db, silencio)
+    await purgarBajas(db, callado)
     assert.equal((await db.query(`SELECT 1 FROM empresas WHERE id_empresa = $1`, [empresa])).rowCount, 1) // aún dentro del plazo
     await db.query(`UPDATE empresas SET baja_borrar_en = now() - interval '1 minute' WHERE id_empresa = $1`, [empresa])
-    await purgarBajas(db, silencio)
+    await purgarBajas(db, callado)
     assert.equal((await db.query(`SELECT 1 FROM empresas WHERE id_empresa = $1`, [empresa])).rowCount, 0)
     assert.equal((await db.query(`SELECT 1 FROM usuarios WHERE id_empresa = $1`, [empresa])).rowCount, 0)
     assert.equal((await db.query(`SELECT 1 FROM cierres_mes WHERE id_empresa = $1`, [otra])).rowCount, 1)

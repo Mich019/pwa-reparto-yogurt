@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
 import { leerAjustes } from './ajustes.js'
+import type { Bitacora } from './bitacora.js'
 import { hashPassword, PASSWORD_MAX, verificarPassword } from './contrasenas.js'
 import { correoBajaEmpresa, correoCuentaEliminada, enviarCorreo, enviarCorreos } from './correo.js'
 import { tx, type Cx, type Db } from './db.js'
@@ -122,7 +123,7 @@ export async function borrarEmpresa(c: Pick<Cx, 'query'>, idEmpresa: string) {
 }
 
 // Las empresas cuya baja ya venció se borran. Lo llama el cron diario (plataforma.ts) con el pool sin empresa.
-export async function purgarBajas(db: Db, log: { info: (o: object, m: string) => void; error: (o: object, m: string) => void }) {
+export async function purgarBajas(db: Db, log: Bitacora) {
   const { rows } = await db.query(`SELECT id_empresa FROM empresas WHERE baja_borrar_en <= now() AND NOT interna`)
   let borradas = 0
   for (const { id_empresa } of rows) {

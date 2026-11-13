@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
 import { avisarFiadoAtrasado } from '../_lib/cobranza.js'
+import { callado } from '../_lib/bitacora.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { cifrasDeAyer } from '../_lib/resumen.js'
 import { correoResumen } from '../_lib/correo.js'
@@ -49,7 +50,7 @@ describe('fiado', () => {
     await app.inject({ method: 'PUT', url: `/clientes/${x.c.id}/limite-fiado`, headers: { authorization: `Bearer ${x.admin.token}` }, payload: { limite: 1000 } })
     assert.equal((await deudor()).limite, 1000) // el suyo gana
     await app.inject({ method: 'PUT', url: `/clientes/${x.c.id}/limite-fiado`, headers: { authorization: `Bearer ${x.admin.token}` }, payload: { limite: null } })
-    await avisarFiadoAtrasado(db, crearDespachador(db, null, { error: () => {} }))
+    await avisarFiadoAtrasado(db, crearDespachador(db, null, callado))
     const { rows: [a] } = await db.query(`SELECT cuerpo FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.admin.id])
     assert.match(a.cuerpo, /y ya pasó su límite de \$100$/)
     // El resumen diario cuenta a quien ya debía de más al terminar ayer.
@@ -96,7 +97,7 @@ describe('fiado', () => {
     const x = await escenario()
     const nuevo = await x.entrega('CREDITO', 1) // de hoy: todavía no
     assert.equal(nuevo.body.resultados[0].estado, 'aplicada')
-    const despachador = crearDespachador(db, null, { error: () => {} })
+    const despachador = crearDespachador(db, null, callado)
     const avisos = async () => (await db.query(`SELECT titulo, cuerpo, datos FROM notificaciones WHERE tipo = 'fiado_atrasado' AND id_usuario = $1`, [x.admin.id])).rows
     await avisarFiadoAtrasado(db, despachador)
     assert.equal((await avisos()).length, 0)

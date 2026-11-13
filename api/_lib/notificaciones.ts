@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { Contexto } from './app.js'
+import type { Bitacora } from './bitacora.js'
 import type { Db } from './db.js'
 import { endpointPermitido, SuscripcionCaducada, type Enviador } from './push.js'
 import { claveUsuario } from './seguridad.js'
@@ -51,9 +52,8 @@ export function unir(avisos: AvisoPendiente[]): AvisoPendiente[] {
   })
 }
 
-export interface Registro { error: (e: unknown, mensaje?: string) => void }
 
-export function crearDespachador(db: Db, enviador: Enviador | null, log: Registro) {
+export function crearDespachador(db: Db, enviador: Enviador | null, log: Bitacora) {
   // Lo guarda sólo si la persona sigue activa y no lo apagó; devuelve su id y si está en su horario de silencio (la hora
   // de la empresa; puede pasar de medianoche). La empresa sale de la cuenta: así sirve también desde el cron, que corre
   // como dueño de la base sin empresa en alcance.
@@ -86,7 +86,7 @@ export function crearDespachador(db: Db, enviador: Enviador | null, log: Registr
     resultados.forEach((r, i) => {
       if (r.status !== 'rejected') return
       if (r.reason instanceof SuscripcionCaducada) caducadas.push(subs[i].id_suscripcion)
-      else log.error(r.reason, 'No se pudo mandar la notificación push')
+      else log.error({ err: r.reason }, 'push: no se pudo mandar una notificación')
     })
     if (caducadas.length) await db.query(`DELETE FROM suscripciones_push WHERE id_suscripcion = ANY($1::uuid[])`, [caducadas])
     return { dispositivos: subs.length, enviados: resultados.filter((r) => r.status === 'fulfilled').length }
@@ -102,7 +102,7 @@ export function crearDespachador(db: Db, enviador: Enviador | null, log: Registr
             // En silencio no suena: queda en la lista y llega al sincronizar. El urgente suena siempre.
             if (r && (!r.callado || a.tipo === 'pedido_urgente')) await entregar(r.id, a)
           } catch (e) {
-            log.error(e, 'No se pudo registrar el aviso')
+            log.error({ err: e, tipo: a.tipo }, 'avisos: no se pudo registrar el aviso')
           }
         }),
       )

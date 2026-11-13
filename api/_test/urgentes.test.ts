@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
+import { callado } from '../_lib/bitacora.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { avisarUrgentesSinAtender } from '../_lib/urgentes.js'
 import { avisarProduccionPendiente } from '../_lib/produccion.js'
@@ -10,7 +11,7 @@ import { app, cliente, config, crearEmpresa, db, op, pedido, push, sesion } from
 // Pedido urgente sin atender (urgentes.ts): a los 30 minutos se le recuerda al vendedor y se avisa a los administradores.
 
 after(async () => { await app.close(); await db.end() })
-const despachador = crearDespachador(db, null, { error: () => {} })
+const despachador = crearDespachador(db, null, callado)
 async function unSabor(admin: Parameters<typeof push>[0]) {
   const s = { id: randomUUID(), sabor: 'Fresa', descripcion: '', presentacion: 1, precio_litro: 60, costo_litro: 20, color_hex: '#f472b6', disponible: true }
   assert.equal((await push(admin, [op('productos', s.id, s)])).body.resultados[0].estado, 'aplicada')

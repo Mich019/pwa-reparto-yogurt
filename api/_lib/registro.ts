@@ -181,7 +181,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
     try {
       await mandarCodigo(b.data.correo, ipCliente(req, config), req.log)
     } catch (e) {
-      req.log.error(e, 'no se pudo preparar o enviar el código de registro')
+      req.log.error({ err: e }, 'registro: no se pudo preparar o enviar el código')
     }
     await esperarHasta(listo)
     return { ok: true, minutos: config.verificacionMinutos }
@@ -222,7 +222,7 @@ export async function rutasRegistro(app: FastifyInstance, { db, config }: Contex
   async function mandarInvitaciones(lista: { correo: string; url: string }[], empresa: string, quien: string, log: FastifyBaseLogger) {
     for (const i of lista) {
       await enviarCorreo(config, { para: i.correo, ...correoInvitacion(empresa, quien, i.url, config.invitacionDias) }, log)
-        .catch((e) => log.error(e, 'no se pudo enviar una invitación'))
+        .catch((err) => log.error({ err }, 'registro: no se pudo enviar una invitación'))
     }
   }
 

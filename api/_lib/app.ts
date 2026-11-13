@@ -77,7 +77,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   // Los detalles de un error interno van al registro del servidor, no a quien llamó.
   app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, req, rep) => {
     if (error.statusCode && error.statusCode < 500) return rep.send(error)
-    req.log.error(error)
+    req.log.error({ err: error, metodo: req.method, ruta: req.routeOptions?.url }, 'api: error interno')
     // Va a Sentry si hay DSN. `routeOptions.url` es la ruta con :parametros, nunca la dirección con datos.
     const reportado = ctx.config.sentryDsn
       ? reportarError(ctx.config.sentryDsn, error, { metodo: req.method, ruta: req.routeOptions?.url, entorno: ctx.config.despliegue.entorno, version: ctx.config.despliegue.commit })

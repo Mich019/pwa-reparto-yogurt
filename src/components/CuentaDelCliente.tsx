@@ -3,7 +3,7 @@ import { Boxes, ChevronRight, HandCoins, MessageCircle } from 'lucide-react'
 import { enlaceWhatsApp, llenar, textoEnvases, useMensaje } from './Mensajes'
 import { textoEstadoCuenta } from '../lib/comprobante'
 import { marcaActual, useConEnvases } from '../lib/marca'
-import { anularAbono, registrarAbono, registrarRecogida, useServidor, type CuentaCliente, type CuentaEnvases } from '../lib/cobranza'
+import { anularAbono, anularRecogida, registrarAbono, registrarRecogida, useServidor, type CuentaCliente, type CuentaEnvases } from '../lib/cobranza'
 import { dinero, textoFecha } from '../lib/fechas'
 import { useRol } from '../lib/sesion'
 import { Boton, Campo, Hoja, Segmentado, aviso, claseInput } from './ui'
@@ -18,7 +18,9 @@ export function CuentaDelCliente({ clienteId, limite, telefono }: { clienteId: s
   const msjEnvases = useMensaje('envases')
   const saldo = cuenta.datos?.saldo ?? 0
   const prestados = envases.datos?.total ?? 0
-  if (saldo <= 0 && prestados <= 0) return null
+  // Sin envases prestados el administrador todavía puede abrir la hoja para anular un «Recoger» equivocado.
+  const deshacer = useRol() === 'administrador' && prestados <= 0 && !!envases.datos?.recogidas.some((r) => !r.anulada)
+  if (saldo <= 0 && prestados <= 0 && !deshacer) return null
   const recargar = () => { cuenta.recargar(); envases.recargar() }
   return (
     <div className="space-y-2">
@@ -51,6 +53,11 @@ export function CuentaDelCliente({ clienteId, limite, telefono }: { clienteId: s
           </span>
           <span className="text-sm font-semibold">Recoger</span>
           <ChevronRight size={18} className="shrink-0 text-apagado/60" />
+        </button>
+      )}
+      {deshacer && (
+        <button onClick={() => setHoja('envases')} className="flex items-center gap-1.5 px-1 py-1 text-sm font-semibold underline-offset-2 hover:underline">
+          <Boxes size={16} aria-hidden="true" /> Ver los envases que se le recogieron
         </button>
       )}
       {prestados > 0 && envases.datos && (() => {
@@ -183,7 +190,23 @@ export function HojaEnvases({ cuenta, onCerrar, onHecho }: { cuenta: CuentaEnvas
   const elegido = pendientes.find((e) => e.productoId === productoId)
   const [cantidad, setCantidad] = useState(1)
   const [enviando, setEnviando] = useState(false)
+  const [anulando, setAnulando] = useState<string | null>(null)
+  const rol = useRol()
   const tope = elegido?.prestados ?? 0
+  const recogidas = cuenta.recogidas.slice(0, 5)
+  async function anular(id: string) {
+    setEnviando(true)
+    try {
+      await anularRecogida(id)
+      aviso('Recogida anulada: los envases vuelven a contar como prestados')
+      onHecho()
+      onCerrar()
+    } catch (e) {
+      aviso(e instanceof Error ? e.message : 'No se pudo anular')
+    } finally {
+      setEnviando(false)
+    }
+  }
   async function guardarRecogida() {
     setEnviando(true)
     try {
@@ -198,18 +221,37 @@ export function HojaEnvases({ cuenta, onCerrar, onHecho }: { cuenta: CuentaEnvas
     }
   }
   return (
-    <Hoja abierta onCerrar={onCerrar} titulo={<div>Recoger envases<div className="text-base font-medium text-apagado">{cuenta.cliente.nombre}</div></div>}
-      pie={<Boton onClick={guardarRecogida} disabled={!elegido || cantidad < 1 || cantidad > tope || enviando} className="w-full text-lg">Registrar</Boton>}>
+    <Hoja abierta onCerrar={onCerrar} titulo={<div>{pendientes.length ? 'Recoger envases' : 'Envases recogidos'}<div className="text-base font-medium text-apagado">{cuenta.cliente.nombre}</div></div>}
+      pie={pendientes.length ? <Boton onClick={guardarRecogida} disabled={!elegido || cantidad < 1 || cantidad > tope || enviando} className="w-full text-lg">Registrar</Boton> : undefined}>
       <div className="space-y-4 pb-4">
         {pendientes.length > 1 && (
           <Segmentado valor={productoId} onChange={(v) => { setProductoId(v); setCantidad(1) }} opciones={pendientes.map((e) => ({ valor: e.productoId, texto: `${e.sabor} (${e.prestados})` }))} className="flex-wrap" />
         )}
         {elegido && <div className="text-sm text-apagado">{elegido.sabor}: tiene {elegido.prestados} {elegido.prestados === 1 ? 'prestado' : 'prestados'}</div>}
-        <div className="flex items-center justify-center gap-6 py-2">
+        {elegido && <div className="flex items-center justify-center gap-6 py-2">
           <button onClick={() => setCantidad((c) => Math.max(1, c - 1))} className="grid h-14 w-14 place-items-center rounded-full bg-niebla text-2xl font-semibold active:bg-linea" aria-label="Menos">−</button>
           <span className="w-16 text-center text-4xl font-semibold tabular-nums">{cantidad}</span>
           <button onClick={() => setCantidad((c) => Math.min(tope, c + 1))} className="grid h-14 w-14 place-items-center rounded-full bg-niebla text-2xl font-semibold active:bg-linea" aria-label="Más">+</button>
-        </div>
+        </div>}
+        {!pendientes.length && <p className="text-sm text-apagado">Ya no tiene envases prestados.</p>}
+        {recogidas.length > 0 && (
+          <div>
+            <div className="mb-1 text-sm font-semibold text-apagado">Últimas recogidas</div>
+            <div className="divide-y divide-linea">
+              {recogidas.map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span className={`min-w-0 truncate ${r.anulada ? 'text-apagado line-through' : ''}`}>{textoFecha(r.fecha)} · {r.sabor}{r.por ? ` · ${r.por}` : ''}</span>
+                  <span className="flex shrink-0 items-center gap-3">
+                    <span className={`font-semibold tabular-nums ${r.anulada ? 'text-apagado line-through' : ''}`}>{r.cantidad}</span>
+                    {rol === 'administrador' && !r.anulada && (anulando === r.id
+                      ? <button className="text-xs font-semibold text-rojo" disabled={enviando} onClick={() => anular(r.id)}>¿Seguro? Anular</button>
+                      : <button className="text-xs font-semibold text-rojo" onClick={() => setAnulando(r.id)}>Anular</button>)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Hoja>
   )

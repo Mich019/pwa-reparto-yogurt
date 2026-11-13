@@ -10,7 +10,7 @@ import {
   agrupacionesPosibles, agrupacionSugerida, cambio, diasDelRango, exportarReporte, mover, rangoDe, TABLAS_CSV, textoPeriodo, textoRango, useReporte,
   type Agrupar, type Formato, type Rango, type Reporte, type TablaCsv, type Vista,
 } from '../../lib/reportes'
-import { aviso, Boton, claseInput, Hoja, PuntoSabor, Segmentado } from '../../components/ui'
+import { aviso, Boton, Hoja, PuntoSabor, Segmentado } from '../../components/ui'
 import { textoPorUnidad, tituloUnidad } from '../../lib/unidades'
 import { Columnas } from '../../components/graficas'
 import { BarraSegmentada, BarrasPeriodo } from '../admin/graficas'

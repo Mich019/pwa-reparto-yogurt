@@ -107,8 +107,8 @@ export const guardarLimitesFiado = (limites: { clienteId: string; limite: number
   llamarAutenticado<{ actualizados: number }>('/clientes/limites-fiado', { metodo: 'PUT', cuerpo: { limites } })
 export const registrarAbono = (b: { clienteId: string; monto: number; metodo: 'efectivo' | 'transferencia'; nota?: string }) => enviar<{ id: string; saldo: number }>('/cobranza/abonos', b)
 export const anularAbono = (id: string, motivo: string) => enviar(`/cobranza/abonos/${id}/anular`, { motivo })
-export const registrarRecogida = (b: { clienteId: string; productoId: string; cantidad: number; nota?: string }) => enviar<{ id: string; prestados: number }>('/envases/recogidas', b)
 export const anularRecogida = (id: string) => enviar(`/envases/recogidas/${id}/anular`)
+export const registrarRecogida = (b: { clienteId: string; productoId: string; cantidad: number; nota?: string }) => enviar<{ id: string; prestados: number }>('/envases/recogidas', b)
 export const entregarCorte = (b: { efectivoEntregado: number; envasesEntregados?: number | null; nota?: string; fecha?: string; vendedorId?: string }) =>
   enviar<{ id: string; esperado: number; entregado: number; diferencia: number; envases: number; envasesEntregados: number | null; envasesDiferencia: number | null }>('/cortes', b)
 // Los envases cuadran si no los anotó (no aplica) o si entregó justo los que recogió.

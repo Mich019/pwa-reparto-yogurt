@@ -6,7 +6,7 @@ import { desdeIso, hoy, sumarDias, textoFecha } from '../../lib/fechas'
 import { SelectorFecha } from '../../components/Calendario'
 import { copiarCarga, guardarCarga, guardarProduccion, useDiaStock, type DiaStock } from '../../lib/stock'
 import { formato, sumaPorUnidad } from '../../lib/unidades'
-import { Boton, Campo, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
+import { Boton, Hoja, PuntoSabor, aviso, claseInput } from '../../components/ui'
 import { Encabezado, Separador, botonPanel, botonPanelIcono, botonPanelSuave } from '../admin/piezas'
 import { CifrasHueso, Esqueleto, FilasHueso, Hueso, Ocupado } from '../../components/Esqueleto'
 

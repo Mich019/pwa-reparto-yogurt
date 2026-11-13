@@ -176,7 +176,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
       [registroAbierto ?? null, pruebaDias !== undefined, pruebaDias ?? null, correoSoporte !== undefined, correoSoporte || null,
         avisoPruebaDias ?? null, avisoPruebaVendedores ?? null],
     )
-    req.log.info({ cambios: Object.keys(b.data) }, 'ajustes de la plataforma cambiados')
+    req.log.info({ cambios: Object.keys(b.data), por: req.usuario.id }, 'plataforma: ajustes cambiados')
     return leerAjustes(db, config)
   })
 
@@ -218,7 +218,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     }
   }
   const releer = async (id: string) => (await db.query<FilaAviso>(`SELECT * FROM avisos_plataforma WHERE id_aviso = $1`, [id])).rows[0]
-  const correosPendientes = (log: FastifyRequest['log']) => mandarAvisosPorCorreo(log).catch((e) => log.error({ err: e }, 'plataforma: avisos por correo'))
+  const correosPendientes = (log: FastifyRequest['log']) => mandarAvisosPorCorreo(log).catch((err) => log.error({ err }, 'plataforma: no se pudieron mandar los avisos por correo'))
 
   // Despertador: manda los avisos programados que ya les tocó, sin esperar a que alguien abra la app. Lo llama un cron
   // (vercel.json) con el secreto en la cabecera; sin CRON_SECRET configurado la ruta no existe.
@@ -228,13 +228,16 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     if (!ok) return rep.code(401).send({ error: 'No autorizado' })
     await mandarAvisosPorCorreo(req.log)
     const borradas = await purgarBajas(db, req.log) // empresas cuya baja ya venció (privacidad.ts)
-    const pruebas = despachador ? await avisarPruebasPorVencer(db, config, despachador).catch((e) => { req.log.error(e, 'No se pudieron avisar las pruebas por vencer'); return 0 }) : 0
-    const resumenes = await mandarResumenes(db, config, req.log).catch((e) => { req.log.error(e, 'No se pudieron mandar los resúmenes diarios'); return 0 })
-    const metas = despachador ? await avisarMetasAtrasadas(db, despachador).catch((e) => { req.log.error(e, 'No se pudieron revisar las metas atrasadas'); return 0 }) : 0
-    const rachas = despachador ? await avisarRachasEnRiesgo(db, despachador).catch((e) => { req.log.error(e, 'No se pudieron revisar las rachas'); return 0 }) : 0
-    const fiado = despachador ? await avisarFiadoAtrasado(db, despachador).catch((e) => { req.log.error(e, 'No se pudo revisar el fiado atrasado'); return 0 }) : 0
-    const envases = despachador ? await avisarEnvasesAtrasados(db, despachador).catch((e) => { req.log.error(e, 'No se pudieron revisar los envases atrasados'); return 0 }) : 0
-    const anual = await mandarResumenAnual(db, config, despachador ?? null, req.log).catch((e) => { req.log.error(e, 'No se pudo mandar el resumen del año'); return 0 })
+    // Cada paso por su lado: uno que falle queda en el registro y los demás siguen.
+    const paso = (que: string, fn: () => Promise<number>) => fn().catch((err) => { req.log.error({ err, paso: que }, 'cron: falló un paso'); return 0 })
+    const conAvisos = (que: string, fn: (d: Despachador) => Promise<number>) => (despachador ? paso(que, () => fn(despachador)) : 0)
+    const pruebas = await conAvisos('pruebas por vencer', (d) => avisarPruebasPorVencer(db, config, d))
+    const resumenes = await paso('resúmenes por correo', () => mandarResumenes(db, config, req.log))
+    const metas = await conAvisos('metas atrasadas', (d) => avisarMetasAtrasadas(db, d))
+    const rachas = await conAvisos('rachas en riesgo', (d) => avisarRachasEnRiesgo(db, d))
+    const fiado = await conAvisos('fiado atrasado', (d) => avisarFiadoAtrasado(db, d))
+    const envases = await conAvisos('envases atrasados', (d) => avisarEnvasesAtrasados(db, d))
+    const anual = await paso('resumen del año', () => mandarResumenAnual(db, config, despachador ?? null, req.log))
     return { ok: true, borradas, pruebas, resumenes, metas, rachas, fiado, envases, anual }
   })
 
@@ -422,7 +425,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
         return rep.code(409).send({ error: 'Ya hay una cuenta con ese correo', codigo: 'CORREO_REPETIDO' })
       }
       await c.query('COMMIT')
-      req.log.info({ correo: b.data.correo, por: req.usuario.id }, 'plataforma: cuenta nueva de super admin')
+      req.log.info({ usuario: u.id_usuario, por: req.usuario.id }, 'plataforma: cuenta nueva de super admin')
       return rep.code(201).send({ nombre: b.data.nombre, correo: b.data.correo, passwordTemporal: temporal })
     } catch (err) {
       await c.query('ROLLBACK').catch(() => {})
@@ -541,7 +544,7 @@ export async function rutasPlataforma(app: FastifyInstance, { db, config }: { db
     }
     const enlace = `${config.urlApp}/invitacion#${token}`
     await enviarCorreo(config, { para: a.correo, ...correoInvitacion(nombre, 'Delisy', enlace, config.invitacionDias) }, req.log)
-      .catch((err) => req.log.error(err, 'no se pudo enviar la invitación del administrador'))
+      .catch((err) => req.log.error({ err }, 'plataforma: no se pudo enviar la invitación del administrador'))
     req.log.info({ empresa: id, por: req.usuario.id }, 'plataforma: empresa nueva')
     return rep.code(201).send({ id, enlace, dias: config.invitacionDias })
   })

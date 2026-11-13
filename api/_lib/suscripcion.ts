@@ -59,7 +59,7 @@ export async function rutasSuscripcion(app: FastifyInstance, { db, config }: Con
         await guardarEstado(s.id, s.estado)
         e = await leer(req.usuario.empresa)
       } catch (err) {
-        req.log.warn(err, 'no se pudo consultar la suscripción en Mercado Pago')
+        req.log.warn({ err }, 'suscripción: Mercado Pago no respondió la consulta')
       }
     }
     return resumen(e)
@@ -87,7 +87,7 @@ export async function rutasSuscripcion(app: FastifyInstance, { db, config }: Con
       `UPDATE empresas SET mp_preapproval_id = $2, suscripcion_estado = 'pending', suscripcion_actualizada = now() WHERE id_empresa = $1`,
       [req.usuario.empresa, nueva.id],
     )
-    if (anterior && anterior !== nueva.id) await mp.cancelar(anterior).catch((err) => req.log.warn(err, 'no se pudo cancelar la suscripción anterior'))
+    if (anterior && anterior !== nueva.id) await mp.cancelar(anterior).catch((err) => req.log.warn({ err }, 'suscripción: no se pudo cancelar la anterior'))
     return rep.code(201).send({ url: nueva.url })
   })
 
@@ -114,14 +114,14 @@ export async function rutasSuscripcion(app: FastifyInstance, { db, config }: Con
       const firma = req.headers['x-signature']
       const idPeticion = req.headers['x-request-id']
       if (!firmaValida(cobro.webhookSecret, { firma: typeof firma === 'string' ? firma : undefined, idPeticion: typeof idPeticion === 'string' ? idPeticion : undefined, idDato: id })) {
-        req.log.warn({ id }, 'aviso de Mercado Pago con firma no válida')
+        req.log.warn({ id }, 'suscripción: aviso de Mercado Pago con firma no válida')
         return rep.code(401).send({ error: 'Firma no válida' })
       }
     }
     if (!mp) return rep.code(200).send({ ok: true })
     const s = await mp.consultar(id)
     const r = await guardarEstado(s.id, s.estado)
-    if (!r.rowCount) req.log.warn({ id: s.id, empresa: s.empresa }, 'aviso de Mercado Pago de una suscripción que no conocemos')
+    if (!r.rowCount) req.log.warn({ id: s.id, empresa: s.empresa }, 'suscripción: aviso de Mercado Pago de una suscripción que no conocemos')
     return rep.code(200).send({ ok: true })
   })
 }

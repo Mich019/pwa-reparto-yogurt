@@ -4,6 +4,7 @@ import { after, describe, it } from 'node:test'
 import { correoMensual, correoResumen, correoVendedor } from '../_lib/correo.js'
 import { avisarMetasAtrasadas, avisarRachasEnRiesgo, mandarResumenAnual, felicitarMeta, rachaDesde, cifrasDeAyer, cifrasDeLaSemana, cifrasVendedor, mandarResumenes } from '../_lib/resumen.js'
 import { xlsxDelMes } from '../_lib/cortes.js'
+import { callado } from '../_lib/bitacora.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { correoAnual } from '../_lib/correo.js'
 import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion } from './ayuda.js'
@@ -11,7 +12,6 @@ import { app, cliente, config, crearEmpresa, db, get, op, pedido, push, sesion }
 // Resumen diario por correo para el administrador (resumen.ts) y lo que el equipo muestra de los avisos de cada quien.
 
 after(async () => { await app.close(); await db.end() })
-const log = { info: () => {}, warn: () => {} }
 const yo = (s: { token: string }, payload: object) => app.inject({ method: 'PATCH', url: '/me', headers: { authorization: `Bearer ${s.token}` }, payload })
 
 describe('resumen diario por correo', () => {
@@ -42,13 +42,13 @@ describe('resumen diario por correo', () => {
     assert.match(correo.texto, /Vendido: \$[\d,.]+ en 1 pedido/)
     assert.match(correo.html, /Abrir el panel/)
 
-    await mandarResumenes(db, config, log)
+    await mandarResumenes(db, config, callado)
     const enviado = async (id: string) => (await db.query(`SELECT resumen_enviado_dia FROM usuarios WHERE id_usuario = $1`, [id])).rows[0].resumen_enviado_dia
     assert.ok(await enviado(pide.id))
     assert.equal(await enviado(noPide.id), null)
     // Otra vuelta del cron el mismo día: ya estaba reclamado, no se vuelve a mandar.
     const antes = await enviado(pide.id)
-    await mandarResumenes(db, config, log)
+    await mandarResumenes(db, config, callado)
     assert.deepEqual(await enviado(pide.id), antes)
   })
 
@@ -113,12 +113,12 @@ describe('resumen diario por correo', () => {
     // Cada quien elige el día: si no es hoy, no sale; si es hoy, sí.
     assert.equal((await yo(admin, { resumenSemanalDia: (hoy % 7) + 1 })).json().resumenSemanalDia, (hoy % 7) + 1)
     assert.equal((await yo(admin, { resumenSemanalDia: 8 })).statusCode, 400)
-    await mandarResumenes(db, config, log)
+    await mandarResumenes(db, config, callado)
     assert.equal(await enviado(), null)
     await yo(admin, { resumenSemanalDia: hoy })
     // El vendedor también lo pide: le llega lo suyo, sin costos.
     assert.equal((await yo(vend, { resumenSemanal: true, resumenSemanalDia: hoy })).statusCode, 200)
-    await mandarResumenes(db, config, log)
+    await mandarResumenes(db, config, callado)
     assert.ok(await enviado())
     assert.ok((await db.query(`SELECT resumen_semanal_enviado FROM usuarios WHERE id_usuario = $1`, [vend.id])).rows[0].resumen_semanal_enviado)
     const suyo = await cifrasVendedor(db, empresa, vend.id)
@@ -138,7 +138,7 @@ describe('resumen diario por correo', () => {
     const { rows: [{ dia }] } = await db.query(`SELECT extract(day FROM now() AT TIME ZONE zona_horaria)::int AS dia FROM empresas WHERE id_empresa = $1`, [empresa])
     if (dia === 1) return // el día 1 nadie va atrasado: el mes no ha empezado
     await db.query(`UPDATE usuarios SET meta_mensual = 100000 WHERE id_usuario = $1`, [vend.id])
-    const despachador = crearDespachador(db, null, { error: () => {} })
+    const despachador = crearDespachador(db, null, callado)
     const avisos = async () => (await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'meta_atrasada' AND id_usuario = $1`, [admin.id])).rows
     await avisarMetasAtrasadas(db, despachador, [dia + 1, 31]) // fuera de los días: nada
     assert.equal((await avisos()).length, 0)
@@ -172,7 +172,7 @@ describe('resumen diario por correo', () => {
     await db.query(`UPDATE pedidos SET estado = 'entregado', metodo_pago = 'efectivo', fecha_entregado_real = date_trunc('month', now()) + interval '12 hours' WHERE id_pedido = $1`, [p.id])
     // La meta deja los $180 en el 60% del ritmo: con umbral 50% no va atrasado; con 90%, sí.
     await db.query(`UPDATE usuarios SET meta_mensual = $2 WHERE id_usuario = $1`, [vend.id, Math.round(180 / (avance * 0.6))])
-    const despachador = crearDespachador(db, null, { error: () => {} })
+    const despachador = crearDespachador(db, null, callado)
     const avisos = async () => (await db.query(`SELECT 1 FROM notificaciones WHERE tipo = 'meta_atrasada' AND id_usuario = $1`, [admin.id])).rowCount
     await avisarMetasAtrasadas(db, despachador, [1, 31])
     assert.equal(await avisos(), 0)
@@ -185,7 +185,7 @@ describe('resumen diario por correo', () => {
     const empresa = await crearEmpresa()
     const admin = await sesion('administrador', 'tel-a', empresa)
     const vend = await sesion('vendedor', 'tel-v', empresa)
-    const despachador = crearDespachador(db, null, { error: () => {} })
+    const despachador = crearDespachador(db, null, callado)
     await db.query(`UPDATE usuarios SET meta_mensual = 150 WHERE id_usuario = $1`, [vend.id])
     assert.equal(await felicitarMeta(db, despachador, vend.id), false) // sin ventas
     const s = { id: randomUUID(), sabor: 'Nuez', descripcion: '', presentacion: 1, precio_litro: 60, costo_litro: 20, color_hex: '#a16207', disponible: true }
@@ -269,7 +269,7 @@ describe('resumen diario por correo', () => {
     assert.ok((await ver(admin)).json().mejorRacha >= 2)
 
     // Al final del mes, si este mes todavía no llega, se le avisa que su racha está en riesgo, una vez.
-    const despachador = crearDespachador(db, null, { error: () => {} })
+    const despachador = crearDespachador(db, null, callado)
     const avisos = async () => (await db.query(`SELECT cuerpo, datos FROM notificaciones WHERE tipo = 'racha_en_riesgo' AND id_usuario = $1`, [vend.id])).rows
     await avisarRachasEnRiesgo(db, despachador, [1, 31]) // sin meta este mes: nada
     assert.equal((await avisos()).length, 0)
@@ -290,8 +290,8 @@ describe('resumen diario por correo', () => {
                     VALUES ($2, date_trunc('year', now()) - interval '1 year' + interval '2 month', 'cerrado', $1, now(), '[]')
                     ON CONFLICT (id_empresa, mes) DO NOTHING`,
       [JSON.stringify({ ventas: { ingreso: 5000 }, vendedores: [{ id: vend.id, nombre: 'Beto', ventas: 5000, meta: 1000, cumplimientoPct: 500 }] }), empresa])
-    await mandarResumenAnual(db, config, despachador, log, true)
-    await mandarResumenAnual(db, config, despachador, log, true)
+    await mandarResumenAnual(db, config, despachador, callado, true)
+    await mandarResumenAnual(db, config, despachador, callado, true)
     const a = await anuales()
     assert.equal(a.length, 1)
     assert.match(a[0].titulo, /^Tu \d{4} en números$/)

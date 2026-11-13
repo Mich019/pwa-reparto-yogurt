@@ -194,11 +194,22 @@ export async function rutasEnvases(app: FastifyInstance, { db, config }: Context
     }
   })
 
+  // Un «Recoger» equivocado se deshace (sólo el administrador, desde la hoja de envases del cliente). Si el corte de ese
+  // día ya se confirmó, sus envases quedaron congelados: primero hay que reabrirlo, igual que con un abono en efectivo.
   app.post('/envases/recogidas/:id/anular', { preHandler: requiereAdmin }, async (req, rep) => {
     const p = idParam.safeParse(req.params)
     if (!p.success) return rep.code(400).send({ error: 'Registro no válido' })
-    const { rowCount } = await db.query(`UPDATE envases_recogidos SET anulado_en = now() WHERE id_recogida = $1 AND anulado_en IS NULL`, [p.data.id])
-    if (!rowCount) return rep.code(404).send({ error: 'Ese registro no existe o ya está anulado' })
-    return { ok: true }
+    try {
+      await tx(db, req.usuario.id, async (c) => {
+        const { rows: [r] } = await c.query(`SELECT fecha::text, id_vendedor, anulado_en FROM envases_recogidos WHERE id_recogida = $1 FOR UPDATE`, [p.data.id])
+        if (!r || r.anulado_en) throw new Falla(404, 'Ese registro no existe o ya está anulado')
+        const { rows: [k] } = await c.query(`SELECT 1 FROM cortes_dia WHERE fecha = $1 AND id_vendedor = $2 AND estado = 'confirmado' FOR SHARE`, [r.fecha, r.id_vendedor])
+        if (k) throw new Falla(409, 'El corte de ese día ya está confirmado: reábrelo primero en Finanzas → Cortes del día')
+        await c.query(`UPDATE envases_recogidos SET anulado_en = now() WHERE id_recogida = $1`, [p.data.id])
+      })
+      return { ok: true }
+    } catch (e) {
+      return responder(rep, e)
+    }
   })
 }

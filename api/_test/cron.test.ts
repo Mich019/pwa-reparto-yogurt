@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, describe, it } from 'node:test'
 import { construirApp } from '../_lib/app.js'
+import { callado } from '../_lib/bitacora.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { avisarPruebasPorVencer } from '../_lib/plataforma.js'
 import { app, config, crearEmpresa, db, sesion } from './ayuda.js'
@@ -43,7 +44,7 @@ describe('cron de avisos', () => {
     const vend = await sesion('vendedor', 'tel-v', vence)
     const otro = await sesion('administrador', 'tel-b', paga)
     // El despachador del cron corre como dueño de la base, sin empresa en alcance.
-    await avisarPruebasPorVencer(db, config, crearDespachador(db, null, { error: () => {} }))
+    await avisarPruebasPorVencer(db, config, crearDespachador(db, null, callado))
     const { rows } = await db.query(`SELECT id_usuario, id_empresa, titulo, datos FROM notificaciones WHERE tipo = 'prueba_por_vencer' AND id_usuario = ANY($1::uuid[])`, [[admin.id, vend.id, otro.id]])
     assert.equal(rows.length, 1)
     assert.equal(rows[0].id_usuario, admin.id)

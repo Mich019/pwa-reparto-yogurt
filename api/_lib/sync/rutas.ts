@@ -54,7 +54,7 @@ export async function rutasSync(
     }
     // Ventas nuevas del vendedor: ¿llegó a su meta del mes? (resumen.ts). No detiene la respuesta si falla.
     if (req.usuario.rol === 'vendedor' && body.data.operaciones.some((o, i) => o.tabla === 'pedidos' && resultados[i]?.estado === 'aplicada')) {
-      await felicitarMeta(db, despachador, req.usuario.id).catch((e) => req.log.error(e, 'No se pudo revisar la meta del vendedor'))
+      await felicitarMeta(db, despachador, req.usuario.id).catch((err) => req.log.error({ err }, 'sync: no se pudo revisar la meta del vendedor'))
     }
     return { ahora: ahoraMs, resultados }
   })

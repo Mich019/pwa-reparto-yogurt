@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CloudOff, LogOut, RefreshCw, Settings, ShieldAlert, Smartphone } from 'lucide-react'
+import { CloudOff, LogOut, Settings, ShieldAlert, Smartphone } from 'lucide-react'
 import { PESTANAS, useMenu, type SeccionAdmin } from './menu'
-import { hace } from '../../lib/fechas'
 import { alCerrarSesion, cerrarSesion, refrescarPerfil, useSesion } from '../../lib/sesion'
 import { quitarEsteTelefono, renovarSuscripcion } from '../../lib/push'
 import { iniciarSincronizacionAutomatica, useEstadoSync } from '../../lib/sync'

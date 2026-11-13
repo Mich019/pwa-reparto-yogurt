@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { construirApp } from '../_lib/app.js'
 import { app, cliente, config, crearEmpresa, db, op, push, sesion } from './ayuda.js'

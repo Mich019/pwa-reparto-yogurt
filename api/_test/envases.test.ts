@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { after, describe, it } from 'node:test'
 import { hoyEn } from '../_lib/fechas.js'
 import { avisarEnvasesAtrasados } from '../_lib/envases.js'
+import { callado } from '../_lib/bitacora.js'
 import { crearDespachador } from '../_lib/notificaciones.js'
 import { app, cliente, config, crearEmpresa, db, op, pedido, pull, push, sesion } from './ayuda.js'
 
@@ -72,6 +73,20 @@ describe('envases retornables', () => {
     assert.equal((await llamar(x.ana, 'POST', `/envases/recogidas/${r.id}/anular`)).status, 403)
     assert.equal((await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)).status, 200)
     assert.equal((await llamar(x.admin, 'GET', '/envases')).body.total, 2)
+    assert.equal((await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)).status, 404) // ya anulada
+  })
+
+  it('no se anula una recogida de un día con el corte ya confirmado', async () => {
+    const x = await escenario()
+    await x.entrega(x.garrafon, 3)
+    const { body: r } = await llamar(x.ana, 'POST', '/envases/recogidas', { clienteId: x.c.id, productoId: x.garrafon.id, cantidad: 2 })
+    const { body: k } = await llamar(x.ana, 'POST', '/cortes', { efectivoEntregado: 0, envasesEntregados: 2 })
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${k.id}/confirmar`)).status, 200)
+    const no = await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)
+    assert.equal(no.status, 409)
+    assert.match(no.body.error, /reábrelo/)
+    assert.equal((await llamar(x.admin, 'POST', `/cortes/${k.id}/reabrir`, { motivo: 'recogida equivocada' })).status, 200)
+    assert.equal((await llamar(x.admin, 'POST', `/envases/recogidas/${r.id}/anular`)).status, 200)
   })
 
   it('lo recogido hoy por cada quien, sin lo anulado (para «¡Ruta terminada!»)', async () => {
@@ -106,7 +121,7 @@ describe('envases retornables', () => {
     const x = await escenario()
     await x.entrega(x.garrafon, 2)
     await db.query(`UPDATE pedidos SET fecha = fecha - 40 WHERE id_cliente = $1`, [x.c.id])
-    const despachador = crearDespachador(db, null, { error: () => {} })
+    const despachador = crearDespachador(db, null, callado)
     const avisos = async () => (await db.query(`SELECT datos FROM notificaciones WHERE id_usuario = $1 AND tipo = 'envases_atrasados'`, [x.ana.id])).rows
     await avisarEnvasesAtrasados(db, despachador)
     assert.equal((await avisos()).length, 0) // la empresa no lleva la cuenta de envases

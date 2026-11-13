@@ -15,6 +15,7 @@ export const NOVEDADES: Novedad[] = [
     puntos: [
       { texto: 'Las gráficas de ventas ahora pueden ser de línea con puntos o de barras: lo eliges en Configuración → Apariencia → «Estilo de las gráficas», viendo cómo queda cada una. Se guarda en tu cuenta.', para: 'administrador', donde: 'panel' },
       { texto: 'En «Ventas por día» del Resumen, una línea gris muestra los mismos días de hace un año (y cuánto subiste o bajaste), y el mejor día lleva su monto escrito.', para: 'administrador', donde: 'panel' },
+      { texto: 'Si alguien registró envases recogidos por error, ábrelos desde la ficha del cliente: en «Últimas recogidas» tócale «Anular» y vuelven a contar como prestados. Si el corte de ese día ya está confirmado, primero hay que reabrirlo.', para: 'administrador', guia: 'envases' },
     ],
   },
   {

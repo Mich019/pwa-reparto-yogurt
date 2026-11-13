@@ -11,7 +11,7 @@ export function crearPool(conexion: string | pg.PoolConfig): Db {
   const pool = new pg.Pool(typeof conexion === 'string' ? { connectionString: conexion, max: 10 } : conexion)
   // Si la base o su proxy cortan una conexión ociosa (reinicio, mantenimiento), el pool la descarta y abre otra.
   // Sin este manejador, ese error tumbaría el proceso.
-  pool.on('error', (e) => console.error('Conexión a la base perdida (se abrirá otra):', e.message))
+  pool.on('error', (e) => console.error('db: conexión perdida, se abrirá otra:', e.message))
   return pool
 }
 
@@ -35,11 +35,6 @@ export function fijarEmpresa(id: string) {
   if (a) a.empresa = id
 }
 export const empresaActual = () => alcance.getStore()?.empresa ?? null
-// Para trabajo fuera de una petición (scripts, pruebas): todo lo de `fn` corre dentro de esa empresa.
-export const enEmpresa = <T>(id: string, fn: () => T): T => {
-  if (!UUID.test(id)) throw new Error('Empresa no válida')
-  return alcance.run({ empresa: id }, fn)
-}
 
 // Dentro de una transacción ya abierta: el rol sin privilegios y la empresa, válidos hasta el COMMIT. El id ya se
 // validó como UUID, así que va directo en el texto (una sola vuelta a la base en lugar de dos).

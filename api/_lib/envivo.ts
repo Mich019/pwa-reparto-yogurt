@@ -80,7 +80,7 @@ export async function rutasEnVivo(app: FastifyInstance, db: Db, { requiereSesion
           ultimoEnvio = Date.now()
         }
       } catch (e) {
-        req.log.error(e, 'No se pudieron leer los cambios en vivo')
+        req.log.error({ err: e }, 'en vivo: no se pudieron leer los cambios')
         terminar('otra-vez')
       } finally {
         ocupado = false

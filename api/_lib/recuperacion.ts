@@ -65,7 +65,7 @@ export async function rutasRecuperacion(app: FastifyInstance, { db, config }: Co
       await mandarCodigo(body.data.correo, ipCliente(req, config), req.log)
     } catch (e) {
       // Un error tampoco cambia la respuesta: decir «no se pudo enviar» revelaría que la cuenta existe.
-      req.log.error(e, 'no se pudo preparar o enviar el correo de recuperación')
+      req.log.error({ err: e }, 'recuperación: no se pudo preparar o enviar el correo')
     }
     await esperarHasta(listo)
     return { ok: true, minutos: config.recuperacionMinutos }
