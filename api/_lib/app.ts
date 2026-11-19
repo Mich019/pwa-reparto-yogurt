@@ -14,6 +14,7 @@ import { rutasDosPasos } from './dosPasos.js'
 import { CABECERA_APP, leerCookie } from './cookies.js'
 import { rutasStock } from './stock.js'
 import { rutasCobranza } from './cobranza.js'
+import { rutasBitacoraCambios } from './bitacoraCambios.js'
 import { rutasEnvases } from './envases.js'
 import { rutasPrecios } from './precios.js'
 import { rutasCortes } from './cortes.js'
@@ -134,7 +135,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
     )
     if (!rows[0]) return rep.code(401).send({ error: 'Sesión inválida o vencida', codigo: 'SESION_INVALIDA' })
     if (!rows[0].empresa_activa) return rep.code(403).send({ error: 'La cuenta de tu empresa está suspendida.', codigo: 'EMPRESA_SUSPENDIDA' })
-    fijarEmpresa(rows[0].id_empresa) // desde aquí, todo lo de esta petición corre dentro de su empresa
+    fijarEmpresa(rows[0].id_empresa, rows[0].id_usuario) // desde aquí, todo lo de esta petición corre dentro de su empresa
     req.usuario = { id: rows[0].id_usuario, rol: rows[0].rol, sid: payload.sid, debeCambiarPassword: rows[0].debe_cambiar_password, empresa: rows[0].id_empresa }
     if (rows[0].debe_cambiar_password && !opciones.passwordPendiente) {
       return rep.code(403).send({ error: 'Debes cambiar tu contraseña antes de continuar', codigo: 'CAMBIAR_PASSWORD' })
@@ -183,6 +184,7 @@ export async function construirApp(entrada: Contexto): Promise<FastifyInstance> 
   await rutasCobranza(app, ctx, { requiereSesion, requiereAdmin })
   await rutasEnvases(app, ctx, { requiereSesion, requiereAdmin })
   await rutasPrecios(app, ctx, { requiereAdmin })
+  await rutasBitacoraCambios(app, ctx, { requiereAdmin })
   await rutasCortes(app, ctx, { requiereSesion, requiereAdmin }, despachador)
   await rutasNotificaciones(app, ctx, { requiereSesion, requiereAdmin }, despachador, enviador)
   // Los urgentes sin atender cruzan empresas: con la conexión del dueño, como el cron.

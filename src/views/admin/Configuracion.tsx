@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { EsqueletoLista, type EstadoListo, Listo, MarcaGuardado, Ocupado, useListo } from '../../components/Esqueleto'
-import { Bell, BellRing, BellOff, CreditCard, GripVertical, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
+import { Bell, BellRing, BellOff, CreditCard, GripVertical, History, KeyRound, LifeBuoy, LockKeyhole, Monitor, Moon, Palette, ShieldCheck, Sun, SwatchBook, UserRound } from 'lucide-react'
 import { ErrorApi } from '../../lib/api'
 import { elegirFondo, elegirGraficas, elegirTema, elegirTexto, guardarPerfil, llamarAutenticado, useSesion } from '../../lib/sesion'
 import { cambiarPreferencias, usePreferenciasPanel, usePreferenciaTema, type EstiloGraficas, type Fondo, type PreferenciaTema, type TamanoTexto, COLOR_FONDO } from '../../lib/tema'
@@ -22,6 +22,7 @@ import { Selector } from '../../components/Selector'
 import { cargarEquipo, useEquipo } from '../../lib/equipo'
 import { prepararLogo } from '../../lib/logo'
 import { PadFirma } from '../../components/PadFirma'
+import { BitacoraCambios } from './BitacoraCambios'
 
 // Configuración del panel, en apartados con su menú al lado (arriba en el teléfono): la cuenta (perfil y actividad), su
 // seguridad (contraseña, dos pasos, sesiones abiertas), la marca de la empresa, la suscripción y la apariencia (de este
@@ -36,7 +37,7 @@ const fechaHora = (s: string | null) => (s ? new Date(s).toLocaleString('es-MX',
 // Secciones del panel a las que puede llevar el «Ir a…» de una guía (las demás son apartados de aquí).
 const SECCIONES_PANEL = ['resumen', 'equipo', 'clientes', 'produccion', 'sabores', 'reportes']
 
-export type ApartadoConfig = 'cuenta' | 'seguridad' | 'preferencias' | 'marca' | 'suscripcion' | 'privacidad' | 'apariencia' | 'ayuda'
+export type ApartadoConfig = 'cuenta' | 'seguridad' | 'preferencias' | 'marca' | 'suscripcion' | 'privacidad' | 'bitacora' | 'apariencia' | 'ayuda'
 export interface ApartadoExtra { id: string; texto: string; ayuda: string; icono: typeof Sun; contenido: ReactNode }
 
 const TEMAS: { valor: PreferenciaTema; texto: string; ayuda: string; icono: typeof Sun }[] = [
@@ -134,6 +135,7 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
     ...(suscripcion && !plataforma ? [{ id: 'suscripcion', texto: 'Suscripción', ayuda: 'Tu plan y el pago', icono: CreditCard }] : []),
     ...extra,
     { id: 'privacidad', texto: 'Privacidad y datos', ayuda: 'Descargar, eliminar, avisos', icono: LockKeyhole },
+    ...(!plataforma && u?.rol === 'administrador' ? [{ id: 'bitacora', texto: 'Bitácora', ayuda: 'Quién cambió qué', icono: History }] : []),
     { id: 'apariencia', texto: 'Apariencia', ayuda: plataforma ? 'Tema, gráficas y texto' : 'Tema, gráficas y orden del menú', icono: Palette },
     ...(plataforma ? [] : [{ id: 'ayuda', texto: 'Ayuda', ayuda: 'Guías paso a paso', icono: LifeBuoy }]),
   ]
@@ -194,6 +196,11 @@ export function Configuracion({ inicial = 'cuenta', plataforma = false, extra = 
           {visible === 'privacidad' && (
             <Seccion id="privacidad" titulo="Privacidad y datos" descripcion={plataforma ? 'Tus datos de esta cuenta y los documentos del servicio.' : 'Tus derechos sobre tus datos (ARCO): verlos, descargarlos y eliminarlos, sin pedírselo a nadie.'}>
               <PrivacidadYDatos plataforma={plataforma} />
+            </Seccion>
+          )}
+          {visible === 'bitacora' && (
+            <Seccion id="bitacora" titulo="Bitácora de cambios" descripcion="Quién cambió qué en tu empresa. Leve es lo de todos los días; moderado, lo que cambia precios, metas o reglas; alto, lo que deshace algo o abre una puerta (anular, reabrir, borrar, cambiar roles). Revisa sobre todo lo alto.">
+              <BitacoraCambios />
             </Seccion>
           )}
           {visible === 'apariencia' && <Apariencia plataforma={plataforma} />}

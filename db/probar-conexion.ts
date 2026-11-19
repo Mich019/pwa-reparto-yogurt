@@ -88,7 +88,8 @@ try {
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'tema') AS m041,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'tamano_texto') AS m042,
               EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cortes_dia' AND column_name = 'envases_entregados') AS m045,
-              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'graficas') AS m046`,
+              EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuarios' AND column_name = 'graficas') AS m046,
+              EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'abonos_auditoria') AS m047`,
     )
     const faltan = Object.entries(m).filter(([, ok]) => !ok).map(([k]) => k.slice(1))
     console.log(faltan.length ? `✗ Esquema creado, pero faltan migraciones (${faltan.join(', ')}): npm run db:migrar` : '✓ Esquema y migraciones al día')

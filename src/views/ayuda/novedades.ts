@@ -11,6 +11,12 @@ export interface Novedad { fecha: string; titulo: string; puntos: PuntoNovedad[]
 
 export const NOVEDADES: Novedad[] = [
   {
+    fecha: '2026-11-18', titulo: 'Bitácora de cambios',
+    puntos: [
+      { texto: 'En Configuración → «Bitácora» ves quién cambió qué en tu empresa: precios, metas, límites de fiado, cortes, cierres de mes, cuentas y más. Cada cambio trae su nivel (leve, moderado o alto) para que veas primero lo que pide atención; con «Lo más serio primero» lo ordenas así.', para: 'administrador', donde: 'panel' },
+    ],
+  },
+  {
     fecha: '2026-11-13', titulo: 'Gráficas a tu gusto',
     puntos: [
       { texto: 'Las gráficas de ventas ahora pueden ser de línea con puntos o de barras: lo eliges en Configuración → Apariencia → «Estilo de las gráficas», viendo cómo queda cada una. Se guarda en tu cuenta.', para: 'administrador', donde: 'panel' },

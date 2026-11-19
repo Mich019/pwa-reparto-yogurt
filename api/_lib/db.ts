@@ -25,20 +25,24 @@ export function crearPool(conexion: string | pg.PoolConfig): Db {
 export const ROL_APP = 'reparto_app'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const alcance = new AsyncLocalStorage<{ empresa: string | null }>()
+const alcance = new AsyncLocalStorage<{ empresa: string | null; usuario?: string }>()
 
 // Abre el alcance de una petición (hook onRequest de app.ts); la empresa se fija al validar la sesión.
 export const conAlcance = (fn: () => void) => alcance.run({ empresa: null }, fn)
-export function fijarEmpresa(id: string) {
-  if (!UUID.test(id)) throw new Error('Empresa no válida')
+// `usuario`: quien hace la petición; queda en app.id_usuario de cada escritura para la bitácora (fn_auditar).
+export function fijarEmpresa(id: string, usuario?: string) {
+  if (!UUID.test(id) || (usuario && !UUID.test(usuario))) throw new Error('Empresa no válida')
   const a = alcance.getStore()
-  if (a) a.empresa = id
+  if (a) Object.assign(a, { empresa: id, usuario })
 }
 export const empresaActual = () => alcance.getStore()?.empresa ?? null
 
-// Dentro de una transacción ya abierta: el rol sin privilegios y la empresa, válidos hasta el COMMIT. El id ya se
-// validó como UUID, así que va directo en el texto (una sola vuelta a la base en lugar de dos).
-const entrar = (empresa: string) => `SET LOCAL ROLE ${ROL_APP}; SELECT set_config('app.id_empresa', '${empresa}', true)`
+// Dentro de una transacción ya abierta: el rol sin privilegios, la empresa y quién (para la bitácora), válidos hasta
+// el COMMIT. Los ids ya se validaron como UUID, así que van directo en el texto (una sola vuelta a la base).
+const entrar = (empresa: string) => {
+  const usuario = alcance.getStore()?.usuario
+  return `SET LOCAL ROLE ${ROL_APP}; SELECT set_config('app.id_empresa', '${empresa}', true)${usuario ? `, set_config('app.id_usuario', '${usuario}', true)` : ''}`
+}
 
 // La conexión que usa la API: igual que el pool, salvo que con una empresa en el alcance cada consulta suelta corre en
 // su propia transacción dentro de esa empresa. tx() hace lo mismo para las transacciones.
